@@ -2,7 +2,7 @@
   The essence editor's IDENTITY tab: icon, name, description, colour palette and the Enabled row.
 
   THE COLOUR PALETTE IS INLINE AND HAS A NO-COLOUR CELL, rendered through
-  `ManagerColorPopover`'s gated `layout="inline"` with `allowNone`, because an inline palette
+  `TintPicker`'s gated `layout="inline"` with `allowNone`, because an inline palette
   without that cell is a one-way door: once a colour is chosen there is no route back to the accent
   default. Both props are off by default, so the biome popover and the modifier picker are
   untouched. Unset is a FIRST-CLASS state, not a failure — an essence with no colour renders in the
@@ -14,7 +14,7 @@
 <script>
   import Field from '../../../components/Field.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -72,6 +72,7 @@
              is invisible until the tile is hovered or the button takes keyboard focus —
              `:focus-visible` keeps it reachable without a pointer. -->
         <div class="manager-essence-icon-tile">
+          <!-- ratchet-exempt(design-system): a 124px preview of the GM's colour and icon choice, not a record tile; the art ladder's 38 would shrink it to a speck -->
           <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
           <IconButton
             class="manager-essence-icon-reset"
@@ -88,7 +89,7 @@
           <IconPicker
             value={icon}
             disabled={saving}
-            buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
             onChange={(iconClass) => onIconChange(iconClass)}
           />
         </div>
@@ -149,7 +150,7 @@
         )}</span
       >
     </div>
-    <ManagerColorPopover
+    <TintPicker
       layout="inline"
       allowNone
       allowCustom={false}
@@ -196,7 +197,7 @@
     disabled={saving}
     section="enabled"
     field="essence-enabled"
-    subAttr="data-essence-enabled-state"
+    subDataAttr="data-essence-enabled-state"
     toggleLabel={enabled !== false
       ? text('FABRICATE.Admin.Manager.Essence.DisableThis', 'Disable this essence')
       : text('FABRICATE.Admin.Manager.Essence.EnableThis', 'Enable this essence')}
@@ -241,11 +242,11 @@
      tile. Specificity is unchanged, because Svelte compiles a scoped descendant with `:where()`. */
   .manager-essence-icon-tile :global(.manager-essence-icon-reset) {
     position: absolute;
-    top: var(--fab-space-1);
-    right: var(--fab-space-1);
+    top: 4px;
+    right: 4px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 120ms ease;
+    transition: opacity var(--fab-motion-control);
   }
 
   .manager-essence-icon-tile:hover :global(.manager-essence-icon-reset),

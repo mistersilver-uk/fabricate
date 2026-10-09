@@ -10,22 +10,29 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_TARGET_RAW_MODULES,
+  GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 let tempRoot;
 let GatheringView;
 let GatheringTaskRow;
+let GatheringEventRow;
 let GatheringTaskDetail;
 let mounted;
 let target;
-
 
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
@@ -33,7 +40,7 @@ function writeCompiledSvelte(sourcePath) {
     filename: sourcePath,
     generate: 'client',
     dev: true,
-    css: 'injected'
+    css: 'injected',
   });
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
@@ -49,7 +56,7 @@ function taskModel(overrides = {}) {
     attemptable: true,
     blockedReasons: [],
     successChance: 0.5,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -66,10 +73,12 @@ function environment(overrides = {}) {
     attemptable: true,
     discoveredTaskCount: 0,
     composedTaskCount: 0,
-    biomeTags: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }],
+    biomeTags: [
+      { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+    ],
     tasks: [taskModel()],
     discoveredTasks: [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -79,21 +88,46 @@ function dropBreakdown() {
     awardMode: 'allDrops',
     awardLimit: 1,
     eventPolicy: 'successWithEvent',
-    drops: [{
-      id: 'd-ore',
-      name: 'Raw Ore',
-      img: 'icons/ore.webp',
-      componentId: 'ore',
-      quantity: 2,
-      baseChance: 0.4,
-      finalChance: 0.53,
-      modifiers: {
-        weather: { conditionId: 'rain', value: 10 },
-        timeOfDay: { conditionId: 'night', value: -5 },
-        biome: { value: 0 },
-        character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }]
-      }
-    }]
+    drops: [
+      {
+        id: 'd-ore',
+        name: 'Raw Ore',
+        img: 'icons/ore.webp',
+        componentId: 'ore',
+        quantity: 2,
+        baseChance: 0.4,
+        finalChance: 0.53,
+        modifiers: {
+          weather: { conditionId: 'rain', value: 10 },
+          timeOfDay: { conditionId: 'night', value: -5 },
+          biome: { value: 0 },
+          character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }],
+        },
+      },
+    ],
+  };
+}
+
+/** Authored rarest-first, so authored order and chance order disagree on every row. */
+function scrambledBreakdown(awardMode) {
+  const drop = (id, name, quantity, chance, modifiers = {}) => ({
+    id,
+    name,
+    quantity,
+    baseChance: chance,
+    finalChance: chance,
+    modifiers,
+  });
+  return {
+    successChance: 0.95,
+    awardMode,
+    awardLimit: 2,
+    eventPolicy: null,
+    drops: [
+      drop('d-rare', 'Starsilver', 1, 0.1),
+      drop('d-common', 'Slag', 3, 0.9),
+      drop('d-mid', 'Iron', 2, 0.45, { weather: { value: -5 } }),
+    ],
   };
 }
 
@@ -101,7 +135,7 @@ function listing(environments) {
   return {
     visible: true,
     selectedActorId: 'Actor.actor-1',
-    environments
+    environments,
   };
 }
 
@@ -118,8 +152,10 @@ function makeServices(result, dropBreakdown = null) {
     },
     getGatheringDropBreakdown: (opts) => {
       calls.dropBreakdown.push(opts);
-      return Promise.resolve(dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, eventPolicy: null });
-    }
+      return Promise.resolve(
+        dropBreakdown ?? { drops: [], awardMode: null, awardLimit: 1, eventPolicy: null }
+      );
+    },
   };
   return { services, calls };
 }
@@ -143,13 +179,38 @@ async function settle() {
 
 // Mount the task ROW / task DETAIL components directly (issue 301 exhausted-node
 // assertions), reusing this suite's compiled-component harness.
-async function renderRow(props = {}) {
+async function renderRow(props = {}, component = GatheringTaskRow) {
   target = document.createElement('div');
   document.body.appendChild(target);
-  mounted = mount(GatheringTaskRow, { target, props });
+  mounted = mount(component, { target, props });
   flushSync();
   await tick();
   flushSync();
+}
+
+/** The elements a list-row control's `aria-describedby` names, in order. */
+function describedBy(control) {
+  return control
+    .getAttribute('aria-describedby')
+    .split(' ')
+    .map((id) => globalThis.document.querySelector(`[id="${id}"]`));
+}
+
+/** The caption an aside's chance draws left of its track: the text and what follows it. */
+function chanceCaption(aside) {
+  const caption = aside.querySelector(':scope > div > [aria-hidden="true"]:first-child');
+  return {
+    text: caption?.textContent,
+    nextRole: caption?.nextElementSibling?.getAttribute('role'),
+    inMeter: Boolean(aside.querySelector('[role="meter"] .fab-kicker')),
+  };
+}
+
+/** The block content inside a list-row control, which a native button may not hold. */
+function nonPhrasingIn(control) {
+  return [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) =>
+    node.tagName.toLowerCase()
+  );
 }
 
 async function renderDetail(props = {}) {
@@ -159,6 +220,29 @@ async function renderDetail(props = {}) {
   flushSync();
   await tick();
   flushSync();
+}
+
+// A disabled start action is named by its visible label and described by visible reason text.
+function assertDescribedBlocker(button, { label, reason }) {
+  assert.ok(button.disabled, 'the start action is disabled');
+  const name = button.getAttribute('aria-label') ?? button.textContent;
+  assert.ok(name.includes(label), `its accessible name keeps its visible label ${label}`);
+  const ids = (button.getAttribute('aria-describedby') || '').split(/\s+/u).filter(Boolean);
+  const described = ids
+    .map((id) => globalThis.document.querySelector(`[id="${id}"]`))
+    .filter(Boolean);
+  assert.ok(described.length > 0, 'it is described by an element in the document');
+  assert.ok(
+    described.some((el) => el.textContent.includes(reason)),
+    `its description names ${reason}`
+  );
+  for (const el of described) {
+    assert.ok(
+      !el.closest('.visually-hidden, [hidden], [aria-hidden="true"]'),
+      'the reason is visible text'
+    );
+  }
+  return described;
 }
 
 // Switch the center column to a given tab ('tasks' | 'events').
@@ -175,8 +259,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     globalThis.game = {
       i18n: {
         localize: (key) => key,
-        format: (key, data) => `${key}:${JSON.stringify(data)}`
-      }
+        format: (key, data) => `${key}:${JSON.stringify(data)}`,
+      },
     };
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-gathering-detail-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
@@ -185,9 +269,20 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // compiled tree imports but the temp tree lacks CANCELS this suite.
     const reasonsDestination = join(tempRoot, 'src/ui/svelte/util/journalRunReasons.js');
     mkdirSync(dirname(reasonsDestination), { recursive: true });
-    writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
+    writeFileSync(
+      reasonsDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8')
+    );
 
-    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) {
+    // Issue 2008: GatheringView words an additional-dice notice through the prompt presenter.
+    for (const modulePath of [
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+      ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+      ...CHECK_TARGET_RAW_MODULES,
+      'src/systems/countEvaluation.js',
+      'src/utils/fillPlaceholders.js',
+    ]) {
       const utilDestination = join(tempRoot, modulePath);
       mkdirSync(dirname(utilDestination), { recursive: true });
       writeFileSync(utilDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
@@ -195,12 +290,24 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
     mkdirSync(dirname(imageDefaultsDestination), { recursive: true });
-    writeFileSync(imageDefaultsDestination, readFileSync(resolve(repoRoot, 'src/gatheringImageDefaults.js'), 'utf8'));
+    writeFileSync(
+      imageDefaultsDestination,
+      readFileSync(resolve(repoRoot, 'src/gatheringImageDefaults.js'), 'utf8')
+    );
 
-    const conditionIconsDestination = join(tempRoot, 'src/ui/svelte/util/gatheringConditionIcons.js');
-    writeFileSync(conditionIconsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringConditionIcons.js'), 'utf8'));
+    const conditionIconsDestination = join(
+      tempRoot,
+      'src/ui/svelte/util/gatheringConditionIcons.js'
+    );
+    writeFileSync(
+      conditionIconsDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringConditionIcons.js'), 'utf8')
+    );
 
-    const selectionDefaultDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js');
+    const selectionDefaultDestination = join(
+      tempRoot,
+      'src/ui/svelte/apps/gathering/selectionDefault.js'
+    );
     mkdirSync(dirname(selectionDefaultDestination), { recursive: true });
     writeFileSync(
       selectionDefaultDestination,
@@ -208,7 +315,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
 
     // GatheringView also imports the pure scoped-selection helper.
-    const scopedSelectionDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js');
+    const scopedSelectionDestination = join(
+      tempRoot,
+      'src/ui/svelte/apps/gathering/scopedSelection.js'
+    );
     writeFileSync(
       scopedSelectionDestination,
       readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js'), 'utf8')
@@ -217,40 +327,80 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // LinkedScene imports the scene-image helper; copy it into the temp tree.
     const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });
-    writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
+    writeFileSync(
+      sceneImagesDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8')
+    );
+    // The linked-scene image the environment card and the centre header share (issue 1518).
+    const linkedSceneImage = 'src/ui/svelte/apps/gathering/linkedSceneImage.js';
+    mkdirSync(dirname(join(tempRoot, linkedSceneImage)), { recursive: true });
+    writeFileSync(
+      join(tempRoot, linkedSceneImage),
+      readFileSync(resolve(repoRoot, linkedSceneImage), 'utf8')
+    );
 
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which in turn imports the pure foundryCalendar helpers; copy
     // both into the temp tree so the dynamic import resolves.
     const formatDurationDestination = join(tempRoot, 'src/ui/svelte/util/formatDuration.js');
-    writeFileSync(formatDurationDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/formatDuration.js'), 'utf8'));
+    writeFileSync(
+      formatDurationDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/formatDuration.js'), 'utf8')
+    );
     const foundryCalendarDestination = join(tempRoot, 'src/systems/foundryCalendar.js');
     mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
-    writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
+    writeFileSync(
+      foundryCalendarDestination,
+      readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8')
+    );
 
     // GatheringView routes its crafting-data subscription through the invalidation-domain
     // taxonomy (issue 1078 part B1). The module imports nothing, so this one entry closes the
     // graph; omitting it HANGS this suite (# cancelled) rather than failing it.
     const invalidationDomainsDestination = join(tempRoot, 'src/systems/invalidationDomains.js');
     mkdirSync(dirname(invalidationDomainsDestination), { recursive: true });
-    writeFileSync(invalidationDomainsDestination, readFileSync(resolve(repoRoot, 'src/systems/invalidationDomains.js'), 'utf8'));
+    writeFileSync(
+      invalidationDomainsDestination,
+      readFileSync(resolve(repoRoot, 'src/systems/invalidationDomains.js'), 'utf8')
+    );
 
     // GatheringTaskDetail + GatheringView share the blocked-reason localizer.
-    const blockedReasonsDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
+    const blockedReasonsDestination = join(
+      tempRoot,
+      'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'
+    );
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
-    writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
+    writeFileSync(
+      blockedReasonsDestination,
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'),
+        'utf8'
+      )
+    );
 
     // The gathering presentation helpers (risk/biome/percent/description) shared
     // across the player + manager gathering components.
     const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
-    writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
+    writeFileSync(
+      gatheringFormatDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8')
+    );
 
     const disclosurePhraseDestination = join(tempRoot, 'src/ui/svelte/util/disclosurePhrase.js');
-    writeFileSync(disclosurePhraseDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8'));
+    writeFileSync(
+      disclosurePhraseDestination,
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8')
+    );
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+    // Issue 2053: the attempt buttons record the window a roll prompt opens in.
+    // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
+    for (const rawModule of [
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
+      'src/ui/svelte/util/rollPromptOrigin.js',
+      'src/ui/svelte/util/dropRateTier.js',
+    ]) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -262,38 +412,55 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
-    // primitive `ui-visual-style/spec.md` names. A hand-rolled harness that omits it HANGS
-    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
-    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+    // `ChanceBar` is a single-row `BandedBar` over the shared `FillBar` (issues 1096, 1782). A
+    // hand-rolled harness that omits either HANGS (# cancelled) rather than failing.
+    for (const instrument of [
+      'src/ui/svelte/components/FillBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      writeCompiledSvelte(instrument);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    for (const dropsModule of GATHERING_DROPS_COMPILED_MODULES) writeCompiledSvelte(dropsModule);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
-    GatheringView = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/apps/gathering/GatheringView.svelte.js'
-    )))).default;
-    GatheringTaskRow = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte.js'
-    )))).default;
-    GatheringTaskDetail = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte.js'
-    )))).default;
+    GatheringView = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringView.svelte.js'))
+      )
+    ).default;
+    GatheringTaskRow = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte.js'))
+      )
+    ).default;
+    GatheringEventRow = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringEventRow.svelte.js'))
+      )
+    ).default;
+    GatheringTaskDetail = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte.js'))
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -327,13 +494,20 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const { services } = makeServices(listing([environment()]));
     await mountView(services);
 
-    assert.ok(target.querySelector('[data-gathering-detail-state="selected"]'), 'detail shows the selected env');
+    assert.ok(
+      target.querySelector('[data-gathering-detail-state="selected"]'),
+      'detail shows the selected env'
+    );
     const pips = target.querySelector('[data-gathering-pips]');
     assert.ok(pips, 'info pips render');
     assert.ok(pips.textContent.includes('Forest'), 'biome pip present');
     // Region is no longer a composition/display axis.
     assert.ok(!pips.textContent.includes('Greenvale'), 'no legacy region pip');
-    assert.equal(target.querySelector('.gathering-detail-pip i.fa-map-location-dot'), null, 'region pip icon removed');
+    assert.equal(
+      target.querySelector('.gathering-detail-pip i.fa-map-location-dot'),
+      null,
+      'region pip icon removed'
+    );
     // Danger is localized via the Risk.<value> key (not the raw enum).
     assert.ok(pips.textContent.includes('Risk.safe'), 'danger pip uses the localized risk key');
 
@@ -344,43 +518,159 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(row, 'task row renders');
     assert.equal(row.getAttribute('data-attemptable'), 'true');
     assert.equal(row.getAttribute('data-blocked'), 'false');
-    assert.ok(row.querySelector('[data-gathering-success-value]'), 'success-chance bar present for d100 task');
+    assert.ok(
+      row.querySelector('[data-gathering-success-value]'),
+      'success-chance bar present for d100 task'
+    );
     // The center row is now read-only: no attempt button.
-    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
+    assert.equal(
+      row.querySelector('[data-gathering-attempt]'),
+      null,
+      'center row has no attempt button'
+    );
     const desc = row.querySelector('[data-gathering-task-description]');
-    assert.ok(desc && desc.textContent.includes('Dig for ore.'), 'description renders underneath the row');
+    assert.ok(
+      desc && desc.textContent.includes('Dig for ore.'),
+      'description renders underneath the row'
+    );
     // The attempt action lives in the right-column inspector for the auto-selected task.
-    const inspectorAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
-    assert.ok(inspectorAttempt && !inspectorAttempt.disabled, 'right-column attempt enabled for the attemptable task');
-    assert.equal(inspectorAttempt.querySelector('.fa-ban'), null, 'no ban icon on an attemptable task');
+    const inspectorAttempt = target.querySelector(
+      '[data-gathering-task-detail] [data-gathering-attempt]'
+    );
+    assert.ok(
+      inspectorAttempt && !inspectorAttempt.disabled,
+      'right-column attempt enabled for the attemptable task'
+    );
+    assert.equal(
+      inspectorAttempt.querySelector('.fa-ban'),
+      null,
+      'no ban icon on an attemptable task'
+    );
     assert.equal(inspectorAttempt.getAttribute('data-gathering-attempt-blocked'), 'false');
+    assert.ok(
+      !inspectorAttempt.hasAttribute('aria-describedby'),
+      'an attemptable task is described by no blocker'
+    );
+    assert.ok(
+      !target.querySelector('[data-gathering-attempt-reason]'),
+      'and the inspector states none'
+    );
+  });
+
+  // Issue 1521: the stamina pool is the one fact of an info strip under its own kicker; the node
+  // legend is a muted line after it, and with stamina off no strip renders.
+  it('states the stamina pool as an info strip named by its kicker, the node legend after it', async () => {
+    const env = environment({
+      staminaEnabled: true,
+      nodesEnabled: true,
+      economyMode: 'both',
+      staminaPool: { current: 6, max: 10 },
+    });
+    await mountView(makeServices(listing([env])).services);
+
+    const strip = target.querySelector('.fabricate-info-strip[data-gathering-economy-strip]');
+    assert.ok(Boolean(strip), 'the economy strip is the shared info strip');
+    assert.equal(strip.getAttribute('data-economy-mode'), 'both');
+    const kicker = strip.querySelector('.fab-kicker');
+    assert.equal(kicker.textContent, 'FABRICATE.App.Gathering.Detail.StaminaKicker');
+    const named = document.querySelector(`[id="${strip.getAttribute('aria-labelledby')}"]`);
+    assert.ok(named?.contains(kicker), 'the kicker names the strip');
+    const facts = strip.querySelectorAll('.fabricate-info-strip-fact');
+    assert.equal(facts.length, 1, 'the stamina pool is the only fact');
+    assert.equal(facts[0].getAttribute('data-gathering-stamina-pool'), '');
+    assert.ok(facts[0].querySelector('i.fa-bolt'), 'the pool keeps its glyph');
+    assert.equal(
+      facts[0].querySelector('.fabricate-info-strip-value').textContent,
+      'FABRICATE.App.Gathering.Detail.StaminaPool:{"current":6,"max":10}'
+    );
+    const legend = strip.nextElementSibling;
+    assert.ok(legend.matches('p[data-gathering-nodes-legend]'), 'the legend follows the strip');
+    assert.equal(legend.textContent, 'FABRICATE.App.Gathering.Detail.NodesLegend');
+  });
+
+  it('says a stamina pool is unset inside the strip', async () => {
+    const env = environment({ staminaEnabled: true, economyMode: 'stamina', staminaPool: null });
+    await mountView(makeServices(listing([env])).services);
+    const fact = target.querySelector(
+      ':scope [data-gathering-economy-strip] [data-gathering-stamina-pool]'
+    );
+    assert.equal(fact.getAttribute('data-gathering-stamina-pool'), 'none');
+    assert.equal(fact.textContent.trim(), 'FABRICATE.App.Gathering.Detail.StaminaPoolNone');
+    assert.ok(!target.querySelector('[data-gathering-nodes-legend]'), 'no legend with nodes off');
+  });
+
+  it('stamps the economy strip "none" when the environment states no economy mode', async () => {
+    const env = environment({ staminaEnabled: true, staminaPool: { current: 1, max: 2 } });
+    delete env.economyMode;
+    await mountView(makeServices(listing([env])).services);
+    const strip = target.querySelector('[data-gathering-economy-strip]');
+    assert.equal(strip.getAttribute('data-economy-mode'), 'none');
+  });
+
+  it('draws no strip with stamina off, and the node legend alone as a muted line', async () => {
+    const env = environment({ nodesEnabled: true, economyMode: 'nodes' });
+    await mountView(makeServices(listing([env])).services);
+    assert.ok(!target.querySelector('[data-gathering-economy-strip]'), 'no strip without stamina');
+    assert.ok(!target.querySelector('.fabricate-info-strip'), 'no info strip at all');
+    assert.ok(
+      target
+        .querySelector('[data-gathering-nodes-legend]')
+        .classList.contains('gathering-detail-nodes-legend'),
+      'the legend is its own muted line'
+    );
   });
 
   it('shows a fallback description (center row + inspector) when a task has none', async () => {
-    const { services } = makeServices(listing([environment({ tasks: [taskModel({ id: 'task-nodesc', description: '' })] })]));
+    const { services } = makeServices(
+      listing([environment({ tasks: [taskModel({ id: 'task-nodesc', description: '' })] })])
+    );
     await mountView(services);
 
-    const desc = target.querySelector('[data-task-id="task-nodesc"] [data-gathering-task-description]');
+    const desc = target.querySelector(
+      '[data-task-id="task-nodesc"] [data-gathering-task-description]'
+    );
     assert.ok(desc, 'the description line is always present');
-    assert.ok(desc.classList.contains('is-fallback'), 'center row marks the placeholder as a fallback');
-    assert.ok(desc.textContent.includes('NoTaskDescription'), 'center row shows the localized fallback');
+    assert.ok(
+      desc.classList.contains('is-fallback'),
+      'center row marks the placeholder as a fallback'
+    );
+    assert.ok(
+      desc.textContent.includes('NoTaskDescription'),
+      'center row shows the localized fallback'
+    );
 
-    const panelDesc = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-description');
-    assert.ok(panelDesc.classList.contains('is-fallback'), 'inspector marks the placeholder as a fallback');
-    assert.ok(panelDesc.textContent.includes('NoTaskDescription'), 'inspector shows the localized fallback');
+    const panelDesc = target.querySelector(
+      '[data-gathering-task-detail] .gathering-task-detail-description'
+    );
+    assert.ok(
+      panelDesc.classList.contains('is-fallback'),
+      'inspector marks the placeholder as a fallback'
+    );
+    assert.ok(
+      panelDesc.textContent.includes('NoTaskDescription'),
+      'inspector shows the localized fallback'
+    );
   });
 
-  it('renders the success-chance bar in-line with the right-column Attempt button', async () => {
+  // Issue 1518: one primary per pane, in its identity row.
+  it('leads each pane with one identity row: the task inspector’s holds the Attempt, the centre’s none', async () => {
     const { services } = makeServices(listing([environment()]));
     await mountView(services);
 
-    const action = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action');
-    assert.ok(action, 'the inspector action row renders');
-    assert.ok(action.querySelector('[data-gathering-success-value]'), 'success-chance bar sits in the action row');
-    assert.ok(action.querySelector('[data-gathering-attempt]'), 'attempt button sits in the same action row');
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    assertIdentityHeader(centre, { primaries: 0, name: 'Sunlit Meadow' });
+
+    const inspector = target.querySelector('[data-gathering-task-detail]');
+    const row = assertIdentityHeader(inspector, { primaries: 1, name: 'Gather Iron' });
+    assert.ok(row.querySelector('[data-gathering-attempt]'), 'the one primary is the Attempt');
+    assert.ok(
+      inspector.querySelector('[data-gathering-success-value]'),
+      'the success-chance bar renders'
+    );
+    assert.ok(!row.querySelector('[data-gathering-success-value]'), 'beneath the row, not in it');
   });
 
-  it('renders "What you might find" with per-drop mini bars, award/event hints, and expandable modifiers', async () => {
+  it('renders "What you might find" as one yield scale with its award and event hints', async () => {
     const { services, calls } = makeServices(listing([environment()]), dropBreakdown());
     await mountView(services);
     await settle();
@@ -390,8 +680,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     // The inspector success bar adopts the personalized aggregate from the
     // breakdown (1.0) rather than the listing's base value (0.5).
-    const successBar = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action [data-gathering-success-value]');
-    assert.equal(successBar.getAttribute('data-gathering-success-value'), '100', 'success chance reflects the modifier-adjusted aggregate');
+    const successBar = target.querySelector(
+      '[data-gathering-task-detail] [data-gathering-success-value]'
+    );
+    assert.equal(
+      successBar.getAttribute('data-gathering-success-value'),
+      '100',
+      'success chance reflects the modifier-adjusted aggregate'
+    );
 
     const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
     assert.ok(section, '"What you might find" section renders');
@@ -399,101 +695,175 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
     assert.ok(hints.textContent.includes('EventImpactSuccess'), 'event-impact hint shown');
 
-    const drop = section.querySelector('[data-gathering-drop]');
-    assert.ok(drop, 'a drop row renders');
-    assert.equal(drop.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'), '53');
-    assert.equal(drop.querySelector('[data-gathering-drop-modifiers]'), null, 'modifiers hidden until expanded');
+    const row = section.querySelector(':scope [data-yield-scale] [data-yield-entry="d-ore"]');
+    assert.ok(Boolean(row), 'the drop is a scale row keyed by its drop id');
+    assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Raw Ore');
+    assert.equal(
+      row.querySelector('.fabricate-list-row-quantity').textContent,
+      'FABRICATE.App.Gathering.Detail.DropQuantity:{"x":2}'
+    );
+    assert.equal(row.querySelector('.manager-chip').textContent.trim(), '53%', 'its chance figure');
+    assert.ok(!row.querySelector('.fabricate-list-row-detail'), 'and no inline sentence');
+    assert.ok(
+      !section.querySelector('[data-gathering-drop-modifiers]'),
+      'the breakdown stays closed until opened'
+    );
+  });
 
-    drop.querySelector('.gathering-task-drop-summary').click();
+  // Issue 1644: reward selection is by authored order, so the preview never re-sorts by chance.
+  const DETAIL_TEXT = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8')).FABRICATE
+    .App.Gathering.Detail;
+  const REWARD_HINTS = {
+    allDrops: ['AwardModeAll', /^Every successful find is awarded\.$/u],
+    highestRankedDrop: [
+      'AwardModeHighest',
+      /priority order: the first successful find on the list/u,
+    ],
+    limitedDrops: [
+      'AwardModeLimited',
+      /priority order: the first \{x\} successful finds on the list/u,
+    ],
+  };
+  for (const awardMode of ['allDrops', 'highestRankedDrop', 'limitedDrops']) {
+    it(`keeps the drops in authored row order under ${awardMode}, each chance its own figure`, async () => {
+      const { services } = makeServices(listing([environment()]), scrambledBreakdown(awardMode));
+      await mountView(services);
+      await settle();
+
+      const rows = [
+        ...target.querySelectorAll(':scope [data-gathering-task-detail] [data-yield-entry]'),
+      ];
+      assert.deepEqual(
+        rows.map((row) => row.getAttribute('data-yield-entry')),
+        ['d-rare', 'd-common', 'd-mid'],
+        'authored order, which this fixture makes differ from chance order'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.manager-chip').textContent.trim()),
+        ['10%', '90%', '45%']
+      );
+      assert.ok(!target.querySelector('[data-yield-cut]'), 'a preview draws no cut');
+
+      const [hintKey, english] = REWARD_HINTS[awardMode];
+      const hints = target.querySelector('[data-gathering-drops-hints]').textContent;
+      assert.ok(hints.includes(`FABRICATE.App.Gathering.Detail.${hintKey}`), `the ${hintKey} hint`);
+      assert.match(DETAIL_TEXT[hintKey], english, 'whose English states how the list is read');
+    });
+  }
+
+  it('draws no control in the scale and one labelled disclosure beneath it for the breakdown', async () => {
+    const { services } = makeServices(
+      listing([environment()]),
+      scrambledBreakdown('highestRankedDrop')
+    );
+    await mountView(services);
+    await settle();
+
+    const section = target.querySelector(
+      ':scope [data-gathering-task-detail] [data-gathering-drops]'
+    );
+    const scale = section.querySelector('[data-yield-scale]');
+    assert.equal(scale.querySelectorAll('[data-yield-entry]').length, 3, 'every drop is drawn');
+    assert.equal(
+      scale.querySelectorAll('button, input, select, a, [role="button"], [tabindex]').length,
+      0,
+      'the scale is a record, with no control in it'
+    );
+
+    const toggles = section.querySelectorAll('.fab-row-disclosure');
+    assert.equal(toggles.length, 1, 'one disclosure for the whole breakdown');
+    const toggle = toggles[0];
+    assert.equal(toggle.tagName, 'BUTTON');
+    assert.equal(toggle.getAttribute('data-keyboard-focus'), 'true');
+    assert.ok(toggle.hasAttribute('data-gathering-drops-disclosure'), 'its rest hook lands');
+    assert.ok(!toggle.parentElement.closest('button'), 'it is never inside another button');
+    const order = [...section.querySelectorAll('[data-yield-scale], .fab-row-disclosure')];
+    assert.ok(order[0] === scale && order[1] === toggle, 'it sits beneath the scale');
+    const label = toggle
+      .closest('[data-gathering-drops-breakdown]')
+      .querySelector('[data-gathering-drops-breakdown-label]');
+    assert.equal(label.textContent.trim(), 'FABRICATE.App.Gathering.Detail.ChanceBreakdown');
+    assert.equal(toggle.getAttribute('aria-label'), label.textContent.trim(), 'named for its row');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.ok(!toggle.hasAttribute('aria-controls'), 'a closed breakdown names no region');
+
+    toggle.click();
     flushSync();
-    const modifiers = drop.querySelector('[data-gathering-drop-modifiers]');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    const region = target.querySelector(`[id="${toggle.getAttribute('aria-controls')}"]`);
+    assert.ok(Boolean(region), 'aria-controls resolves to the region it opened');
+    assert.ok(!scale.contains(region) && !toggle.contains(region), 'beside them, not inside');
+    assert.equal(region.getAttribute('role'), 'group', 'the region is a named group');
+    assert.ok(
+      target.querySelector(`[id="${region.getAttribute('aria-labelledby')}"]`) === label,
+      'named by the visible label beside its disclosure'
+    );
+    const bodies = [...region.querySelectorAll('[data-gathering-drop-modifiers]')];
+    assert.deepEqual(
+      bodies.map((body) => body.querySelector('[data-gathering-drop-modifiers-name]').textContent),
+      ['Starsilver', 'Slag', 'Iron'],
+      'each breakdown is headed by its drop, in scale order'
+    );
+    assert.ok(Boolean(bodies[0].querySelector('[data-gathering-drop-no-modifiers]')));
+    assert.ok(
+      bodies[2].textContent.includes('ModifierWeather') && bodies[2].textContent.includes('-5%')
+    );
+
+    toggle.click();
+    flushSync();
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.ok(!section.querySelector('[data-gathering-drop-modifiers]'), 'and it closes again');
+  });
+
+  it('lists each modifier of an opened breakdown, signed', async () => {
+    const { services } = makeServices(listing([environment()]), dropBreakdown());
+    await mountView(services);
+    await settle();
+
+    target.querySelector('[data-gathering-drops-disclosure]').click();
+    flushSync();
+    const modifiers = target.querySelector('[data-gathering-drop-modifiers]');
     assert.ok(modifiers, 'modifiers reveal on expand');
     assert.ok(modifiers.textContent.includes('Dexterity'), 'character ability contribution listed');
     assert.ok(modifiers.textContent.includes('ModifierWeather'), 'weather contribution listed');
     assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
   });
 
-  it('opens the drop row from its own header button, which names itself and resolves its region', async () => {
-    const { services } = makeServices(listing([environment()]), dropBreakdown());
-    await mountView(services);
-    await settle();
-
-    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
-    const header = row.querySelector('.gathering-task-drop-summary');
-    assertWholeHeaderDisclosure({
-      root: target,
-      header,
-      recordName: 'Raw Ore',
-      expanded: false,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, collapsed',
-    });
-    // ARIA makes a button's children presentational, so the chance cannot be a meter in here: the
-    // figure is the header's own content and the phrase states what the figure is.
-    assert.ok(!header.querySelector('[role="meter"]'), 'no meter role survives inside the header');
-    assert.equal(
-      header.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'),
-      '53',
-      'the chance value hook stays on the bar'
-    );
-    const dropPhrase = header.querySelector('.visually-hidden').textContent;
-    assert.ok(
-      dropPhrase.includes('FABRICATE.App.Gathering.Detail.FindChance') && dropPhrase.includes('53'),
-      'and the phrase carries the chance the stripped meter used to announce'
-    );
-
-    header.click();
-    flushSync();
-
-    const body = assertWholeHeaderDisclosure({
-      root: target,
-      header: row.querySelector('.gathering-task-drop-summary'),
-      recordName: 'Raw Ore',
-      expanded: true,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, open',
-    });
-    assert.ok(
-      body.matches('[data-gathering-drop-modifiers]'),
-      'the region the header controls IS the modifiers body, not a wrapper around it'
-    );
-
-    row.querySelector('.gathering-task-drop-summary').click();
-    flushSync();
-    assertWholeHeaderDisclosure({
-      root: target,
-      header: row.querySelector('.gathering-task-drop-summary'),
-      recordName: 'Raw Ore',
-      expanded: false,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, collapsed again',
-    });
-  });
-
-  it('names a nameless drop from the shared component fallback', async () => {
-    // The lab world holds drops with no name, and "Show details for " names nothing at all.
+  it('names a nameless drop from the shared component fallback, on its row and its breakdown', async () => {
+    // The lab world holds drops with no name, and a blank row names nothing at all.
     const breakdown = dropBreakdown();
     breakdown.drops[0].name = '';
     const { services } = makeServices(listing([environment()]), breakdown);
     await mountView(services);
     await settle();
 
-    const header = target.querySelector('[data-gathering-drop] .gathering-task-drop-summary');
-    assert.ok(
-      header.querySelector('.visually-hidden').textContent.includes('FABRICATE.Labels.UnknownComponent'),
-      'the phrase falls back to the shared unknown-component name'
+    const row = target.querySelector('[data-yield-entry="d-ore"]');
+    assert.equal(
+      row.querySelector('.fabricate-list-row-name').textContent,
+      'FABRICATE.Labels.UnknownComponent'
+    );
+    target.querySelector('[data-gathering-drops-disclosure]').click();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-gathering-drop-modifiers-name]').textContent,
+      'FABRICATE.Labels.UnknownComponent'
     );
   });
 
   it('shows the event-chance bar (with tier) atop the Events tab when event chance > 0', async () => {
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.5 })]));
+    const { services } = makeServices(
+      listing([environment({ risk: 'hazardous', eventChance: 0.5 })])
+    );
     await mountView(services);
     clickTab('events');
 
     const section = target.querySelector('[data-gathering-event-section]');
     assert.ok(section, 'event summary renders atop the Events tab');
     // Highest danger level shown (localized risk key via the i18n stub).
-    assert.ok(section.textContent.includes('Risk.hazardous'), 'section shows the highest danger level');
+    assert.ok(
+      section.textContent.includes('Risk.hazardous'),
+      'section shows the highest danger level'
+    );
     // Event bar present, with the percent + reversed-scale tier (50% -> amber).
     const bar = section.querySelector('[data-gathering-event-value]');
     assert.ok(bar, 'event-chance bar renders when chance > 0');
@@ -518,10 +888,18 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'and does NOT become a callout: a caption for a control is not a standing statement, and ' +
         'converting it would draw a box around a bar label'
     );
-    assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
+    assert.equal(
+      section.querySelector('[data-gathering-safe-hint]'),
+      null,
+      'safe hint hidden when chance > 0'
+    );
     // Targeted (non-blind) environments never show the "events hidden" redaction
     // hint — that is blind-only, even with chance > 0 and no individual events.
-    assert.equal(target.querySelector('[data-gathering-events-hidden]'), null, 'no "events hidden" hint for a targeted environment');
+    assert.equal(
+      target.querySelector('[data-gathering-events-hidden]'),
+      null,
+      'no "events hidden" hint for a targeted environment'
+    );
   });
 
   it('shows the "safe environment" hint (no bar) when event chance is zero', async () => {
@@ -531,8 +909,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const section = target.querySelector('[data-gathering-event-section]');
     assert.ok(section, 'event summary still renders');
-    assert.ok(section.textContent.includes('Risk.safe'), 'danger level still shown for a safe environment');
-    assert.equal(section.querySelector('[data-gathering-event-value]'), null, 'no event bar when chance is zero');
+    assert.ok(
+      section.textContent.includes('Risk.safe'),
+      'danger level still shown for a safe environment'
+    );
+    assert.equal(
+      section.querySelector('[data-gathering-event-value]'),
+      null,
+      'no event bar when chance is zero'
+    );
     const safe = section.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'safe hint shown when chance is zero');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
@@ -550,52 +935,112 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   });
 
   it('hides the Events tab and shows a risk note above the tasks under the dangerLevelOnly tier', async () => {
-    const { services } = makeServices(listing([environment({
-      risk: 'hazardous', eventVisibility: 'dangerLevelOnly', eventChance: null, events: []
-    })]));
+    const { services } = makeServices(
+      listing([
+        environment({
+          risk: 'hazardous',
+          eventVisibility: 'dangerLevelOnly',
+          eventChance: null,
+          events: [],
+        }),
+      ])
+    );
     await mountView(services);
 
     // No tab strip at all in the restricted tiers.
     assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
     // The environment still carries its danger tag in the header pips.
-    assert.ok(target.querySelector('[data-gathering-pips] .is-danger'), 'danger pip retained in the header');
+    assert.ok(
+      target.querySelector('[data-gathering-pips] .is-danger'),
+      'danger pip retained in the header'
+    );
     // No chance bar and no events summary/list, but a risk note above the tasks.
-    assert.equal(target.querySelector('[data-gathering-event-value]'), null, 'no chance bar under dangerLevelOnly');
-    assert.equal(target.querySelector('[data-gathering-event-section]'), null, 'no full-tier event block');
-    assert.equal(target.querySelector('[data-gathering-events-section]'), null, 'no individual event list');
+    assert.equal(
+      target.querySelector('[data-gathering-event-value]'),
+      null,
+      'no chance bar under dangerLevelOnly'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-event-section]'),
+      null,
+      'no full-tier event block'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-events-section]'),
+      null,
+      'no individual event list'
+    );
     const note = target.querySelector('[data-gathering-event-risk-note]');
     assert.ok(note, 'a risk note is shown above the tasks');
-    assert.ok(note.textContent.includes('EventRiskNote'), 'the risk note uses the localized message');
+    assert.ok(
+      note.textContent.includes('EventRiskNote'),
+      'the risk note uses the localized message'
+    );
     // Converted for the same reason as its `EventSafeHint` twin.
     assert.equal(note.getAttribute('data-callout-tone'), 'info', 'drawn as an info callout');
     assert.ok(note.classList.contains('manager-callout'), 'and not as a bare paragraph');
-    assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
+    assert.ok(
+      target.querySelector('[data-gathering-tasks-section]'),
+      'the tasks section still renders'
+    );
   });
 
   it('hides the Events tab and shows the chance bar above the tasks under the encounterChance tier', async () => {
-    const { services } = makeServices(listing([environment({
-      risk: 'hazardous', eventVisibility: 'encounterChance', eventChance: 0.5, events: []
-    })]));
+    const { services } = makeServices(
+      listing([
+        environment({
+          risk: 'hazardous',
+          eventVisibility: 'encounterChance',
+          eventChance: 0.5,
+          events: [],
+        }),
+      ])
+    );
     await mountView(services);
 
     assert.equal(target.querySelector('[data-gathering-detail-tab]'), null, 'tab strip is hidden');
     const summary = target.querySelector('[data-gathering-event-summary]');
     assert.ok(summary, 'an event summary renders above the tasks');
-    assert.ok(summary.querySelector('[data-gathering-event-value]'), 'the encounter-chance bar is shown');
-    assert.equal(target.querySelector('[data-gathering-event-risk-note]'), null, 'no risk note in encounterChance (bar only)');
-    assert.equal(target.querySelector('[data-gathering-events-section]'), null, 'no individual event list under encounterChance');
-    assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
+    assert.ok(
+      summary.querySelector('[data-gathering-event-value]'),
+      'the encounter-chance bar is shown'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-event-risk-note]'),
+      null,
+      'no risk note in encounterChance (bar only)'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-events-section]'),
+      null,
+      'no individual event list under encounterChance'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-tasks-section]'),
+      'the tasks section still renders'
+    );
   });
 
   it('shows the safe hint (no bar) above the tasks under encounterChance when the chance is zero', async () => {
-    const { services } = makeServices(listing([environment({
-      risk: 'safe', eventVisibility: 'encounterChance', eventChance: 0, events: []
-    })]));
+    const { services } = makeServices(
+      listing([
+        environment({
+          risk: 'safe',
+          eventVisibility: 'encounterChance',
+          eventChance: 0,
+          events: [],
+        }),
+      ])
+    );
     await mountView(services);
 
     const summary = target.querySelector('[data-gathering-event-summary]');
     assert.ok(summary, 'an event summary renders');
-    assert.equal(summary.querySelector('[data-gathering-event-value]'), null, 'no bar when chance is zero');
+    assert.equal(
+      summary.querySelector('[data-gathering-event-value]'),
+      null,
+      'no bar when chance is zero'
+    );
     const safe = summary.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'the safe hint is shown instead');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
@@ -621,23 +1066,38 @@ describe('GatheringDetail (center column) mounted behavior', () => {
         {
           code: 'CONDITIONS_BLOCKED',
           message: 'Conditions not met',
-          data: { taskId: 'task-blocked', requiredWeather: ['rain'], requiredTimeOfDay: ['night'] }
-        }
-      ]
+          data: { taskId: 'task-blocked', requiredWeather: ['rain'], requiredTimeOfDay: ['night'] },
+        },
+      ],
     });
     const { services } = makeServices(listing([environment({ tasks: [blockedTask] })]));
     await mountView(services);
 
     const row = target.querySelector('[data-task-id="task-blocked"]');
     assert.equal(row.getAttribute('data-blocked'), 'true');
-    assert.ok(row.querySelector('.gathering-task-lock-overlay'), 'blocked row shows the lock overlay');
+    assert.ok(
+      row.querySelector('.gathering-task-lock-overlay'),
+      'blocked row shows the lock overlay'
+    );
     // Blocking issue appears as a header callout.
     const callouts = row.querySelector('[data-gathering-callouts]');
     assert.ok(callouts, 'header callout bar present');
     assert.ok(callouts.textContent.includes('Conditions'), 'a conditions callout is shown');
-    assert.equal(row.querySelector('[data-gathering-success-value]'), null, 'no success bar when successChance is null');
-    assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
-    assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'no inline blocked detail in the center row');
+    assert.equal(
+      row.querySelector('[data-gathering-success-value]'),
+      null,
+      'no success bar when successChance is null'
+    );
+    assert.equal(
+      row.querySelector('[data-gathering-attempt]'),
+      null,
+      'center row has no attempt button'
+    );
+    assert.equal(
+      row.querySelector('[data-gathering-blocked]'),
+      null,
+      'no inline blocked detail in the center row'
+    );
 
     // Nothing is attemptable, so no task is auto-selected.
     row.querySelector('.gathering-task-summary').click();
@@ -646,31 +1106,62 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(blocked, 'blocked detail appears in the right-column inspector');
     assert.ok(blocked.textContent.includes('night'), 'required time-of-day surfaced');
     assert.ok(blocked.textContent.includes('rain'), 'required weather surfaced');
-    const blockedAttempt = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    const blockedAttempt = target.querySelector(
+      '[data-gathering-task-detail] [data-gathering-attempt]'
+    );
     assert.ok(blockedAttempt.disabled, 'inspector attempt button disabled on a blocked task');
     assert.equal(blockedAttempt.getAttribute('data-gathering-attempt-blocked'), 'true');
     assert.ok(blockedAttempt.querySelector('.fa-ban'), 'blocked attempt shows the ban icon');
-    const attemptWrap = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-attempt-wrap');
-    assert.ok((attemptWrap.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
+    assert.ok(
+      (blockedAttempt.getAttribute('title') || '').includes('Conditions'),
+      'tooltip explains the block reason'
+    );
+    const [reason] = assertDescribedBlocker(blockedAttempt, {
+      label: 'Detail.Attempt',
+      reason: 'Callout.Conditions',
+    });
+    assert.ok(
+      reason.matches('[data-gathering-attempt-reason]'),
+      'the reason is the inspector’s notice'
+    );
   });
 
-  it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {
+  it("lists a selected task's required tools in the right inspector, not inline in the center row", async () => {
     const tooledTask = taskModel({
       id: 'task-tools',
       attemptable: false,
       successChance: null,
       blockedReasons: [{ code: 'TOOL_BLOCKED', message: 'Missing tools', data: {} }],
       tools: [
-        { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp', state: 'present', required: true },
-        { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp', state: 'missing', required: true }
-      ]
+        {
+          id: 'c-axe',
+          name: 'Stone Pickaxe',
+          img: 'icons/axe.webp',
+          state: 'present',
+          required: true,
+        },
+        {
+          id: 'c-lantern',
+          name: 'Lantern',
+          img: 'icons/lantern.webp',
+          state: 'missing',
+          required: true,
+        },
+      ],
     });
     const { services } = makeServices(listing([environment({ tasks: [tooledTask] })]));
     await mountView(services);
 
     const row = target.querySelector('[data-task-id="task-tools"]');
-    assert.ok(row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'), 'missing-tools callout shown');
-    assert.equal(row.querySelector('[data-gathering-tools]'), null, 'center row does not render the tools inline');
+    assert.ok(
+      row.querySelector('[data-gathering-callouts]').textContent.includes('Callout.MissingTools'),
+      'missing-tools callout shown'
+    );
+    assert.equal(
+      row.querySelector('[data-gathering-tools]'),
+      null,
+      'center row does not render the tools inline'
+    );
 
     // Select the task -> its tools list appears in the right-column inspector.
     row.querySelector('.gathering-task-summary').click();
@@ -682,44 +1173,92 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
   });
 
-  it('draws the drop row on the shared art tile and the shared fill bar, at the size each rendered', async () => {
+  it('draws each drop on the shared list row, its artwork on the 22px art tile', async () => {
     const { services } = makeServices(listing([environment()]), {
-      drops: [{ id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 }],
-      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+      drops: [
+        { id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 },
+      ],
+      awardMode: 'allDrops',
+      awardLimit: 1,
+      eventPolicy: null,
     });
     await mountView(services);
     target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
     flushSync();
     await settle();
 
-    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
+    const row = target.querySelector(':scope [data-gathering-task-detail] [data-yield-entry="d1"]');
+    assert.ok(
+      Boolean(row.querySelector('[data-list-row="dense"]')),
+      'the drop is a dense list row'
+    );
     const tile = row.querySelector('.fab-medallion');
-    assert.ok(Boolean(tile), 'the drop thumbnail is the shared art tile');
-    // The CONVERSION RULE the geometry requirement states.
-    assert.match(tile.getAttribute('style'), /width:\s*36px;\s*height:\s*36px/, 'at the 36px it already rendered');
+    assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the row size');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
-
-    const bar = row.querySelector('.fab-fill-bar');
-    assert.ok(Boolean(bar), 'the chance track is the shared fill bar');
-    assert.ok(bar.classList.contains('is-sm'), 'at the `sm` rung, which is the height the hand-rolled track drew');
-    assert.match(bar.querySelector('.fab-fill-bar-fill').getAttribute('style'), /width: 50%/, 'and the fill carries the chance');
+    assert.equal(tile.querySelector('img').getAttribute('src'), 'icons/svg/mystery-man.svg');
+    assert.ok(!row.querySelector('.fab-fill-bar'), 'the chance is a figure, not a fill track');
   });
 
   it('draws the required-tool tile on the shared art tile at the size it rendered', async () => {
-    const { services } = makeServices(listing([environment({
-      tasks: [taskModel({ id: 'task-tool', tools: [{ id: 't1', name: 'Pick', img: 'icons/svg/mystery-man.svg', state: 'missing' }] })]
-    })]));
+    const { services } = makeServices(
+      listing([
+        environment({
+          tasks: [
+            taskModel({
+              id: 'task-tool',
+              tools: [
+                { id: 't1', name: 'Pick', img: 'icons/svg/mystery-man.svg', state: 'missing' },
+              ],
+            }),
+          ],
+        }),
+      ])
+    );
     await mountView(services);
     target.querySelector('[data-task-id="task-tool"] .gathering-task-summary').click();
     flushSync();
     await settle();
 
-    const tile = target.querySelector('[data-gathering-task-detail] [data-gathering-tool] .fab-medallion');
+    const tile = target.querySelector(
+      '[data-gathering-task-detail] [data-gathering-tool] .fab-medallion'
+    );
     assert.ok(Boolean(tile), 'the tool thumbnail is the shared art tile');
-    assert.match(tile.getAttribute('style'), /width:\s*40px;\s*height:\s*40px/, 'at the 40px it already rendered');
+    assert.match(
+      tile.getAttribute('style'),
+      /width:\s*40px;\s*height:\s*40px/,
+      'at the 40px it already rendered'
+    );
   });
 
   // ─── THE THREE ERRORS THAT USED TO BE SWALLOWED (issue 1514) ────────────────────────────
+
+  it('says it is still calculating while the breakdown loads, and draws no find rows yet', async () => {
+    const { services } = makeServices(listing([environment()]));
+    services.getGatheringDropBreakdown = () => new Promise(() => {});
+    await mountView(services);
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'loading');
+    assert.ok(section.textContent.includes('DropsLoading'), 'with the loading sentence');
+    assert.equal(section.querySelectorAll('button').length, 0, 'and no control yet');
+  });
+
+  it('draws no find section for a task with no drops', async () => {
+    const { services, calls } = makeServices(listing([environment()]));
+    await mountView(services);
+    await settle();
+
+    assert.ok(calls.dropBreakdown.length > 0, 'the breakdown was asked for');
+    assert.ok(
+      Boolean(target.querySelector('[data-gathering-task-detail]')),
+      'the inspector renders'
+    );
+    assert.ok(
+      !target.querySelector('[data-gathering-task-detail] [data-gathering-drops]'),
+      'with no find section'
+    );
+  });
 
   it('says so when the drop-breakdown fetch fails, instead of drawing an empty find list', async () => {
     const { services } = makeServices(listing([environment()]));
@@ -731,11 +1270,19 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
     assert.ok(Boolean(section), 'the find section still renders');
-    assert.equal(section.getAttribute('data-gathering-drops-state'), 'error', 'and it reports the error state');
+    assert.equal(
+      section.getAttribute('data-gathering-drops-state'),
+      'error',
+      'and it reports the error state'
+    );
     const notice = section.querySelector('[data-gathering-drops-error]');
     assert.ok(Boolean(notice), 'a notice names the failure');
     assert.ok(notice.textContent.includes('DropsError'), 'with the localized failure sentence');
-    assert.equal(notice.getAttribute('role'), 'status', 'announced politely rather than as an alert');
+    assert.equal(
+      notice.getAttribute('role'),
+      'status',
+      'announced politely rather than as an alert'
+    );
     // TITLE OVER DETAIL, not one string in the title slot (issue 1514). `Notice`'s title is a
     // 12px/600 HEADING slot with no declared leading, and the whole two-sentence string handed
     // to it rendered as a three-line shouty heading.
@@ -751,13 +1298,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'which is what `detail` is for: the second line says what to do next'
     );
     // The DISTINCTION that was missing: this is not the "nothing to find" picture.
-    assert.ok(!section.querySelector('[data-gathering-drop]'), 'no drop rows are drawn');
+    assert.ok(!section.querySelector('[data-yield-entry]'), 'no drop rows are drawn');
   });
 
   it('draws the ordinary ready state when the drop-breakdown fetch succeeds (control)', async () => {
     const { services } = makeServices(listing([environment()]), {
       drops: [{ id: 'd1', name: 'Moss', img: '', finalChance: 0.5, quantity: 1 }],
-      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+      awardMode: 'allDrops',
+      awardLimit: 1,
+      eventPolicy: null,
     });
     await mountView(services);
     target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
@@ -765,18 +1314,30 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await settle();
 
     const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
-    assert.equal(section.getAttribute('data-gathering-drops-state'), 'ready', 'the ready state is reachable');
-    assert.ok(!section.querySelector('[data-gathering-drops-error]'), 'and carries no failure notice');
+    assert.equal(
+      section.getAttribute('data-gathering-drops-state'),
+      'ready',
+      'the ready state is reachable'
+    );
+    assert.ok(
+      !section.querySelector('[data-gathering-drops-error]'),
+      'and carries no failure notice'
+    );
+    assert.equal(section.querySelectorAll('[data-yield-entry]').length, 1, 'and draws its drop');
   });
 
   it('says the linked scene could not be loaded when its uuid does not resolve', async () => {
     const previous = globalThis.fromUuid;
     globalThis.fromUuid = () => Promise.reject(new Error('no such document'));
     try {
-      const { services } = makeServices(listing([environment({
-        sceneUuid: 'Scene.missing',
-        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
-      })]));
+      const { services } = makeServices(
+        listing([
+          environment({
+            sceneUuid: 'Scene.missing',
+            blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }],
+          }),
+        ])
+      );
       await mountView(services);
       await settle();
 
@@ -820,10 +1381,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const previous = globalThis.fromUuid;
     const scenario = async (testUserPermission) => {
       globalThis.fromUuid = () => Promise.resolve({ name: 'Old Mine', testUserPermission });
-      const { services } = makeServices(listing([environment({
-        sceneUuid: 'Scene.mine',
-        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
-      })]));
+      const { services } = makeServices(
+        listing([
+          environment({
+            sceneUuid: 'Scene.mine',
+            blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }],
+          }),
+        ])
+      );
       await mountView(services);
       await settle();
       return target.querySelector('[data-gathering-scene]');
@@ -832,8 +1397,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     try {
       // REFUSED: the check answered, and the answer was no. The player waits for the GM.
       const refused = await scenario(() => false);
-      assert.ok(Boolean(refused.querySelector('[data-gathering-scene-wait]')), 'a refusal shows the wait hint');
-      assert.ok(!refused.querySelector('[data-gathering-scene-permission-unknown]'), 'and does not claim the check failed');
+      assert.ok(
+        Boolean(refused.querySelector('[data-gathering-scene-wait]')),
+        'a refusal shows the wait hint'
+      );
+      assert.ok(
+        !refused.querySelector('[data-gathering-scene-permission-unknown]'),
+        'and does not claim the check failed'
+      );
 
       unmount(mounted);
       mounted = null;
@@ -841,9 +1412,17 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
       // FAILED: the check threw. Telling this player to wait for the GM sends them to the
       // wrong person, which is the whole reason the two outcomes are separated.
-      const unknown = await scenario(() => { throw new Error('broken'); });
-      assert.ok(Boolean(unknown.querySelector('[data-gathering-scene-permission-unknown]')), 'a failed check says so');
-      assert.ok(!unknown.querySelector('[data-gathering-scene-wait]'), 'and is NOT reported as the GM not having shared it');
+      const unknown = await scenario(() => {
+        throw new Error('broken');
+      });
+      assert.ok(
+        Boolean(unknown.querySelector('[data-gathering-scene-permission-unknown]')),
+        'a failed check says so'
+      );
+      assert.ok(
+        !unknown.querySelector('[data-gathering-scene-wait]'),
+        'and is NOT reported as the GM not having shared it'
+      );
     } finally {
       globalThis.fromUuid = previous;
     }
@@ -855,13 +1434,17 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       id: 'task-scene',
       attemptable: false,
       successChance: null,
-      blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
-    });
-    const { services } = makeServices(listing([environment({
-      sceneUuid: 'Scene.abc',
       blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }],
-      tasks: [sceneTask]
-    })]));
+    });
+    const { services } = makeServices(
+      listing([
+        environment({
+          sceneUuid: 'Scene.abc',
+          blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }],
+          tasks: [sceneTask],
+        }),
+      ])
+    );
     await mountView(services);
 
     // The mode hint explains the scene gate instead of the usual "choose a task".
@@ -874,45 +1457,89 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(banner, 'env-level linked-scene banner renders');
     const scene = banner.querySelector('[data-gathering-scene]');
     assert.ok(scene, 'banner contains the LinkedScene panel');
-    assert.ok(banner.querySelector('[data-gathering-scene-wait]'), 'shows the wait hint when the player cannot navigate');
+    assert.ok(
+      banner.querySelector('[data-gathering-scene-wait]'),
+      'shows the wait hint when the player cannot navigate'
+    );
 
     const list = target.querySelector('.gathering-detail-task-list');
     assert.ok(list, 'task list renders');
-    const kids = Array.from(target.querySelector('[data-gathering-detail-state="selected"]').children);
+    const kids = Array.from(
+      target.querySelector('[data-gathering-detail-state="selected"]').children
+    );
     assert.ok(
-      kids.findIndex(el => el.matches('[data-gathering-scene-banner]')) <
-        kids.findIndex(el => el.contains(list) || el.matches('.gathering-detail-section')),
+      kids.findIndex((el) => el.matches('[data-gathering-scene-banner]')) <
+        kids.findIndex((el) => el.contains(list) || el.matches('.gathering-detail-section')),
       'the scene banner precedes the task-list section'
     );
 
     // The task card no longer carries a scene callout or panel.
     const row = target.querySelector('[data-task-id="task-scene"]');
     const callouts = row.querySelector('[data-gathering-callouts]');
-    assert.ok(!callouts || !callouts.textContent.includes('VisitScene'), 'no scene callout on the task card');
-    assert.equal(row.querySelector('[data-gathering-scene]'), null, 'no linked-scene panel inside the task card');
+    assert.ok(
+      !callouts || !callouts.textContent.includes('VisitScene'),
+      'no scene callout on the task card'
+    );
+    assert.equal(
+      row.querySelector('[data-gathering-scene]'),
+      null,
+      'no linked-scene panel inside the task card'
+    );
   });
 
-  it('renders the blind attempt button and the Discovered Tasks section', async () => {
+  it('puts the blind gather in the centre’s identity row, one primary per pane with a discovered task selected', async () => {
     const blindEnv = environment({
       id: 'env-blind',
       selectionMode: 'blind',
       revealPolicy: 'onAttempt',
       discoveredTaskCount: 1,
       composedTaskCount: 3,
-      tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
-      discoveredTasks: [taskModel({ id: 'disc-1', name: 'Found Herb', discovered: true })]
+      tasks: [
+        {
+          action: 'blindGather',
+          label: 'Blind',
+          blind: true,
+          attemptable: true,
+          blockedReasons: [],
+        },
+      ],
+      discoveredTasks: [taskModel({ id: 'disc-1', name: 'Found Herb', discovered: true })],
     });
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
 
-    const blindCard = target.querySelector('[data-gathering-blind-card]');
-    assert.ok(blindCard, 'blind attempt is wrapped in a call-to-action card');
-    assert.ok(blindCard.querySelector('[data-gathering-blind-attempt]'), 'attempt button lives in the card');
-    assert.ok(blindCard.textContent.includes('BlindAttemptPrompt'), 'card shows the blind prompt');
-    assert.ok(blindCard.querySelector('.gathering-detail-blind-card-divider'), 'card has the divider');
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    const row = assertIdentityHeader(centre, { primaries: 1 });
+    assert.ok(
+      row.querySelector('[data-gathering-blind-attempt]'),
+      'the one primary is the blind gather'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-gathering-blind-attempt]').length,
+      1,
+      'one blind Attempt'
+    );
+    assert.ok(
+      !target.querySelector('[data-gathering-blind-attempt-reason]'),
+      'an attemptable blind gather names no blocker'
+    );
+    const inspector = target.querySelector('[data-gathering-task-detail]');
+    assert.equal(
+      inspector?.getAttribute('data-detail-task-id'),
+      'disc-1',
+      'the discovered task is selected'
+    );
+    const inspectorRow = assertIdentityHeader(inspector, { primaries: 1 });
+    assert.ok(
+      inspectorRow.querySelector('[data-gathering-attempt]'),
+      'the inspector’s one primary is its task’s Attempt'
+    );
     const discovered = target.querySelector('[data-gathering-discovered]');
     assert.ok(discovered, 'discovered section present for blind + reveal != never');
-    assert.ok(discovered.textContent.includes('1/3') || discovered.textContent.includes('"x":1'), 'discovered heading carries the counts');
+    assert.ok(
+      discovered.textContent.includes('1/3') || discovered.textContent.includes('"x":1'),
+      'discovered heading carries the counts'
+    );
     assert.ok(target.querySelector('[data-task-id="disc-1"]'), 'discovered task row renders');
   });
 
@@ -921,14 +1548,72 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       id: 'env-blind-never',
       selectionMode: 'blind',
       revealPolicy: 'never',
-      tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
-      discoveredTasks: []
+      tasks: [
+        {
+          action: 'blindGather',
+          label: 'Blind',
+          blind: true,
+          attemptable: true,
+          blockedReasons: [],
+        },
+      ],
+      discoveredTasks: [],
     });
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
 
-    assert.ok(target.querySelector('[data-gathering-blind-attempt]'), 'blind attempt button still present');
-    assert.equal(target.querySelector('[data-gathering-discovered]'), null, 'no discovered section when reveal is never');
+    assert.ok(
+      target.querySelector('[data-gathering-blind-attempt]'),
+      'blind attempt button still present'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-discovered]'),
+      null,
+      'no discovered section when reveal is never'
+    );
+    assert.equal(
+      primaryButtons(target).length,
+      1,
+      'the view shows one Attempt, with no task to inspect'
+    );
+  });
+
+  it('names a generic blocker for a blind gather that cannot run, never a task-derived one', async () => {
+    const toolBlocked = [{ code: 'TOOL_BLOCKED', message: 'Needs the Glass Alembic', data: {} }];
+    const blindEnv = environment({
+      id: 'env-blind-blocked',
+      selectionMode: 'blind',
+      revealPolicy: 'never',
+      attemptable: false,
+      blockedReasons: toolBlocked,
+      tasks: [
+        {
+          action: 'blindGather',
+          label: 'Blind',
+          blind: true,
+          attemptable: false,
+          blockedReasons: toolBlocked,
+        },
+      ],
+      discoveredTasks: [],
+    });
+    const { services } = makeServices(listing([blindEnv]));
+    await mountView(services);
+
+    const attempt = target.querySelector('[data-gathering-blind-attempt]');
+    const [reason] = assertDescribedBlocker(attempt, {
+      label: 'Detail.BlindAttempt',
+      reason: 'Detail.Blocked',
+    });
+    assert.ok(
+      reason.matches('[data-gathering-blind-attempt-reason]'),
+      'the reason is the centre’s notice'
+    );
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    assert.ok(
+      !/MissingTools|Glass Alembic/u.test(centre.textContent),
+      'no task-derived blocker reaches the blind pane'
+    );
   });
 
   it('wires the right-column Attempt to startGatheringAttempt and re-fetches the listing', async () => {
@@ -960,17 +1645,24 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       },
       startGatheringAttempt: (opts) => {
         calls.attempts.push(opts);
-        return new Promise((resolve) => { releaseAttempt = resolve; });
-      }
+        return new Promise((resolve) => {
+          releaseAttempt = resolve;
+        });
+      },
     };
     await mountView(services);
 
-    const attemptBtn = target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]');
+    const attemptBtn = target.querySelector(
+      '[data-gathering-task-detail] [data-gathering-attempt]'
+    );
     attemptBtn.click();
     await tick();
     flushSync();
     // While in flight the button is disabled and a second click is ignored.
-    assert.ok(target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled, 'button disabled during the round-trip');
+    assert.ok(
+      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').disabled,
+      'button disabled during the round-trip'
+    );
     target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
     await tick();
     flushSync();
@@ -992,11 +1684,18 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(panel, 'right-column task inspector renders for the auto-selected task');
     assert.equal(panel.getAttribute('data-detail-task-id'), 'task-1');
     assert.ok(panel.textContent.includes('Gather Iron'), 'inspector header shows the task name');
-    assert.ok(panel.querySelector('[data-gathering-no-requirements]'), 'a task with no tools/blocks shows the no-requirements note');
+    assert.ok(
+      panel.querySelector('[data-gathering-no-requirements]'),
+      'a task with no tools/blocks shows the no-requirements note'
+    );
 
     // The matching center row is the selected one.
     const row = target.querySelector('[data-task-id="task-1"]');
-    assert.equal(row.getAttribute('data-selected'), 'true', 'the center row reflects the selection');
+    assert.equal(
+      row.getAttribute('data-selected'),
+      'true',
+      'the center row reflects the selection'
+    );
   });
 
   it('selecting a task updates the inspector and moves the center accordion (single expanded row)', async () => {
@@ -1005,14 +1704,22 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       name: 'Chop Wood',
       attemptable: true,
       blockedReasons: [],
-      tools: [{ id: 'c-axe', name: 'Axe', img: 'icons/axe.webp', state: 'present', required: true }]
+      tools: [
+        { id: 'c-axe', name: 'Axe', img: 'icons/axe.webp', state: 'present', required: true },
+      ],
     });
     const { services } = makeServices(listing([environment({ tasks: [taskModel(), tooled] })]));
     await mountView(services);
 
     // Defaults to the first attemptable task (task-1); task-2 is not selected.
-    assert.equal(target.querySelector('[data-gathering-task-detail]').getAttribute('data-detail-task-id'), 'task-1');
-    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'false');
+    assert.equal(
+      target.querySelector('[data-gathering-task-detail]').getAttribute('data-detail-task-id'),
+      'task-1'
+    );
+    assert.equal(
+      target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'),
+      'false'
+    );
 
     // Select task-2 by clicking its summary.
     target.querySelector('[data-task-id="task-2"] .gathering-task-summary').click();
@@ -1021,16 +1728,34 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // Right column now shows task-2, including its required tool.
     const panel = target.querySelector('[data-gathering-task-detail]');
     assert.equal(panel.getAttribute('data-detail-task-id'), 'task-2');
-    assert.ok(panel.querySelector('[data-gathering-tool]'), 'inspector lists the selected task tools');
+    assert.ok(
+      panel.querySelector('[data-gathering-tool]'),
+      'inspector lists the selected task tools'
+    );
 
     // Selection moved: task-2 selected, task-1 deselected.
-    assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'true');
-    assert.equal(target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'), 'false');
-    assert.equal(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), null, 'center row has no inline requirements');
+    assert.equal(
+      target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'),
+      'true'
+    );
+    assert.equal(
+      target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'),
+      'false'
+    );
+    assert.equal(
+      target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'),
+      null,
+      'center row has no inline requirements'
+    );
   });
 
   it('shows the "select a gathering task" hint when tasks exist but none is attemptable', async () => {
-    const blocked = taskModel({ id: 'task-x', attemptable: false, successChance: null, blockedReasons: [{ code: 'CONDITIONS_BLOCKED', message: 'no', data: {} }] });
+    const blocked = taskModel({
+      id: 'task-x',
+      attemptable: false,
+      successChance: null,
+      blockedReasons: [{ code: 'CONDITIONS_BLOCKED', message: 'no', data: {} }],
+    });
     const { services } = makeServices(listing([environment({ tasks: [blocked] })]));
     await mountView(services);
 
@@ -1045,7 +1770,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const { services } = makeServices(listing([environment({ tasks: [] })]));
     await mountView(services);
 
-    const state = target.querySelector('[data-gathering-task-detail-column] [data-gathering-task-detail-state]');
+    const state = target.querySelector(
+      '[data-gathering-task-detail-column] [data-gathering-task-detail-state]'
+    );
     assert.equal(state.getAttribute('data-gathering-task-detail-state'), 'none');
     assert.ok(state.textContent.includes('NoAvailableTasks'), 'shows the no-available-tasks hint');
   });
@@ -1055,8 +1782,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       id: 'env-blind',
       selectionMode: 'blind',
       revealPolicy: 'onAttempt',
-      tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
-      discoveredTasks: []
+      tasks: [
+        {
+          action: 'blindGather',
+          label: 'Blind',
+          blind: true,
+          attemptable: true,
+          blockedReasons: [],
+        },
+      ],
+      discoveredTasks: [],
     });
     const { services, calls } = makeServices(listing([blindEnv]));
     await mountView(services);
@@ -1074,14 +1809,23 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
   it('filters and paginates the task list via the task search box', async () => {
     const tasks = Array.from({ length: 8 }, (_, i) =>
-      taskModel({ id: `task-${i}`, name: i === 0 ? 'Gather Quartz' : `Gather Iron ${i}`, description: '' }));
+      taskModel({
+        id: `task-${i}`,
+        name: i === 0 ? 'Gather Quartz' : `Gather Iron ${i}`,
+        description: '',
+      })
+    );
     const { services } = makeServices(listing([environment({ tasks })]));
     await mountView(services);
 
     const section = target.querySelector('[data-gathering-tasks-section]');
     assert.ok(section, 'tasks section renders');
     // Page size defaults to 6, so the 8 tasks span two pages.
-    assert.equal(section.querySelectorAll('.gathering-task-row').length, 6, 'first page shows the default page size');
+    assert.equal(
+      section.querySelectorAll('.gathering-task-row').length,
+      6,
+      'first page shows the default page size'
+    );
 
     const search = section.querySelector('[data-gathering-task-search]');
     assert.ok(search, 'task search input renders');
@@ -1096,23 +1840,94 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     search.value = 'no-such-task';
     search.dispatchEvent(new window.Event('input', { bubbles: true }));
     await settle();
-    assert.ok(section.querySelector('[data-gathering-no-task-matches]'), 'a no-matches hint shows when the search excludes everything');
+    assert.ok(
+      section.querySelector('[data-gathering-no-task-matches]'),
+      'a no-matches hint shows when the search excludes everything'
+    );
   });
 
   it('defaults to the Tasks tab and switches to Events on click', async () => {
-    const events = [{ id: 'h', name: 'Rockslide', description: '', img: 'icons/svg/hazard.svg', dangerTags: ['unsafe'], risk: 'unsafe', chance: 0.4 }];
+    const events = [
+      {
+        id: 'h',
+        name: 'Rockslide',
+        description: '',
+        img: 'icons/svg/hazard.svg',
+        dangerTags: ['unsafe'],
+        risk: 'unsafe',
+        chance: 0.4,
+      },
+    ];
     const { services } = makeServices(listing([environment({ eventChance: 0.4, events })]));
     await mountView(services);
 
     // Tasks tab active by default; tasks panel shown, event summary not.
-    assert.equal(target.querySelector('[data-gathering-detail-tab="tasks"]').getAttribute('aria-selected'), 'true');
-    assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'tasks panel shown by default');
-    assert.equal(target.querySelector('[data-gathering-event-section]'), null, 'event summary not shown on the Tasks tab');
+    assert.equal(
+      target.querySelector('[data-gathering-detail-tab="tasks"]').getAttribute('aria-selected'),
+      'true'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-tasks-section]'),
+      'tasks panel shown by default'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-event-section]'),
+      null,
+      'event summary not shown on the Tasks tab'
+    );
 
     clickTab('events');
-    assert.equal(target.querySelector('[data-gathering-detail-tab="events"]').getAttribute('aria-selected'), 'true');
-    assert.ok(target.querySelector('[data-gathering-event-section]'), 'event summary shown on the Events tab');
-    assert.equal(target.querySelector('[data-gathering-tasks-section]'), null, 'tasks panel hidden on the Events tab');
+    assert.equal(
+      target.querySelector('[data-gathering-detail-tab="events"]').getAttribute('aria-selected'),
+      'true'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-event-section]'),
+      'event summary shown on the Events tab'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-tasks-section]'),
+      null,
+      'tasks panel hidden on the Events tab'
+    );
+  });
+
+  // Issue 1518: the strip is the shared `EditorTabs`, which owns the arrow keys.
+  it('moves focus and selection to the next tab on ArrowRight', async () => {
+    const events = [
+      {
+        id: 'h',
+        name: 'Rockslide',
+        description: '',
+        img: 'icons/svg/hazard.svg',
+        dangerTags: ['unsafe'],
+        risk: 'unsafe',
+        chance: 0.4,
+      },
+    ];
+    const { services } = makeServices(listing([environment({ eventChance: 0.4, events })]));
+    await mountView(services);
+
+    const tasksTab = target.querySelector('[data-gathering-detail-tab="tasks"]');
+    tasksTab.focus();
+    tasksTab.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    );
+    flushSync();
+
+    const eventsTab = target.querySelector('[data-gathering-detail-tab="events"]');
+    assert.equal(eventsTab.getAttribute('aria-selected'), 'true', 'selection moved to Events');
+    assert.ok(globalThis.document.activeElement === eventsTab, 'focus moved to Events');
+    assert.ok(
+      globalThis.document.querySelector(`#${eventsTab.getAttribute('aria-controls')}`),
+      'its panel is in the document'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-detail-tab="tasks"]').hasAttribute('aria-controls'),
+      false,
+      'an unselected tab names no absent panel'
+    );
+    assert.ok(target.querySelector('[data-gathering-event-section]'), 'the Events panel renders');
   });
 
   it('renders a selectable, searchable, paginated events list on the Events tab', async () => {
@@ -1123,21 +1938,35 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       img: 'icons/svg/hazard.svg',
       dangerTags: ['hazardous'],
       risk: 'hazardous',
-      chance: 0.3
+      chance: 0.3,
     }));
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.6, events })]));
+    const { services } = makeServices(
+      listing([environment({ risk: 'hazardous', eventChance: 0.6, events })])
+    );
     await mountView(services);
     clickTab('events');
 
     // The aggregate summary (danger + chance bar) sits atop the tab.
-    assert.ok(target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'), 'aggregate event-chance bar shown atop the tab');
+    assert.ok(
+      target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'),
+      'aggregate event-chance bar shown atop the tab'
+    );
 
     const section = target.querySelector('[data-gathering-events-section]');
     assert.ok(section, 'events list section renders');
     // Event rows render, paginated to the default page size (6 of 7).
-    assert.equal(section.querySelectorAll('.gathering-event-row').length, 6, 'events paginate at the default page size');
-    // Event rows are now selectable (interactive summary).
-    assert.ok(section.querySelector('.gathering-event-row [role="button"]'), 'event rows are selectable');
+    assert.equal(
+      section.querySelectorAll('.gathering-event-row').length,
+      6,
+      'events paginate at the default page size'
+    );
+    // Event rows are selectable: each is a list row whose summary is its one button.
+    assert.equal(
+      section.querySelectorAll(':scope .gathering-event-row > button.gathering-event-summary')
+        .length,
+      6,
+      'event rows are selectable'
+    );
 
     const search = section.querySelector('[data-gathering-event-search]');
     assert.ok(search, 'event search input renders');
@@ -1152,32 +1981,77 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
   it('selecting an event shows its full details in the right column', async () => {
     const events = [
-      { id: 'haz-1', name: 'Rockslide', description: 'Falling rocks.', img: 'icons/svg/hazard.svg', dangerTags: ['hazardous'], risk: 'hazardous', chance: 0.3, weather: ['storm'], timeOfDay: [], biomes: [], regions: [], linkedSceneUuid: '' },
-      { id: 'haz-2', name: 'Sinkhole', description: 'The ground gives way.', img: 'icons/svg/hazard.svg', dangerTags: ['deadly'], risk: 'deadly', chance: 0.5, weather: [], timeOfDay: ['night'], biomes: [], regions: [], linkedSceneUuid: '' }
+      {
+        id: 'haz-1',
+        name: 'Rockslide',
+        description: 'Falling rocks.',
+        img: 'icons/svg/hazard.svg',
+        dangerTags: ['hazardous'],
+        risk: 'hazardous',
+        chance: 0.3,
+        weather: ['storm'],
+        timeOfDay: [],
+        biomes: [],
+        regions: [],
+        linkedSceneUuid: '',
+      },
+      {
+        id: 'haz-2',
+        name: 'Sinkhole',
+        description: 'The ground gives way.',
+        img: 'icons/svg/hazard.svg',
+        dangerTags: ['deadly'],
+        risk: 'deadly',
+        chance: 0.5,
+        weather: [],
+        timeOfDay: ['night'],
+        biomes: [],
+        regions: [],
+        linkedSceneUuid: '',
+      },
     ];
-    const { services } = makeServices(listing([environment({ risk: 'hazardous', eventChance: 0.6, events })]));
+    const { services } = makeServices(
+      listing([environment({ risk: 'hazardous', eventChance: 0.6, events })])
+    );
     await mountView(services);
     clickTab('events');
 
     // Right column shows the event inspector for the default-selected first event.
-    const panel = target.querySelector('[data-gathering-task-detail-column] [data-gathering-event-detail]');
+    const panel = target.querySelector(
+      '[data-gathering-task-detail-column] [data-gathering-event-detail]'
+    );
     assert.ok(panel, 'right column shows the event inspector');
     assert.equal(panel.getAttribute('data-detail-event-id'), 'haz-1');
-    assert.ok(panel.textContent.includes('Rockslide'), 'inspector shows the first event');
+    assertIdentityHeader(panel, { primaries: 0, name: 'Rockslide' });
     const weatherGroup = panel.querySelector('[data-gathering-event-match="weather"]');
     assert.ok(weatherGroup, 'matching weather surfaced for the first event');
     // The weather chip renders the shared icon + capitalized i18n label (not the raw id).
     const weatherChip = weatherGroup.querySelector('.gathering-event-detail-chip');
     assert.ok(weatherChip.querySelector('i.fa-bolt'), 'weather chip shows the storm icon');
-    assert.ok(weatherChip.textContent.includes('Weather.storm'), 'weather chip uses the localized label key');
+    assert.ok(
+      weatherChip.textContent.includes('Weather.storm'),
+      'weather chip uses the localized label key'
+    );
+
+    const selectedOf = () =>
+      ['haz-1', 'haz-2'].map((id) =>
+        target.querySelector(`[data-event-id="${id}"]`).getAttribute('data-selected')
+      );
+    assert.deepEqual(selectedOf(), ['true', 'false'], 'the first event row is the selected one');
 
     // Selecting the second event updates the inspector + its matching fields.
     target.querySelector('[data-event-id="haz-2"] .gathering-event-summary').click();
     flushSync();
-    const updated = target.querySelector('[data-gathering-task-detail-column] [data-gathering-event-detail]');
+    assert.deepEqual(selectedOf(), ['false', 'true'], 'the selection moves to the clicked row');
+    const updated = target.querySelector(
+      '[data-gathering-task-detail-column] [data-gathering-event-detail]'
+    );
     assert.equal(updated.getAttribute('data-detail-event-id'), 'haz-2');
     assert.ok(updated.textContent.includes('Sinkhole'), 'inspector follows the selection');
-    assert.ok(updated.querySelector('[data-gathering-event-match="timeOfDay"]'), 'time-of-day matching surfaced for the second event');
+    assert.ok(
+      updated.querySelector('[data-gathering-event-match="timeOfDay"]'),
+      'time-of-day matching surfaced for the second event'
+    );
   });
 
   it('hides individual events for a blind environment but keeps the chance summary', async () => {
@@ -1188,56 +2062,258 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       risk: 'dangerous',
       eventChance: 0.5,
       events: [],
-      tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: true, blockedReasons: [] }],
-      discoveredTasks: []
+      tasks: [
+        {
+          action: 'blindGather',
+          label: 'Blind',
+          blind: true,
+          attemptable: true,
+          blockedReasons: [],
+        },
+      ],
+      discoveredTasks: [],
     });
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
     clickTab('events');
 
-    assert.ok(target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'), 'aggregate chance bar still shown for a blind env');
-    assert.equal(target.querySelector('.gathering-event-row'), null, 'no individual event rows for a blind env');
-    assert.ok(target.querySelector('[data-gathering-events-hidden]'), 'a "events hidden" hint is shown instead');
+    assert.ok(
+      target.querySelector('[data-gathering-event-section] [data-gathering-event-value]'),
+      'aggregate chance bar still shown for a blind env'
+    );
+    assert.equal(
+      target.querySelector('.gathering-event-row'),
+      null,
+      'no individual event rows for a blind env'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-events-hidden]'),
+      'a "events hidden" hint is shown instead'
+    );
+  });
+
+  // Issue 1778: the task row is the selectable list row, its chance in the aside beside its button.
+  it('draws a task as one list-row button, named by its name and chance, its chance beside it', async () => {
+    const picked = [];
+    const task = taskModel({ rich: { nodes: { current: 2, max: 3 }, stamina: { cost: 1 } } });
+    await renderRow({
+      task,
+      selected: true,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
+
+    const row = target.querySelector('[data-task-id="task-1"]');
+    assert.ok(
+      row.matches('.gathering-task-row.is-selected[role="listitem"][data-list-row="default"]'),
+      'the listitem is the row and keeps its hooks'
+    );
+    const control = row.querySelector(':scope > .gathering-task-summary');
+    assert.equal(control.tagName, 'BUTTON', 'its summary is a native button');
+    assert.equal(
+      row.querySelectorAll('button, [role="button"], [tabindex]').length,
+      1,
+      'and its one control'
+    );
+    assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(control.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Gather Iron',
+      'FABRICATE.App.Gathering.Detail.SuccessChance:{"x":50}',
+    ]);
+    const [economy, copy, chance] = describedBy(control);
+    assert.ok(economy.querySelector('[data-gathering-node-count]'), 'described by its economy');
+    assert.ok(copy.querySelector('[data-gathering-task-description]'), 'its description');
+    assert.ok(
+      chance.querySelector(':scope [data-gathering-success] [role="meter"]'),
+      'and its chance'
+    );
+    assert.ok(row.contains(chance) && !control.contains(chance), 'which sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.SuccessChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned left of its track, once'
+    );
+
+    control.click();
+    assert.deepEqual(picked, ['task-1'], 'the button selects the task');
+  });
+
+  it('keeps a blocked task an enabled control whose name says it is blocked', async () => {
+    const picked = [];
+    const task = taskModel({
+      id: 'task-blocked',
+      attemptable: false,
+      successChance: null,
+      blockedReasons: [{ code: 'TOOL_BLOCKED', message: 'Missing tools', data: {} }],
+    });
+    await renderRow({
+      task,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
+
+    const control = target.querySelector(
+      ':scope [data-task-id="task-blocked"] > .gathering-task-summary'
+    );
+    assert.equal(control.disabled, false, 'it opens the inspector that explains the block');
+    assert.equal(control.getAttribute('aria-pressed'), 'false');
+    assert.ok(
+      control.querySelector(':scope .fabricate-list-row-badges [data-gathering-callouts]'),
+      'the callouts are badges after the name'
+    );
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Gather Iron',
+      'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
+      'FABRICATE.App.Gathering.Detail.Blocked',
+    ]);
+    control.click();
+    assert.deepEqual(picked, ['task-blocked']);
+  });
+
+  it('draws an event as one list-row button, named by its danger and chance', async () => {
+    const picked = [];
+    const event = {
+      id: 'haz-1',
+      name: 'Rockslide',
+      description: '',
+      img: 'icons/svg/hazard.svg',
+      risk: 'deadly',
+      chance: 0.3,
+    };
+    await renderRow(
+      {
+        event,
+        onSelect: (id) => {
+          picked.push(id);
+        },
+      },
+      GatheringEventRow
+    );
+
+    const row = target.querySelector('[data-event-id="haz-1"]');
+    assert.ok(row.matches('.gathering-event-row[role="listitem"][data-list-row="default"]'));
+    const control = row.querySelector(':scope > .gathering-event-summary');
+    assert.equal(control.tagName, 'BUTTON');
+    assert.equal(row.querySelectorAll('button, [role="button"], [tabindex]').length, 1);
+    assert.equal(control.getAttribute('aria-pressed'), 'false');
+    assert.equal(row.getAttribute('data-selected'), 'false');
+    assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
+    assert.ok(
+      control.querySelector(':scope .fabricate-list-row-badges .gathering-event-danger.risk-deadly')
+    );
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Rockslide',
+      'FABRICATE.App.Gathering.Detail.Pips.Danger:{"value":"FABRICATE.App.Gathering.Detail.Risk.deadly"}',
+      'FABRICATE.App.Gathering.Detail.EventChance:{"x":30}',
+    ]);
+    const [copy, chance] = describedBy(control);
+    assert.ok(copy.querySelector('[data-gathering-event-description].is-fallback'));
+    assert.ok(chance.querySelector(':scope [data-gathering-event-chance] [role="meter"]'));
+    assert.ok(!control.contains(chance), 'the chance sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.EventChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned as the task’s chance is, so its qualifier is visible'
+    );
+    control.click();
+    assert.deepEqual(picked, ['haz-1']);
   });
 
   // issue 301: permanently-exhausted (nonRegenerating) node state.
   it('row shows the Exhausted callout for a NODE_EXHAUSTED block', async () => {
     await renderRow({
-      task: { id: 't1', name: 'Vein', attemptable: false, blockedReasons: [{ code: 'NODE_EXHAUSTED' }] }
+      task: {
+        id: 't1',
+        name: 'Vein',
+        attemptable: false,
+        blockedReasons: [{ code: 'NODE_EXHAUSTED' }],
+      },
     });
     const callouts = target.querySelector('[data-gathering-callouts]');
     assert.ok(callouts, 'header callout bar renders for a blocked task');
-    assert.ok(callouts.textContent.includes('Callout.NodeExhausted'), 'the exhausted callout label is shown');
+    assert.ok(
+      callouts.textContent.includes('Callout.NodeExhausted'),
+      'the exhausted callout label is shown'
+    );
   });
 
   it('detail shows the permanent-exhaustion copy and no respawn ETA for an exhausted node', async () => {
     await renderDetail({
       task: {
-        id: 't1', name: 'Vein', attemptable: false,
+        id: 't1',
+        name: 'Vein',
+        attemptable: false,
         blockedReasons: [{ code: 'NODE_EXHAUSTED' }],
-        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: true, current: 0, max: 5 } }
-      }
+        rich: {
+          nodes: {
+            enabled: true,
+            available: false,
+            depleted: true,
+            permanentlyExhausted: true,
+            current: 0,
+            max: 5,
+          },
+        },
+      },
     });
     const callout = target.querySelector('[data-gathering-node-depleted]');
     assert.ok(callout, 'the depleted/exhausted callout renders');
-    assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the permanent-exhaustion copy');
-    assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
+    assert.ok(
+      callout.textContent.includes('NodeExhaustedPermanent'),
+      'shows the permanent-exhaustion copy'
+    );
+    assert.ok(
+      !callout.textContent.includes('NodeDepletedRespawns'),
+      'does NOT show the replenishes-over-time copy'
+    );
     // RETARGETED, not deleted (issue 1514). The ETA moved onto `Notice`'s `detail` line.
-    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
+    assert.ok(
+      !callout.querySelector('.fab-notice-detail'),
+      'no respawn ETA for a permanently exhausted node'
+    );
   });
 
   it('detail still shows the replenishes-over-time copy for a regenerating depleted node (regression)', async () => {
     await renderDetail({
       task: {
-        id: 't2', name: 'Berries', attemptable: false,
+        id: 't2',
+        name: 'Berries',
+        attemptable: false,
         blockedReasons: [{ code: 'NODE_DEPLETED' }],
-        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: false, current: 0, max: 5 } }
-      }
+        rich: {
+          nodes: {
+            enabled: true,
+            available: false,
+            depleted: true,
+            permanentlyExhausted: false,
+            current: 0,
+            max: 5,
+          },
+        },
+      },
     });
     const callout = target.querySelector('[data-gathering-node-depleted]');
     assert.ok(callout, 'the depleted callout renders');
-    assert.ok(callout.textContent.includes('NodeDepletedRespawns'), 'shows the replenishes-over-time copy');
-    assert.ok(!callout.textContent.includes('NodeExhaustedPermanent'), 'does NOT show the permanent copy');
+    assert.ok(
+      callout.textContent.includes('NodeDepletedRespawns'),
+      'shows the replenishes-over-time copy'
+    );
+    assert.ok(
+      !callout.textContent.includes('NodeExhaustedPermanent'),
+      'does NOT show the permanent copy'
+    );
 
     // THE BANNER'S TREATMENT, WHICH NOTHING ASSERTED (issue 1514). Copy was covered and the
     // four things the conversion actually decided were not: flipping this banner to
@@ -1276,10 +2352,22 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   it('detail renders the respawn ETA as the depleted banner second line when one is known', async () => {
     await renderDetail({
       task: {
-        id: 't2b', name: 'Berries', attemptable: false,
+        id: 't2b',
+        name: 'Berries',
+        attemptable: false,
         blockedReasons: [{ code: 'NODE_DEPLETED' }],
-        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: false, current: 0, max: 5, respawnEta: { secondsUntil: 3600 } } }
-      }
+        rich: {
+          nodes: {
+            enabled: true,
+            available: false,
+            depleted: true,
+            permanentlyExhausted: false,
+            current: 0,
+            max: 5,
+            respawnEta: { secondsUntil: 3600 },
+          },
+        },
+      },
     });
     const callout = target.querySelector('[data-gathering-node-depleted]');
     assert.ok(callout, 'the depleted callout renders');
@@ -1295,13 +2383,28 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   it('detail shows the permanence line for a nonRegenerating node with current > 0', async () => {
     await renderDetail({
       task: {
-        id: 't3', name: 'Vein', attemptable: true,
-        rich: { nodes: { enabled: true, available: true, depleted: false, permanentlyExhausted: false, nonRegenerating: true, current: 3, max: 5 } }
-      }
+        id: 't3',
+        name: 'Vein',
+        attemptable: true,
+        rich: {
+          nodes: {
+            enabled: true,
+            available: true,
+            depleted: false,
+            permanentlyExhausted: false,
+            nonRegenerating: true,
+            current: 3,
+            max: 5,
+          },
+        },
+      },
     });
     const scarce = target.querySelector('[data-gathering-node-scarce]');
     assert.ok(scarce, 'the permanence callout renders before exhaustion');
-    assert.ok(scarce.textContent.includes('NodeScarcePermanent'), 'uses the permanence/scarcity key');
+    assert.ok(
+      scarce.textContent.includes('NodeScarcePermanent'),
+      'uses the permanence/scarcity key'
+    );
     // The SECOND node banner, asserted on the same four axes as its sibling above.
     assert.equal(
       scarce.getAttribute('data-notice-tone'),
@@ -1315,25 +2418,60 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
     assert.equal(scarce.getAttribute('role'), 'status', 'non-blocking, like its sibling');
     assert.equal(scarce.getAttribute('aria-live'), 'polite', 'with the live region the role wants');
-    assert.ok(!scarce.textContent.includes('"current"') && !scarce.textContent.includes('"max"'), 'does not repeat the node count');
+    assert.ok(
+      !scarce.textContent.includes('"current"') && !scarce.textContent.includes('"max"'),
+      'does not repeat the node count'
+    );
     // It is NOT the depleted/exhausted callout (resource is not yet exhausted).
-    assert.equal(target.querySelector('[data-gathering-node-depleted]'), null, 'no depleted/exhausted callout while current > 0');
+    assert.equal(
+      target.querySelector('[data-gathering-node-depleted]'),
+      null,
+      'no depleted/exhausted callout while current > 0'
+    );
   });
 
   it('detail shows the exhausted permanence copy for an exhausted nonRegenerating node (current <= 0)', async () => {
     await renderDetail({
       task: {
-        id: 't4', name: 'Vein', attemptable: false,
+        id: 't4',
+        name: 'Vein',
+        attemptable: false,
         blockedReasons: [{ code: 'NODE_EXHAUSTED' }],
-        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: true, nonRegenerating: true, current: 0, max: 5 } }
-      }
+        rich: {
+          nodes: {
+            enabled: true,
+            available: false,
+            depleted: true,
+            permanentlyExhausted: true,
+            nonRegenerating: true,
+            current: 0,
+            max: 5,
+          },
+        },
+      },
     });
     const callout = target.querySelector('[data-gathering-node-depleted]');
     assert.ok(callout, 'the exhausted callout renders');
-    assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the exhausted permanence copy when exhausted');
-    assert.ok(!callout.textContent.includes('"current"') && !callout.textContent.includes('"max"'), 'does not repeat the node count');
-    assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
-    assert.equal(target.querySelector('[data-gathering-node-scarce]'), null, 'the pre-exhaustion scarcity callout is not used at current <= 0');
+    assert.ok(
+      callout.textContent.includes('NodeExhaustedPermanent'),
+      'shows the exhausted permanence copy when exhausted'
+    );
+    assert.ok(
+      !callout.textContent.includes('"current"') && !callout.textContent.includes('"max"'),
+      'does not repeat the node count'
+    );
+    assert.ok(
+      !callout.textContent.includes('NodeDepletedRespawns'),
+      'does NOT show the replenishes-over-time copy'
+    );
+    assert.ok(
+      !callout.querySelector('.fab-notice-detail'),
+      'no respawn ETA for a permanently exhausted node'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-node-scarce]'),
+      null,
+      'the pre-exhaustion scarcity callout is not used at current <= 0'
+    );
   });
 });

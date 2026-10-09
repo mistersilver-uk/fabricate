@@ -6,13 +6,13 @@
   THE `all N faces` CAPTION IS NOT DRAWN HERE: the rail section's heading row carries it, and a
   second copy could disagree, the head's own fallback being a regex over the AUTHORED formula. IT
   ABSTAINS LOUDLY, a formula outside the enumerable shape rendering a STATED note naming the
-  reason rather than an approximation. BARS ARE `FillBar`, FLAT, per
-  `openspec/specs/ui-visual-style/spec.md` → "Shared product UI primitives"; it is a LEAF with no
-  `role` and no `aria-*`, so a row announces as a label/value pair with the bar decorative. No
-  gradient: the band strip's full-track semantic scale is that requirement's only exemption.
+  reason rather than an approximation. The bars are a compact `BandedBar`, flat: each row
+  announces as a name and a percentage, with its track hidden, and a one-outcome chart is its
+  meter drawn in the same band row. No gradient: the band strip's
+  full-track semantic scale is the only exemption.
 -->
 <script>
-  import FillBar from '../../../components/FillBar.svelte';
+  import BandedBar from '../../../components/BandedBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { bandToneFor } from './checkBandModel.js';
   import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
@@ -142,8 +142,14 @@
   const rows = $derived(Array.isArray(odds?.rows) ? odds.rows : []);
   // Rows run worst to best, so each bar takes its rank's hue on the tier strip's ramp; the
   // unrouted bucket is the hazard whatever its position.
-  const toneOf = (row, index) =>
-    row.id === 'unrouted' ? 'danger' : bandToneFor(index, rows.length);
+  const bands = $derived(
+    rows.map((row, index) => ({
+      id: row.id,
+      name: row.label,
+      percent: row.percent,
+      fill: row.id === 'unrouted' ? 'danger' : bandToneFor(index, rows.length),
+    }))
+  );
 </script>
 
 {#if !odds || odds.kind === null}
@@ -180,63 +186,6 @@
     data-checks-odds-direction={odds.direction}
     data-checks-odds-product={odds.product}
   >
-    <ul class="manager-checks-odds-list">
-      {#each rows as row, index (row.id)}
-        <li class="manager-checks-odds-row" data-checks-odds-row={row.id}>
-          <span class="manager-checks-odds-label">{row.label}</span>
-          <FillBar
-            value={row.percent}
-            size="sm"
-            tone={toneOf(row, index)}
-            dataAttr="data-checks-odds-bar"
-            dataValue={row.id}
-          />
-          <span class="manager-checks-odds-percent" data-checks-odds-percent={row.id}>
-            {row.percent}%
-          </span>
-        </li>
-      {/each}
-    </ul>
+    <BandedBar rows={bands} density="compact" />
   </div>
 {/if}
-
-<style>
-  .manager-checks-odds-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A three-track row. The name column is bounded so a long localized tier name cannot
-     squeeze the bar to nothing, and the percentage column is pinned so the numbers align. */
-  .manager-checks-odds-row {
-    display: grid;
-    grid-template-columns: minmax(0, 80px) 1fr 34px;
-    gap: var(--fab-space-2);
-    align-items: center;
-    min-width: 0;
-    margin: 0;
-  }
-
-  /* The library's banded-bar row: an 11px name and a `k-count` reading. */
-  .manager-checks-odds-label {
-    overflow: hidden;
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .manager-checks-odds-percent {
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 10.5px;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-</style>

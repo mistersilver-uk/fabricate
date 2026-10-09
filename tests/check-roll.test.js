@@ -3,6 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { installCountDice } from './helpers/countEngineDice.js';
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
+
 const {
   rolledDiceGroups,
   resolveForcedOutcome,
@@ -200,6 +203,26 @@ function stubCraftingModRoll() {
   };
   globalThis.Roll = Roll;
   return rolledFormulas;
+}
+
+/**
+ * The shared term-bearing double (issue 2007) for the advantage tests: records each EVALUATED
+ * roll's `_formula`, because the keep transform will act on the constructed Roll's terms.
+ */
+function stubTermBearingRoll() {
+  const evaluatedFormulas = [];
+  installTermBearingRoll({
+    total: 12,
+    extend: (TermRoll) =>
+      class RecordingTermRoll extends TermRoll {
+        async evaluate(options) {
+          await super.evaluate(options);
+          evaluatedFormulas.push(this._formula);
+          return this;
+        }
+      },
+  });
+  return evaluatedFormulas;
 }
 
 const MOD_CONTEXT = {
@@ -504,7 +527,7 @@ test('playerPicks: the prompt receives the descriptor and a neutral modifier pla
 });
 
 test('playerPicks: the chosen modifier is APPENDED BEFORE the advantage transform', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   const actor = { getRollData: () => ({}) };
   const rolled = await evaluateCheckRoll('1d20', actor, {
     interactive: true,
@@ -636,8 +659,9 @@ const D20_MODIFIER_CHOICE = {
   defaultSelectedId: 'wild',
 };
 
-test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+// R1 class (a) (issue 2007): the check's own plain `3d6` now keeps; the modifier's d20 never does.
+test("a d20 MODIFIER never receives the keep; the check's own plain first group does", async () => {
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '3d6',
@@ -651,10 +675,10 @@ test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage',
       },
     }
   );
-  assert.equal(asked.allowAdvantage, false, '3d6 is not a plain-d20 check, whatever it appends');
+  assert.equal(asked.allowAdvantage, true, "3d6 is the check's own plain first group");
   assert.equal(
     rolledFormulas.at(-1),
-    '3d6 + (1d20)[Modifiers]',
+    '4d6kh3 + (1d20)[Modifiers]',
     "the modifier's die is left alone even when a caller forces the disposition"
   );
   delete globalThis.Roll;
@@ -662,9 +686,9 @@ test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage',
 
 // The NON-DEFERRED path asked the same question of the POST-append formula, so it is
 // covered separately: on the deferred path the two readings coincide and a mutation there
-// would go unnoticed.
-test('a non-deferred d20 modifier does not manufacture an advantage offer', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+// would go unnoticed. R1 class (a) (issue 2007): the offer is now the check's own plain 3d6.
+test('a non-deferred d20 modifier never becomes the offered or kept group', async () => {
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '3d6',
@@ -682,13 +706,13 @@ test('a non-deferred d20 modifier does not manufacture an advantage offer', asyn
       },
     }
   );
-  assert.equal(asked.allowAdvantage, false, 'the appended d20 is not the check`s own');
-  assert.equal(rolledFormulas.at(-1), '3d6 + (1d20)[Modifiers]');
+  assert.equal(asked.allowAdvantage, true, 'the offer is the check`s own 3d6, not the appended d20');
+  assert.equal(rolledFormulas.at(-1), '4d6kh3 + (1d20)[Modifiers]');
   delete globalThis.Roll;
 });
 
 test('advantage still rewrites the CHECK`s own d20 with a d20 modifier appended', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '1d20',
@@ -855,7 +879,7 @@ test('playerPicks: a cancelled prompt aborts with no appended term and no roll',
 // can silently break: `effectiveFormula` gets the bonus appended, and only the paired `resolved =
 // resolveCheckFormulaDisplay(...)` recompute keeps the journal / `resolvedFormula` in step.
 test('playerPicks: eval == display with a situational bonus (and advantage) composed on top', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   const actor = { getRollData: () => ({}) };
   const rolled = await evaluateCheckRoll('1d20', actor, {
     interactive: true,
@@ -1765,26 +1789,35 @@ test('executed simple evidence records the raw sum/over comparison under a force
   );
 });
 
-test('standalone companion check refuses an unpublished mode before the current over runner', async () => {
-  stubRoll(8);
-  // Count rows publish `interactive: false` (issue 2004), so an interactive count request is unsupported.
-  const result = await rollActorCheck(
-    { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
-      evaluation: { product: 'count', direction: 'under' } },
-    {
-      isElectedExecutor: () => true,
-      hasDiceEngine: () => true,
-      localize: (_key, fallback) => fallback,
-      buildRollOptions: () => ({ post: false }),
-      prompt: async () => ({ confirmed: true }),
-      runPassFail: runFormulaPassFail,
-      runProgressive: runFormulaProgressive,
-    }
-  );
-  assert.equal(result.outcome, 'evaluationUnsupported');
-  assert.equal(result.success, false);
-  assert.equal(result.total, null);
-  assert.deepEqual(evaluateArgs, [], 'the unsupported mode never reached the dice engine');
+test('standalone companion check prompts and rolls an interactive count with additional dice enabled', async () => {
+  // The interim refusal is gone (issue 2008): the prompt offers the dice, here with no source set.
+  const dice = installCountDice({ faces: [9, 3] });
+  const offers = [];
+  try {
+    const result = await rollActorCheck(
+      { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
+        evaluation: { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } } },
+      {
+        isElectedExecutor: () => true,
+        hasDiceEngine: () => true,
+        localize: (_key, fallback) => fallback,
+        buildRollOptions: ({ interactive }) => ({ interactive, post: false }),
+        prompt: async ({ additionalDiceOffer }) => {
+          offers.push(additionalDiceOffer);
+          return { confirmed: true };
+        },
+        runPassFail: runFormulaPassFail,
+        runProgressive: runFormulaProgressive,
+      }
+    );
+    assert.equal(result.outcome, 'checkPassed', 'one of the two authored dice at or under 8');
+    assert.deepEqual([result.total, result.boughtDice], [1, 0]);
+    assert.equal(offers.length, 1, 'the prompt opened, offering the additional dice');
+    assert.equal(offers[0].unavailable, 'sourceMissing');
+    assert.equal(dice.constructed.length, 1, 'the count Roll reached the dice engine');
+  } finally {
+    dice.restore();
+  }
 });
 
 test('gathering routed adapter keeps inert count pool data while executing sum/over', async () => {

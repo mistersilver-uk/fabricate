@@ -24,7 +24,7 @@ import {
   OR_MENU_LABELS,
   assertOneTrackPerGridChild,
   kindPickerFixture,
-  orMenuGroupCardSource,
+  orMenuSource,
 } from './manager-layout-recipes-fixtures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,11 +45,11 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   assert.ok(headBlock.includes('display: flex;'), 'the column header mirrors the row flex split');
   const headClusterBlock = blockFor('.fabricate-manager .manager-recipe-head-cluster');
   assert.ok(
-    headClusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    headClusterBlock.includes('grid-template-columns: var(--fab-manager-recipe-cluster-cols);'),
     'the header cluster shares the row cluster column template so the two align'
   );
   assert.ok(
-    clusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    clusterBlock.includes('grid-template-columns: var(--fab-manager-recipe-cluster-cols);'),
     'the row cluster consumes the same shared column template'
   );
   // The header hides at the stacked breakpoint.
@@ -90,7 +90,7 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   }
   assert.ok(rowBlock.includes('min-height: 62px;'), 'the recipe row is the denser library card');
   assert.ok(
-    rowBlock.includes('padding: 11px 12px;'),
+    rowBlock.includes('padding: var(--fab-space-3);'),
     'the recipe row uses the library card padding'
   );
   // The recipe row's own radius (9px) was retired by issue 883: the edge.
@@ -190,7 +190,7 @@ test('manager recipe row collapses in the specified order and never drops its co
 // than prepended, and that is what makes the column header's four explicit `grid-column`
 // placements survive: a prepend would have shifted every one of them by a track.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
-  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
+  const declarations = [...css.matchAll(/--fab-manager-recipe-cluster-cols:\s*([^;]+);/g)].map(
     ([, value]) => value.replace(/\s+/g, ' ').trim()
   );
   assert.equal(
@@ -200,7 +200,7 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
   );
 
   for (const declaration of declarations) {
-    const tracks = [...declaration.matchAll(/var\(--fab-recipe-col-([a-z]+)\)/g)].map(
+    const tracks = [...declaration.matchAll(/var\(--fab-manager-recipe-col-([a-z]+)\)/g)].map(
       ([, name]) => name
     );
     assert.equal(
@@ -218,7 +218,7 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
 
   assert.ok(
     blockFor('.fabricate-manager .manager-recipes-table').includes(
-      '--fab-recipe-col-select: 22px;'
+      '--fab-manager-recipe-col-select: 22px;'
     ),
     'the track is the SelectionCheckbox `lg` box, declared rather than derived'
   );
@@ -375,7 +375,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
         <span class="manager-recipe-option-divider"></span>
-        <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span></button></div>
+        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
@@ -383,7 +383,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
 
-  // The row exactly as `RecipeIngredientOption` renders a tag requirement: the plate.
+  // The row exactly as `PickerRow` renders a tag requirement: the plate.
   const tagRow = (caseName, chips) =>
     stamp(`
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
@@ -521,7 +521,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
 test('a suggestion reads from the left edge the typed query does, under the host button rule', async () => {
   // `proto:2280` draws a suggestion as `display:flex; align-items:center; gap:8px; height:30px;
   // padding:0 8px`, then a 12px glyph and a label at `font:500 11px var(--sans)`. There is no
-  // centring anywhere in it, and there cannot be: the panel sits directly beneath the field it
+  // centring anywhere in it, and there cannot be: the panel shares the left edge of the field it
   // completes, so a suggestion that does not start where the query starts is not continuing the
   // GM's own typing (issue 1373, maintainer round 7).
   // IT SHIPPED CENTRED, and the sheet looked right. `.manager-recipe-option-suggestion` is a
@@ -559,15 +559,18 @@ test('a suggestion reads from the left edge the typed query does, under the host
               <span class="manager-recipe-option-name-field">
                 <span class="manager-recipe-option-search is-typing">
                   <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" data-recipe-option-search value="ingot" placeholder="Search components...">
-                </span>
-                <span class="manager-recipe-option-suggestions">
-                  <button type="button" class="manager-recipe-option-suggestion" data-recipe-option-suggestion="sm-iron-ingot">
-                    <i class="fas fa-cube manager-recipe-option-mark is-component"></i><span>Iron Ingot</span>
-                  </button>
+                  <input type="text" data-recipe-option-search value="ingot" role="combobox" placeholder="Search components...">
                 </span>
               </span>
             </div>
+            <!-- The list as it renders: portalled out of the row to the application root, with the
+                 placement the typeahead panel action writes inline, beneath the field and sharing
+                 its left edge. -->
+            <span class="manager-recipe-option-suggestions" role="listbox" style="left: 0px; right: auto; width: 300px; min-width: 300px; max-width: 300px; max-height: 232px; top: 34px; bottom: auto;">
+              <button type="button" class="manager-recipe-option-suggestion" data-recipe-option-suggestion="sm-iron-ingot" role="option" tabindex="-1" aria-selected="false">
+                <i class="fas fa-cube manager-recipe-option-mark is-component"></i><span>Iron Ingot</span>
+              </button>
+            </span>
             <!-- The tag picker's own option row (proto:2261), the same shape from the same
                  panel family and therefore exposed to the same host rule. It is here because
                  reading its declaration is not the same as measuring it: the question the
@@ -740,7 +743,7 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
       };
     });
 
-    assert.equal(report.panel.radius, '10px', 'proto:2258 corners the panel at 10px');
+    assert.equal(report.panel.radius, '11px', 'proto:2258 draws 10px; the panel rung is 11');
     assert.equal(report.panel.padding, '6px', 'proto:2258 insets it by 7px, nearest step 6');
     assert.equal(report.panel.gap, '4px', 'proto:2258 gaps its column by 5px, nearest step 4');
     assert.equal(
@@ -838,7 +841,7 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
               <label class="manager-segment" data-segment="all"><input type="radio" class="manager-segment-input" name="tm"><span class="manager-segment-label">All of</span></label>
             </div>`)}
             <span data-probe="edge" style="color: color-mix(in srgb, var(--fab-purple) 40%, transparent)"></span>
-            <span data-probe="lit" style="color: color-mix(in srgb, var(--fab-purple) 22%, transparent)"></span>
+            <span data-probe="lit" style="color: var(--fab-purple-soft)"></span>
             <span data-probe="warm" style="color: var(--fab-surface-active)"></span>
             <span data-probe="resting" style="color: var(--fab-text-subtle)"></span>
           </main>
@@ -1080,7 +1083,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
-      <button type="button" class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>
+      <button type="button" class="fabricate-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
       withChipHash(
@@ -1152,33 +1155,25 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 test('the "or…" menu is a 150px panel of four tinted, one-word entries under its own header', async () => {
   // WHY IT IS MEASURED AND NOT READ. Three of this panel's claims are cascade questions that a
   // sheet cannot answer on its own:
-  const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
+  const kickerScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/Kicker.svelte')
   );
-  const stamp = (markup) =>
-    [
-      'manager-travel-popover',
-      'manager-travel-popover-header',
-      'manager-travel-popover-title',
-      'manager-travel-popover-options',
-      'manager-travel-option',
-      'manager-travel-option-name',
-    ].reduce((html, className) => withScopeHash(html, className, popoverScoped.hashClass), markup);
 
-  // The panel exactly as `SearchablePopover` portals it: the primitive's own two classes.
-  const panel = stamp(
-    '<div class="fabricate-picker-popover manager-travel-popover manager-recipe-or-popover" ' +
-      'role="dialog" aria-label="Accept instead" style="width: 150px;">' +
-      '<div class="manager-travel-popover-header" data-popover-header>' +
-      '<span class="manager-travel-popover-title">Accept instead</span></div>' +
-      '<div class="manager-travel-popover-options" role="listbox" aria-label="Accept instead">' +
+  // The panel exactly as `ActionMenu` portals it with a heading: the heading beside the menu.
+  const panel = withScopeHash(
+    '<div class="fabricate-action-menu-panel manager-action-menu-panel manager-recipe-or-menu">' +
+      '<div class="manager-action-menu-heading" id="or-menu-heading">' +
+      '<span class="fab-kicker">Accept instead</span></div>' +
+      '<div class="manager-action-menu-list" role="menu" aria-labelledby="or-menu-heading">' +
       OR_MENU_KINDS.map(
         (kind) =>
-          `<button type="button" class="manager-travel-option" role="option" data-recipe-add="alternative-${kind}" data-kind="${kind}">` +
-          `<i class="${OR_MENU_GLYPHS[kind]} manager-recipe-option-mark is-${kind}"></i>` +
-          `<span class="manager-travel-option-name">${OR_MENU_LABELS[kind]}</span></button>`
+          `<button type="button" class="manager-action-menu-item is-${kind}" role="menuitem" data-recipe-add="alternative-${kind}" data-kind="${kind}">` +
+          `<i class="${OR_MENU_GLYPHS[kind]}"></i>` +
+          `<span>${OR_MENU_LABELS[kind]}</span></button>`
       ).join('') +
-      '</div></div>'
+      '</div></div>',
+    'fab-kicker',
+    kickerScoped.hashClass
   );
 
   // The reference marks: the same four classes, on the plate a requirement ROW draws.
@@ -1206,7 +1201,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
               a.button, button { display: flex; justify-content: center; }
             }
             @layer modules { ${css} }
-            ${popoverScoped.css}
+            ${kickerScoped.css}
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
             .fas::before, .fa-solid::before { content: "x"; }
           </style>
@@ -1221,12 +1216,12 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     `);
 
     const report = await page.evaluate(() => {
-      const panelNode = document.querySelector('.manager-recipe-or-popover');
+      const panelNode = document.querySelector('.manager-recipe-or-menu');
       const panelStyle = getComputedStyle(panelNode);
-      const heading = panelNode.querySelector('.manager-travel-popover-title');
+      const heading = panelNode.querySelector('.fab-kicker');
       const entries = [...panelNode.querySelectorAll('[data-recipe-add]')].map((entry) => {
         const glyph = entry.querySelector('i');
-        const label = entry.querySelector('.manager-travel-option-name');
+        const label = entry.querySelector('span');
         const style = getComputedStyle(entry);
         const box = entry.getBoundingClientRect();
         const labelStyle = getComputedStyle(label);
@@ -1235,6 +1230,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
           justifyContent: style.justifyContent,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
+          minHeight: style.minHeight,
+          height: Number(box.height.toFixed(2)),
           // The offset of the glyph from the entry's own padding edge.
           glyphIndent: Number(
             (
@@ -1284,6 +1281,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
       );
       assert.equal(entry.fontSize, '11px', `\`proto:4683\`: the ${entry.kind} entry is 11px`);
       assert.equal(entry.fontWeight, '600', `\`proto:4683\`: the ${entry.kind} entry is 600`);
+      assert.equal(entry.minHeight, '28px', `\`proto:4683\`: a 28px ${entry.kind} entry`);
+      assert.ok(entry.height >= 28, `the ${entry.kind} entry paints 28px or more (${entry.height}px)`);
       assert.equal(entry.glyphFontSize, '10px', '`proto:4683`: a 10px glyph');
       assert.equal(entry.glyphWidth, '14px', '`proto:4683`: a 14px glyph column');
       assert.ok(
@@ -1310,13 +1309,12 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     await context.close();
   }
 
-  // THE WIDTH'S OWN SOURCE. The primitive writes the computed width onto the node.
+  // The width's own source. The sheet sizes the panel by the class the caller hands the menu.
   assert.match(
-    orMenuGroupCardSource,
-    /minWidth=\{150\}/,
-    '`proto:2292` fixes the panel at 150px, so the caller must ask for exactly that'
+    orMenuSource,
+    /menuClass="manager-recipe-or-menu"/,
+    '`proto:2292` fixes the panel at 150px through the class the measured panel carries'
   );
-  assert.match(orMenuGroupCardSource, /maxWidth=\{150\}/, 'and must not let it grow past it');
 });
 
 
@@ -1357,9 +1355,9 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker">
+            <div class="fabricate-action-menu">
               <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
-                <i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span>
+                <i class="fa-solid fa-code-branch"></i><span>or…</span>
               </button>
             </div>
             <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -1446,13 +1444,13 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   // it, so the claim that these ARE the two triggers is pinned at both call sites: neither may
   // ask for the chip shape whose own scoped block is what discarded the rules above.
   assert.doesNotMatch(
-    orMenuGroupCardSource,
+    orMenuSource,
     /\n\s+triggerChip\b/,
     'the "or…" trigger is a bare button this sheet can style, not a Chip'
   );
   assert.doesNotMatch(
     readFileSync(
-      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte'),
+      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte'),
       'utf8'
     ),
     /\n\s+triggerChip\b/,

@@ -277,35 +277,35 @@ test('route chrome and header actions are validated as shape, not as content', (
 test('an action tone renders the Manager button class Core uses for its own controls', () => {
   assert.equal(
     managerHeaderActionClass({ tone: 'primary' }),
-    'fabricate-button manager-button is-primary'
+    'fabricate-button is-primary'
   );
   assert.equal(
     managerHeaderActionClass({ tone: 'ghost' }),
-    'fabricate-button manager-button is-ghost'
+    'fabricate-button is-ghost'
   );
   assert.equal(
     managerHeaderActionClass({ tone: 'danger' }),
-    'fabricate-button manager-button is-danger'
+    'fabricate-button is-danger'
   );
-  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'fabricate-button manager-button');
+  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'fabricate-button');
   assert.equal(
     managerHeaderActionClass({ primary: true }),
-    'fabricate-button manager-button is-primary',
+    'fabricate-button is-primary',
     'the shipped `primary` spelling keeps its shipped rendering'
   );
-  assert.equal(managerHeaderActionClass({}), 'fabricate-button manager-button');
-  assert.equal(managerHeaderActionClass(undefined), 'fabricate-button manager-button');
+  assert.equal(managerHeaderActionClass({}), 'fabricate-button');
+  assert.equal(managerHeaderActionClass(undefined), 'fabricate-button');
 
   // The teeth: EVERY declared tone must map to something. A tone added to the list without a class
   // would otherwise render as a bare button and read as a stylesheet oversight.
   for (const tone of ACTION_TONES) {
     const rendered = managerHeaderActionClass({ tone });
     assert.ok(
-      rendered.startsWith('fabricate-button manager-button'),
+      rendered.startsWith('fabricate-button'),
       `${tone} must render through the Manager's own button`
     );
     assert.ok(
-      tone === 'neutral' || rendered !== 'fabricate-button manager-button',
+      tone === 'neutral' || rendered !== 'fabricate-button',
       `${tone} declares a treatment, so it must add a modifier class`
     );
   }

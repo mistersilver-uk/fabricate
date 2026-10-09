@@ -33,7 +33,7 @@
 <script>
   import Medallion from '../../components/Medallion.svelte';
   import Stepper from '../../components/Stepper.svelte';
-  import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
 
   let {
     id = '',
@@ -59,19 +59,6 @@
     minRows = 5,
     children,
   } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  function phrase(key, fallback, data) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(data ?? {})) {
-      result = result.replaceAll(`{${token}}`, String(value));
-    }
-    return result;
-  }
 
   // Spread, following `Callout`'s hook idiom: the attribute NAME is a parameter, so it cannot be
   // written literally. `''` rather than `true`, because Svelte serialises `true` as `="true"`.
@@ -148,19 +135,19 @@
               min={row.min === undefined ? 0 : row.min}
               max={row.max ?? max}
               disabled={inert || row.disabled === true}
-              ariaLabel={phrase(
+              ariaLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceValueFor',
                 'Value for {name}',
                 {
                   name: row.name,
                 }
               )}
-              decrementLabel={phrase(
+              decrementLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceStepDown',
                 'Step {name} down',
                 { name: row.name }
               )}
-              incrementLabel={phrase(
+              incrementLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceStepUp',
                 'Step {name} up',
                 {
@@ -213,11 +200,15 @@
          categories, tags and essences alike. `Page {page} of {of}` is the reference's own sentence
          (`proto:1157`, `Page 1 of 1`); the world panel's `Page {page}/{of}` is its own key. -->
     <span class="fab-bulk-inset-range" data-bulk-inset-range={id}>
-      {phrase('FABRICATE.Admin.Manager.BulkEdit.InsetRange', 'Showing {start}-{end} of {total}', {
-        start: page?.rangeStart ?? 0,
-        end: page?.rangeEnd ?? 0,
-        total: page?.total ?? 0,
-      })}
+      {localizeOr(
+        'FABRICATE.Admin.Manager.BulkEdit.InsetRange',
+        'Showing {start}-{end} of {total}',
+        {
+          start: page?.rangeStart ?? 0,
+          end: page?.rangeEnd ?? 0,
+          total: page?.total ?? 0,
+        }
+      )}
     </span>
     <div class="fab-bulk-inset-pages">
       <!-- EVERY `<button>` HERE DECLARES `data-keyboard-focus="true"`: Foundry's
@@ -225,28 +216,28 @@
            none, so a focused pager would otherwise leave Space pausing the game. -->
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-prev={id}
         disabled={disabled || pageIndex === 0}
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+        aria-label={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
         onclick={() => onPage(pageIndex - 1)}
       >
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
       </button>
       <span class="fab-bulk-inset-page-label">
-        {phrase('FABRICATE.Admin.Manager.BulkEdit.InsetPage', 'Page {page} of {of}', {
+        {localizeOr('FABRICATE.Admin.Manager.BulkEdit.InsetPage', 'Page {page} of {of}', {
           page: pageIndex + 1,
           of: pageCount,
         })}
       </span>
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-next={id}
         disabled={disabled || pageIndex >= pageCount - 1}
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+        aria-label={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
         onclick={() => onPage(pageIndex + 1)}
       >
         <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -281,6 +272,10 @@
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);
+  }
+
+  .fab-bulk-inset-search:focus-within {
+    border-color: var(--fab-accent);
   }
 
   .fab-bulk-inset-search > i {
@@ -318,24 +313,18 @@
     gap: var(--fab-space-1);
     /* A 28px row plus its 4px gap per row, less the last gap (M24: rows sit on rungs now, so the
        window is the rung's arithmetic — five glyph rows are 156px). */
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (28px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (28px + 4px) - 4px);
     align-content: flex-start;
   }
 
   /* The box rows are on the 30 rung (five: 166px) and the stepper rows on 34 (five: 186px, the
      reference's own `min-height:186px` at `proto:1200`). */
   .fab-bulk-inset-rows.is-rung-30 {
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (30px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (30px + 4px) - 4px);
   }
 
   .fab-bulk-inset-rows.is-rung-34 {
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (34px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (34px + 4px) - 4px);
   }
 
   /* THE ROW, ROOTED AT THIS COMPONENT (see the header): the reference's 27px row on the 28 rung
@@ -363,13 +352,13 @@
     cursor: pointer;
   }
 
-  :global(.fab-bulk-inset button.fab-bulk-inset-row:hover:not(:disabled)) {
+  :global(.fab-bulk-inset button.fab-bulk-inset-row:not([aria-pressed='true']):enabled:hover) {
     border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
-  /* The three staged paints (`proto:5601`-`5604`): a chosen or added row on the accent pair, a
-     removal on the danger pair — the direction has to survive a monochrome render, so the glyph
-     carries it too. `is-staged` is the reference's `add`/`on` face; `is-removing` its `rem`. */
+  /* The staged pair (`proto:5601`-`5604`), pressed, kept under the pointer: `add`/`on` on accent,
+     `rem` on danger, and the glyph carries the direction too, for a monochrome render. */
   :global(.fab-bulk-inset .fab-bulk-inset-row.is-staged) {
     border-color: var(--fab-accent-border);
     background: var(--fab-accent-soft);
@@ -387,7 +376,8 @@
     cursor: default;
   }
 
-  :global(.fab-bulk-inset button.fab-bulk-inset-row:focus-visible) {
+  :global(.fab-bulk-inset button.fab-bulk-inset-row:focus-visible),
+  .fab-bulk-inset-page:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
@@ -436,6 +426,7 @@
   :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper) {
     height: 34px;
     min-height: 34px;
+    border-radius: 9px;
     cursor: default;
   }
 
@@ -477,9 +468,8 @@
     font-size: 0.63rem;
   }
 
-  /* The pager is lifted back to `--fab-bg-1` like the search well, so the recess reads as a card
-     with two lit edges rather than as a flat band (`proto:1153`). Radius 7, not the reference's
-     8: the ladder puts nothing on 8. */
+  /* Lifted back to `--fab-bg-1` like the search well, so the recess reads as a card with two lit
+     edges, not a flat band (`proto:1153`); a well's 9, as the reference's 8 is on no rung. */
   .fab-bulk-inset-pager {
     display: flex;
     gap: var(--fab-space-2);
@@ -488,7 +478,7 @@
     /* `proto:1153`: `padding:6px 8px`, the dense step over the scale's 8. */
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 7px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -529,11 +519,6 @@
   .fab-bulk-inset-page:disabled {
     color: var(--fab-text-disabled);
     cursor: default;
-  }
-
-  .fab-bulk-inset-page:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
   }
 
   .fab-bulk-inset-page-label {

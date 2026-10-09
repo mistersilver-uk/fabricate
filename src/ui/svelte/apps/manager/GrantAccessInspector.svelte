@@ -14,7 +14,7 @@
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import { createRecipeAccessBrowserState } from '../../../model/managerBrowserViewState.js';
 
   // Fixed roster page size (design: 6 per roster). THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT
@@ -206,9 +206,9 @@
     <p class="manager-kicker">
       {text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}
     </p>
-    <div class="manager-inspector-title-row">
-      <span class="manager-inspector-icon" aria-hidden="true"
-        ><Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={46} /></span
+    <div class="manager-inspector-title-row is-art">
+      <span class="manager-inspector-icon is-art" aria-hidden="true"
+        ><Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={38} /></span
       >
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>
@@ -235,13 +235,13 @@
              `slice.filtered`, because a field that removed itself once a query matched nothing
              would trap the GM with no way to clear the term they typed. -->
         {#if section.rows.length > 0}
-          <ManagerSearchField
+          <SearchField
             class="manager-access-roster-search"
             value={section.query}
-            onInput={(next) => section.onSearch(next)}
+            onChange={(next) => section.onSearch(next)}
             placeholder={section.searchPlaceholder}
             ariaLabel={section.searchPlaceholder}
-            inputAttrs={{ 'data-access-roster-search': section.key }}
+            inputProps={{ 'data-access-roster-search': section.key }}
           />
         {/if}
         {#if section.slice.filtered.length === 0}
@@ -251,8 +251,7 @@
           <EmptyState
             note
             title={text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
-            dataAttr="data-access-roster-empty"
-            dataValue={section.key}
+            data-access-roster-empty={section.key || true}
           />
         {:else}
           <div class="manager-access-roster-rows">
@@ -277,14 +276,14 @@
                [data-access-roster], and that placement is load-bearing: the primitive stamps a
                bare `data-pagination-prev`/`-next` with no per-instance key, so the roster section
                is the only thing that tells the two bars apart FOR A TEST OR A CAPTURE. A
-               screen-reader user cannot reach the ancestor, which is what `label`/`navLabel`
+               screen-reader user cannot reach the ancestor, which is what `ariaLabel`/`navLabel`
                answer. -->
           <Pagination
             totalCount={section.slice.filtered.length}
             pageSize={ROSTER_PAGE_SIZE}
             pageIndex={section.page}
             showPageSize={false}
-            label={rosterLandmarks(section.title).label}
+            ariaLabel={rosterLandmarks(section.title).label}
             navLabel={rosterLandmarks(section.title).navLabel}
             onPageChange={section.onPageChange}
           />

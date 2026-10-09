@@ -36,6 +36,8 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   'recipes[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.componentId',
   'recipes[].resultGroups[].results[].componentId',
   'recipes[].resultGroups[].results[].systemItemId',
+  'recipes[].resultGroups[].results[].alternatives[].componentId',
+  'recipes[].resultGroups[].results[].alternatives[].systemItemId',
   'recipes[].steps[].toolIds[]',
   'recipes[].steps[].ingredientSets[].toolIds[]',
   'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].componentId',
@@ -44,6 +46,8 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.componentId',
   'recipes[].steps[].resultGroups[].results[].componentId',
   'recipes[].steps[].resultGroups[].results[].systemItemId',
+  'recipes[].steps[].resultGroups[].results[].alternatives[].componentId',
+  'recipes[].steps[].resultGroups[].results[].alternatives[].systemItemId',
   // --- gatheringConfig ---
   'gatheringConfig.systems.*.tasks[].toolIds[]',
   'gatheringConfig.systems.*.tasks[].dropRows[].componentId',
@@ -252,11 +256,12 @@ export function rewriteEssenceQuantityMap(container, { remapEssence = identity }
   container.essences = Object.fromEntries(merged);
 }
 
-/** Rewrite one result reference in place. */
+/** Rewrite one result reference in place, a choice group's members included (issue 1773). */
 function rewriteResultRef(result, remapComponent) {
   if (!isPlainObject(result)) return;
   if ('componentId' in result) result.componentId = remapComponent(result.componentId);
   if ('systemItemId' in result) result.systemItemId = remapComponent(result.systemItemId);
+  for (const member of arrayOf(result.alternatives)) rewriteResultRef(member, remapComponent);
 }
 
 function rewriteResultGroups(resultGroups, remapComponent) {
@@ -406,14 +411,17 @@ export function rewriteSystemReferences(
   { remapComponent = identity, remapTool = identity, remapEssence = identity } = {}
 ) {
   if (!isPlainObject(system)) return;
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const component of arrayOf(system.components)) {
     rewriteComponentReferences(component, { remapComponent, remapTool, remapEssence });
   }
   // The essence definition's own id is not touched, for the reason the component's is not: re-keying
   // a definition is the caller's decision.
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const definition of arrayOf(system.essenceDefinitions)) {
     rewriteEssenceReferences(definition, { remapComponent });
   }
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const tool of arrayOf(system.tools)) {
     rewriteToolReferences(tool, { remapComponent, remapEssence });
   }
@@ -431,6 +439,7 @@ export function rewriteGatheringSliceReferences(
   for (const record of [...arrayOf(slice.tasks), ...arrayOf(slice.events)]) {
     rewriteGatheringRecordReferences(record, { remapComponent, remapTool });
   }
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const tool of arrayOf(slice.tools)) {
     rewriteToolReferences(tool, { remapComponent, remapEssence });
   }

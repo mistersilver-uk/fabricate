@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
@@ -13,7 +14,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,12 +22,18 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-salvage-reload-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
+    // Issue 2008: the salvage sub-stores word an additional-dice refusal through the presenter.
+    ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
@@ -76,9 +83,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    // The shared ladder the routed body draws, and the row each recovered result is (issue 1644).
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
@@ -86,6 +97,8 @@ const harness = createMountedComponentHarness({
     // The multi-system participation selector InventoryComponentDetail now imports (issue
     // 766) — a `.svelte` leaf; an omission HANGS this suite (# cancelled), never fails.
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    // The Info | Salvage strip (issue 1518).
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of

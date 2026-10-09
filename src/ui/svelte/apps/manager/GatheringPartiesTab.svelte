@@ -19,7 +19,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -164,7 +164,7 @@
     scrollPaneToTop();
   }
 
-  // `ManagerSearchField` hands its caller the NEXT VALUE rather than the event (issue 1515);
+  // `SearchField` hands its caller the NEXT VALUE rather than the event (issue 1515);
   // it has already written the string, so this only has to react to it.
   function onSearchInput(next) {
     searchTerm = next;
@@ -244,7 +244,7 @@
           'FABRICATE.Admin.Manager.World.Parties.Empty.Body',
           'Gathering still runs: a character in no party has no current realm, so ungated environments stay open and location-gated ones stay out of reach. Create a party when you want realm gating to apply.'
         )}
-        dataAttr="data-travel-parties-none"
+        data-travel-parties-none
       >
         <button
           type="button"
@@ -260,7 +260,7 @@
       </EmptyState>
     {:else}
       {#if showSearch}
-        <!-- THE SHARED SEARCH FIELD (issue 1515), which `ManagerSearchField`'s own docblock
+        <!-- THE SHARED SEARCH FIELD (issue 1515), which `SearchField`'s own docblock
              listed as one of five hand-rolled twins it declined to convert because doing so
              "would be a re-skin rather than a conversion — a change with visible output and its
              own review". This is that review: the row was a bordered 32px box holding a
@@ -272,19 +272,19 @@
              the pane's only announcement that a query narrowed the list — and drops the border,
              the height, the corner and the fill the field now paints for itself.
 
-             THE INPUT KEEPS BOTH OF ITS OWN ATTRIBUTES through `inputAttrs`, because the rest
+             The input keeps both of its own attributes through `inputProps`, because the rest
              spread belongs to the `<label>`: the capture hook the View Lab case types into, and
              the `aria-describedby` that ties the field to that counter. -->
         <div class="manager-travel-parties-search">
-          <ManagerSearchField
+          <SearchField
             value={searchTerm}
-            onInput={onSearchInput}
+            onChange={onSearchInput}
             placeholder={text(
               'FABRICATE.Admin.Manager.World.Parties.Search.Placeholder',
               'Search by party, member or travel actor'
             )}
             ariaLabel={text('FABRICATE.Admin.Manager.World.Parties.Search.Label', 'Search parties')}
-            inputAttrs={{
+            inputProps={{
               'data-manager-party-search': '',
               'aria-describedby': 'manager-world-parties-match-count',
             }}
@@ -308,17 +308,12 @@
            the type scale, which is why the two looked like two different things. -->
       {#if paneError}
         <div class="manager-travel-parties-summary">
-          <Notice
-            blocking
-            tone="danger"
-            title={paneError}
-            dataAttr="data-manager-party-summary-error"
-          />
+          <Notice blocking tone="danger" title={paneError} data-manager-party-summary-error="" />
         </div>
       {/if}
 
       {#if filteredParties.length === 0}
-        <EmptyState filtered hint={noMatchHint} dataAttr="data-travel-parties-no-match" />
+        <EmptyState filtered hint={noMatchHint} data-travel-parties-no-match />
       {:else}
         <div
           class="manager-travel-parties-list"
@@ -422,12 +417,12 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    padding: 14px 18px 26px;
+    padding: var(--fab-space-4) var(--fab-space-5) var(--fab-space-6);
     overflow: auto;
   }
 
   .manager-travel-parties-intro {
-    margin: 0 0 13px;
+    margin: 0 0 var(--fab-space-3);
     color: var(--fab-text-muted);
     font-family: var(--font-primary);
     font-size: 11px;
@@ -438,13 +433,13 @@
   /* THE ROW IS LAYOUT NOW AND NOTHING ELSE (issue 1515). It used to BE the field — a bordered
      32px box on `--fab-bg-0` at an 8px corner, holding a bare glyph and a borderless input
      pinned to its height because Foundry core gives every input an `--input-height` that
-     overflows a hand-built row. `ManagerSearchField` paints all of that, at the shipped 34px
-     rung, so what is left here is a flex row holding the field and the match counter. */
+     overflows a hand-built row. `SearchField` paints all of that, at the 38px
+     shell (issue 1782), so what is left here is a flex row holding the field and the match counter. */
   .manager-travel-parties-search {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 11px;
+    gap: var(--fab-space-2);
+    margin-bottom: var(--fab-space-3);
   }
 
   .manager-travel-parties-count {
@@ -457,23 +452,23 @@
 
   /* The refusal banner's SLOT. `<Notice>` paints its own edge, fill, corner, glyph and type
      and declares `margin: 0`, because separation from what sits beneath a notice is the
-     caller's layout — so this rule is the caller's layout and nothing else, at the same 11px
-     the bespoke `<p>` it replaces put between itself and the first card. */
+     caller's layout — so this rule is the caller's layout and nothing else, at the scale's 12px
+     between itself and the first card. */
   .manager-travel-parties-summary {
-    margin: 0 0 11px;
+    margin: 0 0 var(--fab-space-3);
   }
 
   .manager-travel-parties-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
   .manager-travel-parties-row {
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-2);
   }
 
@@ -484,11 +479,11 @@
   .manager-travel-parties-create {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 34px;
-    padding: 0 15px;
+    padding: 0 var(--fab-space-4);
     border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-on-accent);
     background: var(--fab-accent);
     font-family: var(--font-primary);

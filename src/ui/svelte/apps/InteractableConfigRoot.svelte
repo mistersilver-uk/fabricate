@@ -32,7 +32,7 @@
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
   import Chip from '../components/Chip.svelte';
   import Field from '../components/Field.svelte';
-  import ManagerButton from '../components/ManagerButton.svelte';
+  import Button from '../components/Button.svelte';
   import Notice from '../components/Notice.svelte';
   import Select from '../components/Select.svelte';
   import StatusToggle from '../components/StatusToggle.svelte';
@@ -352,12 +352,14 @@
 
 <div class="fabricate-interactable-config">
   {#if !view}
-    <p class="fab-ic-empty">
-      {text(
+    <Notice
+      tone="danger"
+      title={text(
         'FABRICATE.Canvas.Interactable.Config.Unavailable',
         'This interactable could not be loaded.'
       )}
-    </p>
+      data-interactable-config-unavailable=""
+    />
   {:else}
     <header class="fab-ic-header">
       <h2 class="fab-ic-title">
@@ -375,11 +377,10 @@
          unconfigured; collapsed re-target affordance once configured. -->
     <section class="fab-ic-section fab-ic-identity" data-interactable-identity-section>
       {#if unconfigured}
-        <!-- THE HOOK RIDES A DECLARED PROP, NOT A SPREAD. `Notice` takes no `class`, no
-             `style` and no rest spread, so `dataAttr` is the only route for
-             `data-interactable-needs-config` - which the Foundry smoke and the View Lab both
-             locate, and which this root's source contract asserts is present. It renders as
-             `data-interactable-needs-config=""` rather than bare; every reader of it is a
+        <!-- The hook rides `Notice`'s rest spread, which exists for hooks: the Foundry smoke
+             and the View Lab both locate `data-interactable-needs-config`, and this root's
+             source contract asserts it is present. It is written `=""` rather than bare,
+             because a bare hook on a component tag renders `="true"`; every reader of it is a
              presence selector.
 
              THE SECTION'S OWN ACCENT BOX LEFT WITH THE BANNER rather than being retargeted.
@@ -397,14 +398,14 @@
             'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint',
             'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.'
           )}
-          dataAttr="data-interactable-needs-config"
+          data-interactable-needs-config=""
         />
       {:else}
         <div class="fab-ic-identity-head">
           <h3 class="fab-ic-section-title">
             {text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}
           </h3>
-          <ManagerButton
+          <Button
             aria-expanded={identityOpen}
             onclick={() => (identityOpen = !identityOpen)}
             data-interactable-identity-toggle=""
@@ -412,7 +413,7 @@
             {identityOpen
               ? text('FABRICATE.Canvas.Interactable.Config.Identity.Hide', 'Hide')
               : text('FABRICATE.Canvas.Interactable.Config.Identity.Retarget', 'Change source')}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
 
@@ -424,7 +425,7 @@
             options={typeOptions}
             onChange={(next) => onSelectType(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-type': '' }}
+            triggerProps={{ 'data-interactable-identity-type': '' }}
           />
 
           <Select
@@ -436,7 +437,7 @@
             options={systemSelectOptions}
             onChange={(next) => onSelectSystem(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-system': '' }}
+            triggerProps={{ 'data-interactable-identity-system': '' }}
           />
 
           <Select
@@ -448,7 +449,7 @@
             disabled={!selSystemId}
             onChange={(next) => (selReferenceId = next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-source': '' }}
+            triggerProps={{ 'data-interactable-identity-source': '' }}
           />
 
           {#if selType === 'gatheringTask'}
@@ -461,12 +462,12 @@
               options={environmentSelectOptions}
               onChange={(next) => (selEnvironmentId = next)}
               maxWidth={OPTION_PANEL_MAX_WIDTH}
-              triggerData={{ 'data-interactable-identity-environment': '' }}
+              triggerProps={{ 'data-interactable-identity-environment': '' }}
             />
           {/if}
 
           <div class="fab-ic-actions fab-ic-actions-inline">
-            <ManagerButton
+            <Button
               role="primary"
               disabled={!canApplyIdentity}
               onclick={applyIdentity}
@@ -476,7 +477,7 @@
               <span
                 >{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span
               >
-            </ManagerButton>
+            </Button>
           </div>
         </div>
       {/if}
@@ -664,7 +665,7 @@
             options={depleteOptions}
             onChange={(next) => setNodeDeplete(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-node-deplete': '' }}
+            triggerProps={{ 'data-interactable-node-deplete': '' }}
           />
 
           <Select
@@ -673,7 +674,7 @@
             options={respawnOptions}
             onChange={(next) => setNodeRespawnPolicy(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-node-respawn': '' }}
+            triggerProps={{ 'data-interactable-node-respawn': '' }}
           />
 
           {#if nodeIsNonRegenerating}
@@ -688,10 +689,10 @@
             </p>
           {:else}
             <div class="fab-ic-actions fab-ic-actions-inline">
-              <ManagerButton onclick={restockFull} data-interactable-node-restock="">
+              <Button onclick={restockFull} data-interactable-node-restock="">
                 <i class="fas fa-arrows-rotate" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Restock', 'Restock')}</span>
-              </ManagerButton>
+              </Button>
             </div>
           {/if}
         {/if}
@@ -718,31 +719,31 @@
 
       {#if visualStatus.severity === 'missing'}
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.createReplacementTile?.())}>
+          <Button onclick={() => run(() => services?.createReplacementTile?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RecreateTile', 'Recreate tile')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.createDrawingMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
               'Create drawing marker'
             )}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.ClearVisualLink', 'Clear visual link')}
-          </ManagerButton>
+          </Button>
         </div>
       {:else if visualStatus.severity === 'none'}
         <!-- Region-only (no marker): offer an upgrade to a linked Tile or Drawing. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.createMarker?.())}>
+          <Button onclick={() => run(() => services?.createMarker?.())}>
             <i class="fas fa-map-pin" aria-hidden="true"></i>
             <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span
             >
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.createDrawingMarker?.())}>
             <i class="fas fa-draw-polygon" aria-hidden="true"></i>
             <span
               >{text(
@@ -750,24 +751,24 @@
                 'Create drawing marker'
               )}</span
             >
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
+          </Button>
         </div>
       {:else if visualStatus.severity === 'ok'}
         <!-- Resolved (healthy) marker: still offer relink-to-a-different-doc and
              remove-from-panel, mirroring the missing-state affordances. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker',
               'Remove visual marker'
             )}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
 
@@ -785,7 +786,7 @@
         options={missingPolicyOptions}
         onChange={(next) => setMissingPolicy(next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-missing-policy': '' }}
+        triggerProps={{ 'data-interactable-missing-policy': '' }}
       />
     </section>
 
@@ -819,22 +820,22 @@
         options={audienceOptions}
         onChange={(next) => setAudience(next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-audience': '' }}
+        triggerProps={{ 'data-interactable-audience': '' }}
       />
     </section>
 
     <!-- Primary action row -->
     <section class="fab-ic-section fab-ic-actions">
-      <ManagerButton role="primary" onclick={() => run(() => services?.testAsPlayer?.())}>
+      <Button role="primary" onclick={() => run(() => services?.testAsPlayer?.())}>
         <i class="fas fa-play" aria-hidden="true"></i>
         <span>{text('FABRICATE.Canvas.Interactable.Config.TestAsPlayer', 'Test as player')}</span>
-      </ManagerButton>
-      <ManagerButton onclick={() => services?.jumpToRegion?.()}>
+      </Button>
+      <Button onclick={() => services?.jumpToRegion?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToRegion', 'Jump to region')}
-      </ManagerButton>
-      <ManagerButton onclick={() => services?.jumpToVisual?.()}>
+      </Button>
+      <Button onclick={() => services?.jumpToVisual?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToVisual', 'Jump to marker')}
-      </ManagerButton>
+      </Button>
     </section>
 
     <!-- State toggle row. These two are PRESSED BUTTONS and stay pressed buttons, which is the
@@ -867,25 +868,25 @@
          second `is-active` class saying the same thing twice. That is the same correction this
          change made for the Manage panel's promote disclosure. -->
     <section class="fab-ic-section fab-ic-actions">
-      <ManagerButton
+      <Button
         aria-pressed={view.state.enabled === false}
         onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
       >
         {view.state.enabled
           ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
           : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         aria-pressed={view.state.locked === true}
         onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
       >
         {view.state.locked
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
-      </ManagerButton>
-      <ManagerButton role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
+      </Button>
+      <Button role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
-      </ManagerButton>
+      </Button>
     </section>
   {/if}
 </div>
@@ -927,24 +928,24 @@
     width: 100%;
   }
 
-  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.manager-field` sets `font-weight:
+  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.fabricate-field` sets `font-weight:
      700` on the BOX because the caption it wraps is a label, and Foundry's control reset gives
      an `<input>` `font: inherit` - so a GM's typed name would render at heading weight. The
      shipped repair for the same defect is scoped to one manager route
      (`[data-manager-view='world-tool-entry']` in `styles/fabricate.css`); this is that rule
      for this window, with its `:not(.fab-stepper-input)` exclusion intact because the stepper
      supplies its own chrome. */
-  .fabricate-interactable-config :global(.manager-field input:not(.fab-stepper-input)) {
+  .fabricate-interactable-config :global(.fabricate-field input:not(.fab-stepper-input)) {
     font-weight: 400;
   }
 
-  /* THE SWITCH'S READING IS A SENTENCE HERE. `.manager-status-toggle` caps itself at 78px, so
+  /* THE SWITCH'S READING IS A SENTENCE HERE. `.fabricate-toggle` caps itself at 78px, so
      with a 34px track the label has ~36px and every reading in this panel would ellipsise -
      "Linked to gathering task" to "Li...". The shipped precedent for a switch whose reading is
      the control's whole content is the Checks activation card, which releases the same cap in
      `styles/fabricate.css` for the same stated reason. Scoped to this root rather than added
      to the sheet, because the sheet is not this phase's to edit. */
-  .fabricate-interactable-config :global(.manager-status-toggle) {
+  .fabricate-interactable-config :global(.fabricate-toggle) {
     max-width: none;
   }
 
@@ -987,16 +988,16 @@
 
      A cap, not a dropped `fill`: this is a `flex-direction: column` parent, so an unfilled
      `.fab-stepper` (a flex item with `width: auto`) is stretched to exactly the same box by
-     `align-items: stretch` - measured at 600/600px - while losing the 36px height that
+     `align-items: stretch` - measured at 600/600px - while losing the 38px height that
      matches the controls above it and leaving its 48px input marooned mid-border. 160px is
      the width the `fill` variant was measured against and leaves a 106px typeable field.
 
-     `:global(...)`, and the `.manager-field` half of the compound is load-bearing rather than
+     `:global(...)`, and the `.fabricate-field` half of the compound is load-bearing rather than
      decorative: this class now travels to a `<Field>`, so the scoped form
      `.fab-ic-node-count-field.svelte-<hash>` would match nothing, and a bare
      `:global(.fab-ic-node-count-field)` would reach the element at (0,1,0) where the scoped
      form was (0,2,0) - smuggling a cascade change in as a repair. */
-  :global(.manager-field.fab-ic-node-count-field) {
+  :global(.fabricate-field.fab-ic-node-count-field) {
     max-width: 160px;
   }
 
@@ -1095,12 +1096,12 @@
   /* THE PRESSED STATE'S ACCENT, STATED AGAINST THE ATTRIBUTE THAT CARRIES IT (issue 1520).
      The Disable and Lock buttons report a live state as well as offering an action, and without
      a treatment that state has no visual expression at all - which is the defect this sheet
-     records for the component browser's grouping switch, a `.manager-button` under a class with
+     records for the component browser's grouping switch, a `.fabricate-button` under a class with
      no CSS anywhere. Keyed on `aria-pressed` rather than on a companion class, so the drawn
      state and the announced state cannot drift; the same correction the Manage panel's promote
      disclosure took for its `aria-expanded` edge.
 
-     `:global(...)` because the element is `ManagerButton`'s, anchored on a class this file
+     `:global(...)` because the element is `Button`'s, anchored on a class this file
      writes so Svelte's hash lands on the ancestor. SEVEN elements carry `.fab-ic-actions` in
      this panel - five inline rows inside the identity, node and visual sections, plus the
      primary action row and the state row - and the compound still reaches exactly two buttons,
@@ -1117,12 +1118,6 @@
 
   .fab-ic-actions-inline {
     display: flex;
-  }
-
-  .fab-ic-empty {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.9rem;
   }
 
   .fab-ic-node-hint {

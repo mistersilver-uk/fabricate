@@ -11,6 +11,7 @@ import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
 } from './labInjectedLayoutGuard.js';
+import { installLabTheme, readLabTheme } from './labTheme.js';
 import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
 import { installLabChatLog } from './labChatLog.js';
@@ -108,15 +109,21 @@ function readParams() {
     // DARK by default, because that is what the smoke renders and the smoke is the fidelity
     // authority.
     colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
+    // The Fabricate palette, which an unknown id refuses rather than letting it fall back (issue 2151).
+    theme: readLabTheme(params),
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    // A recipe result naming no component, for the result row's suggestion list (issue 1516).
+    resultRowState: params.get('resultRowState') ?? null,
     // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
     runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
     checkOverride: params.get('checkOverride') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
     checkPreviewState: params.get('checkPreviewState') ?? null,
+    // Brenna holds a knowledge book she can learn whole, for the Read & learn header action.
+    learnableBook: params.get('learnableBook') === '1',
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -127,8 +134,19 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Refuse every editor save the save-failed frames photograph (issue 1522).
+    saveFails: params.get('saveFails') === '1',
+    // Strip Herbalism's progressive formula, for the System Overview's blocker (issue 1522).
+    systemBlocked: params.get('systemBlocked') === '1',
+    // Give Prospect the Seam a depleted-marker image, for the art picker's filled frame (issue 1522).
+    depletedImage: params.get('depletedImage') === '1',
+    // Bend Horseshoe asks for any ingot, for the held-stack picker's frame (issue 1644).
+    tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
+    // Withhold the world essence scope from the manager, so an essence editor renders unscoped,
+    // with the On craft primer the rules screen drops.
+    noEssenceScope: params.get('noEssenceScope') === '1',
     // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
     // — with `clearSystem` beside it — its component catalogue is too (issue 1540).
     noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
@@ -151,7 +169,7 @@ function readParams() {
     // selection top bar (issue 1198). Nothing shipped changes: the provider lives in this file
     // and registers with the production page-session registry the player app itself reads.
     //
-    // These three params are their own attributed REGION. Only the player window can render what
+    // These params are their own attributed REGION. Only the player window can render what
     // they produce, and `scripts/lib/viewLabCases.js` keys `ATTRIBUTED_LAB_INPUTS` on that fact —
     // so a hunk confined to this block selects the player frames instead of the whole corpus.
     playerProvider: params.get('playerProvider') === '1',
@@ -159,6 +177,11 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // A stand-in companion's interactive count roll, prompting on the standalone overlay; the
+    // `count-additional` request also offers additional dice (issue 2008).
+    companionRoll: ['count', 'count-additional'].includes(params.get('companionRoll'))
+      ? params.get('companionRoll')
+      : null,
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).
@@ -187,6 +210,9 @@ function readParams() {
         ? { width: Number(params.get('w')), height: Number(params.get('h')) }
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
+    // Mount a fixture-only SPECIMEN in the window instead of the window's own root, by the key
+    // `LAB_SPECIMENS` declares (issue 1782).
+    specimen: params.get('specimen') ?? null,
     // Who is looking. Defaults below to the viewer each window is normally used by — player for the
     // player app, GM for the manager — because that is what every existing case assumes (issue
     // 901).
@@ -195,8 +221,9 @@ function readParams() {
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
     // name.
     dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
-    // Dock a chat log in the window, so a case can photograph the result card it posts.
-    chatLog: params.get('chatLog') === '1',
+    // Dock a chat log in the window, so a case can photograph the result card it posts: `1` on
+    // the right, `left` over the recipe list when the right column is what the case names.
+    chatLog: ['1', 'left'].includes(params.get('chatLog')) ? params.get('chatLog') : null,
   };
 }
 
@@ -331,6 +358,10 @@ async function mountPlayerApp(content, params) {
     playerExtensions,
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
+  if (params.companionRoll) {
+    const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
+    installLabCompanionRoll(content.ownerDocument, params.companionRoll);
+  }
   return { instance, services, props };
 }
 
@@ -651,14 +682,54 @@ async function mountManagerApp(content, params) {
         }
       : {}),
   });
+  if (params.noEssenceScope) game.fabricate.getEssenceScopeStore = () => null;
   const props = app._prepareSvelteProps();
   const services = props.services;
   if (params.downtimeProvider) {
     props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
   }
   if (params.clearSystem) await props.store.selectSystem('');
+  if (params.saveFails) {
+    for (const action of ['updateRecipe', 'updateComponent', 'updateEssence', 'saveRecipeItem']) {
+      props.store[action] = async () => false;
+    }
+    // The Tool save reports its failure through the store's own catch, so the write throws.
+    globalThis.game.fabricate.getCraftingSystemManager().upsertTool = async () => {
+      throw new Error('view lab: save refused');
+    };
+  }
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
+}
+
+/**
+ * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
+ * shipped component directly, for props no shipped caller passes yet. Nothing in `src/` imports
+ * them, so a specimen frame depicts a state no GM can reach, and its case label says so.
+ */
+const LAB_SPECIMENS = Object.freeze({
+  'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
+});
+
+/**
+ * Mount a specimen into the built frame in place of the window's own root.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<{instance: object, services: null, props: object}>} The mounted specimen.
+ */
+async function mountSpecimen(content, params) {
+  const load = LAB_SPECIMENS[params.specimen];
+  // Loudly, and by name, as an unknown interactable is: a blank window would publish as evidence.
+  if (!load) {
+    throw new Error(
+      `view lab: unknown specimen "${params.specimen}"; ` +
+        `mount.js declares ${Object.keys(LAB_SPECIMENS).join(', ')}`
+    );
+  }
+  const { default: Specimen } = await load();
+  const props = {};
+  return { instance: mount(Specimen, { target: content, props }), services: null, props };
 }
 
 /**
@@ -669,6 +740,7 @@ async function mountManagerApp(content, params) {
  * @returns {Promise<object>} The mounted window.
  */
 async function mountAppFor(content, params) {
+  if (params.specimen) return mountSpecimen(content, params);
   if (params.appId === 'fabricate-app') return mountPlayerApp(content, params);
   if (params.appId === 'fabricate-crafting-system-manager') return mountManagerApp(content, params);
   if (CANVAS_APP_MOUNTS[params.appId]) return mountCanvasApp(content, params);
@@ -898,15 +970,22 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        resultRowState: params.resultRowState,
         runeworkCheckMode: params.runeworkCheckMode,
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
+        learnableBook: params.learnableBook,
+        systemBlocked: params.systemBlocked,
+        depletedImage: params.depletedImage,
+        tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
+  // After the world build, whose startup applies the stored theme setting to the document.
+  installLabTheme(params.theme);
 
   const built = buildAppWindow({
     appId: params.appId,
@@ -933,7 +1012,11 @@ async function boot() {
     if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
-    if (params.chatLog) installLabChatLog(built.frame);
+    if (params.chatLog) {
+      installLabChatLog(built.frame, undefined, {
+        side: params.chatLog === '1' ? 'right' : 'left',
+      });
+    }
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing

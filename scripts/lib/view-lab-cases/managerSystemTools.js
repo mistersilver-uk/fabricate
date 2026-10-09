@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   TOOL_EDITOR_SHELL_MATCHES,
   TOOL_LIST_MATCHES,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
@@ -47,7 +48,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES],
+    sourceMatches: [...TOOL_LIST_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-tool-zero-state-empty-library-1280x720',
@@ -117,7 +118,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES],
+    sourceMatches: [...TOOL_LIST_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-tool-zero-state-membership-all-1280x720',
@@ -236,7 +237,7 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-manager-tools-search]',
-        target: '[data-manager-tools-search] .manager-toolbar',
+        target: '[data-manager-tools-search] .fabricate-filter-bar',
       },
     ],
     position: { width: 1280, height: 720 },
@@ -281,7 +282,7 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-manager-tools-search]',
-        target: '[data-manager-tools-search] .manager-toolbar',
+        target: '[data-manager-tools-search] .fabricate-filter-bar',
       },
     ],
     expectCenterHit: '.manager-tools-sort-direction',
@@ -400,6 +401,28 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // Issue 1522: a refused save routes to Validation, whose panel states it at its notice position.
+    id: 'manager-tool-editor-save-failed',
+    label: 'Manager — Tool rules editor save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-breakage-choice="limitedUses"]' },
+      { selector: '[data-tool-editor-save]' },
+    ],
+    expectView: 'tool-edit',
+    // The refused write's own toast, and the save-all guard's warning that rides the same press.
+    allowedConsoleErrors: [/The Tool could not be saved/, /assign a component to every tool first/],
+    expectSelector:
+      '[data-tool-editor-panel="validation"] > [data-notice-position] > [data-tool-save-error]',
+    expectCenterHit: '[data-notice-position] > [data-tool-save-error]',
+    kinds: ['manager', 'tools'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+  }),
+  managerCase({
     // The overview frame is gone because the overview tab is (issue 1373).
     id: 'manager-tool-parity-02-remove-1280x720',
     label: 'Manager — Tool parity 02 remove from system 1280x720',
@@ -488,8 +511,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The repair set is `RecipeIngredientOption` rows at system scope, and only this frame photographs them there.
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      // The repair set is `PickerRow` rows at system scope, and only this frame photographs them there.
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       // The summary sentence's own module, claimed by name since the list cases stopped swallowing `tools/`.
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
     ],
@@ -596,6 +619,8 @@ export const CASES = Object.freeze([
         target: '[data-tool-prerequisites-summary]',
       },
     ],
+    // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
+    themeVariants: ['hearth-herb'],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'tools'],
     sourceMatches: [

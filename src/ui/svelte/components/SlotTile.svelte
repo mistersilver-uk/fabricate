@@ -18,7 +18,7 @@
     onActivate = () => {},
   } = $props();
 
-  const states = new Set(['met', 'short', 'open']);
+  const states = new Set(['met', 'partial', 'short', 'open']);
   const resolvedState = $derived(states.has(state) ? state : 'met');
   const host = $derived(interactive ? 'button' : 'div');
   const attributes = $derived(
@@ -42,10 +42,12 @@
     onclick={interactive && !disabled ? onActivate : undefined}
     {...attributes}
   >
+    <!-- ratchet-exempt(design-system): the library's 56px slot tile; its geometry against the specimen is issue 2257's to converge -->
     <Medallion {art} {icon} {tint} alt="" size={56} glyph={19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}
+    {#if pressed}<i class="fab-slot-tick fa-solid fa-circle-check" aria-hidden="true"></i>{/if}
   </svelte:element>
   <span class="fab-slot-caption">{label}</span>
   {#if interactive && affordance}
@@ -87,6 +89,10 @@
     border-color: var(--fab-danger-border);
   }
 
+  .fab-slot-tile.is-partial {
+    border-color: var(--fab-warning-border);
+  }
+
   .fab-slot-tile.is-open {
     border-style: dashed;
     border-color: var(--fab-accent-border);
@@ -95,6 +101,16 @@
   .fab-slot-tile.is-selected {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  .fab-slot-tick {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    font-size: 13px;
+    color: var(--fab-accent);
+    background: var(--fab-bg-1);
+    border-radius: 50%;
   }
 
   .fab-slot-tile :global(.fab-medallion) {
@@ -112,7 +128,7 @@
     transform: translateX(-50%);
     border-radius: 999px;
     background: var(--fab-success);
-    color: var(--fab-bg-0);
+    color: var(--fab-on-success);
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
@@ -123,10 +139,18 @@
 
   .is-short .fab-slot-pip {
     background: var(--fab-danger);
+    color: var(--fab-on-danger);
+  }
+
+  /* No on-warning ink exists, so the warning fill takes the page ground as every solid chip does. */
+  .is-partial .fab-slot-pip {
+    background: var(--fab-warning);
+    color: var(--fab-bg-0);
   }
 
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
+    color: var(--fab-on-accent);
   }
 
   .fab-slot-caption {
@@ -147,6 +171,10 @@
     color: var(--fab-danger-text);
   }
 
+  [data-slot-state='partial'] .fab-slot-caption {
+    color: var(--fab-warning-text);
+  }
+
   [data-slot-state='open'] .fab-slot-caption {
     color: var(--fab-accent-text);
   }
@@ -154,7 +182,7 @@
   .fab-slot-affordance {
     display: flex;
     align-items: center;
-    gap: calc(var(--fab-space-chip) / 2);
+    gap: var(--fab-space-1);
     color: var(--fab-accent);
     font-size: 8px;
     font-weight: 600;

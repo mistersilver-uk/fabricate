@@ -33,10 +33,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     previewPath,
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/Medallion.svelte',
   ],
   componentPath: previewPath,

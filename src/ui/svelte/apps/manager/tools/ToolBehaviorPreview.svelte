@@ -362,7 +362,7 @@
       options={previewActorOptions}
       showTick={false}
       ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewAsLabel', 'Preview as actor')}
-      triggerData={{ 'data-tool-preview-actor': '' }}
+      triggerProps={{ 'data-tool-preview-actor': '' }}
       onChange={(next) => choosePreviewActor(next)}
     />
     <EmptyState
@@ -370,7 +370,7 @@
       inline
       hint={prerequisiteNote}
       contextClass="manager-tool-actor-note"
-      dataAttr="data-tool-preview-gate"
+      data-tool-preview-gate
     />
     <!-- THE `rule` DENSITY, WHICH ALREADY EXISTED: the variant `IconFactRow` shipped for the two
          Tool rails. The default row missed five of its six values, and the fill by a RUNG — the
@@ -380,7 +380,7 @@
       icon={usabilityFact.icon}
       title={usabilityFact.title}
       density="rule"
-      dataAttr="data-tool-preview-usability"
+      data-tool-preview-usability
     />
   </section>
 
@@ -389,12 +389,7 @@
   </p>
   <section class="manager-tool-required-for fab-stack" data-gap="2" data-tool-required-for>
     {#if requiredFor.length === 0}
-      <EmptyState
-        compact
-        inline
-        hint={requiredForEmptyHint}
-        dataAttr="data-tool-required-for-empty"
-      />
+      <EmptyState compact inline hint={requiredForEmptyHint} data-tool-required-for-empty />
     {:else}
       <!-- THE KEY CARRIES THE SYSTEM AND THE POSITION: at WORLD scope the same recipe id can be
            reached through two systems, and a duplicate key is a mount-time throw. -->
@@ -447,7 +442,7 @@
      onto a second line: a pager that says there is more and hides the control that reaches it.
      The region class carries the scoping hash, so the DESCENDANT is what must be `:global`,
      written that way so the reach is this rail rather than every pager in the manager. */
-  .manager-tool-required-for > :global(.manager-pagination) {
+  .manager-tool-required-for > :global(.fabricate-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: var(--fab-space-2);
@@ -465,10 +460,11 @@
     white-space: nowrap;
   }
 
-  .manager-tool-required-for :global(.manager-pagination-nav .manager-icon-button) {
+  .manager-tool-required-for :global(.manager-pagination-nav .fabricate-icon-button) {
     flex: 0 0 24px;
     width: 24px;
     height: 24px;
     min-height: 24px;
+    border-radius: 6px;
   }
 </style>

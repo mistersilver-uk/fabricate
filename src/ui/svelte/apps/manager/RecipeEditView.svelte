@@ -13,10 +13,11 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
-  import RecipeModeBanner from './recipe/RecipeModeBanner.svelte';
+  import RecipeModeCallout from './recipe/RecipeModeCallout.svelte';
   import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
@@ -31,27 +32,25 @@
   } from './recipe/recipeReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
-  import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
     recipe = null,
-    // Whether the system mode allows more than one ingredient set (issue 643), so the Ingredients
-    // tab's single-set view can show the "Add ingredient set" promotion affordance.
+    // Whether the mode allows more than one ingredient set: the single-set view's promotion (643).
     canAddSet = false,
     // Alchemy Simple two-slot result editor (issue 554).
     alchemySimple = false,
-    // A simple-resolution system with the check enabled also gets the reserved-failure two-slot
-    // result editor (issue 643).
+    // A simple system with the check enabled also gets the reserved-failure two slots (issue 643).
     simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
     currencyUnits = [],
-    // Whether the currency feature is ENABLED, not merely seeded with preset units. Defaults true,
-    // so a caller that only passes units keeps the pre-gate behaviour.
+    // Whether currency is ENABLED, not merely seeded with units; true keeps a units-only caller.
     currencyEnabled = true,
-    // Whether the time-requirements feature is ENABLED (issue 714). Defaults true, so a caller
-    // that omits it keeps the pre-gate always-authorable behaviour.
+    // The system's unfiltered recipes, which a knowledge result teaches and readiness resolves.
+    recipeOptions = [],
+    knowledgeObservable = false,
+    // Whether time requirements are ENABLED (issue 714); true keeps an omitting caller authoring.
     timeRequirementsEnabled = true,
     toolsLibrary = [],
     componentOptions = [],
@@ -67,8 +66,7 @@
     // `bySubject` gives the recipe anything to author at all.
     craftingModifierPolicy = 'addAll',
     craftingModifierDefaultIds = [],
-    // The system's pick cap (issue 1055). `null`, NOT a number: absence is the "unlimited" value,
-    // and a numeric default here would cap every unasked system.
+    // The system's pick cap (issue 1055): `null` is "unlimited", so no numeric default caps one.
     craftingModifierMaxPicks = null,
     craftingModifierInertCause = '',
     onOpenChecks = () => {},
@@ -80,26 +78,23 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
-    // Whether the failure-result policy permits results on a failed check (issue 1098): it makes
-    // `routedOutcomeTierOptions` above the UNFILTERED list, and names the policy as a remedy.
+    // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
+    // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
     // Alchemy enable-blocker inputs (issue 549), for the Validation tab and the toggle gate.
     alchemy = null,
     signatureConflicts = [],
-    // Progressive systems award a recipe's results in order, so the Results tab exposes
-    // drag-reorder on the result rows. Other modes ignore result order.
+    // Progressive systems award results in order, so only there the result rows reorder.
     progressive = false,
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
     // a progressive result row deep-links to the component editor rather than stepping it here.
     onOpenComponent = () => {},
-    // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every tab and
-    // routes to Crafting Settings, which is the only place it can change.
+    // The system's resolution mode. Never per-recipe: the mode callout reports it on the tabs it
+    // shapes and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
-    // The system's craftingEffect matrix row, gating the Access and Books & Scrolls tabs (issue
-    // 676). NOT named `effect`.
+    // The craftingEffect matrix row gating the Access and Books & Scrolls tabs (676); not `effect`.
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
-    // Access tab inputs. RESOLVED rows (never ids) — the store resolves them, because a granted id
-    // resolves over EVERY world actor, not the player-character roster.
+    // Access tab inputs: rows the store RESOLVED over EVERY world actor, never ids.
     accessPlayers = [],
     accessCharacters = [],
     // Books & Scrolls tab inputs (the recipe-item definition library + the unlink).
@@ -257,8 +252,7 @@
     updateIngredientSetTools(stepId, setId, (ids) => ids.filter((id) => id !== toolId));
   }
 
-  // Deleting a step removes the whole step — its ingredients, results and tools. The root confirms
-  // with wording contextual to where the delete was triggered.
+  // Deleting a step removes its ingredients, results and tools; the root words the confirm.
   function deleteStepFrom(context) {
     return (stepId) => onDeleteStep(stepId, context);
   }
@@ -266,22 +260,22 @@
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
 
-  // Validation badges: critical and warning issue counts. The draft is the single source of truth,
-  // so the readiness evaluator reads it directly.
+  // Validation badges, read straight off the draft, which is the single source of truth.
   const readiness = $derived(
     evaluateRecipeReadiness(
       { ...(recipe || {}) },
       {
         systemComponents: componentTagOptions,
+        systemRecipes: recipeOptions,
         routingProvider,
         routedOutcomeTierOptions,
         alchemy,
         signatureConflicts,
+        progressive,
       }
     )
   );
-  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517): two
-  // numbers describing one screen have to be one number.
+  // The badge is the Validation tab's own counts through the shared tally (issue 1517).
   const validationCounts = $derived(countRecipeReadiness(readiness));
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
@@ -344,14 +338,6 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  // The resolution-mode banner's copy and icon are NOT re-authored: `resolutionModeOptions.js`
-  // owns the canonical list, and the lookup lives here so a second banner can reuse the chrome with
-  // its own copy — folding it back into `RecipeModeBanner` would re-create the drift.
-  const modeOption = $derived(
-    resolutionModeOptions.find((option) => option.value === resolutionMode) ||
-      resolutionModeOptions[0]
-  );
 
   // Always editable: `recipeIds[]` is many-to-many, so this mirrors no single linked item.
   async function chooseImage() {
@@ -420,6 +406,10 @@
   }
 </script>
 
+{#snippet modeCallout()}
+  <RecipeModeCallout mode={resolutionMode} {text} {onOpenCraftingSettings} />
+{/snippet}
+
 <main
   class="manager-main manager-recipe-edit-main"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
@@ -437,8 +427,6 @@
   </div>
   {#if recipe}
     <div class="fab-stack" data-gap="3" data-recipe-editor>
-      <!-- Header, tabs, banner, content (§4.2): the banner sits BELOW the tab strip so the tabs
-           stay attached to the header above them. -->
       <RecipeEditorTabs
         {activeTab}
         {badges}
@@ -448,23 +436,21 @@
         }}
       />
 
-      <RecipeModeBanner
-        value={modeOption.value}
-        icon={modeOption.icon}
-        kicker={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}
-        label={text(modeOption.labelKey, modeOption.fallback)}
-        scope={text(
-          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
-          'set for this crafting system'
-        )}
-        description={text(modeOption.descKey, modeOption.descFallback)}
-        actionLabel={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}
-        actionHint={text(
-          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint',
-          'Resolution mode is set for the whole crafting system, not per recipe.'
-        )}
-        onAction={onOpenCraftingSettings}
-      />
+      <!-- The blocking notice's page position, outside the scroller so a failed save stays in view
+           on every tab, inset as the panel insets its cards. -->
+      {#if saveFailed}
+        <div class="manager-editor-notice-position" data-notice-position="page">
+          <Notice
+            blocking
+            tone="danger"
+            title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
+            detail={text(
+              'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )}
+          />
+        </div>
+      {/if}
 
       <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
            destination (issue 1517), since `<body>` is where every Foundry keybinding is live. `-1`,
@@ -480,13 +466,13 @@
       >
         {#if activeTab === 'overview'}
           <RecipeOverviewTab
+            {modeCallout}
             {recipe}
             {name}
             {description}
             {img}
             {enabled}
             {saving}
-            {saveFailed}
             {onPickImagePath}
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
@@ -520,6 +506,7 @@
           />
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
+            {modeCallout}
             {recipe}
             {canAddSet}
             {isMultiStep}
@@ -536,12 +523,17 @@
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
+            {modeCallout}
             recipe={resultsRecipe}
             {alchemySimple}
             {simpleFailureSlot}
             isMultiStep={collapsed ? false : isMultiStep}
             {collapsed}
             {componentOptions}
+            {currencyUnits}
+            {currencyEnabled}
+            {recipeOptions}
+            {knowledgeObservable}
             {routingProvider}
             {progressive}
             {onOpenComponent}
@@ -555,6 +547,7 @@
           />
         {:else if activeTab === 'tools'}
           <RecipeToolsTab
+            {modeCallout}
             {recipe}
             {isMultiStep}
             {collapsed}
@@ -587,6 +580,8 @@
             {routedOutcomeTierOptions}
             {alchemy}
             {signatureConflicts}
+            {progressive}
+            systemRecipes={recipeOptions}
             onSelectIssue={selectIssue}
           />
         {/if}

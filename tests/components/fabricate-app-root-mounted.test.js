@@ -1,9 +1,11 @@
 /** The player shell's mounted tier. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
@@ -22,7 +24,7 @@ import {
   INVALIDATION_STORES,
 } from '../../src/systems/invalidationDomains.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -33,6 +35,11 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -42,8 +49,17 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
+    'src/ui/presenters/resultOutputRows.js',
+    // Issue 1773: a reward row's glyph and its unit's display name, and the choice-group shape.
+    'src/ui/presenters/resultKindGlyphs.js',
+    'src/utils/choiceGroupShape.js',
+    'src/systems/currencyProfile.js',
+    'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.
     'src/ui/presenters/checkDescriptor.js',
+    // Issue 2006: a count card's successes needed, read as the engine reads it.
+    'src/systems/countCheck.js',
+    'src/systems/craftingCheckRefusal.js',
     'src/ui/presenters/heldToolBonus.js',
     ...CHECK_TARGET_RAW_MODULES,
     'src/systems/countEvaluation.js',
@@ -77,6 +93,7 @@ const harness = createMountedComponentHarness({
     'src/ui/extensionRegistry.js',
     'src/ui/playerExtensions.js',
     'src/ui/playerNavModel.js',
+    'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475).
     'src/ui/svelte/actions/portal.js',
@@ -92,9 +109,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
+    // Issue 1773: the award face's rows.
+    'src/ui/presenters/awardChoiceRows.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The run kinds the journal store filters by and its kind filter counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/craftingRecipeStatus.js',
@@ -105,19 +126,25 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/formatDuration.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
+    // Issue 2008: the player stores and GatheringView word additional-dice notices through it.
+    ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringConditionIcons.js',
     'src/ui/svelte/util/gatheringFormat.js',
+    'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',
     'src/ui/svelte/util/recipeDuration.js',
     'src/ui/svelte/util/bookRecipeBrowse.js',
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/requirementSlots.js',
+    'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
     'src/ui/svelte/util/sceneImages.js',
+    'src/ui/svelte/apps/gathering/linkedSceneImage.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
     // The player complication projection (issue 1286). Reached TWICE from this tree:
@@ -148,6 +175,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
     'src/ui/svelte/apps/alchemy/Workbench.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+    // Its sources picker (issue 1782).
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/crafting/CraftButton.svelte',
     'src/ui/svelte/apps/crafting/CraftingView.svelte',
     'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
@@ -164,7 +193,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
     'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
     'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+    'src/ui/svelte/components/DataTable.svelte',
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+    'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the two leaves it renders (issue 1286).
@@ -174,15 +205,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-    'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
     'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
     'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
     'src/ui/svelte/apps/crafting/detail/StepRequirementsList.svelte',
+    'src/ui/svelte/components/BandedBar.svelte',
     'src/ui/svelte/apps/gathering/ChanceBar.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
@@ -215,6 +247,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
@@ -222,15 +255,18 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalTips.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
     'src/ui/svelte/apps/journal/RecentResults.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -238,13 +274,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/RunActionBar.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
     'src/ui/svelte/components/ChoiceOptionList.svelte',
     'src/ui/svelte/components/SlotRow.svelte',
     'src/ui/svelte/components/EssencePool.svelte',
     'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/StageBars.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/StageNav.svelte',
     'src/ui/svelte/components/StageCard.svelte',
@@ -762,23 +799,63 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     );
   });
 
-  it('lets the rail button yield the scrollbar gutter rather than overflowing the 84px column', async () => {
-    // ASSERTED AS A DECLARATION, not as measured overflow.
+  it('draws the rail as 72px of 44px wells that yield the scrollbar gutter', async () => {
+    // Asserted as declarations: headless Chromium's overlay scrollbars take no layout width.
     const { root } = await mountOnCompanionTab();
     const css = shellStyleSheet(root);
 
-    assert.match(
-      ruleBody(css, 'fabricate-app-nav-item'),
-      /width:\s*min\(64px,\s*100%\)/,
-      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal '
-        + 'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
-    );
+    assert.match(ruleBody(css, 'fabricate-app-nav'), /flex:\s*0 0 72px/, 'the rail is 72px');
     assert.match(
       ruleBody(css, 'fabricate-app-nav'),
       /scrollbar-gutter:\s*stable/,
-      'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
-        + 'does not reflow the whole column'
+      'the gutter is reserved up front, so crossing the entry count that starts the scroll does '
+        + 'not reflow the column'
     );
+    const item = ruleBody(css, 'fabricate-app-nav-item');
+    assert.match(item, /width:\s*100%/, 'an item fills the rail column rather than capping at 64px');
+    assert.match(item, /height:\s*auto/, 'and grows with its well and label rather than a fixed 64px');
+    assert.doesNotMatch(item, /position\s*:/, "the item declares no position, so it is never the pip's containing block");
+    const well = ruleBody(css, 'fabricate-app-nav-well');
+    assert.match(well, /position:\s*relative/, "the well is the pip's containing block");
+    assert.match(well, /height:\s*44px/, 'each item is a 44px icon well');
+    assert.match(well, /border-radius:\s*9px/, 'at radius 9');
+    assert.match(
+      well,
+      /width:\s*min\(44px,\s*100%\)/,
+      'a well that cannot shrink below 44px inside a 60px rail puts a visible horizontal '
+        + 'scrollbar in it once a thin classic scrollbar takes its ~12px'
+    );
+    assert.match(ruleBody(css, 'fabricate-app-nav-label'), /font-size:\s*10px/, 'labels are 10px');
+    assert.match(
+      ruleBody(css, 'fabricate-app-nav-label'),
+      /text-overflow:\s*ellipsis/,
+      'an unbounded companion label truncates rather than scrolling the 72px rail'
+    );
+  });
+
+  it("puts the journal count pip on the well's outer corner with a ground ring", async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const props = makeHost(registry).props();
+    props.services.journal.navCount = 3;
+    const root = await harness.mount(props);
+
+    const pip = root.querySelector('[data-nav-count="journal"]');
+    assert.equal(pip?.textContent, '3', 'the journal entry renders its active-run count');
+    assert.ok(pip.classList.contains('fabricate-app-nav-count'), 'it is the namespaced pip');
+    assert.ok(
+      pip.parentElement.classList.contains('fabricate-app-nav-well'),
+      'the pip is positioned against the icon well, never against the whole item'
+    );
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const pipRule = /\.fabricate-nav \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
+    assert.match(pipRule, /top:\s*-3px/, 'the pip overhangs the top edge of the well');
+    assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');
+    assert.match(
+      pipRule,
+      /box-shadow:\s*0 0 0 2px var\(--fab-surface-soft\),\s*0 0 0 2px var\(--fab-bg-1\)/,
+      'a 2px ring in the rail ground separates the pip from the well it overhangs'
+    );
+    assert.match(pipRule, /min-width:\s*16px/, 'the pip is at least 16px');
   });
 });
 

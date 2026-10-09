@@ -4,52 +4,31 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flushSync } from 'svelte';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  ROLL_PROMPT_COMPILED_MODULES,
+  ROLL_PROMPT_PATH as PROMPT,
+  ROLL_PROMPT_RAW_MODULES,
+} from '../helpers/rollPromptHarnessModules.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
+import { intersectAdvantageOffers, resolveAdvantageOffer } from '../../src/systems/checkAdvantage.js';
 import {
   buildBulkPromptData,
   buildSinglePromptData,
+  overrideRollPromptSurface,
+  promptActions,
+  promptBulkCheckRoll,
+  promptCheckRoll,
   waitForPrompt,
 } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const PROMPT = 'src/ui/svelte/apps/crafting/RollPrompt.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-roll-prompt-',
   componentPath: PROMPT,
-  rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/actions/anchoredPopover.js',
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/listboxNavigation.js',
-    'src/ui/svelte/util/overlayBounds.js',
-    'src/ui/svelte/util/overlayHost.js',
-    'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/apps/crafting/rollPromptTarget.js',
-    'src/utils/fillPlaceholders.js',
-    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
-    'src/utils/checkAdjustmentFormat.js',
-    'src/utils/scalars.js',
-  ],
-  compiledModules: [
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
-    // The roll mode is the shared `Select`, which renders the popover pair behind it.
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
-    'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
-    PROMPT,
-  ],
+  rawModules: ROLL_PROMPT_RAW_MODULES,
+  compiledModules: ROLL_PROMPT_COMPILED_MODULES,
   rootClass: 'fabricate fabricate-app',
 });
 
@@ -59,8 +38,7 @@ const labels = {
   eachAdds: 'Each adds', bonus: 'Situational bonus', bonusPlaceholder: '+2 or 1d4',
   bonusHelp: 'A bonus adds', rollMode: 'Roll mode', meet: 'meet or beat', exceed: 'beat',
   bulkNote: 'One choice applies to all', bulkRows: 'Rolls in this batch', noCheck: 'No check',
-  noSingleTarget: 'No single target', worse: 'keep the worse', better: 'keep the better',
-  roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage', close: 'Close',
+  noSingleTarget: 'No single target', roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage', close: 'Close',
 };
 const modes = [{ value: 'publicroll', label: 'Public roll' }, { value: 'gmroll', label: 'Private GM roll' }];
 const choices = [
@@ -73,6 +51,7 @@ const base = {
   kind: 'single', title: 'Crafting check', subtitle: 'Brenna · Forge rivets', formula: '2d6 + 3',
   dc: 12, dcText: 'DC 12', chipText: 'DC 12 · meet or beat', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
   defaultRollMode: 'publicroll', choicePlan: noChoice, allowAdvantage: false,
+  actions: promptActions(null, labels),
 };
 const bulk = {
   ...base, kind: 'bulk', title: 'Salvage checks', subtitle: 'Brenna · 3 items', subjects: [
@@ -101,17 +80,15 @@ async function chooseRollMode(dialog, value) {
   await settleUi();
 }
 
-/** The real path: adapter, host and compiled prompt, over an application root holding focus. */
-async function openThroughHost(data, allowAdvantage, choicePlan = data.choicePlan) {
+/** Open a prompt through `start(open)` on the real host, over an application root holding focus. */
+async function openFocused(start) {
   const root = document.createElement('div');
   root.className = 'fabricate fabricate-app';
   const opener = document.createElement('button');
   root.append(opener);
   document.body.append(root);
   opener.focus();
-  const pending = waitForPrompt(data, allowAdvantage, choicePlan, (view) =>
-    openRollPromptModal(view, { loadComponent: loadPrompt })
-  );
+  const pending = start((view) => openRollPromptModal(view, { loadComponent: loadPrompt }));
   for (let attempt = 0; attempt < 20 && !dialogOf(root); attempt += 1) {
     await new Promise((settle) => setImmediate(settle));
   }
@@ -119,6 +96,38 @@ async function openThroughHost(data, allowAdvantage, choicePlan = data.choicePla
   assert.ok(dialog, 'the prompt mounted into the application root');
   return { root, opener, dialog, pending };
 }
+
+/** The real path: adapter, host and compiled prompt. */
+const openThroughHost = (data, allowAdvantage, choicePlan = data.choicePlan) =>
+  openFocused((open) => waitForPrompt(data, allowAdvantage, choicePlan, open));
+
+/** The public entry point (`promptCheckRoll`, `promptBulkCheckRoll`) with the host as its surface. */
+const openThroughEntry = (start) =>
+  openFocused((open) => {
+    const restore = overrideRollPromptSurface(open);
+    try {
+      return start();
+    } finally {
+      restore();
+    }
+  });
+
+/** Each footer button as `[action, note, accessible name, title]`. */
+const footerOf = (dialog) =>
+  [...dialog.querySelectorAll(':scope .manager-modal-footer button')].map((button) => [
+    button.dataset.action,
+    button.querySelector('.action-note')?.textContent ?? '',
+    button.getAttribute('aria-label'),
+    button.getAttribute('title') ?? '',
+  ]);
+
+const sumOver = { product: 'sum', direction: 'over' };
+const sumUnder = { product: 'sum', direction: 'under' };
+/** Any class stands in for core's `Die`, whose presence alone lets a keep offer stand. */
+const CORE_DIE = class Die {};
+const offerFor = (advantage, evaluation = sumOver, authoredFormula = '1d20 + 3') =>
+  resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Die: CORE_DIE });
+const DECISION = { disadvantage: 'disadvantage', normal: 'normal', advantage: 'advantage', roll: 'normal' };
 
 describe('mounted roll prompt', () => {
   before(() => harness.setup());
@@ -206,8 +215,9 @@ describe('mounted roll prompt', () => {
     assert.ok(modeTrigger(empty), 'the roll mode is offered without subjects');
   });
 
-  it('keeps Roll the only submit button, before Advantage, and one Roll unless advantage is strictly true', async () => {
-    const root = await harness.mount({ data: { ...base, allowAdvantage: true } });
+  it('keeps Roll the only submit button, between the outer actions, and one Roll for an empty offer', async () => {
+    const keep = { advantage: true, disadvantage: true, kind: 'keep', detail: null };
+    const root = await harness.mount({ data: { ...base, actions: promptActions(keep, labels) } });
     const actions = [...root.querySelectorAll('.manager-modal-footer button')];
     assert.deepEqual(actions.map((button) => button.dataset.action), ['disadvantage', 'normal', 'advantage']);
     assert.deepEqual(actions.map((button) => button.type), ['button', 'submit', 'button']);
@@ -216,11 +226,12 @@ describe('mounted roll prompt', () => {
       actions.map((button) => button.querySelector('.action-note')?.textContent ?? null),
       ['keep the worse', null, 'keep the better']
     );
-    for (const allowAdvantage of [undefined, null, 'true', 1]) {
+    for (const offer of [undefined, null, { advantage: 'true', disadvantage: true, kind: 'keep' }]) {
       harness.remount();
-      const single = await harness.mount({ data: { ...base, allowAdvantage } });
+      const single = await harness.mount({ data: { ...base, actions: promptActions(offer, labels) } });
       const buttons = [...single.querySelectorAll('.manager-modal-footer button')];
-      assert.deepEqual(buttons.map((button) => button.dataset.action), ['roll'], String(allowAdvantage));
+      assert.deepEqual(buttons.map((button) => button.dataset.action), ['roll'], JSON.stringify(offer));
+      assert.equal(buttons[0].type, 'submit');
     }
   });
 
@@ -650,19 +661,19 @@ describe('mounted roll prompt', () => {
       {
         input: {
           direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool',
-          explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null },
+          explode: { kind: 'best', face: 10, once: false }, cancel: { kind: 'worst', face: 1 },
         },
-        formula: '6d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
-        rules: 'Success on ≥ 8 · best face explodes · worst face cancels',
+        formula: '8d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
+        rules: 'Success on ≥ 8 · explodes on 10 · 1 cancels a success',
         help: 'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
       {
         input: {
           direction: 'under', comparison: 'exceed', pool: 3, die: 20, threshold: 13, required: 1, modifierDestination: 'threshold',
-          thresholdSource: '@abilities.int.mod + 10',
+          thresholdSource: 'character', thresholdAnchor: 13,
         },
-        formula: '3d20 · each < 13', chip: '1 success needed', note: 'Each moves the threshold.',
-        rules: 'Success on < 13 (@abilities.int.mod + 10)',
+        formula: '3d20 · each < 15', chip: '1 success needed', note: 'Each moves the threshold.',
+        rules: 'Success on < 15 (character value 13), moved +2 by modifiers',
         help: 'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
     ];
@@ -673,7 +684,7 @@ describe('mounted roll prompt', () => {
       });
       const { dialog, pending } = await openThroughHost(view, false, noChoice);
       const line = dialog.querySelector('.formula-content .formula');
-      assert.equal(line.textContent, formula, 'the pool line, never the retained 1d20 + 3');
+      assert.equal(line.textContent, formula, 'the pool line settled by Focus +2, never the retained 1d20 + 3');
       assert.equal(line.dataset.rollPromptCount, input.direction);
       const ruleLine = line.nextElementSibling;
       assert.ok(ruleLine.matches('p.help.formula-note'), 'frames 30 and 35: the rule sits under the pool line');
@@ -689,7 +700,6 @@ describe('mounted roll prompt', () => {
       assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
       assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);
-      assert.ok(!dialog.querySelector('button[data-action="advantage"]'), 'no advantage until issue 2007');
       dialog.querySelector('[data-manager-modal-close]').click();
       await pending;
     }
@@ -723,6 +733,87 @@ describe('mounted roll prompt', () => {
     await pending;
   });
 
+  it('settles the count line and its note as the player picks and types, never naming a default face (N30)', async () => {
+    const picks = {
+      options: [
+        { id: 'a', label: 'Steady', value: 1, display: '+1' },
+        { id: 'b', label: 'Luck', value: null, display: '+1d4' },
+      ],
+      maxPicks: 2,
+      defaultSelectedIds: ['a'],
+    };
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8,
+      thresholdSource: 'fixed', required: 2, modifierDestination: 'threshold',
+      explode: { kind: 'from', face: 9, once: true }, displayFormula: '1d20 + @skills.smith.rank', dc: 15,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, picks);
+    const line = () => dialog.querySelector('.formula-content .formula');
+    const note = () => dialog.querySelector('.formula-content .formula-note').textContent.trim();
+    assert.equal(line().getAttribute('aria-live'), 'polite', 'the settled line announces each change');
+    assert.equal(line().textContent, '6d10 · each ≥ 7', 'the default pick already moved the threshold');
+    assert.equal(note(), 'Success on ≥ 7, moved +1 by modifiers · explodes on 9 or above once');
+    dialog.querySelectorAll('input[name="craftingModifier"]')[1].click();
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 7 + 1d4', 'a rolled pick is pending, never averaged');
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    bonus.value = '+2';
+    bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 5 + 1d4');
+    assert.equal(note(), 'Success on ≥ 5, moved +3 by modifiers · explodes on 9 or above once');
+    dialog.querySelectorAll('input[name="craftingModifier"]')[0].click();
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 6 + 1d4', 'unpicking a flat modifier gives its step back');
+    const shown = dialog.querySelector('.formula-row').textContent;
+    assert.ok(!/explodes on 10|@|DC|1d20|15/.test(shown), 'no default face, expression, path, DC or formula');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('warns that a pool reduced to zero fails, and still rolls (issue 2006)', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 1, die: 6, threshold: 5, thresholdAnchor: 5,
+      thresholdSource: 'fixed', required: null, modifierDestination: 'pool', zeroPoolFails: true,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    const notice = () => dialog.querySelector('[data-roll-prompt-zero-pool]');
+    assert.ok(!notice(), 'a pool holding a die claims no automatic failure');
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    const type = (value) => {
+      bonus.value = value;
+      bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+    };
+    type('-1');
+    assert.equal(dialog.querySelector('.formula-content .formula').textContent, '0d6 · each ≥ 5');
+    assert.ok(Boolean(notice()), 'the zero-pool notice shows');
+    assert.equal(notice().textContent.trim(), 'This roll fails automatically: the pool is reduced to zero.');
+    assert.deepEqual([notice().dataset.noticeTone, notice().getAttribute('role')], ['warning', 'status']);
+    const roll = dialog.querySelector('button[type="submit"]');
+    assert.equal(roll.disabled, false, 'Roll stays enabled');
+    type('');
+    assert.ok(!notice(), 'and it leaves once the pool holds a die again');
+    type('-3');
+    dialog.querySelector('form').requestSubmit();
+    const answer = await pending;
+    assert.deepEqual([answer.confirmed, answer.bonus], [true, '-3'], 'the player can still roll it');
+  });
+
+  it('names a rolled pool Tool on the pool line and claims no zero pool it could lift (issue 2008)', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 0, die: 10, threshold: 8, thresholdAnchor: 8,
+      thresholdSource: 'fixed', required: 1, modifierDestination: 'pool', zeroPoolFails: true, pendingTools: ['1d4'],
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector(':scope .formula-content .formula').textContent, '0d10 + 1d4 dice · each ≥ 8');
+    assert.ok(!dialog.querySelector('[data-roll-prompt-zero-pool]'), 'the Tool may lift the pool');
+    const roll = dialog.querySelector('button[type="submit"]');
+    assert.ok(!roll.disabled && !roll.hasAttribute('aria-disabled'), 'Roll stays enabled');
+    dialog.querySelector('form').requestSubmit();
+    assert.equal((await pending).confirmed, true);
+  });
+
   it('shows the base formula once and itemises each applied modifier as a chip', async () => {
     const view = buildSinglePromptData({
       formula: '1d20 + 3 + 6[Modifiers]', resolvedFormula: '1d20 + 3 + 6[Modifiers]',
@@ -734,5 +825,466 @@ describe('mounted roll prompt', () => {
     assert.deepEqual(chips.map((chip) => chip.textContent.trim()), ['Focus +6']);
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;
+  });
+  it('offers each check its own buttons and notes, and every button answers its own choice (issue 2007)', async () => {
+    const keep = [['disadvantage', 'keep the worse'], ['normal', ''], ['advantage', 'keep the better']];
+    const cases = [
+      ['keep over', offerFor({ mode: 'keep' }), keep],
+      ['keep under', offerFor({ mode: 'keep' }, sumUnder, '1d20'), keep],
+      ['keep, two dice', offerFor({ mode: 'keep', extraDice: 2 }, sumOver, '2d6 + @prof'), keep],
+      ['bonus over', offerFor({ mode: 'bonus', bonusExpression: '1d6' }), [
+        ['disadvantage', '−1d6 to the total'], ['normal', ''], ['advantage', '+1d6 to the total'],
+      ]],
+      ['bonus under', offerFor({ mode: 'bonus', bonusExpression: ' +1d8 + 1 ' }, sumUnder, '1d20'), [
+        ['disadvantage', '−(1d8 + 1) to the target'], ['normal', ''], ['advantage', '+(1d8 + 1) to the target'],
+      ]],
+      ['bonus, no disadvantage', offerFor({ mode: 'bonus', bonusExpression: '1d6', offerDisadvantage: false }), [
+        ['normal', ''], ['advantage', '+1d6 to the total'],
+      ]],
+      ['keep, no disadvantage', offerFor({ mode: 'keep', offerDisadvantage: false }), [
+        ['normal', ''], ['advantage', 'keep the better'],
+      ]],
+      ['count', offerFor({}, { product: 'count' }, ''), [['disadvantage', '−1 die'], ['normal', ''], ['advantage', '+1 die']]],
+      ['count, three dice', offerFor({ countDice: 3 }, { product: 'count' }), [
+        ['disadvantage', '−3 dice'], ['normal', ''], ['advantage', '+3 dice'],
+      ]],
+      ['off', offerFor({ mode: 'off' }), [['roll', '']]],
+      ['keep, no plain first group', offerFor({ mode: 'keep' }, sumOver, '(1d20 + 2) * 2'), [['roll', '']]],
+      ['count, disabled', offerFor({ countEnabled: false }, { product: 'count' }), [['roll', '']]],
+    ];
+    const name = { disadvantage: 'Disadvantage', normal: 'Roll', advantage: 'Advantage', roll: 'Roll' };
+    for (const [label, advantageOffer, expected] of cases) {
+      for (const [clicked] of expected) {
+        document.body.replaceChildren();
+        const { dialog, pending } = await openThroughEntry(() =>
+          promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: advantageOffer.advantage, advantageOffer })
+        );
+        // `title` stays empty here: happy-dom's zeroed scrollWidth/clientWidth never overflow, so
+        // none of these untruncated notes duplicate onto `title` (UX-L1; the truncated case is
+        // proven below with an overridden layout).
+        assert.deepEqual(
+          footerOf(dialog),
+          expected.map(([action, note]) => [action, note, note ? `${name[action]}, ${note}` : name[action], '']),
+          label
+        );
+        assert.deepEqual(
+          [...dialog.querySelectorAll(':scope .manager-modal-footer button[type="submit"]')].map((button) => button.dataset.action),
+          [expected.length === 1 ? 'roll' : 'normal'],
+          `${label}: Roll is the only submit`
+        );
+        assert.ok(!dialog.querySelector(':scope .manager-modal-footer i'), `${label}: no footer glyph`);
+        dialog.querySelector(`:scope .manager-modal-footer button[data-action="${clicked}"]`).click();
+        assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
+      }
+    }
+  });
+
+  it('adds a title only once the footer note actually clips (issue 2007 UX-L1)', async () => {
+    const keep = { advantage: true, disadvantage: true, kind: 'keep', detail: null };
+    const scrollWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.Element.prototype, 'scrollWidth');
+    const clientWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.HTMLElement.prototype, 'clientWidth');
+    // happy-dom never lays out real pixels, so the note is stubbed to overflow its box the way a
+    // real browser's ellipsis would once the text is longer than the button can show on one line.
+    Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 200 : scrollWidthDescriptor.get.call(this);
+      },
+    });
+    Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 80 : clientWidthDescriptor.get.call(this);
+      },
+    });
+    try {
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: true, advantageOffer: keep })
+      );
+      const advantage = dialog.querySelector('button[data-action="advantage"]');
+      assert.equal(advantage.getAttribute('title'), 'keep the better', 'the clipped note becomes the title');
+      assert.equal(advantage.getAttribute('aria-label'), 'Advantage, keep the better', 'unchanged');
+      dialog.querySelector('button[data-action="normal"]').click();
+      await pending;
+    } finally {
+      Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', scrollWidthDescriptor);
+      Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', clientWidthDescriptor);
+    }
+  });
+
+  it('offers a batch only what every roll in it offers, and a note only when every roll agrees (issue 2007)', async () => {
+    const keepOver = offerFor({ mode: 'keep' });
+    const keepUnder = offerFor({ mode: 'keep' }, sumUnder, '1d20');
+    const count = offerFor({}, { product: 'count' });
+    const bonus = (bonusExpression) => offerFor({ mode: 'bonus', bonusExpression });
+    const bare = [['disadvantage', ''], ['normal', ''], ['advantage', '']];
+    const cases = [
+      ['keep over and under', [keepOver, keepUnder], [['disadvantage', 'keep the worse'], ['normal', ''], ['advantage', 'keep the better']]],
+      ['keep and count', [keepOver, count], bare],
+      ['bonus 1d6 and 1d8', [bonus('1d6'), bonus('1d8')], bare],
+      ['one off subject', [keepOver, offerFor({ mode: 'off' })], [['roll', '']]],
+      ['one without disadvantage', [keepOver, offerFor({ mode: 'keep', offerDisadvantage: false })], [
+        ['normal', ''], ['advantage', 'keep the better'],
+      ]],
+    ];
+    const subjects = [{ name: 'Ore', need: { kind: 'dc', dc: 12 } }, { name: 'Scrap', need: { kind: 'dc', dc: 14 } }];
+    for (const [label, offers, expected] of cases) {
+      const advantageOffer = intersectAdvantageOffers(offers);
+      const [clicked] = expected.at(-1);
+      document.body.replaceChildren();
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptBulkCheckRoll({ allowAdvantage: advantageOffer.advantage, advantageOffer, count: 2, subjects })
+      );
+      assert.equal(dialog.dataset.rollPrompt, 'bulk');
+      assert.deepEqual(footerOf(dialog).map(([action, note]) => [action, note]), expected, label);
+      dialog.querySelector(`:scope .manager-modal-footer button[data-action="${clicked}"]`).click();
+      assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
+    }
+  });
+
+  describe('additional dice (issue 2008)', () => {
+    const countCheck = {
+      product: 'count',
+      direction: 'under',
+      comparison: 'meet',
+      pool: 2,
+      die: 20,
+      threshold: 14,
+      thresholdAnchor: 14,
+      thresholdSource: 'fixed',
+      modifierDestination: 'pool',
+      actorName: 'Brenna',
+    };
+    const diceOffer = (needed, over = {}) => ({
+      available: 2,
+      limit: 1,
+      max: 1,
+      resourceLabel: 'Momentum',
+      unavailable: null,
+      reach: { needed, perDieMost: 1, explode: 'off', rescued: false },
+      ...over,
+    });
+    const openCount = (input) =>
+      openThroughEntry(() =>
+        promptCheckRoll({
+          ...countCheck,
+          required: input.additionalDiceOffer.reach?.needed,
+          ...input,
+        })
+      );
+    const controlOf = (dialog) => dialog.querySelector('[data-roll-prompt-additional-dice-group]');
+    const stepperInput = (dialog) =>
+      dialog.querySelector('input[data-roll-prompt-additional-dice]');
+    const actionOf = (dialog, action) =>
+      dialog.querySelector(`:scope .manager-modal-footer button[data-action="${action}"]`);
+    const blockNote = (dialog) => dialog.querySelector('[data-roll-prompt-block-note]');
+    const answered = (pending) => {
+      const state = { done: false };
+      pending.then(() => (state.done = true));
+      return state;
+    };
+
+    it('opens at 0 between the bonus and roll mode, and an immediate Enter buys nothing (AD37)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const control = controlOf(dialog);
+      assert.ok(
+        control.previousElementSibling.matches('.bonus-group'),
+        'after the situational bonus'
+      );
+      assert.ok(control.nextElementSibling.classList.contains('mode-field'), 'before roll mode');
+      assert.equal(stepperInput(dialog).value, '0', 'the shortfall is stated, never pre-selected');
+      assert.equal(control.querySelector('[data-notice-tone]').dataset.noticeTone, 'warning');
+      dialog.querySelector('form').requestSubmit();
+      const answer = await pending;
+      assert.deepEqual(
+        [answer.confirmed, answer.advantage, answer.additionalDice],
+        [true, 'normal', 0]
+      );
+    });
+
+    it('draws the whole control in the shared well rather than a hand-rolled frame (frames 30-34)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const well = stepperInput(dialog).closest('.fab-well');
+      assert.ok(Boolean(well), 'the stepper sits inside the shared `<Well>`');
+      assert.ok(well.matches('[data-roll-prompt-additional-dice-group]'), 'the well is the group');
+      for (const hook of ['title', 'line', 'message']) {
+        const part = well.querySelector(`[data-roll-prompt-additional-dice-${hook}]`);
+        assert.ok(Boolean(part), `the ${hook} renders inside the well`);
+      }
+      dialog.querySelector('form').requestSubmit();
+      await pending;
+    });
+
+    it('steps within the limit, settles the pool line and answers the chosen dice (frames 30-31, AD36)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const control = controlOf(dialog);
+      const line = control.querySelector('[data-roll-prompt-additional-dice-line]');
+      const input = stepperInput(dialog);
+      assert.equal(line.textContent, 'Momentum 2 available · Spends 0 Momentum');
+      assert.deepEqual([input.name, input.max, input.disabled], ['additionalDice', '1', false]);
+      const message = control.querySelector('[data-roll-prompt-additional-dice-message]');
+      assert.deepEqual(input.getAttribute('aria-describedby').split(' '), [
+        line.id,
+        message.parentElement.id,
+      ]);
+      control.querySelector('[data-stepper-increment]').click();
+      flushSync();
+      assert.equal(input.value, '1');
+      assert.equal(line.textContent, 'Momentum 2 available · Spends 1 Momentum');
+      assert.equal(
+        dialog.querySelector(':scope .formula-content .formula').textContent,
+        '3d20 · each ≤ 14'
+      );
+      assert.equal(
+        control.querySelector('[data-notice-tone]').textContent.trim(),
+        'At least 1 additional die is needed. You have enough.'
+      );
+      assert.equal(
+        control.querySelector('[data-stepper-increment]').disabled,
+        true,
+        'no step past the limit'
+      );
+      input.value = '5';
+      input.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+      assert.equal(
+        line.textContent,
+        'Momentum 2 available · Spends 1 Momentum',
+        'a typed 5 clamps to 1'
+      );
+      dialog.querySelector('form').requestSubmit();
+      assert.equal((await pending).additionalDice, 1);
+    });
+
+    it('disables a single Roll that cannot reach and refuses Enter and clicks until a bonus reaches (AD38, AD65)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(4) });
+      const roll = actionOf(dialog, 'roll');
+      assert.equal(roll.getAttribute('aria-disabled'), 'true');
+      assert.equal(roll.disabled, false, 'never the native disabled');
+      assert.equal(
+        blockNote(dialog).textContent,
+        'Rolling is disabled: this attempt cannot reach the successes it needs.'
+      );
+      assert.deepEqual(
+        [blockNote(dialog).getAttribute('role'), roll.getAttribute('aria-describedby')],
+        ['status', blockNote(dialog).id]
+      );
+      assert.equal(document.activeElement, dialog.querySelector('input[name="situationalBonus"]'));
+      const state = answered(pending);
+      dialog.querySelector('form').requestSubmit();
+      roll.click();
+      await settleUi();
+      assert.equal(state.done, false, 'neither Enter nor a click rolls a blocked action');
+      const bonus = dialog.querySelector('input[name="situationalBonus"]');
+      bonus.value = '2';
+      bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+      assert.ok(!roll.hasAttribute('aria-disabled'), 'a bonus that reaches unblocks Roll');
+      assert.ok(!blockNote(dialog), 'and the note leaves');
+      dialog.querySelector('form').requestSubmit();
+      assert.deepEqual([(await pending).bonus, state.done], ['2', true]);
+    });
+
+    // A zero pool with nothing to spend that a rolled Tool bonus may still lift.
+    it('keeps Roll enabled while a rolled Tool bonus could still lift a zero pool (R1)', async () => {
+      const zero = { pool: 0, additionalDiceOffer: diceOffer(1, { available: 0, limit: 0 }) };
+      const blocked = await openCount(zero);
+      assert.equal(actionOf(blocked.dialog, 'roll').getAttribute('aria-disabled'), 'true', 'control');
+      blocked.dialog.querySelector('input[name="situationalBonus"]').dispatchEvent(keydown('Escape'));
+      assert.deepEqual(await blocked.pending, { confirmed: false });
+      const { dialog, pending } = await openCount({ ...zero, pendingTools: ['1d4'] });
+      assert.ok(!actionOf(dialog, 'roll').hasAttribute('aria-disabled'), 'the Tool may lift it');
+      assert.ok(!blockNote(dialog), 'no block note');
+      assert.ok(!dialog.querySelector('[data-roll-prompt-zero-pool]'), 'no automatic failure');
+      dialog.querySelector('form').requestSubmit();
+      assert.equal((await pending).confirmed, true);
+    });
+
+    it('keeps Advantage rollable when only it reaches, and focuses it with no bonus field (R1, AD34, AD64)', async () => {
+      const advantageOffer = offerFor({}, { product: 'count' });
+      const { dialog, pending } = await openCount({
+        additionalDiceOffer: diceOffer(3, { available: 0, limit: 0 }),
+        advantageOffer,
+        allowAdvantage: true,
+        offerSituationalBonus: false,
+      });
+      assert.deepEqual(
+        ['disadvantage', 'normal', 'advantage'].map((action) =>
+          actionOf(dialog, action).getAttribute('aria-disabled')
+        ),
+        ['true', 'true', null]
+      );
+      assert.equal(blockNote(dialog).textContent, 'Only Advantage can reach the successes needed.');
+      const message = controlOf(dialog).querySelector('[data-roll-prompt-additional-dice-message]');
+      assert.match(
+        message.textContent.trim(),
+        /^Without Advantage, these dice cannot reach 3 successes\. /,
+        'never "Cannot reach" beside an Advantage that can'
+      );
+      assert.equal(stepperInput(dialog).disabled, true, 'nothing to buy');
+      assert.equal(
+        document.activeElement,
+        actionOf(dialog, 'advantage'),
+        'never the close control or a blocked action'
+      );
+      const state = answered(pending);
+      actionOf(dialog, 'disadvantage').click();
+      await settleUi();
+      assert.equal(state.done, false);
+      actionOf(dialog, 'advantage').click();
+      const answer = await pending;
+      assert.deepEqual([answer.advantage, answer.additionalDice], ['advantage', 0]);
+    });
+
+    it('shows an unavailable control disabled with its reason and no path (frame 34)', async () => {
+      const { dialog, pending } = await openCount({
+        additionalDiceOffer: diceOffer(2, {
+          available: 0,
+          limit: 0,
+          unavailable: 'resourceNotWritable',
+        }),
+      });
+      const control = controlOf(dialog);
+      assert.equal(stepperInput(dialog).disabled, true);
+      assert.equal(
+        control.querySelector('[data-roll-prompt-additional-dice-line]').textContent,
+        'Momentum unavailable · Spends 0'
+      );
+      assert.equal(control.querySelector('[data-notice-tone]').dataset.noticeTone, 'info');
+      assert.ok(!/system\.|Macro\./.test(dialog.textContent));
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    });
+
+    it('renders no control for a check that offers no additional dice', async () => {
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptCheckRoll({ ...countCheck, required: 2 })
+      );
+      assert.ok(!controlOf(dialog));
+      assert.ok(!dialog.querySelector(':scope .manager-modal-footer [aria-disabled]'));
+      dialog.querySelector('form').requestSubmit();
+      assert.ok(!('additionalDice' in (await pending)));
+    });
+
+    describe('in a batch (frame 36)', () => {
+      const batchRow = (name, needed) => ({
+        name,
+        need: { kind: 'successes', count: needed, destination: 'pool' },
+        offerSituationalBonus: true,
+        additionalDice: {
+          countDice: { base: 2, poolDelta: 0, zeroPoolFails: true, destination: 'pool' },
+          reach: { needed, perDieMost: 1, explode: 'off', rescued: false },
+        },
+      });
+      const rowsNeeding = (...needs) => needs.map((needed, index) => batchRow(`Row ${index + 1}`, needed));
+      const openBatch = (subjects, over = {}) =>
+        openThroughEntry(() =>
+          promptBulkCheckRoll({
+            count: subjects.length,
+            subjects,
+            activity: 'Salvage',
+            actorName: 'Brenna',
+            allowAdvantage: true,
+            advantageOffer: offerFor({}, { product: 'count' }),
+            additionalDiceOffer: diceOffer(null, { available: 2, limit: 0, reach: null }),
+            ...over,
+          })
+        );
+      const disabledActions = (dialog) =>
+        ['disadvantage', 'normal', 'advantage'].filter(
+          (action) => actionOf(dialog, action).getAttribute('aria-disabled') === 'true'
+        );
+      const suffixes = (dialog) =>
+        [...dialog.querySelectorAll('.bulk-row')].map(
+          (row) => row.querySelector('[data-roll-prompt-bulk-unreachable]')?.textContent ?? ''
+        );
+
+      it('states the whole batch spend, and one choice answers every roll', async () => {
+        const subjects = rowsNeeding(1, 1, 1, 1);
+        const unaffordable = await openBatch(subjects);
+        const control = controlOf(unaffordable.dialog);
+        assert.equal(
+          control.querySelector('[data-roll-prompt-additional-dice-line]').textContent,
+          'Momentum 2 available · Spends 0 Momentum across 4 rolls (0 each)'
+        );
+        assert.equal(
+          control.querySelector('[data-notice-tone]').textContent.trim(),
+          'Not enough Momentum to buy a die for every roll.'
+        );
+        assert.equal(stepperInput(unaffordable.dialog).disabled, true);
+        unaffordable.dialog.querySelector('[data-manager-modal-close]').click();
+        await unaffordable.pending;
+
+        document.body.replaceChildren();
+        const { dialog, pending } = await openBatch(subjects, {
+          additionalDiceOffer: diceOffer(null, { available: 4, limit: 1, reach: null }),
+        });
+        controlOf(dialog).querySelector('[data-stepper-increment]').click();
+        flushSync();
+        assert.equal(
+          controlOf(dialog).querySelector('[data-roll-prompt-additional-dice-spend]').textContent,
+          'Spends 4 Momentum across 4 rolls (1 each)'
+        );
+        dialog.querySelector('form').requestSubmit();
+        assert.deepEqual((await pending).additionalDice, 1);
+      });
+
+      it('disables Roll and Disadvantage when every row reaches only with Advantage (-blocked)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(3, 3, 3));
+        assert.deepEqual(disabledActions(dialog), ['disadvantage', 'normal']);
+        assert.equal(blockNote(dialog).textContent, 'Only Advantage can reach the successes needed.');
+        assert.deepEqual(suffixes(dialog), ['', '', ''], 'Advantage reaches every row');
+        const state = answered(pending);
+        dialog.querySelector('form').requestSubmit();
+        await settleUi();
+        assert.equal(state.done, false, 'a blocked Roll never answers');
+        actionOf(dialog, 'advantage').click();
+        assert.equal((await pending).advantage, 'advantage');
+      });
+
+      it('disables every action and marks every row when none can reach (-blocked-all)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(4, 4));
+        assert.deepEqual(disabledActions(dialog), ['disadvantage', 'normal', 'advantage']);
+        assert.equal(
+          blockNote(dialog).textContent,
+          'Rolling is disabled: none of these rolls can reach the successes they need.'
+        );
+        assert.deepEqual(suffixes(dialog), [' · cannot reach', ' · cannot reach']);
+        const suffix = dialog.querySelector('[data-roll-prompt-bulk-unreachable]');
+        assert.ok(suffix.parentElement.matches('.bulk-need'), 'after the needed count');
+        assert.ok(suffix.classList.contains('bulk-unreachable'), 'in danger ink');
+        dialog.querySelector('[data-manager-modal-close]').click();
+        await pending;
+      });
+
+      it('marks only the row no action reaches and keeps every action (-partial)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(1, 5, 1, 1));
+        assert.deepEqual(disabledActions(dialog), []);
+        assert.ok(!blockNote(dialog), 'no block note');
+        assert.deepEqual(suffixes(dialog), ['', ' · cannot reach', '', '']);
+        dialog.querySelector('form').requestSubmit();
+        assert.equal((await pending).advantage, 'normal');
+      });
+
+      it('notes a batch whose rows pay differently in the titled well, with no stepper', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(1, 1), {
+          additionalDiceOffer: undefined,
+          additionalDiceMixed: true,
+        });
+        const control = controlOf(dialog);
+        assert.ok(control.matches('.fab-well'), 'the shared well');
+        const title = control.querySelector('[data-roll-prompt-additional-dice-title]');
+        assert.equal(title.textContent, 'Additional dice');
+        assert.ok(!stepperInput(dialog), 'nothing to choose');
+        assert.ok(!control.querySelector('[data-roll-prompt-additional-dice-line]'), 'no spend line');
+        const message = control.querySelector('[data-roll-prompt-additional-dice-message]');
+        assert.deepEqual(
+          [message.dataset.noticeTone, message.textContent.trim()],
+          ['info', 'Rolls in this batch use different resources, so no dice can be added.']
+        );
+        dialog.querySelector('form').requestSubmit();
+        assert.ok(!('additionalDice' in (await pending)));
+      });
+    });
   });
 });

@@ -33,12 +33,12 @@ import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -64,13 +64,17 @@ const AXIS_ROW_COUNT = 18;
 const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-dock-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   // THE manager's labelled push-button (issue 1118). Apply renders through the primitive
   // now, so it is a static import of the shell and belongs in its closure. This suite is
   // NOT covered by `mounted-harness-primitive-allowlist.test.js`, which gates the
   // hand-rolled harnesses only — `createMountedComponentHarness` carries its own closure
   // validator, and that is what named this omission rather than hanging on it.
-  compiledModules: ['src/ui/svelte/components/ManagerButton.svelte', SHELL_PATH],
+  compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/Notice.svelte',
+    SHELL_PATH,
+  ],
   componentPath: SHELL_PATH,
 });
 
@@ -290,7 +294,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
       shell.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       await page.setContent(inspectorPage(rendered.markup), { waitUntil: 'load' });
@@ -317,13 +321,13 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     // `margin-top`) and the delete wore the host button's 14px type on a 6px corner, wrapping the
     // system panel's `Remove 2 components from The Herbalist's Compendium…` to two lines. Both are
     // the SHELL's and the sheet's, so one measurement covers the world and the system panel alike.
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       // Spliced before the LAST `</div></section>`, which closes the dock and the panel.
       const dockClose = rendered.markup.lastIndexOf('</div></section>');
       const probe =
-        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="manager-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
+        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="fabricate-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
       // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`).
       const markupWithFoot = (
         dockClose === -1
@@ -507,7 +511,7 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
       card.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       await page.setContent(inspectorPage(`${rendered.shell}${rendered.card}`), {

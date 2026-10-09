@@ -8,24 +8,23 @@ import {
   resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
 import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
-import {
-  faceBeyondDie,
-  MAX_COUNT_POOL,
-  resolvePool,
-} from '../../../../../systems/countEvaluation.js';
+import { normalizeCheckAdvantage } from '../../../../../systems/normalize/checkAdvantage.js';
 import {
   normalizeCheckEvaluation,
   normalizeNullableAdjustment,
-  normalizeNullableSuccesses,
 } from '../../../../../systems/normalize/checkEvaluation.js';
 import {
   findRangeConflicts,
+  keepGroupOf,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
+import { isBonusExpression } from './checkAdvantageCopy.js';
 import { invalidOverrideRecords, overrideEntriesFor } from './checkOverrideReadiness.js';
-import { missingTargetPaths, readsCharacter, targetExpressionFault } from './checkTargetStatus.js';
+import { missingTargetPaths, targetExpressionFault } from './checkTargetStatus.js';
+import { formulaCountsSuccesses, planCountConversion } from './countFormulaConversion.js';
+import { countReadiness, countRequiredReadiness as countRequiredRows } from './countReadiness.js';
 
 /**
  * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
@@ -44,6 +43,11 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'noRollFormula',
   'retiredPlaceholderBreaksFormula',
   'retiredPlaceholderInFormula',
+  'freeTextCountingFormula',
+  // Advantage (issue 2007)
+  'advantageKeepNoDie',
+  'advantageKeepAfterReference',
+  'advantageBonusInvalid',
   // Outcomes
   'unnamedOutcome',
   'noSuccessOutcome',
@@ -78,11 +82,18 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'countRequiredExceedsMaxPool',
   'countRequiredExceedsBasePool',
   'countPoolTooLarge',
+  'countFaceMissing',
+  'countTriggerGroupUnreachable',
+  // Additional dice (issue 2008)
+  'countAdditionalDiceSourceMissing',
+  'countAdditionalDicePathInvalid',
+  'countAdditionalDiceMacroInvalid',
   // Transient: they name the Preview-as actor and feed no badge, dot, tally or enable gate.
   'attributePathUnresolvedForPreview',
   'attributeValueNotNumeric',
   'countPathUnresolvedForPreview',
   'countValueNotNumericForPreview',
+  'countAdditionalDicePathUnresolvedForPreview',
 ]);
 
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
@@ -108,6 +119,10 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   noRollFormula: 'roll',
   retiredPlaceholderBreaksFormula: 'roll',
   retiredPlaceholderInFormula: 'roll',
+  freeTextCountingFormula: 'roll',
+  advantageKeepNoDie: 'roll',
+  advantageKeepAfterReference: 'roll',
+  advantageBonusInvalid: 'roll',
   unnamedOutcome: 'outcomes',
   noSuccessOutcome: 'outcomes',
   rangeInvalid: 'outcomes',
@@ -137,28 +152,76 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   countRequiredExceedsMaxPool: 'roll',
   countRequiredExceedsBasePool: 'roll',
   countPoolTooLarge: 'roll',
+  countFaceMissing: 'roll',
+  countTriggerGroupUnreachable: 'triggers',
   attributePathUnresolvedForPreview: 'roll',
   attributeValueNotNumeric: 'roll',
   countPathUnresolvedForPreview: 'roll',
   countValueNotNumericForPreview: 'roll',
+  countAdditionalDiceSourceMissing: 'roll',
+  countAdditionalDicePathInvalid: 'roll',
+  countAdditionalDiceMacroInvalid: 'roll',
+  countAdditionalDicePathUnresolvedForPreview: 'roll',
+});
+
+const FACE_CONTROLS = Object.freeze({
+  explode: 'checks-count-explode-face',
+  cancel: 'checks-count-cancel-face',
+});
+const INPUT_CONTROLS = Object.freeze({
+  base: 'checks-count-base',
+  threshold: 'checks-count-threshold',
+});
+const ADDITIONAL_DICE_CONTROLS = Object.freeze({
+  path: 'checks-additional-dice-path',
+  read: 'checks-additional-dice-read-macro',
+  spend: 'checks-additional-dice-spend-macro',
 });
 
 /**
  * Which control each issue names: the `data-validation-target` a Validation row's View and a
  * section notice's Review focus. An id with none is route-only and focuses its section: an
- * Outcomes tier carries no id, and a modifier fault names its own entries.
- * @type {Readonly<Record<string, string>>} */
+ * Outcomes tier carries no id, and a modifier fault names its own entries. A map instead of an
+ * address picks by the issue's `kind` (explode or cancel) or `input` (base or threshold).
+ * @type {Readonly<Record<string, string | Readonly<Record<string, string>>>>} */
 export const CHECK_ISSUE_CONTROLS = Object.freeze({
   noRollFormula: 'checks-roll-formula',
   retiredPlaceholderBreaksFormula: 'checks-roll-formula',
   retiredPlaceholderInFormula: 'checks-roll-formula',
+  freeTextCountingFormula: 'checks-roll-formula',
+  advantageKeepNoDie: 'checks-advantage-mode',
+  advantageKeepAfterReference: 'checks-advantage-mode',
+  advantageBonusInvalid: 'checks-advantage-bonus',
   danglingTierStepTarget: 'checks-triggers',
   multipleTierStepTargets: 'checks-triggers',
+  countTriggerGroupUnreachable: 'checks-triggers',
   attributeTargetMissing: 'checks-target-expression',
   attributeTargetInvalid: 'checks-target-expression',
   attributePathUnresolvedForPreview: 'checks-target-expression',
   attributeValueNotNumeric: 'checks-target-expression',
+  countPoolInvalid: 'checks-count-base',
+  countPoolTooLarge: 'checks-count-base',
+  countThresholdInvalid: 'checks-count-threshold',
+  countExplodeUnbounded: 'checks-count-explode',
+  countFaceBeyondDie: FACE_CONTROLS,
+  countFaceMissing: FACE_CONTROLS,
+  countTierWithoutSuccesses: 'checks-count-tier-successes',
+  countRequiredExceedsMaxPool: 'checks-count-required',
+  countRequiredExceedsBasePool: 'checks-count-required',
+  countPathUnresolvedForPreview: INPUT_CONTROLS,
+  countValueNotNumericForPreview: INPUT_CONTROLS,
+  countAdditionalDiceSourceMissing: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathInvalid: 'checks-additional-dice-path',
+  countAdditionalDiceMacroInvalid: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathUnresolvedForPreview: 'checks-additional-dice-path',
 });
+
+/** The control one raised issue names, or `undefined` for a route-only one. */
+export function issueControl(issue) {
+  const control = CHECK_ISSUE_CONTROLS[issue?.id];
+  if (typeof control !== 'object') return control;
+  return control[issue.data?.kind] ?? control[issue.data?.input];
+}
 
 /**
  * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
@@ -457,160 +520,14 @@ function otherwiseReadiness(result, outcomes) {
   }
 }
 
-/** A pool expression's fault whatever character reads it: blank, `dice` or `invalid`, else null. */
-function poolExpressionFault(expression) {
-  return trimmed(expression) === '' ? 'blank' : targetExpressionFault(expression);
-}
+/** This module's funnel, handed to the count rules so the registry refuses their ids too. */
+const raise = (issues, id, severity, data) => pushIssue(issues, id, severity, data);
 
-/** The effect a beyond-the-die face has, by the pure predicates' own rule. */
-function beyondDieEffect(kind, direction) {
-  if (kind === 'explode') return 'neverExplodes';
-  return direction === 'under' ? 'noFaceCancels' : 'everyFaceCancels';
-}
+export { countCeilingIssues, literalBaseDice } from './countReadiness.js';
 
-/** Explode and cancel faces the die can show, and an explosion that can stop. */
-function countFaceReadiness(result, evaluation, thresholdMode) {
-  const { pool, direction } = evaluation;
-  const beyond = ['explode', 'cancel'].find(
-    (kind) => pool[kind].enabled && faceBeyondDie(pool[kind].faces, pool.die)
-  );
-  result.checks.push({ id: 'countFacesOnDie', satisfied: !beyond });
-  if (beyond) {
-    const effect = beyondDieEffect(beyond, direction);
-    const data = { kind: beyond, face: pool[beyond].faces.value, die: pool.die, effect };
-    pushIssue(result.issues, 'countFaceBeyondDie', 'warning', data);
-  }
-  // Literal inputs, so only the face rules can refuse: the runtime's own every-face test.
-  const literal = { ...evaluation, pool: { ...pool, base: '1', threshold: '1' } };
-  const unbounded =
-    resolvePool({ evaluation: literal, thresholdMode }).reason === 'explode-unbounded';
-  result.checks.push({ id: 'countExplosionStops', satisfied: !unbounded });
-  if (unbounded) pushIssue(result.issues, 'countExplodeUnbounded', 'critical');
-}
-
-/**
- * The issue data for the requirements whose count exceeds the authored ceiling (`overMax`) and
- * those above the base pool but within the ceiling (`overBase`): tier `names`, and `defaultRecord`
- * when the check's own count is among them, which the copy layer names in the reader's language.
- * The ceiling is the base alone until additional dice (issue 2008) raise it.
- */
-export function countCeilingIssues({ base, ceiling, requirements }) {
-  const group = (predicate) => {
-    const over = requirements.filter(({ required }) => predicate(required));
-    const names = over
-      .filter((entry) => !entry.defaultRecord)
-      .map(({ name }) => name)
-      .join(', ');
-    return over.some((entry) => entry.defaultRecord) ? { names, defaultRecord: true } : { names };
-  };
-  return {
-    overMax: group((required) => required > ceiling),
-    overBase: group((required) => required > base && required <= ceiling),
-  };
-}
-
-const raisesAny = (group) => group.defaultRecord === true || group.names !== '';
-
-/**
- * The dice a literal base rolls, as the runtime settles it with no benefit applied, or the refusal.
- * The threshold and face rules are neutralized, so only the base decides.
- */
-function literalBaseDice(evaluation, thresholdMode) {
-  const off = { enabled: false };
-  const pool = { ...evaluation.pool, threshold: '1', explode: off, cancel: off };
-  const placement = { preRolls: [], poolDelta: 0, thresholdDelta: 0 };
-  return resolvePool({ evaluation: { ...evaluation, pool }, thresholdMode, placement });
-}
-
-/**
- * Recipe tiers set their own successes, and a literal base pool can meet every required count.
- * `literal` is the base's settled read, or null when the base reads the character or is faulted.
- */
-function countRequiredReadiness(result, check, evaluation, { activity, literal }) {
-  const { pool } = evaluation;
-  const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
-  const tierRequired = tiers.map((tier) => ({
-    name: trimmed(tier?.name) || String(tier?.id ?? ''),
-    successes: normalizeNullableSuccesses(tier?.successes),
-  }));
-  if (tierRequired.length > 0) {
-    const unset = tierRequired.filter((tier) => tier.successes === null);
-    result.checks.push({ id: 'countTiersSetSuccesses', satisfied: unset.length === 0 });
-    if (unset.length > 0) {
-      const names = unset.map((tier) => tier.name).join(', ');
-      const data = { names, required: pool.required };
-      pushIssue(result.issues, 'countTierWithoutSuccesses', 'warning', data);
-    }
-  }
-  if (poolExpressionFault(pool.base)) return;
-  if (readsCharacter(pool.base)) {
-    result.checks.push({ id: 'countPoolCharacterDependent', satisfied: true });
-    return;
-  }
-  if (!literal?.ok) return;
-  const base = literal.policy.dice;
-  const requirements = [
-    { defaultRecord: true, required: pool.required },
-    ...tierRequired.map((tier) => ({ name: tier.name, required: tier.successes ?? pool.required })),
-  ];
-  const { overMax, overBase } = countCeilingIssues({ base, ceiling: base, requirements });
-  result.checks.push({ id: 'countRequiredWithinMaxPool', satisfied: !raisesAny(overMax) });
-  if (raisesAny(overMax)) {
-    pushIssue(result.issues, 'countRequiredExceedsMaxPool', 'critical', {
-      ...overMax,
-      ceiling: base,
-    });
-  }
-  if (raisesAny(overBase)) {
-    result.checks.push({ id: 'countRequiredWithinBasePool', satisfied: false });
-    pushIssue(result.issues, 'countRequiredExceedsBasePool', 'warning', { ...overBase, base });
-  }
-}
-
-/** The Preview-as actor's reading of a pool that reads the character. */
-function previewActorPoolWarnings(transient, evaluation, thresholdMode, previewActor) {
-  const rollData = previewActor.rollData ?? {};
-  const read = resolvePool({ evaluation, thresholdMode, rollData });
-  if (read.ok || !['base', 'threshold'].includes(read.refusedInput)) return;
-  const actor = previewActor.name ?? '';
-  if (read.reason !== 'unresolved-path') {
-    pushIssue(transient, 'countValueNotNumericForPreview', 'warning', { actor });
-    return;
-  }
-  const { base, threshold } = evaluation.pool;
-  const paths = new Set([
-    ...missingTargetPaths(base, rollData),
-    ...missingTargetPaths(threshold, rollData),
-  ]);
-  const path = [...paths].join(', ');
-  pushIssue(transient, 'countPathUnresolvedForPreview', 'warning', { actor, path });
-}
-
-/**
- * Readiness of a success-counting pool: its expressions, faces and required counts, and the
- * Preview-as actor's reading as `transient` warnings. Fixed ranges and progressive checks grade
- * no required count, so only the pool itself applies to them.
- */
-function countReadiness(result, check, evaluation, { mode, activity, previewActor }) {
-  const { base, threshold } = evaluation.pool;
-  const thresholdMode = check?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  const baseFault = poolExpressionFault(base);
-  result.checks.push({ id: 'countPoolReadable', satisfied: !baseFault });
-  if (baseFault) pushIssue(result.issues, 'countPoolInvalid', 'critical');
-  const thresholdFault = poolExpressionFault(threshold);
-  result.checks.push({ id: 'countThresholdReadable', satisfied: !thresholdFault });
-  if (thresholdFault) pushIssue(result.issues, 'countThresholdInvalid', 'critical');
-  countFaceReadiness(result, evaluation, thresholdMode);
-  const literal =
-    baseFault || readsCharacter(base) ? null : literalBaseDice(evaluation, thresholdMode);
-  if (literal?.reason === 'pool-too-large') {
-    pushIssue(result.issues, 'countPoolTooLarge', 'critical', { max: MAX_COUNT_POOL });
-  }
-  const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
-  if (gradesRequired) countRequiredReadiness(result, check, evaluation, { activity, literal });
-  if (previewActor && !baseFault && !thresholdFault) {
-    previewActorPoolWarnings(result.transient, evaluation, thresholdMode, previewActor);
-  }
+/** The count required-rows the Difficulty card states (issue 2006), through this registry. */
+export function countRequiredReadiness(result, evaluation, { tiers, literal }) {
+  countRequiredRows(result, evaluation, { tiers, literal, raise });
 }
 
 /**
@@ -623,7 +540,7 @@ function targetReadiness(check, { mode, activity, previewActor, overrideEntries 
   const result = { checks: [], issues: [], transient: [] };
   const evaluation = normalizeCheckEvaluation(check?.evaluation);
   if (evaluation.product === 'count') {
-    countReadiness(result, check, evaluation, { mode, activity, previewActor });
+    countReadiness(result, check, evaluation, { mode, activity, previewActor, raise });
     return result;
   }
   if (mode === 'progressive') {
@@ -658,7 +575,7 @@ function targetReadiness(check, { mode, activity, previewActor, overrideEntries 
  * refused one discards the whole formula), with the legacy `rollExpression` alias planned the same
  * way. A count check's retained formula is inert, so it raises nothing and counts as a roll.
  */
-function formulaReadiness(check, evaluation) {
+function formulaReadiness(check, evaluation, options) {
   if (evaluation.product === 'count') return { checks: [], issues: [], hasRollFormula: true };
   const checks = [];
   const issues = [];
@@ -672,7 +589,89 @@ function formulaReadiness(check, evaluation) {
   } else if (plan.outcome === 'stripped' || legacyPlan.outcome === 'stripped') {
     pushIssue(issues, 'retiredPlaceholderInFormula', 'warning');
   }
+  countingFormulaReadiness({ checks, issues }, check, options);
   return { checks, issues, hasRollFormula };
+}
+
+/**
+ * A summing formula whose die counts successes (issue 2006): a warning, never gating, whose data
+ * carries the Convert plan the row and the roll section's notice offer the action from.
+ */
+function countingFormulaReadiness(result, check, { mode, activity, components, gatheringTasks }) {
+  if (!formulaCountsSuccesses(check?.rollFormula)) return;
+  result.checks.push({ id: 'summedFormulaCountsNothing', satisfied: false });
+  const records = { components, gatheringTasks };
+  const plan = planCountConversion(check, { mode, activity, records });
+  const data = { formula: trimmed(check.rollFormula), ...plan };
+  pushIssue(result.issues, 'freeTextCountingFormula', 'warning', data);
+}
+
+/**
+ * The authored advantage rule's own readiness (issue 2007), read the same way the Studio's note
+ * reads it: `keep` against `keepGroupOf`'s proof, `bonus` against the Studio's grammar. Inert
+ * under `off` and for a counting check, whose advantage reads only the count keys.
+ */
+function advantageReadiness(check, evaluation) {
+  if (evaluation.product === 'count') return [];
+  const rule = normalizeCheckAdvantage(check?.advantage);
+  const issues = [];
+  if (rule.mode === 'keep') {
+    const group = keepGroupOf(check?.rollFormula);
+    if (!group.ok && group.reason !== 'none') {
+      pushIssue(issues, 'advantageKeepNoDie', 'warning');
+    } else if (group.ok && group.referenceFirst) {
+      pushIssue(issues, 'advantageKeepAfterReference', 'warning', {
+        n: group.number,
+        dN: `d${group.faces}`,
+      });
+    }
+  } else if (rule.mode === 'bonus' && !isBonusExpression(rule.bonusExpression)) {
+    pushIssue(issues, 'advantageBonusInvalid', 'critical');
+  }
+  return issues;
+}
+
+/**
+ * Routed-only readiness, extracted so `evaluateCheckReadiness` stays under the function-size
+ * ratchet: outcome-tier naming and Success coverage, fixed-range validity, and tier-step targets.
+ * Tier-step targets are read outside the tier-count gate on purpose: a target authored before any
+ * tier exists is exactly the dangling case a GM needs told about.
+ */
+function routedTierReadiness(check) {
+  const checks = [];
+  const issues = [];
+  const { type, outcomes } = routedOutcomes(check);
+  if (outcomes.length > 0) {
+    const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
+    checks.push({ id: 'outcomesNamed', satisfied: allNamed });
+    if (!allNamed) pushIssue(issues, 'unnamedOutcome', 'critical');
+
+    const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
+    checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
+    if (!hasSuccess) pushIssue(issues, 'noSuccessOutcome', 'critical');
+
+    // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
+    // three faults are `critical`: no copy or test may describe `rangeInvalid` or
+    // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
+    if (type === 'fixed') {
+      const conflicts = findRangeConflicts(outcomes);
+      const rangesValid = conflicts.invalid.size === 0;
+      const rangesNoOverlap = conflicts.overlapping.size === 0;
+      checks.push({ id: 'rangesValid', satisfied: rangesValid });
+      if (!rangesValid) pushIssue(issues, 'rangeInvalid', 'critical');
+      checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
+      if (!rangesNoOverlap) pushIssue(issues, 'rangeOverlap', 'critical');
+      const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
+      const gapped = fixedRangesHaveGap(outcomes, excluded);
+      checks.push({ id: 'rangesContiguous', satisfied: !gapped });
+      if (gapped) pushIssue(issues, 'rangeGap', 'critical');
+    }
+  }
+
+  const tierStep = tierStepTargetReadiness(check, outcomes);
+  checks.push(...tierStep.checks);
+  issues.push(...tierStep.issues);
+  return { checks, issues };
 }
 
 /**
@@ -720,57 +719,17 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   }
 
   const evaluation = normalizeCheckEvaluation(check?.evaluation);
-  const formula = formulaReadiness(check, evaluation);
+  const formula = formulaReadiness(check, evaluation, { ...options, mode });
   checks.push(...formula.checks);
-  issues.push(...formula.issues);
+  issues.push(...formula.issues, ...advantageReadiness(check, evaluation));
   const { hasRollFormula } = formula;
 
   // Routed checks route an outcome tier to a result set by tier NAME, and only SUCCESS tiers
   // can be routed, so the rules below wait until at least one tier is authored.
   if (mode === 'routed') {
-    const { type, outcomes } = routedOutcomes(check);
-    if (outcomes.length > 0) {
-      const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
-      checks.push({ id: 'outcomesNamed', satisfied: allNamed });
-      if (!allNamed) {
-        pushIssue(issues, 'unnamedOutcome', 'critical');
-      }
-
-      const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
-      checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
-      if (!hasSuccess) {
-        pushIssue(issues, 'noSuccessOutcome', 'critical');
-      }
-
-      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
-      // three faults are `critical`: no copy or test may describe `rangeInvalid` or
-      // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
-      if (type === 'fixed') {
-        const conflicts = findRangeConflicts(outcomes);
-        const rangesValid = conflicts.invalid.size === 0;
-        const rangesNoOverlap = conflicts.overlapping.size === 0;
-        checks.push({ id: 'rangesValid', satisfied: rangesValid });
-        if (!rangesValid) {
-          pushIssue(issues, 'rangeInvalid', 'critical');
-        }
-        checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
-        if (!rangesNoOverlap) {
-          pushIssue(issues, 'rangeOverlap', 'critical');
-        }
-        const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
-        const gapped = fixedRangesHaveGap(outcomes, excluded);
-        checks.push({ id: 'rangesContiguous', satisfied: !gapped });
-        if (gapped) {
-          pushIssue(issues, 'rangeGap', 'critical');
-        }
-      }
-    }
-
-    // Outside the tier-count gate on purpose: a target authored before any tier exists is
-    // exactly the dangling case a GM needs told about.
-    const tierStep = tierStepTargetReadiness(check, outcomes);
-    checks.push(...tierStep.checks);
-    issues.push(...tierStep.issues);
+    const routed = routedTierReadiness(check);
+    checks.push(...routed.checks);
+    issues.push(...routed.issues);
   }
 
   const overrideEntries = overrideEntriesFor(options.activity, options);

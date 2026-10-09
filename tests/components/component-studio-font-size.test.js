@@ -15,21 +15,21 @@ const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">
-        <section class="fabricate-filter-bar manager-toolbar manager-component-toolbar">
+        <section class="fabricate-filter-bar manager-component-toolbar">
           <div class="manager-component-filter-row">
-            <label class="fabricate-search manager-search">
+            <label class="fabricate-search">
               <input type="search" data-m="search" value="iron">
             </label>
             <!-- The toolbar controls are the shared Select, drawn as it renders: the picker ROOT
                  carrying the caller class, the trigger nested inside it. -->
-            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-form" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           </div>
           <div class="manager-component-filter-row is-secondary">
-            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-form" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
-              <button class="fabricate-toggle manager-status-toggle is-on" data-component-group-by-category>
+              <button class="fabricate-toggle is-on" data-component-group-by-category>
                 <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
               </button>
             </div>
@@ -38,13 +38,13 @@ const FIXTURE = `
               <span class="manager-component-filter-label">Sort by</span>
               <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
               <!-- Carries fab-manager-button because the shipped control does (issue 1118):
-                   ComponentsBrowserView renders this toggle through ManagerButton, and the
-                   .manager-button.manager-component-sort-direction rule was chained onto the
+                   ComponentsBrowserView renders this toggle through Button, and the
+                   .fabricate-button.manager-component-sort-direction rule was chained onto the
                    primitive class so its 9px radius and compact scale stop depending on source
                    order. Note this fixture still measured 11.52px WITHOUT the marker, because
                    the components view has a toolbar rule of its own that supplies it — so it
                    would have gone on passing while measuring a rule it does not name. -->
-              <button class="fabricate-button manager-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+              <button class="fabricate-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
             </div>
           </div>
           <div class="manager-component-filter-row is-chips">
@@ -205,9 +205,9 @@ const FIXTURE = `
                  .fab-bulk-edit-apply was a SCOPED rule at (0,2,0), the primitive's (0,3,0)
                  control would have taken its 38px/0.78rem down to 34px/0.72rem and broken the
                  bottom-slot equality below against a shipped control that has not moved.
-                 That rule now names .manager-button.fab-manager-button and compiles to
+                 That rule now names .fabricate-button.fab-manager-button and compiles to
                  (0,4,0), so the box this fixture measures is the same box it always was. -->
-            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
@@ -219,8 +219,8 @@ const FIXTURE = `
 
             The pair is asserted as a RELATIONSHIP below, not as two constants, because the
             two sides get their geometry from DIFFERENT mechanisms: this one from the global
-            rule at styles/fabricate.css (.manager-button.manager-recipe-browser-inspector-edit,
-            .manager-button.manager-component-browser-inspector-edit) and Apply from
+            rule at styles/fabricate.css (.fabricate-button.manager-recipe-browser-inspector-edit,
+            .fabricate-button.manager-component-browser-inspector-edit) and Apply from
             BulkEditPanelShell.svelte's scoped block. A source-substring pin on either file
             cannot see a cascade change that moves one RENDERED value while both sources sit
             unchanged, which is the drift that desynchronises the slot.
@@ -230,7 +230,7 @@ const FIXTURE = `
                (0,3,0) it only TIED the primitive's own control and held its 38px and 0.78rem
                by source order alone. Unmarked, this fixture matched no rule at all and fell to
                Foundry's 14px app base — which is how it failed, loudly, rather than drifting. -->
-          <button type="button" class="fabricate-button manager-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
+          <button type="button" class="fabricate-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 
@@ -281,26 +281,29 @@ const FIXTURE = `
                 <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
               </div>
             </div>
-            <div class="fabricate-field manager-field">
+            <div class="fabricate-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="fabricate-sortable-list">
                 <li class="fabricate-sortable-list-row manager-salvage-stage-row">
                  <div class="fabricate-sortable-list-line">
-                  <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+                  <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
                   <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
-                  <span class="manager-salvage-component-field">
-                    <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
-                      <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
-                        <span class="manager-travel-portrait"><img src="" alt=""></span>
-                        <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
-                        <i class="fas fa-chevron-down"></i>
-                      </button>
+                  <!-- A salvage stage is the requirement row (issue 1516), its DC and Edit link in
+                       the row's trailing controls, as the recipe stage row draws them. -->
+                  <div class="manager-recipe-ingredient-option-row is-component is-result">
+                    <span class="manager-recipe-option-name-field">
+                      <span class="manager-recipe-option-chosen">
+                        <img class="manager-recipe-option-chosen-img" alt="">
+                        <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Brass Casing</span>
+                      </span>
                     </span>
-                  </span>
-                  <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
-                  <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                    <div class="manager-recipe-option-controls">
+                      <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
+                      <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                    </div>
+                  </div>
                   <span class="fabricate-sortable-list-rocker">
-                    <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
+                    <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                   </span>
                  </div>
                 </li>
@@ -362,27 +365,24 @@ function page() {
 // corresponds to, so drift from the design is visible rather than merely tolerated.
 const EXPECTED = {
   // ── The toolbar. It is the Recipe Studio's bar now (issue 676, ruling 1), so every
-  // control reads at the shared --fab-recipe-control-font and the micro-label at the
+  // control reads at the shared --fab-manager-recipe-control-font and the micro-label at the
   // recipe micro-label size. Both numbers MOVED in that change, and both moved TOWARD
   // the prototype — the map below is re-measured against the real markup, not carried
   // over. The old map pinned the drift and its own comments admitted it
   // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
-  search: 11.52, // 0.72rem — prototype search input 12.5px sans
+  search: 12.5, // the library's `<Search>` at 500 12.5px, which is also the prototype's (issue 1782)
   // `proto:1062` — the toolbar micro-label at 8.5px, which is now the SHIPPED value rather than
   // the target this pin's own comment used to name (issue 1371 r11, UX finding F-K). The 0.08em
   // tracking is unchanged and resolves against this size, so the reference's 0.68px comes with
   // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
   // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
   'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
-  // 0.72rem, the shared `Select`'s `toolbar` rung, which states the literal on the trigger
-  // itself rather than leaving it to inherit Foundry's 14px app base.
-  // The two FILTER triggers take the reference's own 12px (issue 1371 r11, F-K); the SORT
-  // trigger does not, because the reference draws that one at 11.5px (`proto:1066`) against the
-  // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
-  // bar with two pinned sizes is the reference's own arrangement, not an oversight.
-  'filter-select': 12, // proto:1054 — the category filter (was 11.52)
+  // The two FILTER triggers share the search's row and take `Select`'s `form` rung, the search's
+  // own 500 12.5px (issue 1782). The SORT trigger is the `toolbar` rung's 0.72rem literal, which
+  // the reference draws at 11.5px (`proto:1066`); a fiftieth of a pixel is rounding, not drift.
+  'filter-select': 12.5, // the `form` rung, beside the search
   'sort-select': 11.52, // proto:1066 draws 11.5; the residual is 0.02px
-  'essence-select': 12, // proto:1056 — the essence filter (was 11.52)
+  'essence-select': 12.5, // the `form` rung, beside the search
   'toolbar-button': 11, // proto:1067 — the sort-direction toggle at `600 11px` (was 11.52)
   // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
   // the deliberate change, not drift: the compact Tool Studio scale is now the only chip
@@ -433,12 +433,9 @@ const EXPECTED = {
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
   // The ordinal badge is the shared ordered list's as of issue 1512, at the specimen's 10px mono.
   'stage-ordinal': 10,
-  // The yield picker replaced the stage row's native <select> (issue 676). It measures the
-  // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
-  // native control for a popover trigger re-typed nothing. That is the point of checking:
-  // a <button> is exactly the element Foundry's core `button` rule would otherwise size.
-  'stage-picker': 13.12, // 0.82rem — inherits the field size, as the select did
-  'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
+  // The stage names its component in the requirement row's pill (issue 1516), at the size the
+  // recipe stage row's pill reads in `recipe-studio-font-size.test.js`.
+  'stage-picker-name': 11.52, // 0.72rem — the requirement row pill's name
   'stage-dc': 13, // 0.8125rem mono 700 — prototype read-only DC chip 13px mono. Exact.
   // It is the ONLY route to the DC rendered beside it, so it is sized as a real link
   // rather than the 0.56rem speck it shipped as — smaller than its own caption. Raised
@@ -484,8 +481,8 @@ const EXPECTED = {
   // the manager control-text scale the retired native `<select>` took from its own scoped block.
   // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
   // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
-  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
-  // only under `.fabricate-manager`.
+  // because the rung is: the family may not read `--fab-manager-recipe-control-font`, which is
+  // declared only under `.fabricate-manager`.
   'bulk-select': 12.5,
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
   // 0.72rem. `proto:1348` is `font:600 11.5px var(--sans);color:var(--text2)`: the tile's
@@ -576,7 +573,7 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
 
 test('the category fixture spells `-form`, matching the product Select that declares no size', () => {
   const editViewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/component/ComponentCategoryTagsCards.svelte'),
     'utf8'
   );
   const tagStart = editViewSource.indexOf('class="manager-component-category-select"');

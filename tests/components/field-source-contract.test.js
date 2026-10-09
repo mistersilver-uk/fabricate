@@ -1,4 +1,4 @@
-/** The END STATE of the `.manager-field` conversion, pinned in source (issue 1428). */
+/** The END STATE of the `.fabricate-field` conversion, pinned in source (issue 1428). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -10,40 +10,14 @@ import {
 /** The primitive whose adoption this file pins. */
 const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 
-/** The components still writing a raw `class="manager-field …"`, with their EXACT site count. */
-const RAW_FIELD_ALLOWLIST = Object.freeze([
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
-    sites: 1,
-    why:
-      "The systems-list condition shortcut, the last of the manager root's seven. Issue 1721 " +
-      'relocated it with the systems inspector chain without converting it, so the deferral is ' +
-      "unchanged in substance; the file is now one screen's form, which a conversion lane can " +
-      'take on its own.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    sites: 2,
-    why:
-      'The condition-modifier picker and the expression-override field of the panel issue 1707 ' +
-      'wrote once. RELOCATED without converting either, so the deferral is unchanged in ' +
-      'substance; the file is now one screen\'s form, which a conversion lane can take on its own.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
-    sites: 2,
-    why:
-      'The drop-rate editor and the drop-count editor, relocated by issue 1707 phase 2 without ' +
-      'converting either, so the deferral is unchanged in substance; the file is now one ' +
-      "screen's form, which a conversion lane can take on its own.",
-  }),
-]);
+/** No component writes a raw `.fabricate-field`, and the empty array is the claim (issue 1777). */
+const RAW_FIELD_ALLOWLIST = Object.freeze([]);
 
 const { callSites } = definePrimitiveAdoptionContract({
-  label: 'manager-field',
+  label: 'fabricate-field',
   tag: 'Field',
   primitive: FIELD_PATH,
-  contractClass: 'manager-field',
+  contractClass: 'fabricate-field',
   allowlist: RAW_FIELD_ALLOWLIST,
   callSiteFloor: 70,
   fileFloor: 20,
@@ -51,29 +25,29 @@ const { callSites } = definePrimitiveAdoptionContract({
   detectorFixture: {
     source: [
       '<!--',
-      '  Prose mentioning manager-field, which is how five real components document the box.',
+      '  Prose mentioning fabricate-field, which is how five real components document the box.',
       '-->',
       '<script>',
       "  import Field from '../../components/Field.svelte';",
       '</script>',
       '',
-      '<label class="manager-field">a converted-looking site that is still raw</label>',
-      '<div class="wrapper manager-field manager-thing">a second one, mid-list</div>',
+      '<label class="fabricate-field">a converted-looking site that is still raw</label>',
+      '<div class="wrapper fabricate-field manager-thing">a second one, mid-list</div>',
       '<span class="manager-field-error">a different class entirely</span>',
       '<div class="fab-manager-fields">a different class again</div>',
       '<Field as="div" class="manager-thing">the converted shape</Field>',
       '',
       '<style>',
-      '  .manager-field { color: red; }',
+      '  .fabricate-field { color: red; }',
       '</style>',
     ].join('\n'),
     expected: 2,
-    lowered: ['class="manager-field"', 'class="manager-box"'],
+    lowered: ['class="fabricate-field"', 'class="manager-box"'],
     loweredExpected: 1,
   },
 
   rawRemedy:
-    'these components hand-roll the `.manager-field` box that `src/ui/svelte/components/' +
+    'these components hand-roll the `.fabricate-field` box that `src/ui/svelte/components/' +
     'Field.svelte` owns. Render `<Field as="label|div|fieldset">` instead — and choose the ' +
     '`as` from what the markup MEANS, because a `<label>` names the control it wraps and a ' +
     '`<div>` does not',

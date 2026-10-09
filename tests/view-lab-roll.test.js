@@ -4,35 +4,38 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { getCaseById } from '../scripts/lib/viewLabCases.js';
-import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
-import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
-
-import { createLabRoll } from './view-lab/foundry/labRoll.js';
-import { installLabRandom } from './view-lab/foundry/labRandom.js';
-import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
-import { buildLabContent } from './view-lab/world/labContent.js';
-import { buildLabActors } from './view-lab/world/labActors.js';
-import { seedRollPromptFixture } from './view-lab/rollPromptFixtures.js';
-import {
-  rolledDiceGroups,
-  evaluateCheckRoll,
-  evaluatePreparedRunCheck,
-  postCheckRollHandoff,
-} from '../src/systems/checkRoll.js';
+import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
-import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
-import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { installCountDice } from './helpers/countEngineDice.js';
+import {
+  rolledDiceGroups,
+  evaluateCheckRoll,
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+} from '../src/systems/checkRoll.js';
 import { evaluateCountCheckRoll } from '../src/systems/countCheckRoll.js';
 import { findCountRoll, registerCountRoll } from '../src/systems/countRoll.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
-import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
+
+import { installCountDice } from './helpers/countEngineDice.js';
+import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installFoundryPropertyUtils } from './helpers/storedResourceActor.js';
+import { ADDITIONAL_DICE_PROMPT_STATES } from './view-lab/additionalDiceFixtures.js';
+import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
+import { installLabRandom } from './view-lab/foundry/labRandom.js';
+import { createLabRoll } from './view-lab/foundry/labRoll.js';
+import { seedRollPromptFixture } from './view-lab/rollPromptFixtures.js';
+import { buildLabActors } from './view-lab/world/labActors.js';
+import { buildLabContent } from './view-lab/world/labContent.js';
+import { registerLabMacros } from './view-lab/world/labMacros.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
   const content = buildLabContent();
@@ -67,6 +70,7 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
   await underPromptView(world);
   await countPromptView(world);
+  await additionalDicePromptView(world);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
@@ -121,9 +125,9 @@ async function underPromptView(world) {
 async function countPromptView(world) {
   const manager = world.fabricate.craftingSystemManager;
   const frames = {
-    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.', 'Fine Craft'],
+    count: ['5d10 · each ≥ 8', 'Success on ≥ 8 · explodes on 10 · 1 cancels a success', 'Each adds dice.', 'Fine Craft'],
     'count-threshold': [
-      '2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.', 'Complex Work',
+      '2d20 · each ≤ 13', 'Success on ≤ 13 (character value 13)', 'Each moves the threshold.', 'Complex Work',
     ],
   };
   for (const [state, [formula, rules, eachAdds, recipeName]] of Object.entries(frames)) {
@@ -147,12 +151,111 @@ async function countPromptView(world) {
       assert.equal(view.labels.formulaNote, rules);
       assert.equal(view.neededText, '2 successes needed');
       assert.equal(view.labels.eachAdds, eachAdds);
-      assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+      // The count rule offers by default (issue 2007).
+      assert.deepEqual([view.dc, view.allowAdvantage], [null, true]);
       assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
     } finally {
       surface.restore();
       dice.restore();
     }
+  }
+}
+
+/**
+ * Each issue 2008 prompt state's offer, as the real engine reads it from the lab Actor: the most
+ * Sera Vane may buy, why nothing can be bought, and what the prompt may judge (`reach`).
+ */
+const ADDITIONAL_DICE_OFFERS = {
+  'count-additional': { limit: 1, unavailable: null, needed: 2 },
+  'count-additional-floor': { limit: 2, unavailable: null, needed: 3 },
+  'count-additional-insufficient': { limit: 0, unavailable: null, needed: 3 },
+  'count-additional-disadvantage-only': { limit: 0, unavailable: null, needed: 2 },
+  'count-additional-impossible': { limit: 1, unavailable: null, needed: 5 },
+  'count-additional-rescued': { limit: 1, unavailable: null, needed: 5, rescued: true },
+  'count-additional-explode': {
+    limit: 1,
+    unavailable: null,
+    needed: 5,
+    perDieMost: null,
+    explode: 'recursive',
+  },
+  'count-additional-zero-pool': { limit: 0, unavailable: null, needed: 2 },
+  'count-additional-single-roll': { limit: 1, unavailable: null, needed: 4 },
+  'count-additional-unaffordable': { limit: 0, unavailable: null, needed: 1 },
+  'count-additional-unlabelled': { limit: 1, unavailable: null, needed: 2, label: '' },
+  'count-additional-unreadable': { limit: 0, unavailable: 'resourceUnreadable', needed: 1 },
+  'count-additional-overridden': { limit: 0, unavailable: 'resourceOverridden', needed: 1 },
+  'count-additional-not-writable': { limit: 0, unavailable: 'resourceNotWritable', needed: 1 },
+  'count-additional-macro-failed': { limit: 0, unavailable: 'resourceMacroFailed', needed: 1 },
+  'count-result-bought': { limit: 1, unavailable: null, needed: 3 },
+  'count-result-bought-miss': { limit: 1, unavailable: null, needed: 2 },
+};
+
+/** Drive one additional-dice state's horseshoe craft to its prompt, which is dismissed. */
+async function offerFor(world, state) {
+  await seedRollPromptFixture(world, state);
+  const system = world.fabricate.craftingSystemManager.getSystem('lab-smithing');
+  const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  const before = structuredClone(crafter.system.resources ?? {});
+  const surface = stubPromptSurface(() => null);
+  const dice = installCountDice();
+  try {
+    await new CraftingEngine(null)._runPassFailCheck(
+      system, system.craftingCheck.simple, recipe, null, crafter, { interactive: true }
+    );
+    assert.deepEqual(dice.constructed, [], `${state}: a dismissed prompt rolls nothing`);
+    assert.deepEqual(crafter.system.resources ?? {}, before, `${state}: and spends nothing`);
+    return surface.view.additionalDiceOffer;
+  } finally {
+    dice.restore();
+    surface.restore();
+  }
+}
+
+/** Issue 2008: every new `rollPromptState` through the real engine, as the lab renders it. */
+async function additionalDicePromptView(world) {
+  assert.deepEqual(
+    new Set(Object.keys(ADDITIONAL_DICE_OFFERS)),
+    new Set(Object.keys(ADDITIONAL_DICE_PROMPT_STATES)),
+    'every prompt state is asserted here'
+  );
+  const documents = new Map();
+  registerLabMacros(documents);
+  const previous = { game: globalThis.game, fromUuid: globalThis.fromUuid };
+  const store = world.fabricate.characterLibrariesStore;
+  Object.assign(globalThis, {
+    game: { fabricate: { getCharacterLibrariesStore: () => store } },
+    fromUuid: async (uuid) => documents.get(uuid) ?? null,
+  });
+  const restoreFoundry = installFoundryPropertyUtils();
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  const permission = crafter.canUserModify;
+  const manager = world.fabricate.craftingSystemManager;
+  const smithing = manager.getSystem('lab-smithing');
+  try {
+    for (const [state, expected] of Object.entries(ADDITIONAL_DICE_OFFERS)) {
+      // Each lab frame boots its own world, so no state inherits another's check or stamp.
+      await manager.updateSystem(smithing.id, smithing);
+      crafter.overrides = {};
+      crafter.canUserModify = permission;
+      const offer = await offerFor(world, state);
+      const { limit, unavailable, needed, label = 'Momentum', ...reach } = expected;
+      assert.deepEqual(
+        [offer?.limit, offer?.unavailable, offer?.resourceLabel],
+        [limit, unavailable, label],
+        `${state}: the offer's limit, reason and Resource name`
+      );
+      assert.deepEqual(
+        offer.reach,
+        { needed, perDieMost: 1, explode: 'off', rescued: false, ...reach },
+        `${state}: what the prompt may judge`
+      );
+    }
+  } finally {
+    restoreFoundry();
+    Object.assign(globalThis, previous);
+    if (previous.game === undefined) delete globalThis.game;
   }
 }
 
@@ -401,6 +504,15 @@ test('a bare dN defaults to one die', async () => {
   assert.equal(roll.dice[0].results.length, 1);
 });
 
+test('a negated die totals negative, wrapped as core wraps it in `(… * -1)`', async () => {
+  const negated = await new (scriptedRoll([4], 6))('-1d6').evaluate();
+  assert.equal(negated.formula, '(1d6 * -1)');
+  assert.equal(negated.total, -4);
+  const offset = await new (scriptedRoll([7], 20))('-1d20 + 30').evaluate();
+  assert.equal(offset.formula, '(1d20 * -1) + 30');
+  assert.equal(offset.total, 23);
+});
+
 test('toMessage routes to ChatMessage.create and tolerates its absence', async () => {
   const Roll = makeRoll();
   const roll = await new Roll('1d6').evaluate();
@@ -437,7 +549,8 @@ test('toMessage routes to ChatMessage.create and tolerates its absence', async (
 test('evaluated Roll snapshots survive JSON transport without consuming seeded entropy', async () => {
   const Roll = makeRoll();
   const ControlRoll = makeRoll();
-  const formula = '2d20kh1 + @prof + 1d4 [Tool]';
+  // No space before `[Tool]`: real Foundry refuses `1d4 [Tool]` (the recorded 13.351/14.365 terms).
+  const formula = '2d20kh1 + @prof + 1d4[Tool]';
   const options = { flavor: 'Smithing', custom: { source: 'check' } };
   const original = await new Roll(formula, { prof: 3 }, options).evaluate();
   await new ControlRoll(formula, { prof: 3 }).evaluate();
@@ -448,7 +561,7 @@ test('evaluated Roll snapshots survive JSON transport without consuming seeded e
   );
   assert.equal(snapshot.class, 'LabRoll');
   assert.equal(snapshot.evaluated, true, 'core uses evaluated, not _evaluated, on the wire');
-  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4 [Tool]');
+  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4[Tool]');
   assert.equal(snapshot.total, original.total);
   assert.deepEqual(snapshot.options, options);
   const transported = JSON.parse(JSON.stringify(snapshot));
@@ -506,7 +619,7 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const Roll = makeRoll();
       const ControlRoll = makeRoll();
       const posted = [];
-      const previous = ['Roll', 'ChatMessage'].map((key) => [
+      const previous = ['Roll', 'ChatMessage', 'foundry'].map((key) => [
         key, Object.getOwnPropertyDescriptor(globalThis, key),
       ]);
       t.after(() => {
@@ -516,6 +629,8 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
         }
       });
       globalThis.Roll = Roll;
+      // ratchet-exempt(lint): the keep transform reads the lab `Die` from `foundry.dice.terms`.
+      globalThis.foundry = { dice: { terms: Roll.TERM_CLASSES } };
       globalThis.ChatMessage = {
         ...(api === 'v14' ? { applyMode() {} } : {}),
         async create(data) {
@@ -534,7 +649,13 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const result = await evaluatePreparedRunCheck(
         preparation,
         { getRollData: () => ({ prof: 3 }) },
-        { allowAdvantage: true, advantage: 'advantage', rollMode: 'selfroll' }
+        {
+          allowAdvantage: true,
+          // The authority honours only a button the bound offer includes (issue 2007).
+          advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
+          advantage: 'advantage',
+          rollMode: 'selfroll',
+        }
       );
       assert.equal(result.success, true);
       assert.equal(posted.length, 0, 'authority evaluation does not post the visible check');
@@ -611,6 +732,36 @@ test('the shim registers the count Roll over its Roll, so a count check reaches 
     globalThis.Roll = previous.Roll;
   }
   assert.equal(globalThis.CONFIG, previous.CONFIG, 'restore puts CONFIG back');
+});
+
+test('a count Roll snapshot restores as the registered count Roll, as core looks it up', async () => {
+  const content = buildLabContent();
+  const previous = { Roll: globalThis.Roll, CONFIG: globalThis.CONFIG };
+  const shim = installFoundryShim({
+    seed: LIVE_SEED,
+    actorList: buildLabActors(content),
+    scenes: [],
+    settings: new Map(),
+    i18n: { localize: (key) => key, format: (key) => key },
+    worldTime: 0,
+    documents: new Map(),
+  });
+  try {
+    const CountRoll = findCountRoll(globalThis.CONFIG);
+    const policy = { dice: 2, die: 6, direction: 'over', comparison: 'meet', threshold: 1 };
+    const rolled = await CountRoll.fromPolicy({ ...policy, explode: null, cancel: null }).evaluate();
+    const restored = globalThis.Roll.fromData(JSON.parse(JSON.stringify(rolled.toJSON())));
+    assert.ok(restored instanceof CountRoll, 'the base class resolves the snapshot to its own class');
+    assert.equal(restored.total, rolled.total);
+    assert.throws(
+      () => globalThis.Roll.fromData({ ...rolled.toJSON(), class: 'UnregisteredRoll' }),
+      /cannot reconstruct UnregisteredRoll/
+    );
+  } finally {
+    shim.restore();
+    // ratchet-exempt(lint): the shim installs the lab Roll as a Foundry global; this restores it.
+    globalThis.Roll = previous.Roll;
+  }
 });
 
 test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {
@@ -734,4 +885,28 @@ test('the lab roll-prompt answerer stops answering once disconnected', async () 
     globalThis.MutationObserver = previousObserver;
     await window.happyDOM.abort();
   }
+});
+
+test('1516: evaluateSync reads dice at an extreme and skips modifiers, as core does', async () => {
+  const { quantityFormulaErrors } = await import('../src/models/Result.js');
+  const Roll = makeRoll();
+  const maximum = (formula) => new Roll(formula).evaluateSync({ maximize: true }).total;
+  assert.equal(maximum('1d4+1'), 5);
+  assert.equal(maximum('2d6kh1'), 12, 'core’s sync path skips modifiers');
+  assert.equal(maximum('2d20cs<=0'), 40, 'a count modifier too');
+  assert.equal(maximum('@abilities.str.mod + 1'), 1, 'a missing path reads 0');
+  assert.throws(() => maximum('1000d4'), /999 dice/, 'core caps one term at 999 dice');
+  assert.equal(new Roll('2d6 + 1').evaluateSync({ minimize: true }).total, 3);
+  assert.throws(() => new Roll('1d4').evaluateSync(), /synchronously/, 'dice need an extreme');
+  assert.equal(new Roll('2 + 3').evaluateSync().total, 5, 'a dice-free formula needs none');
+
+  // The floor the amount field's error and the save path both read.
+  assert.deepEqual(quantityFormulaErrors('1d4+1', Roll), []);
+  assert.deepEqual(quantityFormulaErrors('0', Roll), [
+    'quantity formula can never award a positive amount',
+  ]);
+  assert.deepEqual(quantityFormulaErrors('max(, 2)', Roll), ['quantity formula cannot be rolled']);
+  assert.deepEqual(quantityFormulaErrors('1d4 / @x', Roll), ['quantity formula cannot be rolled']);
+  const divided = await new Roll('1d4 / @x').evaluate();
+  assert.equal(Number.isFinite(divided.total), false, 'and the async total is left as computed');
 });

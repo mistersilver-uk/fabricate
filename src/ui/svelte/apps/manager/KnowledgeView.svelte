@@ -34,7 +34,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
@@ -203,7 +203,7 @@
           'FABRICATE.Admin.Manager.Knowledge.LoadingHint',
           "Fabricate is reading each player character's recipe items and learned recipes."
         )}
-        dataAttr="data-knowledge-loading"
+        data-knowledge-loading
       />
     {:else if loadError}
       <div class="manager-knowledge-error-slot">
@@ -217,7 +217,7 @@
             'FABRICATE.Admin.Manager.Knowledge.LoadErrorHint',
             'Open another section, then return to Knowledge to try again. The browser console has the error.'
           )}
-          dataAttr="data-knowledge-error"
+          data-knowledge-error=""
         />
       </div>
     {:else if !selectedCharacter}
@@ -228,12 +228,12 @@
           'FABRICATE.Admin.Manager.Knowledge.NoSelectionHint',
           'Pick a player character to review the recipe items they carry and the recipes they have learned.'
         )}
-        dataAttr="data-knowledge-no-selection"
+        data-knowledge-no-selection
       />
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">
-          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={50} alt="" />
+          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={32} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
             <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>
@@ -292,7 +292,7 @@
             'Knowledge reset actions'
           )}
         >
-          <ManagerButton
+          <Button
             role="danger"
             data-knowledge-reset="system"
             onclick={() => {
@@ -303,8 +303,8 @@
             <i class="fas fa-rotate-left" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetSystem', 'Reset this system')}</span
             >
-          </ManagerButton>
-          <ManagerButton
+          </Button>
+          <Button
             role="danger"
             data-knowledge-reset="all"
             onclick={() => {
@@ -314,7 +314,7 @@
           >
             <i class="fas fa-eraser" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetAll', 'Reset all systems')}</span>
-          </ManagerButton>
+          </Button>
         </div>
       </header>
 

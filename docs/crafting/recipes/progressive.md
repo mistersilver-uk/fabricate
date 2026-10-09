@@ -15,7 +15,7 @@ A crafting check returns a numeric **value** that is spent to "buy" results in o
 ## Rules
 
 - Exactly **one** ingredient set
-- Exactly **one** result group with **ordered** results
+- Exactly **one** result set with **ordered** results
 - A crafting check is **required**
 - The check reports either a success with a numeric value or a failure
 - Each result points to a managed component with a difficulty of at least 1
@@ -100,7 +100,7 @@ See [Salvaging From the Inventory Tab]({% link components/salvage.md %}#salvagin
 
 ## Creating a Progressive Recipe
 
-A progressive recipe has one ingredient set and one result group whose results are listed in difficulty order.
+A progressive recipe has one ingredient set and one result set whose results are listed in difficulty order.
 For example, this means Iron Filings, then Steel Ingot, then Fine Steel Ingot, then Masterwork Ingot.
 See the [API reference]({% link api/recipe-manager.md %}) for the methods that create and configure recipes.
 
@@ -108,6 +108,7 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 
 {: .note }
 > Each result must point to a managed component with a difficulty of at least 1.
+> Stage rows have no amount, and any rolled amount is ignored.
 
 ## Setting Component Difficulty
 

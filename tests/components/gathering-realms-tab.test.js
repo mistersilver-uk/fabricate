@@ -12,7 +12,7 @@ import {
   createSvelteCompiler,
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -74,6 +74,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
+    for (const modulePath of LOCALIZE_OR_RAW_MODULES) writeRawModule(modulePath);
     // The lifted browse view-state (issue 1438), imported by BOTH components below.
     writeRawModule('src/ui/model/managerBrowserViewState.js');
     writeRawModule('src/ui/svelte/util/disclosurePhrase.js');
@@ -85,8 +86,8 @@ describe('GatheringRealmsTab mounted behavior', () => {
       writeCompiledSvelte(selectModule);
     }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchField.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/FilterBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte.js')).href);
@@ -168,7 +169,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
 
   it('keeps the pager outside the scroller, after it', async () => {
     await mountTab({ realms: makeRealms(7) });
-    const pager = target.querySelector('.manager-pagination');
+    const pager = target.querySelector('.fabricate-pagination');
     assert.ok(Boolean(pager), 'seven realms render a pager');
     const panel = target.querySelector('[data-travel-panel="realms"]');
     const scroller = panel.querySelector(':scope > .manager-table-scroll');

@@ -34,11 +34,13 @@
    - contextClass: extra class(es) whose rules live in the global sheet because they
      describe how a specific container places this panel (fill, min-height). Never use it
      for appearance — add a prop here instead.
-   - dataAttr / dataValue: an optional test/screenshot hook, e.g.
-     `dataAttr="data-knowledge-learned-empty"`.
    - children: trailing content inside the panel — a "Clear filters" button, a primary
      CTA, or a docs link. It is the way out of the dead end, so it belongs inside the
      panel rather than beside it.
+
+  Rest spread:
+  - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
+    The root's class prop is `contextClass`, so `class` is not a prop here.
 
   Invariants:
   - The DOM shape is part of the contract: the icon, title and body rules are written as
@@ -62,15 +64,9 @@
     note = false,
     filtered = false,
     contextClass = '',
-    dataAttr = '',
-    dataValue = '',
     children = undefined,
+    ...rest
   } = $props();
-
-  // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
-  // `dataValue || true` COERCES A BARE HOOK TO `="true"` and an explicit `dataValue=""` does not
-  // change that (issue 1514); every shipped reader is a presence selector, so nothing breaks.
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <div
@@ -81,7 +77,7 @@
   class:is-fill={fill}
   class:is-note={note}
   class:is-filtered={filtered}
-  {...hookAttributes}
+  {...rest}
 >
   <div>
     {#if icon}
@@ -107,9 +103,9 @@
     box-sizing: border-box;
     display: grid;
     place-items: center;
-    padding: 44px 20px;
+    padding: var(--fab-space-6) var(--fab-space-5);
     border: 1.5px dashed var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     color: var(--fab-text-subtle);
     text-align: center;
   }
@@ -118,7 +114,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 9px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -128,7 +124,7 @@
     justify-content: center;
     width: 46px;
     height: 46px;
-    border-radius: 12px;
+    border-radius: 11px;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-soft);
     font-size: 18px;
@@ -162,6 +158,7 @@
 
   .manager-empty.is-compact > div > i {
     width: 32px;
+    /* ratchet-exempt(design-system): a tile, not a control: the portrait ladder's 32, the slot PartyTravelActorPanel fills with an actor portrait on link */
     height: 32px;
     border-radius: 9px;
     font-size: 14px;
@@ -178,14 +175,14 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 14px 16px;
+    padding: var(--fab-space-4);
     text-align: left;
   }
 
   .manager-empty.is-inline > div {
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .manager-empty.is-inline > div > i {
@@ -204,6 +201,7 @@
   .manager-empty.is-field {
     width: 100%;
     height: 34px;
+    border-radius: 9px;
     padding: var(--fab-space-1) var(--fab-space-2);
   }
 
@@ -280,7 +278,7 @@
     padding: var(--fab-space-6);
     border-width: 1px;
     border-color: var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     color: var(--fab-text-muted);
   }
 

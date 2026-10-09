@@ -3,7 +3,7 @@
  * Original contribution indices identify pre-rolls even when labels repeat.
  */
 
-const SOURCES = new Set(['tool', 'library', 'situational', 'advantage']);
+const SOURCES = new Set(['tool', 'library', 'situational', 'advantage', 'additionalDice']);
 
 /** The compatibility evaluation every caller places by until an engine activates another mode. */
 export const SUM_OVER_EVALUATION = Object.freeze({
@@ -16,17 +16,24 @@ function placementOrder({ source, form }) {
   if (source === 'tool') return 0;
   if (source === 'library') return form === 'scalar' ? 1 : 2;
   if (source === 'situational') return 3;
-  return 4;
+  return source === 'advantage' ? 4 : 5;
 }
 
-function destinationFor(evaluation, source) {
+/** Where one source's benefit lands for `evaluation`: `append`, `target`, `pool` or `threshold`. */
+export function destinationFor(evaluation, source) {
   if (evaluation.product === 'sum') return evaluation.direction === 'over' ? 'append' : 'target';
-  if (source === 'advantage') return 'pool';
+  if (source === 'advantage' || source === 'additionalDice') return 'pool';
   return evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool';
 }
 
-function benefitSign(destination, direction) {
+/** A threshold benefit lowers a roll-high threshold and raises a roll-low one. */
+export function benefitSign(destination, direction) {
   return destination === 'threshold' && direction === 'over' ? -1 : 1;
+}
+
+/** What a settled pre-roll moved its destination by: its total, subtracted when `negate`. */
+export function preRollBenefit(entry) {
+  return entry?.negate === true ? -entry.total : entry?.total;
 }
 
 function addBenefit(plan, destination, value) {
@@ -52,8 +59,15 @@ function validateEvaluation(evaluation) {
   }
 }
 
-function validateContribution(contribution) {
-  if (!SOURCES.has(contribution?.source)) throw new TypeError('Unknown contribution source');
+function validateSource(source, evaluation) {
+  if (!SOURCES.has(source)) throw new TypeError('Unknown contribution source');
+  if (source === 'additionalDice' && evaluation.product !== 'count') {
+    throw new TypeError('Bought dice belong only to a count pool');
+  }
+}
+
+function validateContribution(contribution, evaluation) {
+  validateSource(contribution?.source, evaluation);
   if (contribution.form === 'scalar') {
     if (!Number.isFinite(contribution.value)) throw new TypeError('Scalar benefit must be finite');
   } else if (
@@ -62,6 +76,9 @@ function validateContribution(contribution) {
     !contribution.expression.trim()
   ) {
     throw new TypeError('Contribution requires a scalar or expression form');
+  }
+  if (Object.hasOwn(contribution, 'negate') && typeof contribution.negate !== 'boolean') {
+    throw new TypeError('A negated benefit requires a boolean flag');
   }
   if (contribution.preRoll) {
     if (contribution.form !== 'scalar') {
@@ -86,6 +103,7 @@ function preRollRecord({ index, contribution, destination }) {
     label: contribution.label,
     expression: evidence?.expression ?? contribution.expression,
     destination,
+    ...(contribution.negate === true && { negate: true }),
   };
   if (evidence) {
     record.total = evidence.total;
@@ -106,7 +124,7 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
 
   const ordered = contributions
     .map((contribution, index) => {
-      validateContribution(contribution);
+      validateContribution(contribution, evaluation);
       return { contribution, index };
     })
     .sort(
@@ -146,6 +164,7 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
           ...(contribution.form === 'scalar'
             ? { value: contribution.value }
             : { expression: contribution.expression }),
+          ...(contribution.negate === true && { negate: true }),
         });
       }
     } else if (contribution.form === 'scalar') {
@@ -158,7 +177,10 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
   return plan;
 }
 
-/** Settles each pending expression once; preserved evidence adds no second benefit. */
+/**
+ * Settles each pending expression once; preserved evidence adds no second benefit. A `negate`
+ * entry keeps its rolled total unsigned and subtracts it.
+ */
 export function settlePlacement(plan, preRollResults = []) {
   if (!Array.isArray(preRollResults)) throw new TypeError('Pre-roll results must be an array');
   const pending = new Set(
@@ -185,7 +207,7 @@ export function settlePlacement(plan, preRollResults = []) {
     if (Object.hasOwn(result, 'serializedRoll')) {
       entry.serializedRoll = structuredClone(result.serializedRoll);
     }
-    addBenefit(settled, entry.destination, result.total);
+    addBenefit(settled, entry.destination, preRollBenefit(entry));
   }
   return settled;
 }

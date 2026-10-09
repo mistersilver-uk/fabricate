@@ -39,7 +39,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test('manager pagination footer uses scoped chrome with stable summary, nav, and per-page controls', () => {
-  const block = blockFor('.fabricate-pagination.manager-pagination');
+  const block = blockFor('.fabricate-pagination.fabricate-pagination');
 
   assert.ok(block.includes('display: flex;'), 'pagination footer should layout horizontally');
   assert.ok(
@@ -69,61 +69,26 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
 });
 
 /*
-  The OPEN state of a manager `<select>` (issue 772).
+  The manager's NATIVE-select theme went with its last native select (issue 1777).
 
-  `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
-  until it is opened — and then the option list fell back to the browser's black-on-white
-  default, in every native select the manager renders. The player app carried
-  `.fabricate-app select option` for a long time and stopped needing it at issue 1511, when its
-  last native select converted and that rule was deleted; the manager root is
-  `.fabricate-manager` and never inherited it while it existed.
-
-  This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
-  be photographed: a native select's popup is painted by the browser, not into the page DOM,
-  so Playwright never sees it and no smoke screenshot can contain the defect. It was found
-  by opening the control by hand. A source assertion is therefore the only gate available,
-  and its job is to stop the rule being deleted as "unused".
+  `.fabricate-manager select`, its option rows and the `@supports (appearance: base-select)`
+  picker themed a popup the browser draws (issue 772), and stood as a source assertion because no
+  frame can photograph one. Every manager select is the shared `<Select>` now, whose list is drawn
+  in the page, so those rules painted nothing and are deleted, and
+  `tests/select-element-typed-legs.test.js` holds their absence. The root's dark UA scheme
+  stays, for the browser chrome it still reaches.
 */
-test('the manager themes select options, not just the closed select', () => {
-  const optionRule = blockFor('.fabricate-manager select option');
-  assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
-  assert.match(
-    optionRule,
-    /background:\s*var\(--fab-bg-3\)/,
-    'an option list must take its background from `--fab-bg-3`, so it re-themes with the ' +
-      'rest of the manager; unpainted, it falls back to whatever the browser draws, which ' +
-      'in every engine tested is a light list inside a dark app'
-  );
-  assert.match(optionRule, /color:\s*var\(--fab-text\)/);
-
-  // The selected row must be marked the SAME way on both rendering paths.
-  const checkedRule = blockFor('.fabricate-manager select option:checked');
-  assert.ok(checkedRule, 'the selected row needs its own treatment');
-  assert.match(
-    checkedRule,
-    /background:\s*var\(--fab-overlay-light-08\)/,
-    'the checked row shares the picker treatment rather than painting a filled bar'
-  );
-  assert.match(checkedRule, /color:\s*var\(--fab-accent\)/);
-
-  // `color-scheme` is the only layer here that reaches every engine.
+test('the manager keeps its dark UA scheme once the native-select theme is gone', () => {
   assert.match(
     blockFor('.fabricate-manager'),
     /color-scheme:\s*dark/,
     'the manager root must declare the dark UA scheme, as the player root already does'
   );
-
-  // …and the opt-in that makes those colours visible at all. Without it the rules above
-  // are correct and inert on the engines most players use, because a legacy select popup
-  // is painted by the platform rather than the page.
-  assert.match(
+  assert.doesNotMatch(
     css,
     /@supports \(appearance: base-select\)/,
-    'the option colours only reach a Chromium popup through the customizable-select opt-in'
+    'the customizable-select opt-in themed native selects only, and no template renders one'
   );
-  const picker = blockFor('.fabricate-manager select::picker(select)');
-  assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
-  assert.match(picker, /background:\s*var\(--fab-bg-3\)/);
 });
 
 /*
@@ -234,12 +199,12 @@ test('all three browser sort-direction toggles render as one control', async () 
     // discriminator this test used to prove the toolbar rule had reached its fixture at all: 9px
     // against the bare primitive's 6px. The primitive is 9px now, so that half of the control has
     // been superseded rather than lost — `fontWeight` still discriminates (600 against 700), and
-    // this probe carries the family ROOT and `manager-button` WITHOUT `fab-manager-button`, which
+    // this probe carries the family ROOT and `fabricate-button` WITHOUT `fab-manager-button`, which
     // is what an unconverted hand-written button is and is still on the base rule's 6px. So the
     // corner is measured in a real browser on both sides of the conversion boundary instead.
-    // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button manager-button"`
+    // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button"`
     // to `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
-    const unconverted = `<button type="button" class="fabricate-button manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    const unconverted = `<button type="button" class="fabricate-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
       <!doctype html>
@@ -254,7 +219,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-filter-bar manager-toolbar">${toggles}${bare}${unconverted}</div>
+            <div class="fabricate-filter-bar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -295,14 +260,13 @@ test('all three browser sort-direction toggles render as one control', async () 
       'so the bare probe still discriminates — an equality that held for every property would mean the rule was reaching nothing'
     );
 
-    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner and the
-    // unconverted hand-written button is still on the base rule's 6px, so the ruling moved the
-    // primitive and not the whole `.manager-button` family.
+    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner, and so is the
+    // unconverted hand-written button, from the base rule that sizes it at 34.
     assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
     assert.equal(
       measured.unconverted.borderRadius,
-      '6px',
-      'and an unconverted hand-written one still paints the base control, so the edit is scoped to the primitive'
+      '9px',
+      'and an unconverted hand-written one takes the same corner from the base rule that sizes it'
     );
 
     for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
@@ -382,7 +346,8 @@ test('the composed picker cascade resolves to the shared panel and the callers o
         let order = -1;
         for (const rule of rules) {
           order += 1;
-          for (const selector of rule.selectorText.split(',')) {
+          // Split at top-level commas only: a comma inside `:is()` or `:not()` is not a list break.
+          for (const selector of rule.selectorText.split(/,(?![^()]*\))/)) {
             const trimmed = selector.trim();
             let matched;
             try {
@@ -596,7 +561,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       '#111a23',
       'and that IS `--fab-bg-0` in the default theme, read off the same document'
     );
-    assert.equal(panel['border-top-left-radius'].computed, '10px');
+    assert.equal(panel['border-top-left-radius'].computed, '11px');
     assert.equal(panel['padding-left'].computed, '6px');
     assert.equal(panel['max-width'].computed, '340px');
     assert.equal(panel['row-gap'].computed, '4px');
@@ -676,7 +641,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     }
     assert.equal(row.display.computed, 'grid');
     assert.equal(row['min-height'].computed, '38px');
-    assert.equal(row['border-top-left-radius'].computed, '6px');
+    assert.equal(row['border-top-left-radius'].computed, '9px');
     assert.equal(
       row.color.selector,
       SHARED_ROW,
@@ -786,7 +751,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     // ── THE z-index BAND, MEASURED RATHER THAN ASSERTED EMPTY IN PROSE ─────────────────
     // The panel's stacking rung moved 120 → 4000, so every rule in this sheet declaring a
     // z-index in [120, 4000) is one whose relationship to the panel changed. The delta expected
-    // that set to be EMPTY. Measured, it is not: `ManagerColorPicker`'s panel is the one other
+    // that set to be EMPTY. Measured, it is not: `TintPickerButton`'s panel is the one other
     // popover still on the old rung.
     assert.deepEqual(
       report.band,
@@ -994,8 +959,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
                    trigger beside the search field and the direction toggle, which are measured
                    in the same row. -->
               <div class="manager-vocabulary-shell-panel">
-                <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
-                  <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
+                <div class="fabricate-filter-bar manager-scoped-list-toolbar">
+                  <div class="fabricate-search"><input type="text" data-probe="shipped-search"></div>
                   <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-probe="shipped-select" data-select-size="toolbar"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
                     ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
@@ -1042,14 +1007,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
       return {
         triggers: Object.fromEntries(
           ['player', 'manager'].flatMap((area) =>
-            rungs.map((rung) => [`${area}-${rung}`, trigger(`${area}-${rung}`)])
+            rungs.map((rung) => [`${area}:${rung}`, trigger(`${area}-${rung}`)])
           )
         ),
         panels: {
-          'player-inline': panel('player-panel-inline'),
-          'manager-inline': panel('manager-panel-inline'),
-          'player-form': panel('player-panel-form'),
-          'manager-toolbar': panel('manager-panel-toolbar'),
+          'player:inline': panel('player-panel-inline'),
+          'manager:inline': panel('manager-panel-inline'),
+          'player:form': panel('player-panel-form'),
+          'manager:toolbar': panel('manager-panel-toolbar'),
         },
         rows: {
           alignItems: of('player-row-inline').alignItems,
@@ -1083,7 +1048,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
     // ── THE THREE RUNGS, IN BOTH AREAS, IDENTICALLY ─────────────────────────────────────────
     for (const rung of SELECT_RUNGS) {
       for (const area of ['player', 'manager']) {
-        const measured = report.triggers[`${area}-${rung.rung}`];
+        const measured = report.triggers[`${area}:${rung.rung}`];
         const where = `${area} ${rung.rung}`;
         assert.ok(
           Math.abs(measured.height - rung.height) <= 1,
@@ -1113,8 +1078,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
       }
 
       assert.deepEqual(
-        report.triggers[`player-${rung.rung}`],
-        report.triggers[`manager-${rung.rung}`],
+        report.triggers[`player:${rung.rung}`],
+        report.triggers[`manager:${rung.rung}`],
         `the ${rung.rung} rung is the SAME control in both areas, on every measured axis — which ` +
           'is the claim a shared primitive makes and the one a manager-rooted family cannot'
       );
@@ -1122,19 +1087,19 @@ test('the shared Select paints identically in both areas, and beats the paint it
 
     // The literal's whole observable consequence, stated as its own clause.
     assert.equal(
-      report.triggers['player-toolbar'].fontSize,
+      report.triggers['player:toolbar'].fontSize,
       '11.52px',
       'the toolbar rung ships a LITERAL 0.72rem, so it is 11.52px with no manager ancestor'
     );
     assert.notEqual(
-      report.triggers['player-toolbar'].fontSize,
+      report.triggers['player:toolbar'].fontSize,
       '14px',
       'and not the inherited app base, which is what an area-scoped property read would give'
     );
 
     // ── THE PANEL BEATS (0,2,0) ON ONE ELEMENT, TWICE ───────────────────────────────────────
     for (const rung of SELECT_RUNGS) {
-      const key = Object.keys(report.panels).find((name) => name.endsWith(`-${rung.rung}`));
+      const key = Object.keys(report.panels).find((name) => name.endsWith(`:${rung.rung}`));
       assert.equal(
         report.panels[key].radius,
         '11px',
@@ -1145,14 +1110,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
       assert.equal(report.panels[key].maxWidth, rung.maxWidth, `${key}: and its own ceiling`);
     }
     assert.equal(
-      report.panels['player-inline'].minWidth,
+      report.panels['player:inline'].minWidth,
       '96px',
       'an inline panel opens at its own 96px floor rather than at the sheet`s 240px, which is ' +
         'the defect: a 240px panel over a list of two-digit page sizes'
     );
     assert.deepEqual(
-      report.panels['player-inline'],
-      report.panels['manager-inline'],
+      report.panels['player:inline'],
+      report.panels['manager:inline'],
       'and the panel is the same box in both areas'
     );
 
@@ -1184,16 +1149,17 @@ test('the shared Select paints identically in both areas, and beats the paint it
 
     // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW.
     assert.equal(report.shipped.select.size, '11.52px', 'the converted sort trigger`s type size');
-    assert.equal(report.shipped.search.size, '11.52px', 'and its search field`s');
+    // The search field is the library's `<Search>` at 500 12.5px since issue 1782.
+    assert.equal(report.shipped.search.size, '12.5px', 'and its search field states its own');
     assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
     assert.deepEqual(
       [report.shipped.select.weight, report.shipped.search.weight, report.shipped.direction.weight],
-      ['500', '400', '400'],
-      'the sort takes the rung`s 500 while its two neighbours declare no weight and compute ' +
-        '`normal`, which is OFF the published ramp'
+      ['500', '500', '400'],
+      'the sort and the search take the ramp`s 500 while the direction toggle declares no ' +
+        'weight and computes `normal`, which is OFF the published ramp'
     );
     assert.equal(
-      report.triggers['manager-toolbar'].fontWeight,
+      report.triggers['manager:toolbar'].fontWeight,
       '500',
       'so the toolbar line`s SIZE is intact across the conversion and only its WEIGHT moves'
     );
@@ -1670,8 +1636,8 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
                     class="fas fa-chevron-down" aria-hidden="true"></i></button>
                 </div>
               </div>
-              <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
-                <div class="fabricate-search manager-search"><input type="text" data-scoped-list-search></div>
+              <div class="fabricate-filter-bar manager-scoped-list-toolbar">
+                <div class="fabricate-search"><input type="text" data-scoped-list-search></div>
                 <div class="fabricate-picker manager-travel-picker fabricate-select">
                   <button
                     type="button"
@@ -1752,7 +1718,7 @@ test('the pager names its per-page control with the words a GM can see', () => {
   );
   assert.match(
     source,
-    /<span id=\{captionId\}\s+class:manager-pagination-hidden=\{compact\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    /<span id=\{captionId\}\s+class:manager-pagination-hidden=\{compact\}\s*>\{localizeOr\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
     'the caption carries the per-instance id, visually hidden only in compact mode'
   );
   assert.match(

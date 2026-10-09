@@ -653,7 +653,7 @@ export function registerChecksCases() {
     // card, and the exemption that excused it has been overruled rather than reworded.
     assert.ok(
       !target.querySelector(
-        '[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'
+        '[data-checks-panel="crafting"] .fabricate-card [data-recipe-section="failure-consume-ingredients"]'
       ),
       'no card wraps the two failure flags'
     );
@@ -1689,7 +1689,7 @@ export function registerChecksCases() {
     // Add appends a new trigger; remove drops one.
     triggers.querySelector('[data-add-trigger]').click();
     assert.equal(emitted.at(-1).checkBreakage.triggers.length, 3, 'add appends a trigger');
-    triggers.querySelector('[data-trigger="c1"] [data-remove-trigger]').click();
+    triggers.querySelector(':scope [data-trigger="c1"] [data-rule-row-remove]').click();
     assert.deepEqual(
       emitted.at(-1).checkBreakage.triggers.map((t) => t.id),
       ['c2'],
@@ -1873,13 +1873,13 @@ export function registerChecksCases() {
 
   // A trigger's controls sit behind a disclosure (issue 1096).
   function openTrigger(root, id) {
-    const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+    const disclosure = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-disclosure]`);
     assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
     disclosure.click();
     flushSync();
     const card = root.querySelector(`[data-trigger="${id}"]`);
     assert.ok(
-      Boolean(card.querySelector(`[data-trigger-body="${id}"]`)),
+      Boolean(card.querySelector('[data-rule-row-body]')),
       `the head of trigger ${id} opens its body`
     );
     return card;
@@ -3569,6 +3569,39 @@ export function registerChecksCases() {
     assert.match(detailOf('salvage'), /Routed by check/, 'and the salvage row the same one');
   });
 
+  it('names the pool a counting check rolls in the ALL CHECKS rail, never its retained formula (issue 2084)', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20+@abilities.int.mod',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+          evaluation: {
+            product: 'count',
+            direction: 'over',
+            pool: { die: 10, base: '6', threshold: '8', required: 2 },
+          },
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    const detailNode = (id) =>
+      target
+        .querySelector(`[data-checks-all-checks-row="${id}"]`)
+        .querySelector('.manager-checks-rail-row-detail');
+    const detailOf = (id) => detailNode(id).textContent.trim();
+    assert.equal(detailOf('salvage'), 'Routed by check · 6d10 each ≥ 8');
+    assert.equal(detailOf('crafting'), 'Routed by check · 1d20', 'a summing check keeps its formula');
+    assert.equal(
+      detailNode('salvage').getAttribute('title'),
+      'Routed by check · 6d10 each ≥ 8',
+      'the line ellipsises in the rail, so it carries its full text'
+    );
+  });
+
   it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
     // The mirror defect, which is why the latch cannot simply be removed.
     await mountChecks([], {
@@ -3713,7 +3746,10 @@ export function registerChecksCases() {
 
   it('sorts a section’s blocking notices above its warnings, as Validation orders its rows', async () => {
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes.
-    await mountChecks([], routedCraftingOptions('1d20 * @craftingmod'));
+    // Advantage is off: a keep rule cannot keep a die multiplied by a reference (issue 2007).
+    const options = routedCraftingOptions('1d20 * @craftingmod');
+    options.craftingCheck.routed.advantage = { mode: 'off' };
+    await mountChecks([], options);
     await openChecksActivity('crafting');
     assert.deepEqual(noticeIds(), ['retiredPlaceholderBreaksFormula', 'noRollFormula']);
     for (const notice of target.querySelectorAll('[data-checks-section-notice]')) {

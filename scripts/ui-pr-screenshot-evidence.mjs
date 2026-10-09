@@ -66,9 +66,9 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  // The shared side-panel primitives the Tool Studio's preview and library inspector render (issue
+  // The shared side-panel fact row the Tool Studio's preview and library inspector render (issue
   // 881).
-  /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/IconFactRow\.svelte$/,
 ];
 
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
@@ -149,7 +149,7 @@ const requirementRailFrame = (id, label) => ({
 // header actions of every manager frame the shell appears in are drawn by these six.
 const PAGE_HEADER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ManagerPageHeader\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderBreadcrumbs\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/headerBreadcrumbs\.js$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderCraftingActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderGatheringActions\.svelte$/,
@@ -190,6 +190,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],
@@ -205,6 +206,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],
@@ -360,9 +362,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-component-edit-difficulty',
     label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    // The difficulty control rehomed from the deleted ComponentDifficultyInspector into
-    // ComponentEditView's body.
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    // The staged difficulty control is ComponentDifficultyCard, which ComponentEditView renders.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentDifficultyCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit-salvage',
@@ -372,16 +376,20 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvage(?:Card|Stages)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
     ],
   },
   {
-    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add group
+    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add result set
     // control hidden and the required hint shown.
     id: 'manager-component-edit-salvage-simple',
-    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)',
+    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add result set, required hint)',
     smokeLabels: ['manager-component-edit-salvage-simple'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvageCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',
@@ -390,10 +398,6 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
-      // The rail's standing help card renders through the shared explainer primitive
-      // (issue 883), whose CSS is co-located in its own scoped block; this is the frame
-      // that shows it on this screen.
-      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
     ],
   },
   {
@@ -494,7 +498,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-gathering-tasks',
     label: 'Manager gathering tasks',
     smokeLabels: ['manager-gathering-task-editor-normal', 'manager-gathering-task-editor-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/gathering-task\//, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
   },
   {
     id: 'manager-gathering-events',
@@ -600,7 +604,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the
   // rendering file is now `ImportReportModal.svelte` rather than the app shell's HTML
-  // builder — and `ManagerModal.svelte`, the chrome BOTH import-flow modals render
+  // builder — and `Modal.svelte`, the chrome BOTH import-flow modals render
   // through, changes this frame's appearance too. All four are load-bearing.
   {
     id: 'manager-import-report',
@@ -612,7 +616,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       // The model that opens both import-flow modals (issue 1721).
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
@@ -626,7 +630,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
@@ -789,7 +793,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-roll-prompt',
     label: 'Player crafting — interactive check roll prompt',
     smokeLabels: ['player-crafting-roll-prompt'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt\.svelte)$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt(?:Footer|AdditionalDice)?\.svelte)$/,
+      // Issue 2008: the additional-dice control's presenter.
+      /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
+    ],
   },
   {
     id: 'player-crafting-essence-legacy',
@@ -992,6 +1000,45 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/presenters\/CraftingChatCard\.js$/,
       /^src\/ui\/presenters\/SalvageChatCard\.js$/,
+    ],
+  },
+  // Issue 2006: the success-counting result cards, rolled deterministically in real Foundry.
+  {
+    id: 'chat-craft-card-count',
+    label: 'Chat — success-counting crafting result cards and their summed control',
+    smokeLabels: [
+      'chat-craft-card-count-pass',
+      'chat-craft-card-count-fail',
+      'chat-craft-card-count-botch',
+      'chat-craft-card-count-zero',
+      'chat-craft-card-count-bought',
+      'chat-craft-card-over-control',
+      // Issue 2007: the same count presenters also render the counting advantage case.
+      'chat-craft-card-advantage-count',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:countDiceTiles|countEvidenceRows)\.js$/,
+      /^src\/systems\/countDisplayEvidence\.js$/,
+    ],
+  },
+  // Issue 2005: the roll-under result cards and the refusal, against the summed roll-over control.
+  {
+    id: 'chat-craft-card-under',
+    label: 'Chat — roll-under crafting result cards, their refusal and the roll-over control',
+    // Issue 2007: the same sum-check presenters also render its keep, bonus-die and off cases.
+    smokeLabels: [
+      'chat-craft-card-under-pass',
+      'chat-craft-card-under-fail',
+      'chat-craft-card-under-otherwise',
+      'chat-craft-card-under-misconfigured',
+      'chat-craft-card-over-control',
+      'chat-craft-card-advantage-keep',
+      'chat-craft-card-advantage-keep-under',
+      'chat-craft-card-advantage-bonus',
+      'chat-craft-card-advantage-off',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay|CraftingChatCard)\.js$/,
     ],
   },
   {
@@ -1711,8 +1758,9 @@ function parseCaptureEligible(value) {
   throw new Error(`--capture-eligible must be the literal 'true' or 'false', not '${value}'`);
 }
 
-// `--capture-timeout-minutes` pins the gate's capture deadline to `capture`'s real
-// `timeout-minutes` in `pr-screenshots.yml`.
+// `--capture-timeout-minutes` pins the gate's capture deadline to the summed stage
+// `timeout-minutes` of `pr-screenshots.yml` — select, warm-foundry, the longer of render and
+// verify-chrome, then capture.
 function parseCaptureTimeoutMs(value) {
   if (value === undefined || value === '') return undefined;
   const minutes = Number(value);

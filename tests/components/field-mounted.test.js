@@ -1,9 +1,12 @@
-/** `Field`, the manager's labelled `.manager-field` column, RENDERED (issue 1428). */
+/** `Field`, the manager's labelled `.fabricate-field` column, RENDERED (issue 1428). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -32,7 +35,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
@@ -41,7 +44,7 @@ const vocabularyHarness = createMountedComponentHarness({
 const radioHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-field-radio-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -64,9 +67,9 @@ const RADIO_OPTIONS = Object.freeze([
 
 /** The exact class string the `<fieldset>` carries, in source order. */
 const RADIO_CLASS_CONFIG_CARDS =
-  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
+  'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
 const RADIO_CLASS_PLAIN =
-  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
+  'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
 
 before(async () => {
   await vocabularyHarness.setup();
@@ -89,7 +92,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
     assert.ok(Boolean(group), 'the radio card group must render at all');
@@ -117,7 +120,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const row = root.querySelector('.manager-resolution-option');
     assert.ok(Boolean(row), 'an option row must render, or this assertion has no subject');
@@ -138,8 +141,8 @@ describe('Field (mounted, through its real callers)', () => {
     const input = root.querySelector('#field-mounted-vocabulary');
     assert.ok(Boolean(input), 'the vocabulary text input rendered');
 
-    const field = input.closest('.manager-field');
-    assert.ok(Boolean(field), 'the input sits inside a `.manager-field`');
+    const field = input.closest('.fabricate-field');
+    assert.ok(Boolean(field), 'the input sits inside a `.fabricate-field`');
     assert.equal(
       field.tagName,
       'LABEL',
@@ -166,7 +169,7 @@ describe('Field (mounted, through its real callers)', () => {
         'would announce a name that reaches nothing'
     );
     assert.ok(
-      iconField.classList.contains('manager-field'),
+      iconField.classList.contains('fabricate-field'),
       'the primitive class is emitted whatever the host'
     );
     assert.ok(
@@ -184,7 +187,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
     assert.ok(Boolean(group), 'the radio card group rendered');
@@ -207,7 +210,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
       configCards: false,
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
@@ -221,7 +224,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     };
     const on = await radioHarness.mount({ ...props, disabled: true });
     const disabledGroup = on.querySelector('[data-radio-card-group="field-mounted"]');

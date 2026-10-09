@@ -78,7 +78,8 @@ export function expandObject(changes) {
 }
 
 /**
- * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, and `-=key` DELETES.
+ * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, `-=key` DELETES, and
+ * `==key` replaces wholesale (the companion-effect marker a currency credit writes, issue 1773).
  *
  * @param {object} target Object to mutate.
  * @param {object} changes Expanded change set.
@@ -88,6 +89,10 @@ export function applyUpdate(target, changes) {
   for (const [key, value] of Object.entries(changes)) {
     if (key.startsWith('-=')) {
       delete target[key.slice(2)];
+      continue;
+    }
+    if (key.startsWith('==')) {
+      target[key.slice(2)] = structuredClone(value);
       continue;
     }
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -115,6 +120,21 @@ export function installUpdateSemantics(document) {
     return document;
   };
   return document;
+}
+
+/**
+ * Core's stored-data members on a lab Actor (issue 2008): `_source` reads the same live data
+ * `update` writes, never a copy, `overrides` stores an effect's change nested as core does, and
+ * `canUserModify` answers core's OWNER test, which every lab viewer passes.
+ *
+ * @param {object} actor Actor to equip.
+ * @returns {object} The same actor.
+ */
+export function installSourceSemantics(actor) {
+  Object.defineProperty(actor, '_source', { get: () => actor, configurable: true });
+  actor.overrides = {};
+  actor.canUserModify = () => true;
+  return actor;
 }
 
 /**

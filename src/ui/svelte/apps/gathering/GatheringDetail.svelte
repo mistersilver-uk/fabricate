@@ -2,15 +2,14 @@
 <!--
   GatheringDetail is the center column of the player gathering tab. With no
   environment selected it shows a hint to pick one from the left. With an
-  environment selected it renders a header (name, biome/danger info pips,
-  description, and a gathering-mode hint), the economy strip, an optional
+  environment selected it renders the identity header (tile, name, biome/danger
+  info pips, description, and a gathering-mode hint), the economy strip, an optional
   environment-level scene banner, then a TAB STRIP (GatheringDetailTabs) with two
   tab panels:
 
-   - Tasks (default): for blind environments an "Attempt gathering" button (a
-     blind gather omits the task id so the engine picks a candidate) plus — when
-     the effective reveal policy is not `never` — a "Discovered Tasks (x/y)" list;
-     for targeted environments the selectable task list. Searchable + paginated.
+   - Tasks (default): for blind environments — when the effective reveal policy is
+     not `never` — a "Discovered Tasks (x/y)" list; for targeted environments the
+     selectable task list. Searchable + paginated.
    - Events: the aggregate Highest-Danger + event-chance summary, then a
      searchable, paginated list of selectable event rows (GatheringEventRow).
      The list is redacted (engine sends `[]`) for a non-GM viewer of a blind
@@ -20,18 +19,25 @@
   inspector (the task inspector carries the per-task Attempt action; the event
   inspector is read-only). `activeTab`, `selectedTaskId`, and `selectedEventId`
   are owned by GatheringView so the right column can swap inspectors with the tab.
-  The blind "Attempt gathering" button and the task inspector's Attempt both call
-  the `onAttempt` handler (lifted to GatheringView), which runs
-  services.startGatheringAttempt and re-fetches the listing; `busy` guards against
-  double-submits. Tasks and events keep independent search + pagination state.
+
+  A blind environment's header carries the pane's one primary, "Attempt gathering": the generic
+  gather `ui-gathering-app/spec.md` requires, which omits the task id so the engine picks a
+  candidate. It and the task inspector's Attempt both call `onAttempt` (lifted to GatheringView);
+  `busy` guards against double-submits. Tasks and events keep independent search + pagination.
 -->
 <script>
+  import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
+  import { watchSceneImage } from './linkedSceneImage.js';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTasksPanel from './GatheringTasksPanel.svelte';
   import GatheringEventsPanel from './GatheringEventsPanel.svelte';
   import LinkedScene from './LinkedScene.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import InfoStrip from '../../components/InfoStrip.svelte';
 
   let {
     environment = null,
@@ -49,9 +55,13 @@
   const env = $derived(environment);
   const envId = $derived(String(env?.id ?? ''));
   const name = $derived(String(env?.name ?? ''));
+  const img = $derived(String(env?.img ?? ''));
   const description = $derived(String(env?.description ?? ''));
   const isBlind = $derived(env?.selectionMode === 'blind');
   const sceneUuid = $derived(String(env?.sceneUuid ?? ''));
+  // The header tile draws what the environment's card draws: the linked scene's image first.
+  let sceneThumb = $state('');
+  $effect(() => watchSceneImage(sceneUuid, (image) => (sceneThumb = image)));
   // The linked scene is an environment-level restriction: show its banner once,
   // above the task list, exactly when the environment is scene-gated.
   const envBlockedReasons = $derived(Array.isArray(env?.blockedReasons) ? env.blockedReasons : []);
@@ -65,17 +75,30 @@
   const discoveredTaskCount = $derived(Number(env?.discoveredTaskCount ?? discoveredTasks.length));
   const composedTaskCount = $derived(Number(env?.composedTaskCount ?? 0));
   const blindAttemptable = $derived(env?.attemptable === true);
+  // A blind gather that cannot run names a generic reason only: its blockers may be task-derived.
+  const blindBlocked = $derived(isBlind && !blindAttemptable);
+  const uid = $props.id();
+  const blindReasonId = `${uid}-blind-reason`;
 
-  // System limitation flags + (when stamina enabled) the actor's pool, surfaced
-  // as a strip beneath the header. Both flags off shows nothing; both on shows
-  // both items. Blind environments keep the node legend generic (per-task counts
-  // are redacted in the rows themselves).
+  // System limitation flags + (when stamina enabled) the actor's pool. The pool is the one fact of
+  // an info strip beneath the header, and the node legend a muted line after it; with stamina off no
+  // strip renders. Blind environments keep the legend generic (per-task counts are redacted in rows).
   const staminaEnabled = $derived(env?.staminaEnabled === true);
   const nodesEnabled = $derived(env?.nodesEnabled === true);
   const staminaPool = $derived(env?.staminaPool ?? null);
   const hasStaminaPool = $derived(
     staminaEnabled && staminaPool && staminaPool.current != null && staminaPool.max != null
   );
+  const staminaFact = $derived({
+    icon: 'fas fa-bolt',
+    value: hasStaminaPool
+      ? localize('FABRICATE.App.Gathering.Detail.StaminaPool', {
+          current: staminaPool.current,
+          max: staminaPool.max,
+        })
+      : localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone'),
+    props: { 'data-gathering-stamina-pool': hasStaminaPool ? '' : 'none' },
+  });
 
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
   const danger = $derived(
@@ -115,8 +138,36 @@
   // only mounted in the 'full' tier i.e. the blind-redaction context).
   const events = $derived(Array.isArray(env?.events) ? env.events : []);
 
-  const titleId = 'gathering-detail-title';
+  const hasPips = $derived(biomeTags.length > 0 || danger !== '');
 </script>
+
+{#snippet pips()}
+  <ul class="gathering-detail-pips" data-gathering-pips>
+    {#each biomeTags as tag (tag.id)}
+      <li
+        class="gathering-detail-pip is-biome"
+        style={biomeChipStyle(tag)}
+        aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Biome', {
+          value: tag.label,
+        })}
+      >
+        <i class={tag.icon} aria-hidden="true"></i>
+        <span>{tag.label}</span>
+      </li>
+    {/each}
+    {#if dangerLabel !== ''}
+      <li
+        class={`gathering-detail-pip is-danger ${dangerRiskClass}`}
+        aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Danger', {
+          value: dangerLabel,
+        })}
+      >
+        <i class="fas fa-skull" aria-hidden="true"></i>
+        <span>{dangerLabel}</span>
+      </li>
+    {/if}
+  </ul>
+{/snippet}
 
 {#if env == null}
   <div class="gathering-detail-state" data-gathering-detail-state="empty">
@@ -126,40 +177,36 @@
 {:else}
   <section
     class="gathering-detail"
-    aria-labelledby={titleId}
+    aria-label={name}
     data-gathering-detail-state="selected"
     data-detail-environment-id={envId}
     data-selection-mode={isBlind ? 'blind' : 'targeted'}
   >
     <header class="gathering-detail-header">
-      <h2 id={titleId} class="gathering-detail-title" title={name}>{name}</h2>
-
-      {#if biomeTags.length > 0 || danger !== ''}
-        <ul class="gathering-detail-pips" data-gathering-pips>
-          {#each biomeTags as tag (tag.id)}
-            <li
-              class="gathering-detail-pip is-biome"
-              style={biomeChipStyle(tag)}
-              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Biome', {
-                value: tag.label,
-              })}
-            >
-              <i class={tag.icon} aria-hidden="true"></i>
-              <span>{tag.label}</span>
-            </li>
-          {/each}
-          {#if dangerLabel !== ''}
-            <li
-              class={`gathering-detail-pip is-danger ${dangerRiskClass}`}
-              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Danger', {
-                value: dangerLabel,
-              })}
-            >
-              <i class="fas fa-skull" aria-hidden="true"></i>
-              <span>{dangerLabel}</span>
-            </li>
-          {/if}
-        </ul>
+      <PlayerDetailHeader
+        {name}
+        art={sceneThumb || img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
+        chips={hasPips ? pips : null}
+        primaryLabel={isBlind ? localize('FABRICATE.App.Gathering.Detail.BlindAttempt') : ''}
+        primaryIcon="fas fa-dice"
+        primaryDisabled={!blindAttemptable || busy}
+        primaryProps={{
+          class: 'gathering-detail-blind-attempt',
+          'data-gathering-blind-attempt': '',
+          title: blindBlocked ? localize('FABRICATE.App.Gathering.Detail.Blocked') : undefined,
+          'aria-describedby': blindBlocked ? blindReasonId : undefined,
+        }}
+        onclick={(event) =>
+          withRollPromptOrigin(event, () => onAttempt?.({ environmentId: envId, taskId: null }))}
+      />
+      {#if blindBlocked}
+        <div id={blindReasonId} data-gathering-blind-attempt-reason>
+          <Notice
+            tone="warning"
+            icon="fa-solid fa-ban"
+            title={localize('FABRICATE.App.Gathering.Detail.Blocked')}
+          />
+        </div>
       {/if}
 
       {#if description !== ''}
@@ -179,36 +226,18 @@
       </p>
     </header>
 
-    {#if staminaEnabled || nodesEnabled}
-      <section
-        class="gathering-detail-economy"
-        data-gathering-economy-strip
+    {#if staminaEnabled}
+      <InfoStrip
+        label={localize('FABRICATE.App.Gathering.Detail.StaminaKicker')}
+        facts={[staminaFact]}
+        data-gathering-economy-strip=""
         data-economy-mode={env?.economyMode ?? 'none'}
-      >
-        {#if staminaEnabled}
-          <span class="gathering-detail-economy-item">
-            <i class="fas fa-bolt" aria-hidden="true"></i>
-            {#if hasStaminaPool}
-              <span data-gathering-stamina-pool
-                >{localize('FABRICATE.App.Gathering.Detail.StaminaPool', {
-                  current: staminaPool.current,
-                  max: staminaPool.max,
-                })}</span
-              >
-            {:else}
-              <span data-gathering-stamina-pool="none"
-                >{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span
-              >
-            {/if}
-          </span>
-        {/if}
-        {#if nodesEnabled}
-          <span class="gathering-detail-economy-item">
-            <i class="fas fa-mountain" aria-hidden="true"></i>
-            <span>{localize('FABRICATE.App.Gathering.Detail.NodesLegend')}</span>
-          </span>
-        {/if}
-      </section>
+      />
+    {/if}
+    {#if nodesEnabled}
+      <p class="gathering-detail-nodes-legend" data-gathering-nodes-legend>
+        {localize('FABRICATE.App.Gathering.Detail.NodesLegend')}
+      </p>
     {/if}
 
     {#if sceneBlocked}
@@ -243,12 +272,9 @@
           {showDiscovered}
           {discoveredTaskCount}
           {composedTaskCount}
-          {blindAttemptable}
           {activeTasks}
           {selectedTaskId}
           {onSelectTask}
-          {onAttempt}
-          {busy}
           {envId}
           {eventVisibility}
           {eventChance}
@@ -299,15 +325,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .gathering-detail-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .gathering-detail-pips {
@@ -382,34 +399,10 @@
     color: var(--fab-text);
   }
 
-  .gathering-detail-mode-hint {
+  .gathering-detail-mode-hint,
+  .gathering-detail-nodes-legend {
     margin: 0;
     font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
-  /* Environment safety readout: highest danger level + event-chance bar (or a
-     "safe" hint when there is no event chance). */
-  .gathering-detail-economy {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .gathering-detail-economy-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text);
-  }
-
-  .gathering-detail-economy-item i {
     color: var(--fab-text-muted);
   }
 

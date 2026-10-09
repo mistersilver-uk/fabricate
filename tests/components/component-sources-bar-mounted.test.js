@@ -106,36 +106,39 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.deepEqual(calls.remove, ['b'], 'right-click did NOT remove the required source');
   });
 
-  /** THE PANEL IS `SearchablePopover`'S NOW, AND IT IS PORTALED (issue 1513). */
+  /** The panel is `SetPicker`'s, in its `choose` form, and it is portaled (issues 1513, 1782). */
   it('opens the add/edit picker listing every owned actor to toggle, and commits on choose', async () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
 
-    assert.ok(!target.querySelector('.crafting-sources-popover'), 'panel closed by default');
-    target.querySelector('[data-crafting-sources-add]').click();
+    assert.ok(!target.querySelector('.fabricate-set-picker-popover'), 'panel closed by default');
+    const add = target.querySelector('[data-crafting-sources-add]');
+    assert.match(add.getAttribute('aria-label') ?? '', /Sources\.Edit/u, 'the icon-only + is named');
+    assert.equal(add.getAttribute('title'), add.getAttribute('aria-label'), 'and titled alike');
+    add.click();
     flushSync();
 
-    const popover = target.querySelector('.crafting-sources-popover');
+    const popover = target.querySelector('.fabricate-set-picker-popover');
     assert.ok(Boolean(popover), 'panel opened');
     assert.ok(
       !popover.closest('[data-crafting-sources]'),
       'and it is PORTALED out of the bar rather than positioned inside it, which is the whole ' +
         'reason the hand-rolled `position: absolute` panel could be clipped by the listing'
     );
-    const options = popover.querySelectorAll('.crafting-source-option');
+    const options = popover.querySelectorAll('.fabricate-set-picker-option');
     assert.equal(options.length, 3, 'one option per available owned actor');
 
     options[2].click();
     flushSync();
     assert.deepEqual(calls.toggle, ['c'], 'toggling an available actor calls store.toggle');
     assert.ok(
-      Boolean(target.querySelector('.crafting-sources-popover')),
+      Boolean(target.querySelector('.fabricate-set-picker-popover')),
       'and the panel STAYS OPEN, because a control that adds four source actors must not cost ' +
         'four open-choose-reopen cycles'
     );
 
     target
-      .querySelectorAll('.crafting-sources-popover .crafting-source-option')[1]
+      .querySelectorAll('.fabricate-set-picker-popover .fabricate-set-picker-option')[1]
       .click();
     flushSync();
     assert.deepEqual(
@@ -156,13 +159,13 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const popover = target.querySelector('.crafting-sources-popover');
+    const popover = target.querySelector('.fabricate-set-picker-popover');
     assert.equal(
       popover.querySelector('[role="listbox"]').getAttribute('aria-multiselectable'),
       'true',
       'the list declares itself multi-selectable'
     );
-    const marks = [...popover.querySelectorAll('.crafting-source-option')].map((row) =>
+    const marks = [...popover.querySelectorAll('.fabricate-set-picker-option')].map((row) =>
       row.getAttribute('aria-selected')
     );
     assert.deepEqual(
@@ -173,7 +176,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
         'has always made correctly and must not lose to the conversion'
     );
     assert.equal(
-      popover.querySelectorAll('.crafting-source-option-check').length,
+      popover.querySelectorAll('.fabricate-set-picker-option-check').length,
       2,
       'and the visible check glyph agrees with the announcement'
     );
@@ -186,12 +189,12 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const field = target.querySelector('.crafting-sources-popover .manager-travel-popover-search input');
+    const field = target.querySelector('.fabricate-set-picker-popover .manager-travel-popover-search input');
     field.value = 'c';
     field.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
 
-    const before = [...target.querySelectorAll('.crafting-sources-popover .crafting-source-option')];
+    const before = [...target.querySelectorAll('.fabricate-set-picker-popover .fabricate-set-picker-option')];
     assert.equal(before.length, 1, 'the query narrows the owned-actor list to Cy');
     assert.equal(before[0].getAttribute('aria-selected'), 'false');
 
@@ -206,7 +209,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     });
     await harness.setProps({ services: { craftingSources: next } });
 
-    const popover = target.querySelector('.crafting-sources-popover');
+    const popover = target.querySelector('.fabricate-set-picker-popover');
     assert.ok(Boolean(popover), 'the panel survives a whole new services object');
     assert.equal(
       popover.querySelector('.manager-travel-popover-search input').value,
@@ -214,7 +217,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
       'and so does the query the GM typed, which a close-and-reopen would have cleared'
     );
 
-    const after = [...popover.querySelectorAll('.crafting-source-option')];
+    const after = [...popover.querySelectorAll('.fabricate-set-picker-option')];
     assert.equal(after.length, 1, 'the filtered list is still the filtered list');
     assert.ok(
       after[0] === before[0],
@@ -228,7 +231,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
       'and the mark follows the new selection rather than the one the panel opened over'
     );
     assert.equal(
-      popover.querySelectorAll('.crafting-source-option-check').length,
+      popover.querySelectorAll('.fabricate-set-picker-option-check').length,
       1,
       'the visible check agrees with it'
     );
@@ -241,7 +244,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const popover = target.querySelector('.crafting-sources-popover');
+    const popover = target.querySelector('.fabricate-set-picker-popover');
     const panelName = popover.getAttribute('aria-label');
     const listName = popover.querySelector('[role="listbox"]').getAttribute('aria-label');
     assert.notEqual(panelName, '', 'an unnamed dialog is invisible in a frame and is not a compiler error');
@@ -259,7 +262,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const popover = target.querySelector('.crafting-sources-popover');
+    const popover = target.querySelector('.fabricate-set-picker-popover');
     const field = popover.querySelector('.manager-travel-popover-search input');
     assert.ok(Boolean(field), 'the panel renders a query field');
     assert.ok(
@@ -272,7 +275,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     field.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(
-      target.querySelector('.crafting-sources-popover [data-popover-filtered-count]').textContent,
+      target.querySelector('.fabricate-set-picker-popover [data-popover-filtered-count]').textContent,
       '1 of 3',
       'and the count answers the query rather than restating the list length'
     );
@@ -290,7 +293,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const empty = target.querySelector('.crafting-sources-popover .manager-travel-popover-empty');
+    const empty = target.querySelector('.fabricate-set-picker-popover .manager-travel-popover-empty');
     assert.ok(Boolean(empty), 'the empty branch renders');
     assert.ok(!empty.querySelector('h3'), 'and it renders NO heading');
     assert.match(
@@ -338,7 +341,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     flushSync();
 
     const tiles = [
-      ...target.querySelectorAll('.crafting-sources-popover .crafting-source-option .fab-avatar'),
+      ...target.querySelectorAll('.fabricate-set-picker-popover .fabricate-set-picker-option .fab-avatar'),
     ];
     assert.equal(tiles.length, 3, 'one shared portrait per available actor');
     assert.ok(

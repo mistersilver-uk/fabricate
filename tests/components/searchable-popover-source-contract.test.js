@@ -19,6 +19,7 @@ import { repoRoot } from '../helpers/sourceScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 import {
   SOURCES,
+  componentCallSites,
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
@@ -33,7 +34,7 @@ const RAW_ALLOWLIST = Object.freeze([
     sites: 1,
     why:
       'The primitive itself. Its picker root writes the token inside a TEMPLATE LITERAL — ' +
-      '`class={`manager-travel-picker ${pickerClass}`}` — so unlike `ManagerToolbar`, whose ' +
+      '`class={`manager-travel-picker ${pickerClass}`}` — so unlike `FilterBar`, whose ' +
       'class comes from a bare identifier, the source-text detector sees it. Exactly one ' +
       'element in the component carries it; a second would mean a second root.',
   }),
@@ -93,17 +94,17 @@ const popover = definePrimitiveAdoptionContract({
   rawRemedy:
     'these components hand-roll the trigger-plus-popover that ' +
     '`src/ui/svelte/components/SearchablePopover.svelte` owns. Render `<SearchablePopover ' +
-    'options={…} onChoose={…}>` instead — a per-site modifier travels on `triggerClass`, ' +
+    'options={…} onSelect={…}>` instead — a per-site modifier travels on `triggerClass`, ' +
     '`popoverClass`, `valueClass` or `pickerClass`, a `data-*` hook on the trigger rides ' +
-    '`triggerData` and one on an option rides that option`s `data` map. If the site is a ' +
+    '`triggerProps` and one on an option rides that option`s `data` map. If the site is a ' +
     'typeahead COMBOBOX with no trigger, or a `role="menu"` of actions, it is a different ' +
     'widget and belongs in `scripts/lib/designSystemPrimitives.json`, not here',
   valuelessRemedy:
     'write `attribute=""` instead — that renders identically on a raw element and through the ' +
     'rest spread, where a bare `data-x` arrives as the boolean `true` and renders `="true"`. ' +
     'Presence selectors resolve either way, which is why the mounted suites and the smoke ' +
-    'steps that use them would not catch it. The same is true of a `triggerData` entry and of ' +
-    'an option`s `data` map: spell the value `\'\'`',
+    'steps that use them would not catch it. The same is true of a `triggerProps` entry and of ' +
+    "an option`s `data` map: spell the value `''`",
 });
 
 /**
@@ -117,35 +118,35 @@ function snippetTriggerName(site) {
   const snippet = site.snippetSource('trigger');
   if (!snippet) return null;
   let found = null;
-  walkTemplate(parse(snippet, { modern: true, filename: 'trigger-snippet.svelte' }).fragment, (node) => {
-    if (found || node.type !== 'RegularElement') return;
-    const attributes = node.attributes ?? [];
-    if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
-    const label = attributes.find(
-      (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
-    );
-    if (label) found = snippet.slice(label.start, label.end);
-  });
+  walkTemplate(
+    parse(snippet, { modern: true, filename: 'trigger-snippet.svelte' }).fragment,
+    (node) => {
+      if (found || (node.type !== 'RegularElement' && node.type !== 'Component')) return;
+      const attributes = node.attributes ?? [];
+      if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
+      const label = attributes.find(
+        (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
+      );
+      if (label) found = snippet.slice(label.start, label.end);
+    }
+  );
   return found;
 }
 
 /** ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION. */
 const MULTI_SELECT_ADOPTERS = Object.freeze([
-  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  // The link-recipe picker, which takes the GATE ALONE (issue 1513, phase 4). Linking stays one
-  // choice at a time — no `multiple`, so the panel still announces a single-value listbox — but
-  // linking a second recipe is the common next action and each choice SHRINKS the option list it
-  // was made from, which is the case the gate's cursor clamp exists for.
-  'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
+  // `SetPicker` (issue 1782) is the one adopter: the crafting sources bar and the recipe-item
+  // contents tab, the two files issue 1513 converted onto `multiple` and `stayOpen`, reach the
+  // panel through it. No caller passes the gate ALONE since the contents tab became staged.
+  'src/ui/svelte/components/SetPicker.svelte',
+  // The Journal's run-type filter (issue 1644): a multi-select over the four kinds by maintainer
+  // ruling 2026-10-05, applying each choice as it is made with no query field.
+  'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
 ]);
 
-// THE TWO PROPS ARE READ THROUGH SEPARATE NON-VACUITY PROBES rather than through the adopter
-// list's first entry, because the entries no longer agree about which prop they pass. A single
-// probe against one file cannot see a reader that has stopped finding the other, and the
-// set-equality clause above passes either way: a pattern matching nothing makes it pass the day
-// both adopters are removed, which is the direction that hides.
-const MULTIPLE_ADOPTER = 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte';
-const STAY_OPEN_ADOPTER = 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte';
+// The reader is probed rather than trusted: a pattern matching nothing makes the set-equality
+// clause pass the day the adopter is removed, which is the direction that hides.
+const MULTIPLE_ADOPTER = 'src/ui/svelte/components/SetPicker.svelte';
 
 /** Every file with a `<SearchablePopover>` node that passes one of the two capability props. */
 function adopterFiles() {
@@ -188,12 +189,6 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
     'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
       'it, or it is finding nothing anywhere and this clause is decorative'
   );
-  assert.ok(
-    popover.callSites.some((site) => site.file === STAY_OPEN_ADOPTER && site.attribute('stayOpen')),
-    'the reader must find a `stayOpen` ATTRIBUTE on the call site in the one file that passes ' +
-      'it WITHOUT `multiple`, or the gate is being asserted through the prop that implies it ' +
-      'and its own adoption is unmeasured'
-  );
 });
 
 /**
@@ -209,9 +204,10 @@ function propsBlock() {
   return source.slice(start, end + closer.length);
 }
 
-/** The destructure as it stood before the panel was extracted (issue 1719). */
-const PROPS_BLOCK_DIGEST = 'e01ee104cdd7442f362b3e569cdf14c3d62d2fccf399b176bdf72181ea0d69c0';
-const PROPS_BLOCK_NAMES = 59;
+/** The destructure's digest (issues 1719, 1507). */
+// Re-derived at issue 1782, which added `source`, `loading` and `error` after `options`.
+const PROPS_BLOCK_DIGEST = 'e8349aa1252b4539dc5a7da0affedbad25c32a9e30ac4a8cf3467e9e4fbea124';
+const PROPS_BLOCK_NAMES = 62;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
   // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this
@@ -236,6 +232,10 @@ test('the declared prop surface is byte-identical to the pre-decomposition block
   );
 });
 
+// `SetPicker` forwards its `trigger` snippet to this primitive as a prop (issue 1782), so a snippet
+// handed to a `<SetPicker>` never appears at a `<SearchablePopover>` node and is read at its own.
+const setPickerSites = componentCallSites('SetPicker');
+
 test('the snippet-trigger naming route reads the element the spread lands on', () => {
   // NON-VACUITY, and it is the whole reason this route can be trusted.
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
@@ -243,14 +243,33 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     snippetSites.length,
     3,
     `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
-      '`IconPicker`, `EssenceSourceSelector` and, since issue 1513, ' +
-      '`apps/crafting/ComponentSourcesBar`. A different number means the route has gained or ' +
-      'lost a caller and the figures in this file need re-measuring. The third took the route ' +
-      'for a reason neither of the first two states: its trigger is a 40px dashed well sized to ' +
-      'the row of portrait buttons beside it, and the rule that draws it is in the CALLER`s ' +
-      'scoped block — which cannot reach the primitive`s own button, so `triggerClass` would ' +
-      'have named an element no rule of its could paint.'
+      "`IconPicker`, `EssenceSourceSelector` and `ComponentSalvageCard`'s salvage adder (issue " +
+      '1516). A different number means the route has gained or lost a caller and the figures in ' +
+      'this file need re-measuring.'
   );
+  const setPickerSnippetSites = setPickerSites.filter((site) => site.snippetSource('trigger'));
+  assert.deepEqual(
+    setPickerSnippetSites.map((site) => site.file),
+    ['src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'],
+    'one `<SetPicker>` hands it a `trigger` snippet: the crafting sources bar, whose 40px `+` ' +
+      'well is sized to its portraits. The contents tab names the default Add by `addLabel`.'
+  );
+
+  for (const site of setPickerSnippetSites) {
+    assert.ok(
+      snippetTriggerName(site),
+      `${site.file} hands \`SetPicker\` a \`trigger\` snippet and writes no \`aria-label\` on ` +
+        'the element the forwarded attributes are spread onto, so its button has no name'
+    );
+    for (const prop of ['addLabel', 'addProps']) {
+      assert.ok(
+        !site.attribute(prop),
+        `${site.file} passes both a \`trigger\` snippet and \`${prop}\`, which belongs to the ` +
+          'default Add the snippet replaces: a label would name nothing, and the attributes ride ' +
+          'the spread onto the snippet’s button, overriding what it writes.'
+      );
+    }
+  }
 
   for (const site of snippetSites) {
     assert.ok(
@@ -260,8 +279,8 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
         'place of the primitive`s own has no accessible name'
     );
     assert.ok(
-      !site.attribute('triggerAriaLabel'),
-      `${site.file} passes BOTH a \`trigger\` snippet and \`triggerAriaLabel\`. The primitive ` +
+      !site.attribute('ariaLabel'),
+      `${site.file} passes both a \`trigger\` snippet and \`ariaLabel\`. The primitive ` +
         'renders no button of its own in that shape, and the prop rides the spread — so it ' +
         'would silently override the name the snippet writes rather than naming anything.'
     );
@@ -290,7 +309,10 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     'the reader accepts an `aria-label` on an element that does not receive the spread, so a ' +
       'nameless trigger inside a labelled wrapper would pass'
   );
-  const named = decoy.replace('<button {...attributes}>', '<button aria-label="Go" {...attributes}>');
+  const named = decoy.replace(
+    '<button {...attributes}>',
+    '<button aria-label="Go" {...attributes}>'
+  );
   assert.notEqual(named, decoy, 'the discrimination control did not perturb the fixture');
   assert.ok(
     snippetTriggerName({ snippetSource: () => named }),
@@ -334,14 +356,12 @@ test('every popover names its trigger and the panel that opens', () => {
 
   const unnamed = [];
   for (const site of popover.callSites) {
-    // The TRIGGER is named by `triggerAriaLabel` or by a visible `triggerLabel`.
+    // The trigger is named by `ariaLabel` or by a visible `triggerLabel`.
     const triggerName =
-      site.attribute('triggerAriaLabel') ??
-      site.attribute('triggerLabel') ??
-      snippetTriggerName(site);
+      site.attribute('ariaLabel') ?? site.attribute('triggerLabel') ?? snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
-    // The PANEL is named by `dialogAriaLabel` or by `dialogAriaLabelledBy`.
-    const panelName = ['dialogAriaLabel', 'dialogAriaLabelledBy']
+    // The panel is named by `panelLabel` or by `panelLabelledBy`.
+    const panelName = ['panelLabel', 'panelLabelledBy']
       .map((prop) => site.attribute(prop))
       .find((written) => written && !/=(""|'')$/.test(written));
     if (!panelName) {
@@ -353,7 +373,7 @@ test('every popover names its trigger and the panel that opens', () => {
     unnamed.sort((left, right) => left.localeCompare(right)),
     [],
     'a `<SearchablePopover>` renders a portaled `role="dialog"` containing a `role="listbox"`, ' +
-      'and it names both from `dialogAriaLabel`, or from `dialogAriaLabelledBy` where the ' +
+      'and it names both from `panelLabel`, or from `panelLabelledBy` where the ' +
       'caller has a caption rather than a string. With neither, a GM using a screen reader ' +
       'is told a dialog opened and is not told what it is for, then lands in a list with no ' +
       'name either. Nothing else reports this: it is invisible in a frame, it is not a ' +

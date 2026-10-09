@@ -20,19 +20,38 @@ permissions:
   pull-requests: read
 
 jobs:
-  unit-tests:
+  # The suite runs as four shards (`node --test --test-shard`). Run whole, its ~33 CPU-minutes took
+  # 14-15 minutes wall-clock on a hosted runner and the 15-minute ceiling started cancelling green
+  # runs, main included. The ceiling is not the fix: each shard runs in a few minutes, under 10.
+  unit-test-shards:
+    name: unit-tests (shard ${{ matrix.shard }}/4)
     # Skip on `edited` PR events: editing the title/body doesn't change the head
     # commit, so the existing result for that SHA still stands. Runs on push and
     # all other registered PR events.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
-    # 10 was the cap that a hung `playwright install` used to consume in full. The install is
-    # now bounded to ~6 minutes by its own per-attempt timeout, so this bound is about the
-    # tests and the build, which run in about 4 minutes warm. Raising it does not reintroduce
-    # the burn it used to hide: nothing here can now hang for the whole budget unnoticed.
-    timeout-minutes: 15
+    strategy:
+      # Every shard reports, so one red shard does not hide another's failures.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    # A shard is a quarter of the suite. A hung `playwright install` is bounded at ~6 minutes by its
+    # own per-attempt timeout, so this bound is about the tests, not the install.
+    timeout-minutes: 10
+    env:
+      UNIT_TEST_SHARD: ${{ matrix.shard }}/4
+      # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
+      # PR's merge ref HEAD^1 is the base tip, and a push compares with the tip it replaced.
+      RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD^1' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # A push of several commits leaves the tip it replaced outside the depth-2 checkout.
+      - name: Fetch the ratchet base
+        if: github.event_name == 'push'
+        run: git cat-file -e "$RATCHET_BASE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$RATCHET_BASE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -81,10 +100,12 @@ jobs:
       # TEE'd to RUNNER_TEMP rather than the workspace: several suites scan the repository tree, and
       # a stray file appearing there mid-run is a test input. `pipefail` keeps the step's status the
       # runner's rather than `tee`'s, which always succeeds.
+      # `test:shard` is `npm test` plus `--test-shard`, which node only honours BEFORE the glob, so
+      # `npm test -- --test-shard=…` would silently run the whole suite in every shard.
       - name: Run unit tests
         run: |
           set -o pipefail
-          npm test 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
+          npm run test:shard 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
 
       # THE FAILING TEST NAMES, RE-PRINTED LAST. The TAP reporter writes each failure where it
       # happens and emits ~119,000 lines in total, so on a red run every `not ok` line sits in the
@@ -106,12 +127,31 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: unit-tests-tap
+          name: unit-tests-tap-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/unit-tests.tap
           retention-days: 7
 
+      # Once, not four times: the build does not depend on the shard.
       - name: Build module
+        if: matrix.shard == 1
         run: npm run build
+
+  # The required `unit-tests` check. It is green only when every shard passed, so a cancelled or
+  # failed shard can never read as a pass, and it is skipped exactly when the shards are.
+  unit-tests:
+    needs: unit-test-shards
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'edited')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.unit-test-shards.result }}
+        run: |
+          if [ "$SHARDS" != "success" ]; then
+            echo "::error::the unit-test shards ended $SHARDS; open the red shard for its failing tests"
+            exit 1
+          fi
 
   lint:
     # Skip on `edited` PR events for the same reason as unit-tests: editing the
@@ -129,12 +169,22 @@ jobs:
     # hosted runner is commonly 1.5-2x slower than a dev machine on CPU-bound Node work, so 10
     # no longer leaves room for a slow install on top. 15 does, and still bounds a genuine hang.
     #
-    # `npm run lint:debt` is deliberately NOT a step here — it lints the repository a second
-    # time with the debt baseline lifted, which would serialise two full ESLint passes into one
-    # job's budget. It has its own job below so the two run in parallel.
+    # `npm run lint` and `npm run format:check` compare with the base commit below: a changed
+    # file fails on a finding its base content did not have, so existing debt needs no list.
     timeout-minutes: 15
+    env:
+      # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
+      # PR's merge ref HEAD^1 is the base tip, and a push compares with the tip it replaced.
+      RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD^1' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # A push of several commits leaves the tip it replaced outside the depth-2 checkout.
+      - name: Fetch the ratchet base
+        if: github.event_name == 'push'
+        run: git cat-file -e "$RATCHET_BASE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$RATCHET_BASE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -166,36 +216,6 @@ jobs:
 
       - name: Lint markdown (markdownlint)
         run: npm run lint:md
-
-  lint-debt:
-    # The ratchet half of the glob gate (issue #1660). `npm run lint` passes on the baselined
-    # files by construction — their failing rules are switched off per file in `eslint-debt.txt` —
-    # so this runs the same config with the baseline LIFTED and fails on an entry that reports
-    # nothing any more. Without it the baseline never shrinks, and "only shrinks" is a property
-    # nothing enforces. It is not hypothetical: the `tests/**` list shipped its first stale entry
-    # within an hour of being generated.
-    #
-    # Its own job rather than a step of `lint`, because it is a second full ESLint pass (~272s
-    # locally) and running the two in sequence would put both inside one budget. Not a unit test
-    # either: `npm test` shares its runner with browser-backed suites that starve beside a
-    # CPU-bound job. The cheap half of the ratchet is `tests/lint-coverage.test.js`.
-    if: github.event_name != 'pull_request' || github.event.action != 'edited'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Check the lint debt baseline is not stale
-        run: npm run lint:debt
 
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
@@ -261,8 +281,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # 110, raised from 75 (issue 1594; 75 was itself raised from 5 under issue 1133). This job
-    # AWAITS the `capture` job in `pr-screenshots.yml` for the same head SHA before deciding, and
-    # that job's own ceiling is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
+    # AWAITS the `pr-screenshots.yml` run for the same head SHA before deciding, and that run's
+    # summed stage ceiling (select, then warm-foundry, then the longer of render and verify-chrome,
+    # then capture) is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
     # construction — the bounds inequality in `tests/ci-workflow-semantics.test.js` pins that
     # ordering against this number — so a wait that runs long reports `capture-did-not-conclude`
     # with a diagnosis rather than being killed here with none. Every one of those numbers moves

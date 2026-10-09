@@ -5,22 +5,15 @@
  * counted. The seams replaced are the recorder `_runCraftingCheck` passes through, the Tool states
  * `craftingWorld` resolves, and `MacroExecutor.run` in the macro test.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
-import { installCountDice } from './helpers/countEngineDice.js';
-import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
-import { createLangBackedI18n } from './helpers/langBackedI18n.js';
-import {
-  GatheringDocumentActor,
-  gatheringFixture,
-  runRealGatheringAttempt,
-} from './helpers/real-gathering-attempt.js';
-import { repoRoot } from './helpers/sourceScan.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
-import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import {
+  resolveActiveCraftingCheckFormula,
+  resolveActiveGatheringCheckFormula,
+  resolveActiveSalvageCheckFormula,
+} from '../src/systems/checkModifierResolver.js';
 import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
@@ -28,18 +21,27 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
-import {
-  resolveActiveCraftingCheckFormula,
-  resolveActiveGatheringCheckFormula,
-  resolveActiveSalvageCheckFormula,
-} from '../src/systems/checkModifierResolver.js';
+import { refusalMessage } from '../src/systems/checkTarget.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
-import { refusalMessage } from '../src/systems/checkTarget.js';
 import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
 import { evaluateSystemValidation } from '../src/systems/systemValidation.js';
 import { evaluateCheckBreakage } from '../src/toolBreakageRuntime.js';
+import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
+import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
+import { createLangBackedI18n } from './helpers/langBackedI18n.js';
+import {
+  GatheringDocumentActor,
+  gatheringFixture,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
+import { repoRoot } from './helpers/sourceScan.js';
 
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
@@ -472,7 +474,7 @@ test('bulk salvage: a refused count row is misconfigured, rolls nothing and cons
   assert.deepEqual(control.formulas, ['2d10']);
 });
 
-test('bulk salvage offers no advantage over a count check whose retained formula is a d20', async () => {
+test('bulk salvage offers the count rule over a count check whose retained formula is a d20', async () => {
   const prompts = [];
   salvageWorld('simple', simpleCheck(countEvaluation(), { rollFormula: '1d20' }));
   const system = globalThis.game.fabricate.getCraftingSystemManager().getSystem('sys-salvage');
@@ -488,7 +490,8 @@ test('bulk salvage offers no advantage over a count check whose retained formula
     [{ system, component: {}, item: { actorName: 'Salvager', name: 'Ore' } }],
     true
   );
-  assert.equal(prompts[0].allowAdvantage, false);
+  assert.equal(prompts[0].allowAdvantage, true);
+  assert.deepEqual(prompts[0].advantageOffer, { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } });
 });
 
 // ── gathering ─────────────────────────────────────────────────────────────────
@@ -558,6 +561,33 @@ test('gathering legacy progressive executes count: a refusal before any roll, el
   assert.equal(control.actor.items.length, 1, 'a budget of one awards the difficulty-1 herb');
 });
 
+test('every progressive site forwards the slot comparison to the count runner (issue 2067)', async () => {
+  const exceed = (evaluation) => ({ ...progressiveCheck(evaluation), thresholdMode: 'exceed' });
+  const craft = async (config) => {
+    const world = craftingWorld({ resolutionMode: 'progressive', slot: 'progressive', config });
+    const checks = recordChecks(world.engine);
+    await withDice([1, 8, 8, 9], () => world.craft());
+    return checks[0].value;
+  };
+  assert.deepEqual([await craft(progressiveCheck(countEvaluation())), await craft(exceed(countEvaluation()))], [3, 1]);
+
+  const engine = Object.create(CraftingEngine.prototype);
+  const salvage = (config) =>
+    withDice([1, 8, 8, 9], () =>
+      engine._runSalvageProgressiveCheck(config, { name: 'Scrap', salvage: {} }, { system: {} }, {
+        toolItems: SALVAGE_TOOL_ITEMS,
+      })
+    );
+  assert.deepEqual(
+    [(await salvage(progressiveCheck(countEvaluation()))).value, (await salvage(exceed(countEvaluation()))).value],
+    [3, 1]
+  );
+
+  const gather = async (config) =>
+    (await gatheringAttempt('progressive', config, { faces: [8, 3] })).actor.items.length;
+  assert.deepEqual([await gather(progressiveCheck(countEvaluation())), await gather(exceed(countEvaluation()))], [1, 0]);
+});
+
 test('gathering legacy progressive: a pool above 999 dice refuses at settlement, never a failed attempt', async () => {
   const refused = await gatheringAttempt('progressive', progressiveCheck(countEvaluation({ base: '1000' })));
   assert.equal(refused.response.accepted, false);
@@ -609,6 +639,7 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
   const { dc, target, targetSource, count } = described.privateEvaluation.decisionPolicy;
   assert.deepEqual([dc, target, targetSource], [null, null, null], 'no DC or target for count');
   assert.deepEqual(count, {
+    thresholdSource: 'fixed',
     die: 10,
     direction: 'under',
     base: 4,
@@ -620,7 +651,11 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
     zeroPoolFails: false,
     modifierDestination: 'threshold',
   });
-  assert.equal(described.publicPrompt.allowAdvantage, false, 'the retained 1d20 offers none');
+  assert.deepEqual(
+    described.publicPrompt.advantageOffer,
+    { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } },
+    'the count rule offers, never the retained 1d20'
+  );
   assert.equal(described.publicPrompt.allowsSituationalModifier, true);
   assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check', 'no DC suffix');
   assert.equal(JSON.stringify(described.publicPrompt).includes('skills'), false);
@@ -639,6 +674,19 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
       modifierDestination: 'threshold',
     },
     'the prompt shows the resolved pool line and the override required count'
+  );
+  const { thresholdAnchor, thresholdSource, explode: explodes, cancel: cancels, zeroPoolFails } =
+    described.publicPrompt;
+  assert.deepEqual(
+    { thresholdAnchor, thresholdSource, explodes, cancels, zeroPoolFails },
+    {
+      thresholdAnchor: 8,
+      thresholdSource: 'fixed',
+      explodes: { kind: 'from', face: 9, once: true },
+      cancels: { kind: 'worst', face: 10 },
+      zeroPoolFails: false,
+    },
+    'the prompt names the faces the pool acts on and where its threshold came from (issue 2006)'
   );
 });
 
@@ -925,7 +973,7 @@ test('QE5: salvage simple and gathering routed place the same benefits the same 
 // ── grading, routing, progressive and evidence ───────────────────────────────
 
 const ACTOR = { getRollData: () => ({}) };
-const normalized = (pool, direction) => normalizeCheckEvaluation(countEvaluation({ direction, ...pool }));
+const normalized = (pool = {}, direction = 'over') => normalizeCheckEvaluation(countEvaluation({ direction, ...pool }));
 const cancelWorst = { cancel: { enabled: true, faces: { kind: 'worst', value: null } } };
 
 test('a count/over exceed check passes when its net equals the required count: grading is met', async () => {
@@ -1047,21 +1095,25 @@ test('the interactive count prompt reads the pre-modifier pool and each runner\'
     await runFormulaProgressive({ ...shared, dc: 7 });
     assert.deepEqual(dice.formulas(), ['3d10', '3d10', '3d10'], 'the bonus moved the threshold, not the pool');
   });
-  const fields = ({ product, direction, comparison, pool, threshold, die, required, modifierDestination }) => ({
-    product, direction, comparison, pool, threshold, die, required, modifierDestination,
+  const fields = ({
+    product, direction, comparison, pool, threshold, thresholdAnchor, thresholdSource, die, required,
+    modifierDestination,
+  }) => ({
+    product, direction, comparison, pool, threshold, thresholdAnchor, thresholdSource, die, required,
+    modifierDestination,
   });
   const expected = {
-    product: 'count', direction: 'under', comparison: 'exceed', pool: 3, threshold: 5, die: 10,
-    modifierDestination: 'threshold',
+    product: 'count', direction: 'under', comparison: 'exceed', pool: 3.6, threshold: 5, thresholdAnchor: 5,
+    thresholdSource: 'fixed', die: 10, modifierDestination: 'threshold',
   };
   assert.deepEqual(prompted.map(fields), [
     { ...expected, required: 2 },
     { ...expected, required: 4 },
-    // The progressive runner takes no threshold mode, so it compares as it rolls: met.
-    { ...expected, comparison: 'meet', required: null },
-  ], 'the pool 3.6 shows rounded down, and a progressive check needs no count');
+    // The progressive runner honours the per-die test too (issue 2067).
+    { ...expected, required: null },
+  ], 'the pool 3.6 is handed unfloored for the prompt to floor after its benefits, and a progressive check needs no count');
   for (const input of prompted) {
-    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', true]);
   }
 });
 
@@ -1092,6 +1144,56 @@ test('a fixed-range routed count prompt names no required count, since ranges gr
   };
   assert.deepEqual([describe('fixed').required, describe('relative').required], [null, 2]);
   assert.equal(describe('fixed').pool, 2, 'the pool line still shows');
+});
+
+test('a count roll posts its successes needed in the flavor, never a DC, and none for ranges (N37)', async () => {
+  const evaluation = normalized({ base: '2', threshold: '5' }, 'under');
+  const options = buildInteractiveRollOptions(
+    { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc: 3, evaluation },
+    async () => ({ confirmed: true })
+  );
+  const shared = { formula: '1d20', actor: ACTOR, evaluation };
+  const routing = { relativeOutcomes: LADDER, fixedOutcomes: RANGES, clampToNearest: true };
+  const dice = installCountDice({ faces: [1, 2, 1, 2, 1, 2, 1, 2, 1, 2] });
+  let posted;
+  try {
+    await runFormulaPassFail({ ...shared, dc: 3, rollOptions: options });
+    await runFormulaPassFail({ ...shared, dc: 1, rollOptions: options });
+    await runFormulaRouted({ ...shared, dc: 2, type: 'relative', ...routing, rollOptions: options });
+    await runFormulaRouted({ ...shared, dc: 2, type: 'fixed', ...routing, rollOptions: options });
+    await runFormulaProgressive({ ...shared, rollOptions: options });
+    posted = dice.posts.map((post) => post.messageData.flavor);
+  } finally {
+    dice.restore();
+  }
+  assert.equal(options.flavor, 'Rope — Crafting check', 'the options flavor names no DC');
+  assert.deepEqual(posted, [
+    'Rope — Crafting check (3 successes needed)',
+    'Rope — Crafting check (1 success needed)',
+    'Rope — Crafting check (2 successes needed)',
+    'Rope — Crafting check',
+    'Rope — Crafting check',
+  ]);
+});
+
+test('a prepared count names its successes needed in its posted and handed-back flavor, never when secret', async () => {
+  const flavors = async (options = {}, prepared = preparedCount()) => {
+    const dice = installCountDice({ faces: [9, 3] });
+    try {
+      const result = await evaluatePreparedRunCheck(prepared, LIVE_ACTOR, {}, options);
+      // An entitled roll is handed back for the player to post; a secret one posts in the GM realm.
+      return [dice.posts[0]?.messageData.flavor ?? null, result.rollHandoff?.flavor ?? null];
+    } finally {
+      dice.restore();
+    }
+  };
+  const named = 'Sun Tea — Crafting check (1 success needed)';
+  assert.deepEqual(await flavors(), [null, named]);
+  assert.deepEqual(await flavors({ secret: true }), ['Sun Tea — Crafting check', null]);
+  const fixed = preparedCountCheck({ count: { required: 3 } });
+  Object.assign(fixed, { mode: 'routedByCheck', slot: 'routed' });
+  Object.assign(fixed.decisionPolicy, { type: 'fixed', fixedOutcomes: RANGES });
+  assert.deepEqual(await flavors(undefined, fixed), [null, 'Sun Tea — Crafting check']);
 });
 
 test('a zero pool fails in every mode with no Roll and no triggers, even needing nothing', async () => {
@@ -1177,6 +1279,16 @@ test('a zero pool keeps the evidence of a modifier it already rolled', async () 
   ]);
 });
 
+test('a count progressive check qualifies each die by its comparison, as simple and routed do (issue 2067)', async () => {
+  const evaluation = normalized({ base: '3', threshold: '8' });
+  const progressive = (thresholdMode) =>
+    withDice([8, 8, 9], () =>
+      runFormulaProgressive({ formula: '', triggers: [], actor: ACTOR, evaluation, thresholdMode })
+    );
+  assert.equal((await progressive(undefined)).value, 3, 'meet by default: 8, 8 and 9 qualify');
+  assert.equal((await progressive('exceed')).value, 1, 'exceed: only the 9 beats 8');
+});
+
 test('progressive spends max(0, net): progressiveValue reads the budget, rollTotal the raw botch', async () => {
   const progressive = (triggers) =>
     withDice([1, 3], () =>
@@ -1218,7 +1330,7 @@ test('progressive spends max(0, net): progressiveValue reads the budget, rollTot
 // ── prepared and secret checks ────────────────────────────────────────────────
 
 /** A prepared count check authoring a live base path, whose capture resolved a base of 2. */
-const preparedCount = (options) =>
+const preparedCount = (options = {}) =>
   preparedCountCheck({ evaluation: countEvaluation({ base: '@skills.craft.value' }), ...options });
 
 const LIVE_ACTOR = { getRollData: () => ({ skills: { craft: { value: 5 } } }) };

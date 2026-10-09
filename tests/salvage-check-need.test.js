@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { salvageCheckNeed, salvageDisplayDc } from '../src/ui/presenters/salvageCheckNeed.js';
+
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import {
+  salvageCheckNeed,
+  salvageCheckTarget,
+  salvageDisplayDc,
+  withSalvageBands,
+} from '../src/ui/presenters/salvageCheckNeed.js';
+import { fill } from '../src/utils/fillPlaceholders.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 
 test('display DC shares override and fallback arithmetic with the listing', () => {
   assert.equal(salvageDisplayDc({ mode: 'simple', config: { dc: 16 }, component: { salvage: { dcOverride: 21.8 } } }), 21);
@@ -69,4 +80,59 @@ test('a summed roll-under row names its fixed target, and a character value has 
     salvageCheckNeed({ mode: 'progressive', config: { evaluation: { direction: 'under' } }, checkUsable: true }),
     { kind: 'noSingleTarget' }
   );
+});
+
+test('a routed FIXED tier bands its authored [start, end] through the shared netRange formatter (issue 2152)', () => {
+  const rows = [
+    { id: 'o1', name: 'Fail', success: false, threshold: null, start: -2, end: -1, results: [] },
+    { id: 'o2', name: 'Pass', success: true, threshold: null, start: 10, end: 20, results: [] },
+    { id: 'o3', name: 'Even', success: true, threshold: null, start: 5, end: 5, results: [] },
+    { id: 'o4', name: 'Open', success: true, threshold: null, start: null, end: null, results: [] },
+  ];
+  const config = { type: 'fixed' };
+  const banded = withSalvageBands(rows, { config, component: null, localize: () => '' });
+  assert.deepEqual(
+    banded.map((row) => row.band),
+    ['−2 – −1', '10–20', '5', null],
+    'a negative-ended range spaces its dash from the true minus; a positive one stays tight; ' +
+      'a single-value range collapses; a row missing a bound bands nothing'
+  );
+  // A non-counting (summed) fixed check reaches the same branch and is banded identically:
+  // fixed routing never reads a DC either way, so there is nothing to discriminate on.
+  assert.equal(
+    withSalvageBands(
+      [{ id: 'o1', success: true, threshold: null, start: -2, end: -1, results: [] }],
+      { config: { type: 'fixed', evaluation: { product: 'sum', direction: 'over' } }, component: null, localize: () => '' }
+    )[0].band,
+    '−2 – −1'
+  );
+});
+
+test('a count check names its successes needed and the salvager\'s per-die test (issue 2006)', () => {
+  const localize = (key, data) => fill(shippedLocalize(key), data ?? {});
+  const actor = { getRollData: () => ({ skills: { craft: { value: 7 } } }) };
+  const target = (pool, { mode = 'simple', component = null, thresholdMode = 'meet' } = {}) =>
+    salvageCheckTarget({
+      mode,
+      config: { thresholdMode, evaluation: normalizeCheckEvaluation(countEvaluation(pool)) },
+      component,
+      actor,
+      localize,
+    });
+  const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
+  assert.deepEqual(target({ threshold: '@skills.craft.value', required: 2 }), {
+    rule,
+    direction: 'over',
+    text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7',
+  });
+  assert.equal(
+    target({ direction: 'under', die: 6 }, { component: { salvage: { successesOverride: 1 } }, thresholdMode: 'exceed' }).text,
+    'Salvage check · 1 success needed · d6s, success on < 8',
+    "the component's override, singular, and the per-die strictness"
+  );
+  assert.deepEqual(target({ threshold: '@skills.none.value' }), {
+    rule,
+    unresolved: 'Salvage check could not read a number for its target from this character.',
+  });
+  assert.equal(target({}, { mode: 'progressive' }), null, 'a budget has no count to reach');
 });

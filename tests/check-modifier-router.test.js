@@ -147,3 +147,41 @@ test('settlement rejects missing, repeated or non-finite results instead of losi
     { source: 'advantage', label: 'Synthetic', form: 'scalar', value: 1 },
   ] }), /count pool/i);
 });
+
+test('a negated advantage expression keeps its roll unsigned and subtracts it (issue 2007)', () => {
+  const bonus = { source: 'advantage', label: 'Disadvantage', form: 'expression', expression: '1d8 + 1', negate: true };
+  const over = planModifierPlacement({ evaluation: sum('over'), contributions: [bonus] });
+  assert.equal(over.appendTerms[0].negate, true);
+  const under = planModifierPlacement({ evaluation: sum('under'), contributions: [bonus] });
+  assert.deepEqual(under.preRolls, [{
+    index: 0, source: 'advantage', label: 'Disadvantage', expression: '1d8 + 1', destination: 'target', negate: true,
+  }]);
+  const settled = settlePlacement(under, [{ index: 0, total: 6 }]);
+  assert.deepEqual([settled.preRolls[0].total, settled.targetDelta], [6, -6]);
+  assert.throws(
+    () => planModifierPlacement({ evaluation: sum('under'), contributions: [{ ...bonus, negate: 'yes' }] }),
+    /boolean/i
+  );
+});
+
+test('bought dice land on the pool after advantage, whatever the destination, and never on a sum', () => {
+  const bought = { source: 'additionalDice', label: 'Momentum', form: 'scalar', value: 2 };
+  const advantage = { source: 'advantage', label: 'Advantage', form: 'scalar', value: 1 };
+  const situational = { source: 'situational', label: '', form: 'expression', expression: '1d4' };
+  const plan = planModifierPlacement({
+    evaluation: count('over', 'threshold'),
+    contributions: [bought, situational, advantage],
+  });
+  assert.deepEqual([plan.poolDelta, plan.thresholdDelta], [3, 0]);
+  assert.deepEqual(
+    plan.preRolls.map((entry) => entry.destination),
+    ['threshold'],
+    'only the situational expression follows the destination'
+  );
+  for (const evaluation of [sum('over'), sum('under')]) {
+    assert.throws(
+      () => planModifierPlacement({ evaluation, contributions: [bought] }),
+      /Bought dice belong only to a count pool/
+    );
+  }
+});

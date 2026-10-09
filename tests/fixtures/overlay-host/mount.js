@@ -5,9 +5,9 @@ import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
 import ActorSelectTopBar from '../../../src/ui/svelte/apps/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
-import ManagerColorPicker from '../../../src/ui/svelte/components/ManagerColorPicker.svelte';
 import RecipeDurationEditor from '../../../src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte';
 import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
+import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';
@@ -122,7 +122,7 @@ function actorBarStore() {
 
 /** The seven overlay subjects this fixture can mount, by `?component=` (issue 1470). */
 const COMPONENTS = {
-  icon: [IconPicker, { value: 'fas fa-fire', buttonTitle: 'Choose an icon' }],
+  icon: [IconPicker, { value: 'fas fa-fire', ariaLabel: 'Choose an icon' }],
   source: [
     EssenceSourceSelector,
     {
@@ -134,7 +134,7 @@ const COMPONENTS = {
       onChange: () => {},
     },
   ],
-  color: [ManagerColorPicker, { colorToken: 'sage', buttonTitle: 'Choose a colour' }],
+  color: [TintPickerButton, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
   // THE SIXTH COPY OF THE POSITIONING PASS (issue 1500), and the only one of the six that had no
   // row here.
   duration: [
@@ -154,7 +154,7 @@ const COMPONENTS = {
         { id: 'restore', label: 'Restore', icon: 'fas fa-rotate-left' },
         { id: 'exclude', label: 'Exclude from environment', icon: 'fas fa-ban', danger: true },
       ],
-      triggerLabel: 'More actions',
+      ariaLabel: 'More actions',
       onSelect: () => {},
     },
   ],
@@ -169,7 +169,7 @@ const COMPONENTS = {
       value: 'alpha',
       triggerClass: 'manager-travel-trigger',
       triggerLabel: 'Alpha',
-      onChoose: () => {},
+      onSelect: () => {},
     },
   ],
   // THE PRIMITIVE'S FIRST PLAYER-WINDOW ADOPTER (issue 1475), and the reason it is a whole product

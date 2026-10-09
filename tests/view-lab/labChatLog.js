@@ -65,15 +65,18 @@ function messageElement(doc, data, options) {
   return item;
 }
 
-/** Dock the log in `frame` and mirror every message `ChatMessage.create` makes into it. */
-export function installLabChatLog(frame, doc = globalThis.document) {
+/**
+ * Dock the log in `frame`, on its right or (`side: 'left'`) its left, and mirror every message
+ * `ChatMessage.create` makes into it.
+ */
+export function installLabChatLog(frame, doc = globalThis.document, { side = 'right' } = {}) {
   const log = doc.createElement('ol');
   log.className = 'chat-log';
   log.dataset.viewLabChatLog = '';
   Object.assign(log.style, {
     position: 'absolute',
     top: '48px',
-    right: '12px',
+    [side === 'left' ? 'left' : 'right']: '12px',
     width: '300px',
     maxHeight: 'calc(100% - 60px)',
     margin: '0',

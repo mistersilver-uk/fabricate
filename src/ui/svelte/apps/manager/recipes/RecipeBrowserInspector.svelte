@@ -18,7 +18,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -30,9 +30,11 @@
     buildRecipeRoutingModel,
     buildRecipeStepModel,
     groupProduceRowsByResultGroup,
+    recipeCheckFact,
   } from '../../../../model/recipeBrowserModel.js';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
+  import RecipeProduceRow from './RecipeProduceRow.svelte';
 
   let {
     selectedRecipe = null,
@@ -49,6 +51,10 @@
     // of the ids the recipe references. The inspector reads; it never authors.
     componentOptions = [],
     essenceOptions = [],
+    // The system's recipes ({id, name}) and the world's currency units, read only to name a
+    // knowledge or currency result (issue 1773).
+    recipeOptions = [],
+    currencyUnits = [],
     showRecipeCategories = false,
     showVisibilitySummary = false,
     onEdit = () => {},
@@ -75,23 +81,6 @@
   // The four questions a GM has about the recipe they just clicked: what it takes, what it makes,
   // how many steps, what they roll. `results` is the one stat with a DANGER state, because a recipe
   // producing nothing is a successful craft that makes nothing.
-  const CHECK_LABELS = {
-    dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
-    target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}'],
-    attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value'],
-    dynamicTarget: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
-    dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
-    progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
-    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
-  };
-
-  function checkValue(recipe) {
-    const summary = recipe?.checkSummary || { kind: 'none', dc: null };
-    const [labelKey, fallback] = CHECK_LABELS[summary.kind] || CHECK_LABELS.none;
-    return format(labelKey, fallback, { dc: summary.dc ?? '' });
-  }
-
   const stats = $derived(
     selectedRecipe
       ? [
@@ -117,7 +106,7 @@
           },
           {
             id: 'check',
-            value: checkValue(selectedRecipe),
+            value: recipeCheckFact(selectedRecipe.checkSummary, format),
             label: text('FABRICATE.Admin.Manager.Recipe.CraftingCheck', 'Crafting check'),
             // A system that cannot roll for this recipe is a WARNING, exactly as the row's
             // pill says. `ingredients` is not: it is a working, roll-free configuration.
@@ -135,8 +124,10 @@
       ? buildRecipeRequirementRows(selectedRecipe, { componentOptions, essenceOptions })
       : []
   );
+  // A reward row names its taught recipe and its unit's display name from these rosters.
+  const produceRosters = $derived({ componentOptions, recipeOptions, currencyUnits });
   const produceRows = $derived(
-    selectedRecipe ? buildRecipeProduceRows(selectedRecipe, { componentOptions }) : []
+    selectedRecipe ? buildRecipeProduceRows(selectedRecipe, produceRosters) : []
   );
   // Every produced row is listed, TONED BY ROLE. A `role: 'failure'` group is the reserved
   // alchemy-Simple group and exists ONLY there, so no failure row is invented for a routed mode.
@@ -252,7 +243,9 @@
   // Multi-step recipes paginate one step at a time: each step's own Requires / Produces,
   // stepped through with prev/next and an (x / y) position hint (issue 643).
   const stepModel = $derived(
-    selectedRecipe ? buildRecipeStepModel(selectedRecipe, { componentOptions, essenceOptions }) : []
+    selectedRecipe
+      ? buildRecipeStepModel(selectedRecipe, { ...produceRosters, essenceOptions })
+      : []
   );
   const isMultiStep = $derived(stepModel.length > 1);
 
@@ -384,10 +377,6 @@
     if (row.kind === 'currency') return '';
     return `×${row.quantity}`;
   }
-
-  function produceName(row) {
-    return row.name || text(UNNAMED_COMPONENT, 'Unknown component');
-  }
 </script>
 
 {#if selectedRecipe}
@@ -399,7 +388,7 @@
     </p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={52} />
+      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={38} />
       <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!-- TWO chips on one line: what it is, and whether it is on. No "Unlocked" pill for a
@@ -529,7 +518,7 @@
           'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
           'Select ingredient set'
         )}
-        triggerData={{ 'data-recipe-route': 'ingredient-set' }}
+        triggerProps={{ 'data-recipe-route': 'ingredient-set' }}
         onChange={selectRoutingSet}
       />
     {/if}
@@ -591,39 +580,12 @@
     <!-- One produced row, TONED BY ROLE. `showGroupPill` is false wherever the group is already
          identified, so the pill is never doubled up. -->
     {#snippet produceRow(row, showGroupPill)}
-      <div
-        class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
-        data-recipe-produces={row.failure ? 'failure' : 'success'}
-      >
-        <span class="manager-recipe-flow-icon" aria-hidden="true">
-          {#if row.img}
-            <img src={row.img} alt="" />
-          {:else}
-            <i class="fas fa-cube"></i>
-          {/if}
-        </span>
-        <span class="manager-recipe-flow-name">{produceName(row)}</span>
-        {#if isProgressive}
-          <!-- Progressive: the component's DC (its ordered "cost"), not a redundant
-               single-group pill. -->
-          <span
-            class="manager-recipe-flow-group manager-recipe-flow-dc"
-            data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
-            >{progressiveDcLabel(row)}</span
-          >
-        {:else if showGroupPill && row.groupName && !routedPairing}
-          <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
-               tiers are authored, so the NAME is the recipe's; the tone is not. -->
-          <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}
-            >{row.groupName}</span
-          >
-        {/if}
-        {#if !isProgressive}
-          <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
-               would read as if all results are produced together — omitted. -->
-          <span class="manager-recipe-flow-qty">×{row.quantity}</span>
-        {/if}
-      </div>
+      <RecipeProduceRow
+        {row}
+        unknownName={text(UNNAMED_COMPONENT, 'Unknown component')}
+        dcLabel={isProgressive ? progressiveDcLabel(row) : null}
+        groupPill={showGroupPill && !routedPairing ? row.groupName : ''}
+      />
     {/snippet}
     <div class="manager-recipe-flow-list">
       {#if isTwoOutcome && !isMultiStep}
@@ -696,23 +658,23 @@
          dark secondary above it, and Delete below in danger ink — NOT a text link, so a GM never
          fires it by reflex, but still a real action rather than a demoted afterthought. -->
     <div class="manager-recipe-browser-inspector-actions">
-      <ManagerButton
+      <Button
         class="manager-recipe-browser-inspector-duplicate"
         data-recipe-action="duplicate"
         onclick={() => onDuplicate()}
       >
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         class="manager-recipe-browser-inspector-edit"
         data-recipe-action="edit"
         onclick={() => onEdit()}
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         role="danger"
         class="manager-recipe-browser-inspector-delete"
         data-recipe-action="delete"
@@ -720,7 +682,7 @@
       >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else if recipeCount === 0}
@@ -760,7 +722,7 @@
         <li>
           {text(
             'FABRICATE.Admin.Manager.Recipe.EmptySetup.StepResults',
-            'Define result groups and enable the recipe when it is ready for players.'
+            'Define result sets and enable the recipe when it is ready for players.'
           )}
         </li>
       </ol>
@@ -797,7 +759,7 @@
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}
     >
       {#if componentCount <= 0}
-        <ManagerButton role="primary" onclick={() => onAddComponents()}>
+        <Button role="primary" onclick={() => onAddComponents()}>
           <i class="fas fa-boxes" aria-hidden="true"></i>
           <span
             >{text(
@@ -805,24 +767,24 @@
               'Add components'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       {/if}
-      <ManagerButton
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/crafting/recipes/"
         target="_blank"
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else}

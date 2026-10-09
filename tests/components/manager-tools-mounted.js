@@ -142,15 +142,15 @@ export function registerToolsCases() {
       ['in', 'all', 'over']
     );
     // THE BROWSE ARCHETYPE'S FILTER BAR (issue 1515). The search and the membership filter are
-    // the screen's two filters and render in one `ManagerToolbar` INSIDE the search card, which
+    // the screen's two filters and render in one `FilterBar` INSIDE the search card, which
     // is why the band above still reports as `search`: the card is unchanged and the bar nests
-    // in it. Identity rather than presence, because two `.manager-toolbar` elements on one
+    // in it. Identity rather than presence, because two `.fabricate-filter-bar` elements on one
     // screen - a bar per control - is the failure this reads for, and `querySelector` would
     // find the first either way.
-    const toolsBar = target.querySelector('[data-manager-tools-search] .manager-toolbar');
+    const toolsBar = target.querySelector('[data-manager-tools-search] .fabricate-filter-bar');
     assert.ok(Boolean(toolsBar), 'the Tools search band renders the shared filter bar');
     assert.equal(
-      target.querySelectorAll('[data-manager-tools-search] .manager-toolbar').length,
+      target.querySelectorAll('[data-manager-tools-search] .fabricate-filter-bar').length,
       1,
       'one bar, not one per control'
     );
@@ -177,7 +177,7 @@ export function registerToolsCases() {
     const enabledSwitch = target.querySelector('.manager-tools-enabled-toggle');
     assert.ok(Boolean(enabledSwitch), 'the row still writes its enable switch');
     assert.equal(enabledSwitch.tagName, 'BUTTON');
-    for (const token of ['fabricate-toggle', 'manager-status-toggle', 'is-on']) {
+    for (const token of ['fabricate-toggle', 'is-on']) {
       assert.ok(
         enabledSwitch.classList.contains(token),
         `the enable switch is the shared control and carries \`${token}\``
@@ -215,7 +215,7 @@ export function registerToolsCases() {
       'the bottom-pinned pager slot must survive the bar it no longer holds'
     );
     assert.ok(
-      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      !target.querySelector('[data-tool-browser-pagination] .fabricate-pagination'),
       'a one-page list must draw no foot pager at all'
     );
     // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default.
@@ -279,7 +279,7 @@ export function registerToolsCases() {
       8,
       'the page size the pager is judged against is not the one this list actually pages by'
     );
-    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    const bar = target.querySelector('[data-tool-browser-pagination] .fabricate-pagination');
     assert.ok(Boolean(bar), 'a two-page list must still draw its foot pager');
     assert.match(bar.querySelector('[data-pagination-summary]').textContent, /of 9/);
     assert.ok(
@@ -891,7 +891,7 @@ export function registerToolsCases() {
       'the widened list gets its layout slot back'
     );
     assert.ok(
-      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      !target.querySelector('[data-tool-browser-pagination] .fabricate-pagination'),
       'a single page still draws no bar inside that slot'
     );
   });
@@ -919,7 +919,7 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    const bar = target.querySelector('[data-tool-browser-pagination] .fabricate-pagination');
     assert.ok(
       Boolean(bar),
       'twelve world Tools over eight rows a page is two pages, so the bar must RENDER — ' +
@@ -1177,10 +1177,13 @@ export function registerToolsCases() {
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
       /Adds @prof/
     );
-    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE.
+    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE. Each is a rail
+    // section named by its heading (issue 1782).
     assert.deepEqual(
-      Array.from(inspector.querySelectorAll('.manager-tool-inspector-section-kicker')).map((node) =>
-        node.textContent.trim()
+      Array.from(inspector.querySelectorAll('.fab-rail[role="group"]')).map((section) =>
+        document
+          .querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)
+          ?.textContent.trim()
       ),
       ['Effective rules here', 'Inheritance'],
       'one heading names the resolved rules, a second names where each of them came from'
@@ -1584,6 +1587,35 @@ export function registerToolsCases() {
     await Promise.resolve();
     await tick();
     flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+  });
+
+  // The selected ids, typed: a click event reaching `selectSystem` is the defect issue 1777 fixed,
+  // and an object is never serialised into an assertion message (a DOM event OOMs the diff).
+  const selectedSystemIds = (calls) =>
+    calls.filter((call) => call[0] === 'selectSystem').map((call) => String(call[1]));
+
+  it('routes the Tool editor’s root crumb with the system id, not the click', async () => {
+    const calls = await mountToolRoute();
+    await openFixtureToolEditor(calls);
+    const before = selectedSystemIds(calls).length;
+    target.querySelector('[data-tool-editor-open-systems]').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(selectedSystemIds(calls).slice(before), ['alchemy']);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+  });
+
+  it('routes the Tool library’s system crumb to that system’s editor', async () => {
+    const calls = await mountToolRoute();
+    const before = selectedSystemIds(calls).length;
+    const trail = ':scope .manager-tools-context-header .manager-breadcrumbs';
+    target.querySelector(`${trail} button:nth-of-type(2)`).click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(selectedSystemIds(calls).slice(before), ['alchemy']);
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
   });
 }

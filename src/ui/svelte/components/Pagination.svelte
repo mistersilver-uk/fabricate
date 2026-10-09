@@ -1,6 +1,6 @@
 <!--
   THE browse-screen pager: a range summary, a prev/page/next nav, and a per-page `<Select>`.
-  Area-agnostic — six player-app components render it as well as the manager's browse screens.
+  Area-agnostic — the player app's lists render it as well as the manager's browse screens.
 
   Props:
   | prop | values | default | contract |
@@ -10,10 +10,11 @@
   | `persistent` | boolean | `false` | Render the bar ALWAYS, with disabled arrows rather than no nav, for a browse surface whose footer is part of its frame: a footer that appears past a threshold reads as a layout glitch. |
   | `showPageSize` | boolean | `true` | Opt-OUT. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
   | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the per-page selector with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. |
-  | `label` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits. |
+  | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row; the full page sentence stays in the accessibility tree. |
 
   Invariants:
-  - THE ROOT `<section>` CARRIES `fabricate-pagination` AHEAD OF `manager-pagination`, written inline
+  - THE ROOT `<section>` CARRIES `fabricate-pagination`, written inline
     because this component composes nothing. THE `<nav>` IS NOT THE ROOT: the descendant rules
     resolve through the `<section>`, so a root there would leave the summary and per-page label
     unpainted. The family declares its own focus pair for the BUTTONS it contains, buttons only,
@@ -26,7 +27,7 @@
     requires; callers pass a RESOLVED string, not a key.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import IconButton from './IconButton.svelte';
   import Select from './Select.svelte';
 
@@ -40,11 +41,12 @@
     persistent = false,
     showPageSize = true,
     multiPageOnly = false,
-    label = '',
+    ariaLabel = '',
     navLabel = '',
-    // Compact browse rails keep one row; the full page sentence remains accessible.
-    compact = false,
+    density = 'default',
   } = $props();
+
+  const compact = $derived(density === 'compact');
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
   const firstShown = $derived(totalCount === 0 ? 0 : pageIndex * pageSize + 1);
@@ -56,11 +58,6 @@
     persistent || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
   );
   const showNav = $derived(persistent || totalPages > 1);
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   function goToPage(index) {
     const next = Math.max(0, Math.min(totalPages - 1, index));
@@ -82,26 +79,27 @@
 
 {#if showPagination}
   <section
-    class="fabricate-pagination manager-pagination"
+    class="fabricate-pagination"
     class:is-compact={compact}
     data-pagination-compact={compact || undefined}
-    aria-label={label || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
-      {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
-        .replace('{first}', firstShown)
-        .replace('{last}', lastShown)
-        .replace('{total}', totalCount)}
+      {localizeOr('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}', {
+        first: firstShown,
+        last: lastShown,
+        total: totalCount,
+      })}
     </span>
     {#if showNav}
       <nav
         class="manager-pagination-nav"
         aria-label={navLabel ||
-          text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
+          localizeOr('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
       >
         <IconButton
           data-pagination-prev=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
           disabled={pageIndex === 0}
           onclick={() => goToPage(pageIndex - 1)}
         >
@@ -112,13 +110,14 @@
           class:manager-pagination-hidden={compact}
           data-pagination-page
         >
-          {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
-            .replace('{page}', pageIndex + 1)
-            .replace('{total}', totalPages)}
+          {localizeOr('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}', {
+            page: pageIndex + 1,
+            total: totalPages,
+          })}
         </span>
         <IconButton
           data-pagination-next=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
           disabled={pageIndex >= totalPages - 1}
           onclick={() => goToPage(pageIndex + 1)}
         >
@@ -129,7 +128,7 @@
     {#if showPageSize}
       <span class="manager-pagination-size">
         <span id={captionId} class:manager-pagination-hidden={compact}
-          >{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
+          >{localizeOr('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
         >
         <Select
           size="inline"
@@ -137,7 +136,7 @@
           value={pageSize}
           options={sizeOptions}
           ariaLabelledBy={captionId}
-          triggerData={{ 'data-pagination-size': '' }}
+          triggerProps={{ 'data-pagination-size': '' }}
           onChange={changePageSize}
         />
       </span>

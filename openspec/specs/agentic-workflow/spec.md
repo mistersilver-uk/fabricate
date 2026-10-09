@@ -478,6 +478,53 @@ A missing local dependency MUST fail setup normally with an actionable diagnosti
 - **AND** the test process reports a normal failure with zero cancelled tests rather than hanging
 - **AND** local development and CI exercise the same helper through the existing `npm test` path
 
+### Requirement: Quality ratchets compute their baseline
+
+A test that bounds a population of offenders MUST compute its baseline at test time from the base commit, and MUST NOT read a checked-in ledger, baseline or pinned total.
+The base commit MUST be `RATCHET_BASE` when that variable is set, and otherwise the merge base of `HEAD` with `origin/main`.
+A ratchet MUST fail only on an offender that appeared or got worse against that base, MUST pass and report a shrink, and MUST offer no update, tighten or slack mode.
+A regression MUST pass only when its site carries a `ratchet-exempt(<family>): <reason>` marker in the file's own comment form, and a marker with an empty reason MUST fail.
+A marker at one site of many MUST excuse only an offender that is new against the base, so marking an offender the base already had makes no room for another.
+
+#### Scenario: a change adds an offender
+
+- **WHEN** a change adds an offender, or makes an existing one worse, against the base commit
+- **THEN** the ratchet fails, naming the offender with its base value and its head value, or naming it as new
+- **AND** the failure says how to fix it or record a `ratchet-exempt` reason, and that a stale `origin/main` is refreshed with `git fetch origin main`
+
+#### Scenario: a change removes an offender
+
+- **WHEN** a change shrinks or removes an offender
+- **THEN** the ratchet passes and reports the shrink as a diagnostic
+- **AND** no file needs editing to record it
+
+#### Scenario: the requested base does not resolve
+
+- **WHEN** `RATCHET_BASE` is set to a ref that names no commit
+- **THEN** the ratchet fails rather than passing unchecked
+
+#### Scenario: CI has no base
+
+- **WHEN** a ratchet runs with `CI` or `GITHUB_ACTIONS` set, `RATCHET_BASE` unset, and no merge base with `origin/main`, or a merge base that is `HEAD` itself
+- **THEN** the ratchet fails, naming `RATCHET_BASE` as the fix
+
+#### Scenario: a run opts out
+
+- **WHEN** `RATCHET_BASE` is `none`, as on the beta and release jobs that test a tree CI already compared
+- **THEN** every ratchet skips and says it was opted out
+
+#### Scenario: a local run has no origin/main
+
+- **WHEN** a ratchet runs outside CI with `RATCHET_BASE` unset and `origin/main` unresolvable or sharing no merge base with `HEAD`
+- **THEN** the ratchet skips with a diagnostic that names the fix, `git fetch origin main` or setting `RATCHET_BASE`
+
+#### Scenario: a regression carries a marker
+
+- **WHEN** an appeared or worsened offender's site carries a `ratchet-exempt(<family>): <reason>` marker for that ratchet's family
+- **THEN** the ratchet passes and reports the exemption with its reason
+- **AND** a marker for that family with an empty reason fails the ratchet
+- **AND** a marker placed on an offender the base already had excuses nothing, so a new unmarked offender beside it still fails
+
 ### Requirement: Product contracts stay in specs
 
 Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.
@@ -654,6 +701,14 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **AND** the reason this is gated is that an unclaimed path does not produce NO evidence — selection falls back — it produces UNRELATED evidence, a frame of a different window offered as proof of a change it does not contain
 - **AND** a path deliberately left unclaimed carries a recorded reason, and that record is itself gated so it cannot outlive the thing it exempts
 
+#### Scenario: a case names a file that is not a render file
+
+- **WHEN** a PR changes a file that is neither a render file nor one of the producer's own inputs, such as an engine module, and a case's own selection patterns name it
+- **THEN** that case is selected, unioned with whatever the PR's render files and producer inputs select
+- **AND** such a file selects nothing beyond the cases naming it: no representative set, no surface coverage and no fallback frame, so a file no case names selects nothing
+- **AND** it never arms the evidence gate, which still arms on render files alone, yet the producer still renders and publishes the cases it selects, so a PR whose only changes are such files carries their frames as evidence without being required to
+- **AND** every selection pattern, and each alternative within one, names a tracked file, so a rename cannot silently stop a case being selected
+
 #### Scenario: the producer's own inputs change
 
 - **WHEN** a PR changes any input the producer itself renders from — the fixture world, the mounting page, the case registry, the capture driver, or the window-chrome specification — rather than a file the product renders
@@ -792,22 +847,26 @@ Skills SHOULD include provider-specific metadata under the skill directory when 
 
 ### Requirement: Two-class performance measurement baselines
 
-Committed performance baselines MUST contain only machine-invariant values, and machine-dependent measurements MUST NOT be committed or asserted.
+Class-1 performance measurements MUST contain only machine-invariant values, and MUST be measured at the base commit at test time rather than committed; machine-dependent measurements MUST NOT be committed or asserted.
 Comparison between two runs MUST be refused when the runs came from environments that cannot be meaningfully compared.
 
 #### Scenario: recording a performance measurement
 
 - **WHEN** the deterministic benchmark harness measures a profile
-- **THEN** it writes operation counts, model counts, serialized payload sizes, and fixture checksums to a committed class-1 baseline under `benchmarks/baselines/`
+- **THEN** it produces operation counts, model counts, serialized payload sizes, and fixture checksums as a class-1 payload that is never committed
 - **AND** it writes wall clock and heap to a gitignored class-2 run record carrying the commit, branch, dirty flag, Node and V8 versions, OS, architecture, CPU model and count, memory, containerization, fixture profile, fixture seed, and harness version
 - **AND** no committed artifact contains a wall-clock or heap value, and no test asserts one
 - **AND** fixture generation and case setup run outside every timed region
 
-#### Scenario: guarding a committed baseline against drift
+#### Scenario: guarding class-1 counts against a rise
 
-- **WHEN** a committed class-1 count or fixture checksum changes
-- **THEN** a drift test re-derives the counts from the fixtures and the code under measurement and fails, naming the case, the count, and both values
-- **AND** the failure instructs the author to re-record the baseline in the same pull request and state what moved and why
+- **WHEN** a change touches the measured code or the harness, and a class-1 count exceeds the same count measured at the base commit with an identical fixture
+- **THEN** the drift test fails, naming the case, the count, and both values
+- **AND** the base's counts are measured by the base commit's own harness over the base commit's own code, extracted into a gitignored directory, and may be cached there per commit
+- **AND** a fall passes and is reported, and an added case is reported
+- **AND** a profile whose fixture identity changed, and a removed profile or case, fails as a rise does, because its counts are no longer compared
+- **AND** when the dependency lockfile differs between base and head, the comparison still runs and each rise says the lockfile changed
+- **AND** a rise or such a failure passes only when the change adds a `ratchet-exempt(benchmark)` reason, naming the case or its profile, to a source file it touches
 
 #### Scenario: comparing two performance runs
 

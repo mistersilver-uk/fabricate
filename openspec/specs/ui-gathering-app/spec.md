@@ -80,7 +80,7 @@ Bidirectional shell↔tab actor/realm state flows through a single shared select
 
 - Show only environments whose owning crafting system has `features.gathering === true`.
 - Disabled environments surface to all viewers (players and GMs alike) as non-interactive **locked teasers** (identity-only, unselectable), never as selectable environments; their tasks, weights, and composition internals are redacted.
-- The Environments column provides a **player-side, client-persisted "hide unavailable" toggle** rendered as Fabricate's pill switch (a `<button>` with a track/knob and an On/Off state label, matching the GM apps' `manager-status-toggle`) on its own row beneath the search field, with a preceding descriptive label that is the switch's accessible name.
+- The Environments column provides a **player-side, client-persisted "hide unavailable" toggle** rendered as Fabricate's pill switch (a `<button>` with a track/knob and an On/Off state label, matching the GM apps' `fabricate-toggle`) on its own row beneath the search field, with a preceding descriptive label that is the switch's accessible name.
   When enabled it hides exactly the **locked** listings (engine `locked === true`): disabled environments and location-gated environments the party is not in (out-of-realm or scene-gated).
   It **does not** hide in-realm, selectable environments whose individual tasks are merely blocked (e.g. stamina- or tool-blocked) — those remain visible with their blocked reasons.
   The toggle defaults **off** (show all), changes only the viewing client's presentation (never saved data, the engine listing, or GM configuration), and persists **per client/device** via a client-scoped (`localStorage`) setting.
@@ -153,10 +153,24 @@ If the environment is `targeted`:
 If the environment is `blind`:
 
 - show one generic gather action or equivalent environment-level action for unrevealed hidden tasks
+- the generic gather action, "Attempt gathering", is the environment detail's identity-header primary; the task list draws no second one, and with a discovered task selected the task inspector carries that task's own Attempt, so each pane holds one primary
 - do not expose alternate unrevealed per-task choices to the player
 - if progressive reveal is enabled, revealed blind tasks may appear as named task rows for the relevant actor/user/party/global scope while unrevealed tasks remain hidden
 - still show task-derived time requirement, stamina cost, node availability, and requirement summaries where useful and safe to reveal
 - GM users may inspect full task, node, condition, risk, encounter, and diagnostic detail
+
+### Drop Preview
+
+A selected visible d100 task's inspector previews its drop rows under "What you might find".
+
+- The rows are one `YieldScale` in authored row order under every `rewardSelectionMode`, because the system's reward selection is by authored order: `allDrops` keeps every dropped row, `highestRankedDrop` and `limitedDrops` take the first by authored rank.
+  Each row's modifier-adjusted chance is its figure and never re-sorts it.
+- A drop row authored without a name takes its component's name.
+- The reward-selection hint and the event hint stay above the scale.
+  The reward-selection hint for `highestRankedDrop` and `limitedDrops` says the list is in priority order and the first successful find, or first N, on it is awarded.
+- The scale carries no control.
+  One labelled `RowDisclosure` beneath it opens one region holding every drop's modifier breakdown, each headed by its drop's name, in scale order.
+- Loading, a failed fetch and an empty drop table stay distinct: a loading line, an error notice, and no section.
 
 ### Start Gathering Flow
 
@@ -175,6 +189,9 @@ Before creating a run, the UI must check:
 When the game is paused, the app must keep environment browsing readable, show a paused-game blocker, disable start actions, and avoid implying that stamina, nodes, catalysts, rolls, chat, history, or item awards were consumed.
 
 Start actions must surface blocking reasons for missing stamina, depleted nodes, scene/token access, duplicate active runs, hidden tasks, missing catalysts/tools, attempt limits, provider diagnostics, and paused game.
+A blocked Attempt stays a disabled primary with its visible label, in the pane's identity header.
+Its reason is a visible warning notice directly under the header, "Can't attempt — {reason}", which the Attempt references by `aria-describedby`.
+A blind environment's header Attempt states only the generic reason, because its blockers may be derived from tasks the player cannot see.
 
 If `task.timeRequirement` is absent:
 

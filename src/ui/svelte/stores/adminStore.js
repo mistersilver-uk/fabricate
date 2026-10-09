@@ -15,7 +15,7 @@ import {
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
 // THE ONE HOME OF "IS THIS SYSTEM-SCOPE ESSENCE WRITE AN OVERRIDE" (issue 1371 r19-store2).
-// Shared with the standalone component editor app, which writes the same rows without this store.
+// Shared with componentEditorSave.js, which writes the same rows without this store.
 import { componentEssenceOverrideOn } from '../../../systems/componentEssenceOverride.js';
 import {
   buildExportPayload,
@@ -1322,15 +1322,15 @@ export function createAdminStore(services) {
     // rules editor's `Required for` rail. An empty map is what a world with no selection publishes.
     toolRequiredFor: {},
     recipes: [],
+    // The selected system's unfiltered `{ id, name, img }` roster, which no recipe search narrows.
+    recipeRoster: [],
     recipeCategories: [],
-    // The recipe half of the Tags & Categories reference count, folded by the row projection off the
-    // recipe MODELS (issue 1081). Published as data because its reader — the persistent left nav
-    // badge — is a sibling of every view, so deriving it walked the DETAIL tier on every render.
+    // The recipe half of the Tags & Categories reference count, folded off the recipe MODELS
+    // (issue 1081): data, because deriving it walked the DETAIL tier on every nav-badge render.
     recipeTagPlaceholderCounts: {},
     showVisibilitySummary: false,
     worldUsers: [],
-    // EVERY world actor (not the player-character roster), each carrying its control set; the recipe
-    // editor's context rail resolves granted character ids over it. See `src/ui/model/recipeAccessRoster.js`.
+    // EVERY world actor with its control set, which the recipe rail resolves granted ids over.
     accessCharacters: [],
     // The derived `evaluateSystemValidation` report for the selected system, consumed by the system
     // overview, its rail count badge and the blocker banner. Derived — nothing is persisted.
@@ -2673,6 +2673,7 @@ export function createAdminStore(services) {
       itemCards: [],
       essenceCards: prev.systems.length > 0 ? prev.essenceCards : [],
       recipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -2772,9 +2773,8 @@ export function createAdminStore(services) {
       if (resolvedSystemId !== currentSystemId) selectedSystemId.set(resolvedSystemId);
     }
 
-    // Item-card memo invalidation chokepoint: a system-id change drops every cached card.
-    // `features.salvage` and essence-catalog toggles are captured IN the per-item signature, so they
-    // miss without a clear; item-search changes deliberately do not invalidate.
+    // Item-card memo chokepoint: a system-id change drops every cached card. Salvage and essence
+    // toggles are IN the per-item signature, and an item search deliberately never invalidates.
     if (resolvedSystemId !== itemCardCacheSystemId) {
       itemCardCache.clear();
       itemCardCacheSystemId = resolvedSystemId;
@@ -2807,15 +2807,12 @@ export function createAdminStore(services) {
 
     const availableScriptMacros = services.getScriptMacros?.() || [];
     const sceneOptions = services.getSceneOptions?.() || [];
-    // Non-GM world users, for the per-recipe "restrict to specific users" editor.
-    // Sourced through the injected service so the store never touches `game.*`.
+    // Non-GM world users for the recipe's user restriction, via the service and never `game.*`.
     const worldUsers = services.getWorldUsers?.() || [];
-    // Every world actor with its control set (see getAccessCharacterActors): the
-    // rail resolves granted character ids over this, NOT the PC-filtered roster.
+    // Every world actor with its control set; the rail resolves granted ids over it, NOT the PCs.
     const accessCharacters = services.getAccessCharacterActors?.() || [];
 
-    // One read of the world corpus per publish (issue 1374), hoisted so the selected-system
-    // projection and the published `worldScope` key come from the same snapshot.
+    // One world-corpus read per publish (issue 1374), shared by the projection and `worldScope`.
     const worldScopeState = buildWorldScopeState();
 
     let selectedSystemData = null;
@@ -2824,6 +2821,7 @@ export function createAdminStore(services) {
     let recipeListData = {
       recipes: [],
       rosterRecipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -2920,6 +2918,7 @@ export function createAdminStore(services) {
       experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
+      recipeRoster: recipeListData.recipeRoster,
       recipeCategories: recipeListData.recipeCategories,
       recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
@@ -3008,6 +3007,7 @@ export function createAdminStore(services) {
       experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
+      recipeRoster: recipeListData.recipeRoster,
       recipeCategories: recipeListData.recipeCategories,
       recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
@@ -3208,12 +3208,10 @@ export function createAdminStore(services) {
           addOption(required, option);
         }
       }
-      for (const group of Array.isArray(holder?.resultGroups) ? holder.resultGroups : []) {
-        for (const result of Array.isArray(group?.results) ? group.results : []) {
-          addOption(produced, result);
-        }
-      }
-      for (const result of Array.isArray(holder?.results) ? holder.results : []) {
+      const groups = Array.isArray(holder?.resultGroups) ? holder.resultGroups : [];
+      const results = [...groups.map((group) => group?.results), holder?.results].flat();
+      // A choice group produces each of its alternatives (issue 1773).
+      for (const result of results.filter(Boolean).flatMap((r) => r.alternatives ?? [r])) {
         addOption(produced, result);
       }
     }
@@ -5119,16 +5117,14 @@ export function createAdminStore(services) {
   }
 
   function _validateGatheringLibraryTaskForSystem(task, systemId = get(selectedSystemId)) {
-    const errors = [];
     const resultErrors = [];
     if (!task || typeof task !== 'object') {
-      errors.push('Task is required');
-      return { valid: false, errors, resultErrors };
+      return { valid: false, errors: ['Task is required'], nameErrors: [], resultErrors };
     }
     const name = String(task.name || '').trim();
-    if (!name) {
-      errors.push('Task name is required');
-    }
+    // The editor files `nameErrors` under Overview; `errors` stays the union the Save reads.
+    const nameErrors = name ? [] : ['Task name is required'];
+    const errors = [...nameErrors];
     const label = `Task "${name || task.id || 'unnamed'}"`;
     const system = _selectedGatheringSystem(systemId);
     const mode = TASK_RESOLUTION_MODES.has(task.resolutionMode) ? task.resolutionMode : 'd100';
@@ -5194,7 +5190,7 @@ export function createAdminStore(services) {
       }
     }
     errors.push(...resultErrors);
-    return { valid: errors.length === 0, errors, resultErrors };
+    return { valid: errors.length === 0, errors, nameErrors, resultErrors };
   }
 
   function validateGatheringLibraryTask(task) {
@@ -5886,7 +5882,7 @@ export function createAdminStore(services) {
 
     if (strippedGroupCount > 0) {
       services.notify?.info?.(
-        `Removed deleted tier from ${strippedGroupCount} recipe result group(s).`
+        `Removed deleted tier from ${strippedGroupCount} recipe result set(s).`
       );
     }
   }

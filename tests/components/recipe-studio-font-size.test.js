@@ -21,50 +21,41 @@ const FIXTURE = `
         </div>
         <div class="manager-header-actions">
           <!-- Carries fab-manager-button because the shipped Back button does (issue 1118).
-               The number below does not move: .manager-header-actions .manager-button and the
+               The number below does not move: .manager-header-actions .fabricate-button and the
                primitive both state 0.72rem, which is exactly why the header rule's type scale
                survived while its 38px height was retired. What moves is which rule this
                fixture proves — the container's, or the one the product will match. The resting
-               BORDER moved too: .manager-header-actions .manager-button.is-ghost was retired
+               BORDER moved too: .manager-header-actions .fabricate-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
-          <button class="fabricate-button manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
+          <button class="fabricate-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
         </div>
         <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
             <span class="manager-chip is-neutral manager-editor-tab-badge" data-m="tab-badge">4</span>
           </button>
         </div>
-        <div class="manager-nav-button">
+        <div class="fabricate-nav"><div class="manager-nav-button">
           <span class="manager-nav-label" data-m="nav-label">Recipes</span>
           <span class="manager-nav-count" data-m="nav-count">105</span>
-        </div>
+        </div></div>
         <div class="manager-recipe-ingredient-set-add">
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed
                size. -->
-          <button class="fabricate-button manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
+          <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
-        <!-- The FLAT (non-progressive) ingredient/result row's component picker (issue
-             676). It now carries the name INSIDE the trigger and joins the SAME shared
-             rule as the salvage yield trigger and the progressive stage trigger, so it
-             is pinned to their number — 0.82rem — not to whatever it used to inherit.
-             It previously had no font-size of its own at all and bled to Foundry's 14px
-             app base; the flat-picker vs bleed-baseline assertions below prove it no
-             longer does. -->
-        <div class="manager-recipe-ingredient-option-row">
+        <!-- A flat result row names its component in the requirement row's pill (issue 1516),
+             as an ingredient row does, so its name reads at the pill's own size. -->
+        <div class="manager-recipe-ingredient-option-row is-component is-result">
           <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
-          <div class="manager-recipe-option-target">
-            <div class="manager-recipe-option-component">
-              <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                <button class="fabricate-button manager-button manager-recipe-component-trigger" data-m="flat-picker">
-                  <img class="manager-travel-portrait" alt="">
-                  <span class="manager-travel-picker-value manager-recipe-component-name" data-m="flat-picker-name">Venom Gland</span>
-                </button>
-              </span>
-            </div>
-          </div>
+          <span class="manager-recipe-option-name-field">
+            <span class="manager-recipe-option-chosen">
+              <img class="manager-recipe-option-chosen-img" alt="">
+              <span class="manager-recipe-option-chosen-name" data-m="flat-picker-name">Venom Gland</span>
+            </span>
+          </span>
         </div>
         <!-- The progressive stage row (issue 676). It is the SAME surface as the
              progressive SALVAGE stage row and shares its rules by joining their selector
@@ -74,26 +65,22 @@ const FIXTURE = `
         <div class="fabricate-sortable-list">
          <div class="fabricate-sortable-list-row manager-recipe-stage-row">
           <div class="fabricate-sortable-list-line">
-          <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+          <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
           <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
-          <div class="manager-recipe-ingredient-option-row">
-            <div class="manager-recipe-option-target">
-              <div class="manager-recipe-option-component">
-                <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                  <button class="fabricate-button manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
-                    <img class="manager-travel-portrait" alt="">
-                    <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
-                  </button>
-                </span>
-              </div>
-            </div>
+          <div class="manager-recipe-ingredient-option-row is-component is-result">
+            <span class="manager-recipe-option-name-field">
+              <span class="manager-recipe-option-chosen">
+                <img class="manager-recipe-option-chosen-img" alt="">
+                <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Mountain Herb</span>
+              </span>
+            </span>
             <div class="manager-recipe-option-controls">
               <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
               <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
             </div>
           </div>
           <span class="fabricate-sortable-list-rocker">
-            <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
+            <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
           </span>
           </div>
          </div>
@@ -143,7 +130,7 @@ const FIXTURE = `
         anything the recipes VIEW scopes applies as it does in the shipped tree.
       -->
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="recipes">
-        <section class="fabricate-filter-bar manager-toolbar manager-recipe-toolbar">
+        <section class="fabricate-filter-bar manager-recipe-toolbar">
           <!-- The multi-select row is the LAST row of this toolbar, immediately above the
                list. The host row class is a PROP of the shared toolbar primitive, so this
                studio names its own ("manager-recipe-filter-row") and its own data hook.
@@ -268,9 +255,9 @@ const FIXTURE = `
                  The marking and the re-chain landed in ONE commit, and had to: while the
                  scoped .fab-bulk-edit-apply rule was (0,2,0), the primitive's (0,3,0) control
                  would have handed this box 34px/0.72rem while the shipped control had not
-                 moved. That rule now names .manager-button.fab-manager-button and compiles to
+                 moved. That rule now names .fabricate-button.fab-manager-button and compiles to
                  (0,4,0), so the box is the same box it always was. -->
-            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
           </div>
         </section>
       </div>
@@ -323,7 +310,7 @@ const EXPECTED = {
   'nav-count': 10, // 0.625rem
   // 11px, NOT the 0.7rem (11.2px) this row committed before issue 1118 — a real change, and
   // the one number in this file that moved. It used to come from a CONTAINER rule,
-  // `.manager-recipe-ingredient-set-add .manager-button`, which existed because the dashed
+  // `.manager-recipe-ingredient-set-add .fabricate-button`, which existed because the dashed
   // adds "inherit the ambient ~1rem" and so each recipe container had to state a size for
   // them. That group is RETIRED: the `is-dashed` role states 11px itself now, on every screen
   // and for the `SearchablePopover` triggers among them, so the bleed it defended against
@@ -332,25 +319,22 @@ const EXPECTED = {
   // reconciliation exists to remove.
   'dashed-add': 11,
   muted: 10.24, // 0.64rem — recipe-view-scoped
-  // ── The FLAT component picker (issue 676). Same shared rule as the stage/salvage
-  // triggers below, so it reads at the same 0.82rem — a flat row and a stage row name a
-  // component identically. If these ever diverge from `stage-picker`, the sharing broke.
+  // ── The FLAT result row's name (issue 1516): the requirement row's pill, at the same size as
+  // a stage row's name below. If these ever diverge, the sharing broke.
   // The requirement row's PLATE (issue 1373, maintainer round 5). It was a 30px tinted tile
   // whose glyph read at 0.82rem; `proto:2247` and premium's `RewardRow` both draw a neutral
   // 28px tile at 12px carrying the kind's tinted glyph, so the tile shrank by a rung and its
   // mark with it. It no longer shares a number with the pickers below, and that is the change
   // rather than a drift: a plate is a MARK and a picker trigger is a control naming a thing.
   'option-lead': 12, // 0.75rem — the neutral plate's type-tinted glyph
-  'flat-picker': 13.12, // 0.82rem — shared .manager-recipe-component-trigger rule
-  'flat-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
+  'flat-picker-name': 11.52, // 0.72rem — the requirement row pill's name
   // ── The progressive stage row (issue 676). Every number below is the one the salvage
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing
   // broke, not that this row wants its own scale.
   'stage-grip': 14, // 14px — the shared ordered list's grip glyph, at the specimen's figure (issue 1512)
   'stage-ordinal': 10, // 10px mono — the list's ordinal badge, at the specimen's figure
-  'stage-picker': 13.12, // 0.82rem — the picker trigger, as salvage's measures
-  'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
+  'stage-picker-name': 11.52, // 0.72rem — the same pill on a stage row
   'stage-dc': 13, // 0.8125rem mono 700 — shared read-only DC
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc, as on salvage
   'stage-move': 9, // 9px — the list's rocker chevron glyph
@@ -386,8 +370,8 @@ const EXPECTED = {
   // the manager control-text scale the retired native `<select>` took from its own scoped block.
   // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
   // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
-  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
-  // only under `.fabricate-manager`.
+  // because the rung is: the family may not read `--fab-manager-recipe-control-font`, which is
+  // declared only under `.fabricate-manager`.
   'bulk-select': 12.5,
   // ── The two roles the recipe panel adds to that chrome. Both are shipped primitives the
   // Component Studio's panel does not render, so neither has a committed number there.
@@ -473,13 +457,12 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
       );
     }
 
-    // The flat and stage component pickers SHARE one rule (issue 676).
+    // The flat and stage result rows name their component through one pill (issue 1516).
     assert.equal(
-      measured['flat-picker'],
-      measured['stage-picker'],
-      'the flat and progressive component pickers share a rule, so they share a size'
+      measured['flat-picker-name'],
+      measured['stage-picker-name'],
+      'the flat and progressive result names share a rule, so they share a size'
     );
-    assert.notEqual(measured['flat-picker'], 14, 'the flat component picker must not bleed to the Foundry base');
 
     // The bulk panel's staged select and the segmented track beneath it are DELIBERATELY
     // UNEQUAL (issue 1504), which is the opposite polarity of the pair above and is written in

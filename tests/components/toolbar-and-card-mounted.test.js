@@ -15,8 +15,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const toolbarHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-manager-toolbar-',
-  compiledModules: ['src/ui/svelte/components/ManagerToolbar.svelte'],
-  componentPath: 'src/ui/svelte/components/ManagerToolbar.svelte',
+  compiledModules: ['src/ui/svelte/components/FilterBar.svelte'],
+  componentPath: 'src/ui/svelte/components/FilterBar.svelte',
 });
 
 const cardHarness = createMountedComponentHarness({
@@ -46,11 +46,10 @@ function composedClasses(file, label) {
 /** The two primitives, and the facts each clause below is stated over. */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
-    name: 'ManagerToolbar',
-    file: 'src/ui/svelte/components/ManagerToolbar.svelte',
+    name: 'FilterBar',
+    file: 'src/ui/svelte/components/FilterBar.svelte',
     harness: toolbarHarness,
     root: 'fabricate-filter-bar',
-    hook: 'manager-toolbar',
     // A bar is a `region` landmark only while it has an accessible name.
     baseProps: Object.freeze({ ariaLabel: 'Filter components' }),
     callerClass: 'manager-scoped-list-toolbar',
@@ -61,7 +60,6 @@ const PRIMITIVES = Object.freeze([
     file: 'src/ui/svelte/components/InspectorCard.svelte',
     harness: cardHarness,
     root: 'fabricate-card',
-    hook: 'manager-inspector-card',
     baseProps: Object.freeze({}),
     callerClass: 'manager-checks-card',
     dataHook: 'data-checks-odds',
@@ -101,7 +99,7 @@ const emittedClasses = (node) => {
 
 describe('the filter bar and the card shell emit their family root on the rendered element', () => {
   for (const primitive of PRIMITIVES) {
-    const { name, file, harness, root, hook, baseProps, callerClass, dataHook } = primitive;
+    const { name, file, harness, root, baseProps, callerClass, dataHook } = primitive;
 
     it(`${name} declares ${root} as the FIRST literal of its class array`, () => {
       // THE SOURCE HALF, asserted here rather than left to the area-scope gate.
@@ -114,14 +112,10 @@ describe('the filter bar and the card shell emit their family root on the render
           '`]`, so a root moved off the head of the array is reported as unemitted while every ' +
           're-rooted rule in the sheet keeps matching'
       );
-      assert.deepEqual(
-        tokens,
-        [root, hook],
-        `${name} emits exactly its family root and its hook class unconditionally`
-      );
+      assert.deepEqual(tokens, [root], `${name} emits exactly its family root unconditionally`);
     });
 
-    it(`${name} renders a <section> carrying exactly "${root} ${hook}" by default`, async () => {
+    it(`${name} renders a <section> carrying exactly "${root}" by default`, async () => {
       const target = await harness.mount({ ...baseProps });
       const node = target.querySelector('section');
       assert.ok(Boolean(node), `${name} rendered a <section>`);
@@ -130,13 +124,13 @@ describe('the filter bar and the card shell emit their family root on the render
       assert.equal(node.tagName, 'SECTION');
       // THE WHOLE ATTRIBUTE, by equality. `classList.contains(root)` cannot see a root that
       // arrived second, and the position is what the area-scope gate depends on.
-      assert.equal(emittedClasses(node), `${root} ${hook}`);
+      assert.equal(emittedClasses(node), root);
     });
 
     it(`${name} APPENDS the caller's class behind its own, never in front of it`, async () => {
       const target = await harness.mount({ ...baseProps, class: callerClass });
       const node = target.querySelector('section');
-      assert.equal(emittedClasses(node), `${root} ${hook} ${callerClass}`);
+      assert.equal(emittedClasses(node), `${root} ${callerClass}`);
     });
 
     it(`${name} drops an empty class prop rather than emitting a trailing space`, async () => {
@@ -144,7 +138,7 @@ describe('the filter bar and the card shell emit their family root on the render
       // sites these primitives replaced, and a trailing space would make every whole-attribute
       // equality in this repository disagree with the markup it was derived from.
       const target = await harness.mount({ ...baseProps, class: '' });
-      assert.equal(emittedClasses(target.querySelector('section')), `${root} ${hook}`);
+      assert.equal(emittedClasses(target.querySelector('section')), root);
     });
 
     it(`${name} forwards a data hook through the rest spread as the empty string`, async () => {
@@ -155,11 +149,11 @@ describe('the filter bar and the card shell emit their family root on the render
       // AND THE SPREAD DID NOT EAT THE CLASS. The rest spread lands after `class={classes}` in
       // the markup, which is exactly why `class` is a named prop; this is the clause that says
       // the arrangement still holds.
-      assert.equal(emittedClasses(node), `${root} ${hook}`);
+      assert.equal(emittedClasses(node), root);
     });
   }
 
-  it('ManagerToolbar names its landmark from the ariaLabel prop', async () => {
+  it('FilterBar names its landmark from the ariaLabel prop', async () => {
     const target = await toolbarHarness.mount({ ariaLabel: 'Filter components' });
     assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Filter components');
   });

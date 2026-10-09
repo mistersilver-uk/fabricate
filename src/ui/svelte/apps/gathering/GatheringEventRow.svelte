@@ -1,20 +1,22 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringEventRow renders one environment event in the Events tab of the
-  center column. Like GatheringTaskRow it is a compact, selectable row: clicking
-  it selects the event, which drives the right-column event inspector and
-  highlights the row. Unlike a task row it carries no Attempt action and no
-  economy/blocked callouts — events are informational.
-
-  Layout mirrors the task row's visual language for consistency: a thumbnail, the
-  event name with a danger pip (its icon escalates in colour with the risk
-  tier), an optional per-event ChanceBar (event scale), and a short clamped description.
+  GatheringEventRow draws one environment event in the center column's Events tab as a selectable
+  ListRow (issue 1778); selecting it drives the right-column event inspector. Events are
+  informational, so the row carries no Attempt: the 56px thumb leads, the danger (risk) level is
+  a badge, the description is the row's content and the event ChanceBar sits in the aside.
 -->
 <script>
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import {
+    riskClass,
+    riskLabel,
+    descriptionOrDefault,
+    toPercent,
+  } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
+  import Kicker from '../../components/Kicker.svelte';
+  import ListRow from '../../components/ListRow.svelte';
 
   let { event = null, selected = false, onSelect = null } = $props();
 
@@ -36,116 +38,77 @@
   const dangerLabel = $derived(riskLabel(danger, localize));
   const dangerRiskClass = $derived(riskClass(danger));
 
+  // The control's name is the visible name, then every state the row only draws (issue 1778).
+  const accessibleName = $derived(
+    [
+      name,
+      dangerLabel !== '' &&
+        localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel }),
+      chance != null &&
+        localize('FABRICATE.App.Gathering.Detail.EventChance', { x: toPercent(chance) }),
+    ]
+      .filter(Boolean)
+      .join(', ')
+  );
+
   function select() {
     onSelect?.(id);
   }
-  function onSummaryKey(event) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      select();
-    }
-  }
 </script>
 
-<div
-  class="gathering-event-row"
-  class:is-selected={selected}
+{#snippet thumb()}
+  <span class="gathering-event-thumb-wrap">
+    <img
+      class="gathering-event-thumb"
+      class:is-fallback={!img}
+      src={img || DEFAULT_GATHERING_EVENT_IMG}
+      alt=""
+    />
+  </span>
+{/snippet}
+
+{#snippet badges()}
+  <span class={`gathering-event-danger is-danger ${dangerRiskClass}`}>
+    <i class="fas fa-skull" aria-hidden="true"></i>
+    <span>{dangerLabel}</span>
+  </span>
+{/snippet}
+
+{#snippet copy()}
+  <span
+    class="gathering-event-description"
+    class:is-fallback={!hasDescription}
+    data-gathering-event-description>{descriptionText}</span
+  >
+{/snippet}
+
+{#snippet odds()}
+  <div class="gathering-event-chance" data-gathering-event-chance>
+    <span class="gathering-event-chance-caption" aria-hidden="true"
+      ><Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.EventChanceLabel')}</Kicker
+      ></span
+    >
+    <ChanceBar value={chance} scale="event" showCaption={false} />
+  </div>
+{/snippet}
+
+<ListRow
+  {name}
+  density="default"
+  class={['gathering-event-row', { 'is-selected': selected }]}
   role="listitem"
   data-event-id={id}
   data-selected={selected ? 'true' : 'false'}
->
-  <div
-    class="gathering-event-summary is-toggle"
-    role="button"
-    tabindex="0"
-    onclick={select}
-    onkeydown={onSummaryKey}
-  >
-    <div class="gathering-event-main">
-      <span class="gathering-event-thumb-wrap">
-        <img
-          class="gathering-event-thumb"
-          class:is-fallback={!img}
-          src={img || DEFAULT_GATHERING_EVENT_IMG}
-          alt=""
-        />
-      </span>
-
-      <span class="gathering-event-copy">
-        <span class="gathering-event-name" title={name}>{name}</span>
-        {#if dangerLabel !== ''}
-          <span class={`gathering-event-danger is-danger ${dangerRiskClass}`}>
-            <i class="fas fa-skull" aria-hidden="true"></i>
-            <span>{dangerLabel}</span>
-          </span>
-        {/if}
-      </span>
-
-      {#if chance != null}
-        <span class="gathering-event-chance" data-gathering-event-chance>
-          <ChanceBar value={chance} scale="event" showCaption={false} />
-        </span>
-      {/if}
-    </div>
-
-    <p
-      class="gathering-event-description"
-      class:is-fallback={!hasDescription}
-      data-gathering-event-description
-    >
-      {descriptionText}
-    </p>
-  </div>
-</div>
+  {selected}
+  onOpen={select}
+  openProps={{ class: 'gathering-event-summary', 'aria-label': accessibleName }}
+  leading={thumb}
+  badges={dangerLabel !== '' ? badges : undefined}
+  children={copy}
+  aside={chance != null ? odds : undefined}
+/>
 
 <style>
-  .gathering-event-row {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    overflow: hidden;
-  }
-
-  /* Selection highlight mirrors the task row's selected state. */
-  .gathering-event-row.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
-  }
-
-  .gathering-event-summary {
-    display: flex;
-    flex-direction: column;
-    /* Bottom whitespace for the row lives here, NOT as a padding-bottom on the
-       clamped description below: a padding-bottom on a -webkit-line-clamp box
-       makes Chromium paint a sliver of the clamped-away third line into that
-       padding band, which then bleeds under the row border (most visible with
-       Foundry's tall Signika metrics). Keeping the gap on the summary wrapper
-       preserves the whitespace without the sliver. */
-    padding-bottom: var(--fab-space-2);
-  }
-
-  .gathering-event-summary.is-toggle {
-    cursor: pointer;
-  }
-
-  .gathering-event-summary.is-toggle:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
-  }
-
-  .gathering-event-main {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    min-height: 72px;
-    padding: var(--fab-space-2);
-  }
-
   .gathering-event-thumb-wrap {
     flex: 0 0 auto;
     width: 56px;
@@ -165,22 +128,6 @@
     object-fit: contain;
     padding: 8px;
     box-sizing: border-box;
-  }
-
-  .gathering-event-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .gathering-event-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
   }
 
   /* Danger pip + tier icon colour, mirroring the header danger pip in
@@ -219,23 +166,21 @@
   }
 
   .gathering-event-chance {
-    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--fab-space-2);
   }
 
-  /* Short, always-visible description, mirroring the task row's clamp. */
+  /* Clamped to two lines, as the task row's description is. */
   .gathering-event-description {
-    margin: 0;
-    /* No padding-bottom here — it would reintroduce the line-clamp sliver (see
-       .gathering-event-summary). The bottom gap is owned by the summary. */
-    padding: 0 var(--fab-space-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    /* 1.5 line-height keeps the second line's descenders inside the clamp box
-       so overflow: hidden no longer shaves g/y/p (issue 401). */
     font-size: 12px;
     line-height: 1.5;
+    white-space: normal;
     color: var(--fab-text-muted);
   }
 

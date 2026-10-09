@@ -81,7 +81,7 @@ describe('FillBar (mounted)', () => {
   });
 
   it('offers a compact track and an optional test hook', async () => {
-    const compact = await harness.mount({ value: 10, size: 'sm', dataAttr: 'data-odds-bar' });
+    const compact = await harness.mount({ value: 10, density: 'compact', 'data-odds-bar': true });
     const track = compact.querySelector('.fab-fill-bar');
     assert.ok(track.classList.contains('is-sm'));
     assert.ok(track.hasAttribute('data-odds-bar'));

@@ -8,7 +8,13 @@ import {
 import { captureAlchemyThemes } from '../pageOps/managerViews.mjs';
 import { assertNoScreenshotOverlays, closeOpenApplications } from '../pageOps/pageLifecycle.mjs';
 
+import { runAdvantageChatCards } from './phase-e-advantage-chat-cards.mjs';
 import { runCraftExecutionAsserts, runFullProfileGatherAsserts } from './phase-e-asserts.mjs';
+import { runAwardChoice } from './phase-e-award-choice.mjs';
+import { runCountChatCards } from './phase-e-count-chat-cards.mjs';
+import { runRewardKindCards } from './phase-e-reward-kind-cards.mjs';
+import { runRolledAmountCards } from './phase-e-rolled-amount-cards.mjs';
+import { runUnderChatCards } from './phase-e-under-chat-cards.mjs';
 
 export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
   const { page, results, screenshot } = ctx;
@@ -292,6 +298,20 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
     if (crafter) crafter.sheet.close();
   }, cleanup.crafterId);
 
+  // Issue 2006: the success-counting cards, asserted in every profile and captured with the rest,
+  // after the post-craft inventory frame so their tokens and charms never reach it.
+  await runCountChatCards(ctx);
+  // Issue 2005: the roll-under cards and the refusal, asserted and captured the same way.
+  await runUnderChatCards(ctx);
+  // Issue 1516: a rolled result amount, authored in the editor, crafted, gathered and refused.
+  await runRolledAmountCards(ctx);
+  // Issue 1773: currency and knowledge rewards, credited and granted on both craft paths.
+  await runRewardKindCards(ctx);
+  // Issue 1773: a reward the player picks, settled from a second client joined as that player.
+  await runAwardChoice(ctx);
+  // Issue 2007: the advantage rule's keep, bonus-die, counting and off cases, likewise.
+  await runAdvantageChatCards(ctx);
+
   // Cheap API crafts, tool breakages, salvage, negative gating, and one guaranteed-success
   // gather — no screenshots, so they run in every profile.
   if (executionFixtures) {
@@ -385,7 +405,7 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
       await journalActiveCard.click();
     } else {
       const journalHistoryRow = appShell
-        .locator('.journal-history-row [data-history-run-id]')
+        .locator('.journal-history-list [data-history-run-id]')
         .first();
       if ((await journalHistoryRow.count()) > 0) {
         await journalHistoryRow.scrollIntoViewIfNeeded();
@@ -403,7 +423,7 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
     // Phase E guarantees a terminal craft; capture its historical account after the
     // general Journal frame so selecting it cannot disturb that frame's selection.
     if (RUN_SCREENSHOT_PHASES) {
-      const historyRows = appShell.locator('.journal-history-row [data-history-run-id]');
+      const historyRows = appShell.locator('.journal-history-list [data-history-run-id]');
       const historyCount = await historyRows.count();
       let craftingRunSelected = false;
       for (let i = 0; i < historyCount; i += 1) {

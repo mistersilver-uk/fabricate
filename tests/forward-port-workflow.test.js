@@ -1399,3 +1399,16 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
     'the provenance decision has ONE implementation, and it is not this script'
   );
 });
+
+// ── 16 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('release-bot App token minting uses the Node 24 action in both privileged workflows', () => {
+  for (const file of [FORWARD_PORT, `${WORKFLOW_DIR}/promote-to-early-access.yml`]) {
+    const source = read(file);
+    const uses = [...source.matchAll(/^\s*uses:\s*actions\/create-github-app-token@(\S+)/gm)];
+    assert.equal(uses.length, 1, `${file} must mint exactly one App installation token`);
+    assert.equal(uses[0][1], 'v3', `${file} must not use the deprecated Node 20 action`);
+    assert.match(source, /app-id:\s*\$\{\{ vars\.APP_ID \}\}/);
+    assert.match(source, /private-key:\s*\$\{\{ secrets\.RELEASE_BOT_KEY \}\}/);
+  }
+});

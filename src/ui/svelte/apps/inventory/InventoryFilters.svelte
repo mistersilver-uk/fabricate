@@ -12,11 +12,11 @@
   markup below for the two props that reproduce its construction and its paint.
 
   THE SORT CONTROL IS THE SHARED `Select` (issue 1511), so the list it opens is the app's own
-  rather than the operating system's. The search field is still NOT converted: it belongs to the
-  controls issue.
+  rather than the operating system's, and the search is the shared `SearchField`.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import SearchField from '../../components/SearchField.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
 
@@ -96,23 +96,17 @@
    * floor is 96px, which is why one pixel of shortfall was enough to ellipsise the label.
    */
   const SORT_PANEL_MIN_WIDTH = 97;
-
-  function onInput(event) {
-    onSearch?.(event.currentTarget.value);
-  }
 </script>
 
 <div class="inventory-filters" data-inventory-filters>
-  <div class="inventory-search">
-    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-    <input
-      type="text"
-      value={search}
-      placeholder={localize('FABRICATE.App.Inventory.Filters.SearchPlaceholder')}
-      aria-label={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
-      oninput={onInput}
-    />
-  </div>
+  <SearchField
+    class="inventory-search"
+    value={search}
+    onChange={(next) => onSearch?.(next)}
+    placeholder={localize('FABRICATE.App.Inventory.Filters.SearchPlaceholder')}
+    ariaLabel={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
+    inputProps={{ 'data-inventory-search': '' }}
+  />
 
   <div class="inventory-filters-row">
     <!-- THE KIND FILTER IS A RADIOGROUP, not five toggles (issue 1514). Choosing a kind is a
@@ -154,7 +148,7 @@
         options={sortOptions}
         ariaLabelledBy={sortCaptionId}
         minWidth={SORT_PANEL_MIN_WIDTH}
-        triggerData={{ 'data-inventory-sort': '' }}
+        triggerProps={{ 'data-inventory-sort': '' }}
         onChange={(next) => onSort?.(next)}
       />
     </span>
@@ -168,30 +162,9 @@
     gap: 8px;
   }
 
-  .inventory-search {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 40px;
-    padding: 0 12px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-search input {
-    flex: 1 1 auto;
-    min-width: 0;
-    border: none;
-    background: transparent;
-    color: var(--fab-text);
-    font-size: 13px;
-  }
-
-  .inventory-search input:focus-visible {
-    outline: none;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .inventory-filters > :global(.inventory-search) {
+    flex: none;
   }
 
   .inventory-filters-row {

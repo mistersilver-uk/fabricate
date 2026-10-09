@@ -28,8 +28,8 @@
   attribute is written from the branch exactly as the caller spelled it, never derived from `kind`.
 
   Written as a spread so an unset hook is genuinely absent rather than an empty attribute a
-  presence selector would still match, and so the VALUE reaches the DOM as written. `EmptyState`
-  coerces a bare hook to `data-x="true"` via `dataValue || true`; this one does not, because it
+  presence selector would still match, and so the value reaches the DOM as written. A bare hook
+  on the `<EmptyState>` tag renders `data-x="true"`; this one does not, because it
   carries the box these hooks have always sat on and an exact-value reader must see what it saw
   before.
 
@@ -60,9 +60,9 @@
   `spec.md:43` says "a candidate that decomposes entirely into existing members is a COMPOSITION
   and MUST NOT enter the set", and this decomposes into `EmptyState` and `Notice` plus one line of
   chrome. It cannot take a `notAPrimitive` row either — `tests/design-system-primitives.test.js`
-  caps a recorded non-member at one caller. So it takes an `unregisteredSharedComponents` row in
-  `tests/components/design-system-known-debt.json`, which is the register's answer for a
-  screen-region composition rather than a gap in it.
+  caps a recorded non-member at one caller. So it stays an unregistered shared component, which
+  `tests/design-system-primitives.test.js` holds against the base commit: the register's answer
+  for a screen-region composition rather than a gap in it.
 
   THAT ANSWER IS PATH-CONDITIONAL. The banked route holds only while this file lives OUTSIDE
   `src/ui/svelte/components/` and inside `src/ui/svelte/`. The same file under `components/` would
@@ -125,7 +125,7 @@
 <style>
   /* The fill the five deleted blocks declared, byte for byte, with the one 12px literal taken to
      the published spacing token it already equalled — `--fab-space-3` is 12px, so nothing moves
-     and five `spacing-known-literals` rows are paid down rather than re-banked under a new path. */
+     and the spacing ratchet sees five literals fall rather than reappear under a new path. */
   .fab-view-state {
     display: flex;
     flex-direction: column;

@@ -16,11 +16,12 @@
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
+  import DiceTiles from '../../../components/DiceTiles.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import CheckSimulatorFaces from './CheckSimulatorFaces.svelte';
 
   let {
     /** The readout view-model built by the route. */
@@ -53,6 +54,18 @@
     ],
   };
   const dynamicNote = $derived(DYNAMIC_NOTES[preview?.dynamicNote] ?? null);
+
+  const uid = $props.id();
+  const extra = $derived(preview?.additionalDice ?? null);
+  const extraLimit = $derived(extra?.limit ?? 0);
+  const extraTitle = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.Title', 'Additional dice')
+  );
+  // Clamped whenever its bound moves, so the count shown and the count rolled agree.
+  let additionalDice = $state(0);
+  $effect.pre(() => {
+    if (additionalDice > extraLimit) additionalDice = extraLimit;
+  });
 </script>
 
 <div class="manager-checks-simulator" data-checks-simulator-panel>
@@ -71,22 +84,58 @@
       )}
     </p>
   {:else}
+    {#if extra}
+      <div class="manager-checks-simulator-extra" data-checks-preview-additional-dice-field>
+        <div class="manager-checks-simulator-extra-row">
+          <span class="manager-checks-simulator-extra-title">{extraTitle}</span>
+          <Stepper
+            density="comfortable"
+            min={0}
+            max={extraLimit}
+            value={additionalDice}
+            disabled={extraLimit === 0}
+            ariaLabel={extraTitle}
+            decrementLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.Fewer',
+              'Fewer additional dice'
+            )}
+            incrementLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.More',
+              'More additional dice'
+            )}
+            inputProps={{
+              'data-checks-preview-additional-dice': '',
+              'aria-describedby': `${uid}-additional-dice-note`,
+            }}
+            onChange={(next) => (additionalDice = next)}
+          />
+        </div>
+        <p
+          class="manager-muted"
+          id={`${uid}-additional-dice-note`}
+          data-checks-preview-additional-dice-note={extra.note.kind}
+        >
+          {extra.note.text}
+        </p>
+      </div>
+    {/if}
+
     <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
-             `manager-button is-primary` matches no rule stating a type size, so the label lands on
+             `fabricate-button is-primary` matches no rule stating a type size, so the label lands on
              Foundry's inherited app base while every other button reads at the primitive's size —
-             the drift `ManagerButton` exists to end, and one a remembered class string cannot be
+             the drift `Button` exists to end, and one a remembered class string cannot be
              checked for. A CONVERSION, not a wrapper: the element below is already the button. -->
-    <ManagerButton
+    <Button
       role="primary"
       class="manager-checks-simulator-roll"
       data-checks-simulator-roll
       disabled={Boolean(abstain)}
       aria-disabled={preview.rolling === true ? 'true' : undefined}
-      onclick={() => onRoll()}
+      onclick={() => onRoll(additionalDice)}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span>{preview.rollLabel}</span>
-    </ManagerButton>
+    </Button>
 
     {#if dynamicNote}
       <p class="manager-muted" data-checks-simulator-note={preview.dynamicNote}>
@@ -149,7 +198,13 @@
           </div>
 
           {#if count && !count.zeroPool}
-            <CheckSimulatorFaces faces={count.faces} />
+            <DiceTiles
+              model={count.dice}
+              legend
+              faceDataAttr="data-checks-simulator-face"
+              marksDataAttr="data-checks-simulator-face-marks"
+              legendDataAttr="data-checks-simulator-legend"
+            />
           {/if}
 
           {#if card}
@@ -178,7 +233,7 @@
 
           {#if rows.length > 0}
             <div class="manager-checks-simulator-facts">
-              <Kicker dataAttr="data-checks-simulator-facts-heading">
+              <Kicker data-checks-simulator-facts-heading="">
                 {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
               </Kicker>
               <div class="manager-checks-flag-list">
@@ -187,8 +242,7 @@
                     icon={row.icon}
                     density="line"
                     tone={row.tone}
-                    dataAttr="data-checks-simulator-fact"
-                    dataValue={row.id}
+                    data-checks-simulator-fact={row.id || true}
                     metaAttr="data-checks-simulator-fact-meta"
                     title={row.label}
                     subtitle={row.meta}
@@ -222,6 +276,26 @@
   .manager-checks-simulator-hint {
     padding: var(--fab-space-4) var(--fab-space-2);
     text-align: center;
+  }
+
+  /* The prototype's 5px under the stepper row snaps to 6, and its 10px row gap to 12. */
+  .manager-checks-simulator-extra {
+    display: grid;
+    gap: var(--fab-space-chip);
+  }
+
+  .manager-checks-simulator-extra-row {
+    display: flex;
+    gap: var(--fab-space-3);
+    align-items: center;
+  }
+
+  .manager-checks-simulator-extra-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--fab-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .manager-checks-simulator-live {

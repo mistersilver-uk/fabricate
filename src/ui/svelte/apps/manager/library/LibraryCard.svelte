@@ -130,7 +130,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--fab-space-2);
-    padding-right: 2.25rem;
+    padding-right: 36px;
   }
 
   .fab-library-card-heading {
@@ -139,7 +139,7 @@
     min-width: 0;
     flex-direction: column;
     justify-content: center;
-    min-height: 40px;
+    min-height: 38px;
   }
 
   .fab-library-card-name {
@@ -155,7 +155,7 @@
 
   .fab-library-card-subtitle {
     min-width: 0;
-    margin-top: 0.15rem;
+    margin-top: var(--fab-space-2xs);
     overflow: hidden;
     color: var(--fab-text-subtle);
     text-overflow: ellipsis;
@@ -194,7 +194,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-bg-1);
     color: var(--fab-text-subtle);
     font-size: 0.62rem;
@@ -259,7 +259,7 @@
   /* The selection box is pinned into the top-right corner over the header. */
   .fab-library-card :global(.fab-selection-checkbox) {
     position: absolute;
-    top: var(--fab-space-3);
-    right: var(--fab-space-3);
+    top: 12px;
+    right: 12px;
   }
 </style>

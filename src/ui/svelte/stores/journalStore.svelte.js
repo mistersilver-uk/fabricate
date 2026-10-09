@@ -1,14 +1,11 @@
-import {
-  isResolvedFailureOutcome,
-  journalRefusalMessage,
-  resolvedFailureMessage,
-} from '../util/journalRunReasons.js';
+import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
+import { RUN_KINDS, runActivityKind } from '../util/journalRunKinds.js';
+import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
-const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
 /**
  * The player-facing Active status tabs. `inProgress` selects BOTH projected statuses that wear
  * the merged `In progress` badge (issue 1648, D-029): before the merge there was no tab for
@@ -24,7 +21,8 @@ const ACTIVE_STATUS_MEMBERS = Object.freeze({
 });
 
 /**
- * Status counts use the kind cohort before search, status filtering or paging.
+ * The kind filter is the session-only subset of `RUN_KINDS` shown, every kind at first.
+ * Status counts use the union of the shown kinds before search, status filtering or paging.
  * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
  */
 export function createJournalStore({ services } = {}) {
@@ -34,7 +32,7 @@ export function createJournalStore({ services } = {}) {
   let selectedRunId = $state('');
   let selectedRunKey = $state('');
   let search = $state('');
-  let kindFilter = $state('all');
+  let kindFilter = $state.raw(RUN_KINDS);
   let activeStatusFilter = $state('all');
   let activeSort = $state('soonestReady');
   let historySort = $state('newest');
@@ -186,9 +184,9 @@ export function createJournalStore({ services } = {}) {
     historyWindow.resetPage();
   }
 
-  function setKindFilter(next) {
-    if (!KIND_FILTERS.has(next)) return;
-    kindFilter = next;
+  function toggleKind(kind) {
+    if (!RUN_KINDS.includes(kind)) return;
+    kindFilter = toggledKinds(kindFilter, kind);
     activeWindow.resetPage();
     historyWindow.resetPage();
   }
@@ -258,6 +256,10 @@ export function createJournalStore({ services } = {}) {
     return runCommand(run, 'setCompletionMode', { completionMode });
   }
 
+  const settledAwards = createSettledAwards();
+  const chooseAward = async (run, request) =>
+    settledAwards.settled(run, await runCommand(run, 'chooseAward', awardPayload(request)));
+
   async function setSelection(run, selection) {
     return runCommand(run, 'setSelection', {
       stepIndex: run?.stepIndex,
@@ -294,28 +296,21 @@ export function createJournalStore({ services } = {}) {
         action,
         payload: payload ?? {},
       });
-      // A DISMISSED prompt is a refusal that carries `cancelled`, and nothing happened, so
-      // there is nothing to re-read. A CANCEL command answers `{success: true, cancelled: true}`
-      // for the run it just cancelled — which is a change, and the most disruptive one the
-      // Journal has. Returning here for it skipped the refresh below, leaving the view on the
-      // listing this command's own actor write had triggered mid-flight, while the execution
-      // claim was still held: every other run frozen at `claim-held` against a claim that had
-      // since been released, unfixable without reloading Foundry (issue 1648, M25).
+      // A DISMISSED prompt changed nothing, so nothing is re-read; a CANCEL also answers
+      // `cancelled`, as `success: true`, and must reach the refresh below (issue 1648, M25).
       if (result?.success === false && result?.cancelled === true) return;
-      // Two different `success: false` results. A REFUSAL carries `reason` and no `message`
-      // (which recorded an EMPTY command error and toasted nothing); a resolved failed check
-      // is an OUTCOME the run's own history records, so it raises no command error and never
-      // takes the generic craft error's "Nothing was consumed" promise.
+      // A REFUSAL carries `reason` and no `message`; a resolved failed check is an OUTCOME the
+      // run's history records, raising no command error and no "Nothing was consumed" promise.
       const outcome = isResolvedFailureOutcome(result);
       const refused = result?.success === false && !outcome;
       let message = safeCommandMessage(result?.message);
       if (outcome) message = resolvedFailureMessage(services?.localize);
       if (refused) {
         const generic = services?.craftErrorMessage?.();
-        message = journalRefusalMessage(result, services?.localize, generic);
+        message = journalCommandRefusal(result, services?.localize, generic);
         setCommandError(request, message);
       }
-      if (message) services?.notify?.(message);
+      notifyEach(services, [message, spentDiceNotice(result, services?.localize)]);
       await load(true);
       if (
         action === 'execute' &&
@@ -327,6 +322,7 @@ export function createJournalStore({ services } = {}) {
         if (completed && !completed.recoveryEvidence?.required && !completed.redacted)
           commandResult = { runKey: request.runKey };
       }
+      return result;
     } catch (err) {
       console.error(`Fabricate | Error running Journal ${action} command:`, err);
       const message = safeCommandMessage(services?.craftErrorMessage?.());
@@ -542,7 +538,7 @@ export function createJournalStore({ services } = {}) {
     load,
     select,
     setSearch,
-    setKindFilter,
+    toggleKind,
     setActiveStatusFilter,
     setActiveSort,
     setHistorySort,
@@ -559,6 +555,8 @@ export function createJournalStore({ services } = {}) {
     resume,
     setCompletionMode,
     setSelection,
+    chooseAward,
+    awardChoiceSettled: settledAwards.has,
     advance: execute,
     cancel,
     dismiss,
@@ -566,8 +564,17 @@ export function createJournalStore({ services } = {}) {
   };
 }
 
-function matchesKind(kind) {
-  return (run) => kind === 'all' || activityKind(run) === kind;
+function notifyEach(services, messages) {
+  for (const message of messages) if (message) services?.notify?.(message);
+}
+
+/** `kinds` with `kind` flipped in or out, the others untouched, in `RUN_KINDS` order. */
+function toggledKinds(kinds, kind) {
+  return Object.freeze(RUN_KINDS.filter((entry) => kinds.includes(entry) !== (entry === kind)));
+}
+
+function matchesKind(kinds) {
+  return (run) => kinds.includes(runActivityKind(run));
 }
 
 function matchesSearch(query) {
@@ -583,21 +590,43 @@ function matchesSearch(query) {
     );
 }
 
+const awardPayload = ({ choiceId, picks } = {}) => ({ choiceId, picks: [...(picks ?? [])] });
+
+/**
+ * The runs whose last owed pick this client settled (issue 1773), so the crafting outcome stops
+ * naming it: `settled(run, result)` records a settle's reply and answers it.
+ */
+function createSettledAwards() {
+  let runIds = $state.raw([]);
+  return {
+    settled(run, result) {
+      if (result?.success === true && result.awardChoicePending !== true) {
+        runIds = [...runIds, run.id];
+      }
+      return result;
+    },
+    has: (runId) => runIds.includes(runId),
+  };
+}
+
+/** The status a run is tabbed by: one owing a pick awaits its player, so it is `ready` (issue
+ *  1773) unless paused, whatever its own closed or in-progress status. */
+function activeStatusOf(run) {
+  const owed = run?.awardChoicePending === true && run?.derivedStatus !== 'paused';
+  return owed ? 'ready' : run?.derivedStatus;
+}
+
 function matchesActiveStatus(status) {
   if (status === 'all') return () => true;
   const members = ACTIVE_STATUS_MEMBERS[status] ?? [status];
-  return (run) => members.includes(run?.derivedStatus);
-}
-
-function activityKind(run) {
-  return run?.activityKind ?? run?.runType ?? 'crafting';
+  return (run) => members.includes(activeStatusOf(run));
 }
 
 function countActiveStatuses(runs) {
   const counts = { all: runs.length, ready: 0, inProgress: 0, paused: 0 };
   for (const run of runs) {
     for (const [tab, members] of Object.entries(ACTIVE_STATUS_MEMBERS)) {
-      if (members.includes(run?.derivedStatus)) counts[tab] += 1;
+      if (members.includes(activeStatusOf(run))) counts[tab] += 1;
     }
   }
   return counts;

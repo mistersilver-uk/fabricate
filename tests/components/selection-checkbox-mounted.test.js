@@ -68,6 +68,28 @@ describe('SelectionCheckbox', () => {
     harness.remount();
   });
 
+  it('draws only the box when decorative, with no input, label or callback', async () => {
+    const changes = [];
+    const target = await harness.mount({
+      decorative: true,
+      checked: true,
+      ariaLabel: 'Ignored',
+      onChange: (checked) => {
+        changes.push(checked);
+      },
+    });
+
+    assert.equal(input(target), null, 'no real control');
+    assert.equal(target.querySelector('label'), null, 'no label wrapper');
+    assert.equal(box(target).getAttribute('aria-hidden'), 'true');
+    assert.equal(box(target).classList.contains('is-checked'), true);
+    box(target).click();
+    assert.deepEqual(changes, [], 'the box is inert');
+    await harness.setProps({ checked: false });
+    assert.equal(box(target).classList.contains('is-checked'), false, 'is-checked follows checked');
+    harness.remount();
+  });
+
   it('reports the new checked state to onChange, in both directions', async () => {
     const changes = [];
     const target = await harness.mount({ onChange: (checked) => changes.push(checked) });
@@ -99,15 +121,19 @@ describe('SelectionCheckbox', () => {
     harness.remount();
   });
 
-  it('carries the declared size, and falls back rather than emitting an unstyled class', async () => {
-    for (const size of ['sm', 'md', 'lg']) {
-      const target = await harness.mount({ size });
+  it('carries the declared density, and falls back rather than emitting an unstyled class', async () => {
+    for (const [density, size] of [
+      ['compact', 'sm'],
+      ['default', 'md'],
+      ['comfortable', 'lg'],
+    ]) {
+      const target = await harness.mount({ density });
       assert.equal(box(target).classList.contains(`is-${size}`), true);
       harness.remount();
     }
 
-    const target = await harness.mount({ size: 'huge' });
-    assert.equal(box(target).classList.contains('is-md'), true, 'an unknown size renders a box');
+    const target = await harness.mount({ density: 'huge' });
+    assert.equal(box(target).classList.contains('is-md'), true, 'an unknown density renders a box');
     assert.equal(box(target).classList.contains('is-huge'), false);
     harness.remount();
   });

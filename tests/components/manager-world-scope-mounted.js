@@ -26,10 +26,10 @@ import {
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { parseUuidDouble } from '../helpers/manager/parseUuidDouble.js';
 import {
   labCaseSelector,
   managerComponents,
-  parseUuidDouble,
   settle,
   settleBetweenTests,
   settleRouteExit,
@@ -76,7 +76,6 @@ export function registerWorldScopeCases() {
     target = null;
     await settleBetweenTests();
   });
-
 
   // The card moved to World > Rules & Resources > Character prerequisites in issue 1311.
   it('World prerequisites page renders an icon picker left of the name input (issue 544)', async () => {
@@ -452,7 +451,8 @@ export function registerWorldScopeCases() {
     flushSync();
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
     assert.equal(
-      target.querySelectorAll('[aria-current="page"]').length,
+      // The rail's own: the breadcrumb trail's leaf is the current page of ITS nav (issue 1777).
+      target.querySelector('.manager-rail').querySelectorAll('[aria-current="page"]').length,
       1,
       'only the concrete destination is current'
     );
@@ -646,6 +646,7 @@ export function registerWorldScopeCases() {
       'the travel inspector marks itself as the travel branch of the inspector chain'
     );
     assert.equal(inspector.getAttribute('data-travel-inspector'), 'realms');
+    assert.ok(!inspector.classList.contains('is-empty'), 'a selected realm is not the empty state');
     assert.equal(
       inspector.querySelector('.manager-inspector-name').textContent.trim(),
       'Green March',
@@ -686,6 +687,10 @@ export function registerWorldScopeCases() {
       target.querySelector('.manager-travel-inspector').getAttribute('data-travel-inspector'),
       'map',
       'the one card follows the tab rather than being two cards'
+    );
+    assert.ok(
+      target.querySelector('.manager-travel-inspector').classList.contains('is-empty'),
+      'the map tab with no region selected draws the empty state'
     );
   });
 
@@ -803,7 +808,9 @@ export function registerWorldScopeCases() {
       'parties',
       'the full-width layout is scoped to the World Parties route'
     );
-    const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    const createButton = target.querySelector(
+      '.manager-header-actions .fabricate-button.is-primary'
+    );
     assert.equal(createButton.disabled, false);
     assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
     assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);
@@ -1557,7 +1564,7 @@ export function registerWorldScopeCases() {
         await openChecksSection('triggers');
         const trigger = target.querySelector('[data-trigger="trg-1"]');
         assert.ok(Boolean(trigger), 'the authored trigger renders, so the gate has a subject');
-        target.querySelector('[data-trigger-disclosure="trg-1"]').click();
+        target.querySelector(':scope [data-trigger="trg-1"] [data-rule-row-disclosure]').click();
         await tick();
         flushSync();
         assert.ok(
@@ -1922,7 +1929,13 @@ export function registerWorldScopeCases() {
         await openPickEntry({
           actorOptions: [
             { uuid: 'Actor.mira', id: 'mira', name: 'Mira', img: '', isPlayerCharacter: true },
-            { uuid: 'Actor.wolf', id: 'wolf', name: 'Dire Wolf', img: '', isPlayerCharacter: false },
+            {
+              uuid: 'Actor.wolf',
+              id: 'wolf',
+              name: 'Dire Wolf',
+              img: '',
+              isPlayerCharacter: false,
+            },
           ],
         });
         const picker = '.fabricate-select-trigger[data-tool-preview-actor]';
@@ -1964,7 +1977,18 @@ export function registerWorldScopeCases() {
         img: '',
         description: '',
       });
-      const SOURCES = Object.freeze({ [HAMMER.uuid]: HAMMER, [AWL.uuid]: AWL });
+      // An actor's embedded copy, which only the component catalogue refuses.
+      const OWNED = Object.freeze({
+        uuid: 'Actor.a.Item.b',
+        name: 'Owned Pick',
+        img: '',
+        description: '',
+      });
+      const SOURCES = Object.freeze({
+        [HAMMER.uuid]: HAMMER,
+        [AWL.uuid]: AWL,
+        [OWNED.uuid]: OWNED,
+      });
 
       async function settleDrop() {
         for (let i = 0; i < 24; i += 1) await Promise.resolve();
@@ -2054,6 +2078,11 @@ export function registerWorldScopeCases() {
         assert.equal(entryName(), HAMMER.name, 'and it is the record the Item already had');
         assert.equal(secondDrop.length, 1, 'the GM is TOLD they landed on an existing record');
         assert.match(secondDrop[0], /Smith Hammer/, 'and the toast names it');
+        assert.doesNotMatch(
+          secondDrop[0],
+          /disabled/i,
+          'and an enabled record is not called disabled'
+        );
       });
 
       it('resolves the drop through the whole source-reference union, not one field', async () => {
@@ -2109,12 +2138,50 @@ export function registerWorldScopeCases() {
         await goToToolCatalogue();
         await dropItem(AWL.uuid);
 
-        assert.equal(
-          worldToolIds().length,
-          2,
-          'a different source Item is a different world Tool'
-        );
+        assert.equal(worldToolIds().length, 2, 'a different source Item is a different world Tool');
         assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
+      });
+
+      it('mints a world Tool from an EMBEDDED Item, which only the component catalogue refuses', async () => {
+        await openToolCatalogue([]);
+        await dropItem(OWNED.uuid);
+
+        assert.equal(worldToolIds().length, 1, 'an actor-owned Item still mints a world Tool');
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.equal(entryName(), OWNED.name);
+      });
+
+      it('relinks a world Tool to an EMBEDDED Item from its entry', async () => {
+        await openToolCatalogue([]);
+        await dropItem(HAMMER.uuid);
+        const zone = target.querySelector('[data-item-drop-zone="tool-source"]');
+        assert.ok(Boolean(zone), 'the entry renders its source drop zone');
+
+        dispatchDrop(zone, { type: 'Item', uuid: OWNED.uuid });
+        await settleDrop();
+
+        const [entity] = scopeStores.tool.corpus().entities;
+        assert.equal(entity.registeredItemUuid, OWNED.uuid, 'the relink patched the record');
+        assert.equal(entity.originItemUuid, OWNED.uuid);
+        assert.equal(entity.name, OWNED.name);
+      });
+
+      it('unlinks the open world Tool from its source, through the entry id', async () => {
+        await openToolCatalogue([]);
+        await dropItem(HAMMER.uuid);
+        const [linked] = scopeStores.tool.corpus().entities;
+        assert.equal(linked.registeredItemUuid, HAMMER.uuid);
+
+        target.querySelector('[data-tool-source-unlink]').click();
+        await settleDrop();
+
+        const [entity] = scopeStores.tool.corpus().entities;
+        assert.equal(entity.id, linked.id, 'the same record');
+        for (const field of ['registeredItemUuid', 'originItemUuid']) {
+          assert.ok(!entity[field], `${field} is cleared`);
+        }
+        assert.deepEqual(entity.aliasItemUuids ?? [], []);
+        assert.equal(target.querySelector('[data-tool-source-unlink]'), null);
       });
     });
 
@@ -2140,7 +2207,15 @@ export function registerWorldScopeCases() {
         description: '',
       });
       const PACKED_LEGACY = Object.freeze({ ...PACKED, uuid: 'Compendium.p.b', name: 'Older Ore' });
+      // Resolvable, so a refusal below is the embedded gate and not an unresolved source.
+      const OWNED = Object.freeze({
+        uuid: 'Actor.a.Item.b',
+        name: 'Owned Resin',
+        img: '',
+        description: '',
+      });
       const COMPONENT_SOURCES = Object.freeze({
+        [OWNED.uuid]: OWNED,
         [RESIN.uuid]: RESIN,
         [SALT.uuid]: SALT,
         [PACKED.uuid]: PACKED,
@@ -2194,7 +2269,7 @@ export function registerWorldScopeCases() {
        * @param {object} payload the raw drag payload.
        * @returns {Promise<{info: string[], warn: string[]}>} the toasts the drop raised.
        */
-      async function dropPayload(payload, { withParser = true } = {}) {
+      async function dropPayload(payload, { withParser = true, zone = 'component-create' } = {}) {
         const info = [];
         const warn = [];
         const previousUi = globalThis.ui;
@@ -2218,7 +2293,7 @@ export function registerWorldScopeCases() {
         // shim, or the gate running before `foundry` is populated.
         if (!withParser) delete globalThis.foundry.utils.parseUuid;
         try {
-          dispatchDrop(target.querySelector('[data-item-drop-zone="component-create"]'), payload);
+          dispatchDrop(target.querySelector(`[data-item-drop-zone="${zone}"]`), payload);
           await settleDrop();
           return { info, warn };
         } finally {
@@ -2243,6 +2318,7 @@ export function registerWorldScopeCases() {
 
         assert.equal(worldComponentIds().length, 1, 'the second drop mints NOTHING');
         assert.equal(second.info.length, 1, 'and says so rather than appearing to do nothing');
+        assert.match(second.info[0], /^Wildwood Resin is already a world component/, 'naming it');
         assert.deepEqual(worldComponentIds(), [created], 'the record is the one that existed');
         assert.equal(managerView(), 'world-component-entry');
       });
@@ -2291,6 +2367,9 @@ export function registerWorldScopeCases() {
 
         const modern = await dropPayload({ type: 'Item', uuid: 'Compendium.p.q.Item.b' });
         assert.equal(worldComponentIds().length, 1, 'a compendium Item is a world component');
+        const [minted] = scopeStores.component.corpus().entities;
+        assert.equal(minted.registeredItemUuid, PACKED.uuid, 'registered on the resolved uuid');
+        assert.equal(minted.originItemUuid, PACKED.uuid);
         assert.deepEqual(modern.warn, [], 'and nothing refused it');
         assert.equal(managerView(), 'world-component-entry');
 
@@ -2298,6 +2377,47 @@ export function registerWorldScopeCases() {
         const legacy = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
         assert.equal(worldComponentIds().length, 2, 'and so is one dragged the legacy way');
         assert.deepEqual(legacy.warn, []);
+        const [, legacyMinted] = scopeStores.component.corpus().entities;
+        assert.equal(
+          legacyMinted.registeredItemUuid,
+          PACKED_LEGACY.uuid,
+          'the legacy shape registers on the uuid the resolver answered'
+        );
+      });
+
+      it('and REFUSES a relink to an embedded Item from the entry, keeping the link', async () => {
+        await openComponentCatalogue([]);
+        await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(managerView(), 'world-component-entry');
+
+        const refused = await dropPayload(
+          { type: 'Item', uuid: OWNED.uuid },
+          { zone: 'component-source' }
+        );
+
+        assert.equal(refused.warn.length, 1, 'the GM is told why');
+        assert.match(refused.warn[0], /belongs to an actor/);
+        const [entity] = scopeStores.component.corpus().entities;
+        assert.equal(entity.registeredItemUuid, RESIN.uuid, 'and the link is unchanged');
+        assert.equal(entity.name, RESIN.name);
+      });
+
+      it('unlinks the open component from its source, through the entry id', async () => {
+        await openComponentCatalogue([]);
+        await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        const [linked] = scopeStores.component.corpus().entities;
+        assert.equal(linked.registeredItemUuid, RESIN.uuid);
+
+        target.querySelector('[data-scoped-entry-source-unlink]').click();
+        await settleDrop();
+
+        const [entity] = scopeStores.component.corpus().entities;
+        assert.equal(entity.id, linked.id, 'the same record');
+        for (const field of ['registeredItemUuid', 'originItemUuid']) {
+          assert.ok(!entity[field], `${field} is cleared`);
+        }
+        assert.deepEqual(entity.aliasItemUuids ?? [], []);
+        assert.equal(target.querySelector('[data-scoped-entry-source-unlink]'), null);
       });
 
       it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
@@ -2336,7 +2456,10 @@ export function registerWorldScopeCases() {
         // else in this path distinguishes a world Item from an actor's embedded copy.
         await openComponentCatalogue([]);
 
-        const refused = await dropPayload({ type: 'Item', uuid: RESIN.uuid }, { withParser: false });
+        const refused = await dropPayload(
+          { type: 'Item', uuid: RESIN.uuid },
+          { withParser: false }
+        );
         assert.deepEqual(
           worldComponentIds(),
           [],
@@ -2487,7 +2610,10 @@ export function registerWorldScopeCases() {
         const raw = [...target.querySelectorAll('[data-popover-option]')].find(
           (option) => option.textContent.trim() === 'Raw'
         );
-        assert.ok(Boolean(raw), 'the category picker offered nothing, so the stage below is vacuous');
+        assert.ok(
+          Boolean(raw),
+          'the category picker offered nothing, so the stage below is vacuous'
+        );
         raw.click();
         await settleEntryRoute();
         const ore = target.querySelector('[data-scoped-entry-tag="ore"]');
@@ -2681,10 +2807,7 @@ export function registerWorldScopeCases() {
             target.querySelector('[data-essence-id="ash"].is-selected'),
             'the target rules list lost the essence id while the system selection settled'
           );
-          assert.equal(
-            persistedName(ENTRY_ROWS[0]),
-            answer === 'save' ? 'Ash the Second' : 'Ash'
-          );
+          assert.equal(persistedName(ENTRY_ROWS[0]), answer === 'save' ? 'Ash the Second' : 'Ash');
         });
       }
     });
@@ -3038,6 +3161,206 @@ export function registerWorldScopeCases() {
           'coal',
           'and it is the component whose entry the GM came from — not Ash, which M14 would ' +
             'have marked had the deep link dropped its id'
+        );
+      });
+    });
+
+    // ── THE ROOT HANDS THE WORLD-SCOPE MODEL TO THE ENTRY PAGES (issue 1721) ──────────────
+    describe('the root wires the world-scope model into the entry pages (issue 1721)', () => {
+      const ENTRY_ROWS = [
+        {
+          scope: 'essence',
+          leaf: 'essence-catalogue',
+          id: 'ash',
+          mount: { worldEssences: [{ id: 'ash', name: 'Ash' }] },
+          name: '[data-scoped-entry-name]',
+          save: '[data-world-essence-save]',
+        },
+        {
+          scope: 'tool',
+          leaf: 'tool-catalogue',
+          id: 'pick',
+          mount: { worldTools: [{ id: 'pick', name: 'Mining Pick' }] },
+          name: '[data-world-tool-entry-name]',
+          save: '[data-world-tool-save]',
+          subline: '[data-world-tool-entry-subline]',
+        },
+        {
+          scope: 'component',
+          leaf: 'component-catalogue',
+          id: 'salt',
+          mount: { worldComponents: [{ id: 'salt', name: 'Unbound Salt' }] },
+          name: '[data-scoped-entry-name]',
+          save: '[data-world-component-save]',
+          subline: '[data-world-component-entry-subline]',
+        },
+      ];
+
+      async function settleWiring() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      /** Mount, then open the entry the way a GM does: the rail, then the row's pen. */
+      async function openEntry(row, mountOptions = row.mount) {
+        const store = await mountWithRealStore(mountOptions);
+        await openMountedEntry(row);
+        return store;
+      }
+
+      async function openMountedEntry(row) {
+        worldNavItem(row.leaf).click();
+        await settleWiring();
+        const listRow = target.querySelector(`[data-scoped-list-row="${row.id}"]`);
+        listRow.querySelector('[data-scoped-list-action="open-entry"]').click();
+        await settleWiring();
+      }
+
+      for (const row of ENTRY_ROWS) {
+        it(`holds the ${row.scope} Save disabled while its write is in flight`, async () => {
+          const store = await openEntry(row);
+          const family = store.worldScope[row.scope];
+          const landed = family.updateEntity.bind(family);
+          let release;
+          const held = new Promise((resolve) => (release = resolve));
+          family.updateEntity = async (...args) => {
+            await held;
+            return landed(...args);
+          };
+
+          const field = target.querySelector(row.name);
+          field.value = 'Renamed';
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          await settleWiring();
+          const save = () => target.querySelector(row.save);
+          assert.equal(save().disabled, false, 'a dirty entry arms its Save');
+
+          save().click();
+          await settleWiring();
+          assert.equal(save().disabled, true, 'and the Save is held while the write is in flight');
+
+          release();
+          await settleWiring();
+          assert.equal(save().disabled, true, 'a landed write leaves nothing to save');
+        });
+
+        if (!row.subline) continue;
+        it(`shows the ${row.scope} page's own sub-line in the header`, async () => {
+          await openEntry(row);
+          const line = target.querySelector(row.subline)?.textContent?.trim();
+          assert.ok(line, 'the header draws a sub-line the page reported');
+        });
+      }
+
+      it('arms and confirms the world Tool header Delete', async () => {
+        const tool = ENTRY_ROWS[1];
+        await openEntry(tool);
+        const button = () => target.querySelector('[data-arm-token="world-tool-delete:pick"]');
+        assert.ok(Boolean(button()), 'the page published its Delete to the header');
+        assert.equal(button().dataset.armed, 'false');
+
+        button().click();
+        await settleWiring();
+        assert.equal(button().dataset.armed, 'true', 'the first press arms it');
+        button().click();
+        await settleWiring();
+
+        assert.deepEqual(scopeStores.tool.corpus().entities, [], 'the second press deletes it');
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-tools',
+          'and returns to the catalogue'
+        );
+      });
+
+      it('resolves the repair names of the Tool page from the world component and essence offers', async () => {
+        const tool = ENTRY_ROWS[1];
+        const store = await mountWithRealStore({
+          worldTools: [{ id: 'pick', name: 'Mining Pick' }],
+          worldComponents: [{ id: 'scrap', name: 'Scrap Iron' }],
+          worldEssences: [{ id: 'fire', name: 'Fire Essence' }],
+        });
+        const current = scopeStores.tool.get();
+        scopeStores.tool.save({
+          ...current,
+          defaults: {
+            pick: {
+              id: 'pick',
+              onBreak: { mode: 'flagBroken' },
+              repairRequirements: [
+                {
+                  id: 'g1',
+                  options: [
+                    { quantity: 2, match: { type: 'component', componentId: 'scrap' } },
+                    { quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } },
+                  ],
+                },
+              ],
+            },
+          },
+        });
+        await settle(store);
+        await openMountedEntry(tool);
+
+        target.querySelector('[data-world-tool-entry-tab="breakage"]').click();
+        await settleWiring();
+        const summary = target.querySelector('[data-tool-repair-summary]')?.textContent ?? '';
+        assert.match(summary, /Scrap Iron/, 'the component offer names the requirement');
+        assert.match(summary, /Fire Essence/, 'and so does the essence offer');
+      });
+    });
+
+    describe('the essence inspector reads the world entry through the model (issue 1721)', () => {
+      it('counts the members and attributes the on-craft layer to the selected system', async () => {
+        const store = createStore([], { smithingFeatures: { essences: true, gathering: false } });
+        store.viewState.update((state) => ({
+          ...state,
+          worldScope: {
+            ...state.worldScope,
+            essence: {
+              available: true,
+              entries: [
+                {
+                  id: 'earth',
+                  entity: { name: 'Earth' },
+                  membershipCount: 7,
+                  systems: [
+                    {
+                      systemId: 'alchemy',
+                      member: true,
+                      enabled: true,
+                      inherited: { effectSource: false, propertyMacro: false },
+                    },
+                    { systemId: 'smithing', member: false, enabled: false },
+                  ],
+                },
+              ],
+            },
+          },
+        }));
+        target = document.createElement('div');
+        document.body.appendChild(target);
+        mounted = mount(Component, {
+          target,
+          props: { store, services: { openCurrentAdmin: () => {} } },
+        });
+        flushSync();
+        navButton('Essence Rules').click();
+        await tick();
+        flushSync();
+
+        assert.match(
+          target.querySelector('[data-scoped-list-system-count]')?.textContent ?? '',
+          /^\s*7 \/ \d+\s*$/,
+          'the roster counts the entry’s own members'
+        );
+        assert.match(
+          target.textContent,
+          /overridden here/,
+          'and the on-craft cards attribute their layer from the selected system’s row'
         );
       });
     });

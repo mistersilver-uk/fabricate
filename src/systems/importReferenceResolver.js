@@ -28,6 +28,9 @@ export const REFERENCE_KINDS = Object.freeze({
   EVENT_LINK: 'eventLink',
   COMPONENT_LINK: 'componentLink',
   RECIPE_ITEM: 'recipeItem',
+  // A `knowledge` result's taught recipe and a `currency` result's unit (issue 1773).
+  RECIPE_LINK: 'recipeLink',
+  CURRENCY_UNIT: 'currencyUnit',
   // The world-scope kinds (issue 1364) reuse the entity owner types; `worldToolBreakageDropped`,
   // whose subject is a setting, takes `unknown`; a generic `worldEntity` would be unsearchable.
   WORLD_ENTITY_COLLISION: 'worldEntityCollision',
@@ -129,7 +132,7 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
 export function reportWorldEntityCollisions(prepared, worldEntityIndex, mode) {
   const entries = [];
   if (!prepared || typeof prepared !== 'object' || !worldEntityIndex) return entries;
-  const components = arrayOf(prepared.system?.components);
+  const components = arrayOf(prepared.system?.components); // ratchet-exempt(world-scope): import
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     // Copy-mode components bind by match-or-mint, so they never arrive under a colliding id.
     if (mode === 'copy' && entityType === 'components') continue;
@@ -198,7 +201,7 @@ export function rebindCopyComponentIds(
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes, gatheringConfig } = prepared;
 
-  const components = Array.isArray(system?.components) ? system.components : [];
+  const components = Array.isArray(system?.components) ? system.components : []; // ratchet-exempt(world-scope): import
   const roster = destinationRoster(worldEntityIndex, 'components');
 
   const idMap = {};
@@ -308,7 +311,7 @@ function reportBinding(report, component, claimed, contested, beaten) {
  * would otherwise merge in as a second world record for an Item the destination already has.
  */
 function dropMatchedWorldEntities(prepared, matched, idMap) {
-  const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components];
+  const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components]; // ratchet-exempt(world-scope): import
   if (!slice || typeof slice !== 'object' || !Array.isArray(slice.entities)) return;
   const kept = [];
   for (const entity of slice.entities) {
@@ -345,11 +348,23 @@ function rewriteScopeSliceReferences(prepared, remappers, remapId) {
   }
 }
 
+/** Every result a recipe authors, top level and per step, a choice group's members included. */
+function recipeResults(recipe) {
+  const groups = [
+    ...arrayOf(recipe?.resultGroups),
+    ...arrayOf(recipe?.steps).flatMap((step) => arrayOf(step?.resultGroups)),
+  ];
+  return [
+    ...groups.flatMap((group) => arrayOf(group?.results)),
+    ...arrayOf(recipe?.results),
+  ].flatMap((result) => [result, ...arrayOf(result?.alternatives)]);
+}
+
 /**
  * Copy mode: regenerate every recipe id and remap each `recipeItemDefinitions[].recipeIds` entry
- * to it (issue 701), or every copied book renders empty; an id absent from the payload stays
- * verbatim and still reports. Only `recipeIds[]` positions move, and the component remap never
- * touches them.
+ * and each `knowledge` result's `recipeId` to it (issues 701, 1773), or every copied book renders
+ * empty and every taught recipe is lost; an id absent from the payload stays verbatim and still
+ * reports. The component remap never touches either.
  */
 export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
@@ -374,6 +389,11 @@ export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
   for (const def of arrayOf(system?.recipeItemDefinitions)) {
     if (def && Array.isArray(def.recipeIds)) {
       def.recipeIds = def.recipeIds.map((rid) => idMap.get(rid) ?? rid);
+    }
+  }
+  for (const result of arrayOf(recipes).flatMap(recipeResults)) {
+    if (result?.kind === 'knowledge' && idMap.has(result.recipeId)) {
+      result.recipeId = idMap.get(result.recipeId);
     }
   }
 
@@ -501,8 +521,8 @@ function collectExternalDescriptors(payload) {
   collectMacroDescriptors(slice.tasks, 'task', descriptors);
   collectMacroDescriptors(slice.events, 'event', descriptors);
   // Essence property macros (issue 1036) sit on a differently named field.
-  collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');
-  collectComplicationMacroDescriptors(system.components, descriptors);
+  collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid'); // ratchet-exempt(world-scope): import
+  collectComplicationMacroDescriptors(system.components, descriptors); // ratchet-exempt(world-scope): import
 
   return descriptors;
 }
@@ -555,7 +575,7 @@ function collectMacroDescriptors(records, ownerType, descriptors, field = 'macro
 /** Report the internal references that resolve to nothing within the payload. */
 function collectBrokenInternalReferences(payload, out) {
   const system = payload.system || {};
-  const componentIds = idSet(system.components);
+  const componentIds = idSet(system.components); // ratchet-exempt(world-scope): import
   const recipeItemIds = idSet(system.recipeItemDefinitions);
   const slice = systemSlice(payload.gatheringConfig);
   const taskIds = idSet(slice.tasks);
@@ -603,8 +623,8 @@ function collectBrokenInternalReferences(payload, out) {
       push(REFERENCE_KINDS.COMPONENT_LINK, 'tool', tool, replacementComponentId);
     }
   };
-  for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool);
-  for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);
+  for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool); // ratchet-exempt(world-scope): import
+  for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool); // ratchet-exempt(world-scope): import
 
   // Recipe ingredient, result and catalyst refs, recursive `alternatives[]` and flat aliases
   // included, top level and per step (issue 570). `ownerType` travels with the owner because a
@@ -623,14 +643,8 @@ function collectBrokenInternalReferences(payload, out) {
     }
     for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner, ownerType);
   };
-  const reportResultRef = (result, owner, ownerType) => {
-    const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
-    for (const componentId of references) {
-      if (!componentIds.has(componentId)) {
-        push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
-      }
-    }
-  };
+  const recipeIds = idSet(payload.recipes);
+  const reportResultRef = resultReferenceReporter(payload, { componentIds, recipeIds }, push);
   const reportResultGroups = (resultGroups, owner, ownerType) => {
     for (const group of arrayOf(resultGroups)) {
       for (const result of arrayOf(group?.results)) reportResultRef(result, owner, ownerType);
@@ -666,6 +680,7 @@ function collectBrokenInternalReferences(payload, out) {
 
   // Component salvage result refs + legacy salvage catalysts (issue 570 D2). The owner
   // here is a COMPONENT, so the report says "Component: <name>" (issue 877).
+  // ratchet-exempt(world-scope): import
   for (const component of arrayOf(system.components)) {
     const salvage = component?.salvage;
     if (!salvage || typeof salvage !== 'object') continue;
@@ -675,6 +690,7 @@ function collectBrokenInternalReferences(payload, out) {
   }
 
   // Essence `sourceComponentId`, falling back to the legacy `associatedSystemItemId`.
+  // ratchet-exempt(world-scope): import
   for (const def of arrayOf(system.essenceDefinitions)) {
     const sourceComponentId = def?.sourceComponentId ?? def?.associatedSystemItemId;
     if (sourceComponentId && !componentIds.has(sourceComponentId)) {
@@ -682,6 +698,11 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
+  reportRecipeItemLinks(payload, { recipeIds, recipeItemIds }, push);
+}
+
+/** Book-to-recipe links in both directions, reported where either end is absent. */
+function reportRecipeItemLinks(payload, { recipeIds, recipeItemIds }, push) {
   // Legacy reverse `recipeItemId`; absent once a world has book-side membership.
   for (const recipe of arrayOf(payload.recipes)) {
     if (recipe?.recipeItemId && !recipeItemIds.has(recipe.recipeItemId)) {
@@ -690,14 +711,42 @@ function collectBrokenInternalReferences(payload, out) {
   }
 
   // Book membership: each definition's recipeIds → recipes (issue 511 many-to-many).
-  const recipeIds = idSet(payload.recipes);
-  for (const def of arrayOf(system.recipeItemDefinitions)) {
+  for (const def of arrayOf(payload.system?.recipeItemDefinitions)) {
     for (const rid of arrayOf(def?.recipeIds)) {
       if (rid && !recipeIds.has(rid)) {
         push(REFERENCE_KINDS.RECIPE_ITEM, 'recipeItem', def, rid);
       }
     }
   }
+}
+
+/** Reports a result's absent component, taught recipe or unit, a choice group's members included. */
+function resultReferenceReporter(payload, { componentIds, recipeIds }, push) {
+  const reportRewardRef = rewardReferenceReporter(payload, recipeIds, push);
+  const report = (result, owner, ownerType) => {
+    for (const member of arrayOf(result?.alternatives)) report(member, owner, ownerType);
+    reportRewardRef(result, owner, ownerType);
+    const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
+    for (const componentId of references) {
+      if (!componentIds.has(componentId)) {
+        push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
+      }
+    }
+  };
+  return report;
+}
+
+/** Reports a `knowledge` result's absent taught recipe and a `currency` result's absent unit. */
+function rewardReferenceReporter(payload, recipeIds, push) {
+  const unitIds = idSet(payload.currencyConfig?.units);
+  return (result, owner, ownerType) => {
+    if (result?.kind === 'knowledge' && result.recipeId && !recipeIds.has(result.recipeId)) {
+      push(REFERENCE_KINDS.RECIPE_LINK, ownerType, owner, result.recipeId);
+    }
+    if (result?.kind === 'currency' && result.unit && !unitIds.has(result.unit)) {
+      push(REFERENCE_KINDS.CURRENCY_UNIT, ownerType, owner, result.unit);
+    }
+  };
 }
 
 function taskLinkIds(env) {

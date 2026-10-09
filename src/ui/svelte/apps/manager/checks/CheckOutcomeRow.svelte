@@ -1,13 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One routed outcome tier row: its band swatch, name, threshold field, success toggle, the
-  `checkDriven` break-tools switch and delete. `column` names the threshold field: `dc` (`DC ±`)
-  and `benefit` (`Benefit ±`) edit the tier's `dc` offset, `adjustment` edits its multiplier with
+  `checkDriven` break-tools switch and delete. `column` names the threshold field: `dc` (`DC ±`),
+  `benefit` (`Benefit ±`) and `successes` (`Extra successes`) edit the tier's `dc` offset, `adjustment` edits its multiplier with
   a null endpoint read as Otherwise, and a fixed-type row edits its `start`/`end` range. The list's
   column header names each field on screen; every control also carries its own accessible name.
 -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -153,7 +153,7 @@
     value={outcome.success === true ? 'success' : 'failure'}
     groupName={`outcome-success-${outcome.id}`}
     ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-    dataAttr="data-outcome-success"
+    data-outcome-success
     optionDataAttr="data-outcome-success-option"
     onChange={(next) => onUpdate({ success: next === 'success' })}
   />
@@ -172,7 +172,7 @@
     </span>
   {/if}
 
-  <ManagerButton
+  <Button
     role="danger"
     class="manager-checks-tier-remove"
     data-remove-outcome
@@ -180,7 +180,7 @@
     onclick={onRemove}
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
-  </ManagerButton>
+  </Button>
 </div>
 
 <style>

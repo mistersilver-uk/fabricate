@@ -27,10 +27,11 @@
     pickDefaultSystemId,
   } from '../../util/systemDisambiguation.js';
   import Chip from '../../components/Chip.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Field from '../../components/Field.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
 
@@ -301,18 +302,18 @@
   </header>
 
   <div class="fab-im-toolbar">
-    <!-- THE OPEN STATE RIDES `aria-expanded`, NOT A CLASS (issue 1520). `ManagerButton`'s role
+    <!-- THE OPEN STATE RIDES `aria-expanded`, NOT A CLASS (issue 1520). `Button`'s role
          vocabulary is about what a verb MEANS, not about whether its disclosure is open, so the
          `is-active` accent edge this button drew is restated below against the attribute that
          already announces the state — a hook that cannot drift from the behaviour it describes. -->
-    <ManagerButton
+    <Button
       aria-expanded={showPromote}
       onclick={() => (showPromote = !showPromote)}
       data-interactable-manager-promote-toggle=""
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}</span>
-    </ManagerButton>
+    </Button>
   </div>
 
   {#if showPromote}
@@ -334,7 +335,7 @@
         options={regionSelectOptions}
         onChange={(next) => (selectedRegionId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-region': '' }}
+        triggerProps={{ 'data-interactable-manager-region': '' }}
       />
 
       <Select
@@ -343,7 +344,7 @@
         options={systemSelectOptions}
         onChange={(next) => (selectedSystemId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-system': '' }}
+        triggerProps={{ 'data-interactable-manager-system': '' }}
       />
 
       <!-- THE THREE RADIO FIELDSETS ARE SEGMENTED TRACKS (issue 1520). Each is a closed set of
@@ -370,7 +371,7 @@
           groupName="fab-im-source-type"
           ariaLabel={text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}
           fill
-          dataAttr="data-interactable-manager-source-type"
+          data-interactable-manager-source-type
           optionDataAttr="data-interactable-manager-source-type-option"
         />
       </Field>
@@ -381,7 +382,7 @@
         options={sourceSelectOptions}
         onChange={(next) => (selectedReferenceId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-source': '' }}
+        triggerProps={{ 'data-interactable-manager-source': '' }}
       />
 
       <Field as="label">
@@ -406,7 +407,7 @@
           groupName="fab-im-visual-mode"
           ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}
           fill
-          dataAttr="data-interactable-manager-visual-mode"
+          data-interactable-manager-visual-mode
           optionDataAttr="data-interactable-manager-visual-mode-option"
         />
       </Field>
@@ -421,27 +422,24 @@
             groupName="fab-im-marker-kind"
             ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}
             fill
-            dataAttr="data-interactable-manager-marker-kind"
+            data-interactable-manager-marker-kind
             optionDataAttr="data-interactable-manager-marker-kind-option"
           />
         </Field>
       {/if}
 
       <div class="fab-im-promote-actions">
-        <ManagerButton
+        <Button
           role="primary"
           disabled={!canPromote}
           onclick={confirmPromote}
           data-interactable-manager-promote-confirm=""
         >
           {text('FABRICATE.Canvas.Manage.PromoteConfirm', 'Promote region')}
-        </ManagerButton>
-        <ManagerButton
-          onclick={() => (showPromote = false)}
-          data-interactable-manager-promote-cancel=""
-        >
+        </Button>
+        <Button onclick={() => (showPromote = false)} data-interactable-manager-promote-cancel="">
           {text('FABRICATE.Canvas.Manage.PromoteCancel', 'Cancel')}
-        </ManagerButton>
+        </Button>
       </div>
     </InspectorCard>
   {/if}
@@ -451,12 +449,13 @@
     aria-label={text('FABRICATE.Canvas.Manage.ListLabel', 'Interactables on this scene')}
   >
     {#if rows.length === 0}
-      <p class="fab-im-empty">
-        {text(
+      <EmptyState
+        hint={text(
           'FABRICATE.Canvas.Manage.Empty',
           'No interactables on this scene yet. Promote a region above, or drag one from the Interactable browser.'
         )}
-      </p>
+        data-interactable-manager-empty=""
+      />
     {:else}
       <ul class="fab-im-list">
         {#each rows as row (row.ref.regionId + '.' + row.ref.behaviorId)}
@@ -565,7 +564,7 @@
   /* THE OPEN DISCLOSURE'S ACCENT EDGE, restated against `aria-expanded` (issue 1520). The
      button's `is-active` class said the same thing twice — once to a reader of the markup and
      once to assistive technology — and only the attribute is the behaviour's own. `:global(...)`
-     because the element is `ManagerButton`'s; anchored on `.fab-im-toolbar`, which this file
+     because the element is `Button`'s; anchored on `.fab-im-toolbar`, which this file
      writes, so the hash lands there. */
   .fab-im-toolbar :global(.fabricate-button[aria-expanded='true']) {
     border-color: var(--fab-accent);
@@ -617,12 +616,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .fab-im-empty {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.85rem;
   }
 
   .fab-im-list {

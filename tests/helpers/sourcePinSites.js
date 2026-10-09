@@ -457,17 +457,19 @@ function analyseModule(ast, { file = '', scopeManager, exportsOf = NO_EXPORTS } 
   const context = { readers, paths, sources, keyFor, parameters };
   // A local wrapper's body calls one of these, so they alone decide whether the module reads files.
   const direct = new Set([...readers, ...seeds.wrappers]);
-  let sites = 0;
+  const siteLines = [];
   let readsFiles = false;
   for (const node of index.calls) {
     readsFiles ||= isReader(node, direct);
-    if (isPinSite(node, context)) sites += 1;
+    if (isPinSite(node, context)) siteLines.push(node.loc.start.line);
   }
-  if (!hasExports(ast)) return { sites, readsFiles, exports: new Map() };
+  const sites = siteLines.length;
+  if (!hasExports(ast)) return { sites, siteLines, readsFiles, exports: new Map() };
   const wrappers = readerNames(index, direct);
   const texts = textReaderNames(index, seeds.readers);
   return {
     sites,
+    siteLines,
     readsFiles,
     exports: exportTable(ast, { ...context, wrappers, texts }, exportsOf),
   };
@@ -494,8 +496,9 @@ const sameTable = (left, right) =>
  * Every module's pin sites, with imported text followed across modules to a fixpoint.
  *
  * @param {Map<string, {ast: object, scopeManager?: object}>} corpus Keyed by repo-relative path.
- * @returns {{sites: Map<string, number>, fileReaders: Set<string>}} Sites for modules with any,
- *   and every module that calls a raw reader or an imported reader wrapper.
+ * @returns {{sites: Map<string, number>, siteLines: Map<string, number[]>,
+ *   fileReaders: Set<string>}} Sites, and the 1-based line of each, for modules with any; and every
+ *   module that calls a raw reader or an imported reader wrapper.
  */
 export function countCorpusPinSites(corpus) {
   const tables = new Map();
@@ -522,10 +525,14 @@ export function countCorpusPinSites(corpus) {
   }
   for (const file of corpus.keys()) if (!results.has(file)) analyse(file);
   const sites = new Map();
+  const siteLines = new Map();
   const fileReaders = new Set();
   for (const [file, result] of results) {
-    if (result.sites > 0) sites.set(file, result.sites);
+    if (result.sites > 0) {
+      sites.set(file, result.sites);
+      siteLines.set(file, result.siteLines);
+    }
     if (result.readsFiles) fileReaders.add(file);
   }
-  return { sites, fileReaders };
+  return { sites, siteLines, fileReaders };
 }

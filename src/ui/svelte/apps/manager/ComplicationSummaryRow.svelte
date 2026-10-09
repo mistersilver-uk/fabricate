@@ -16,8 +16,11 @@
   Snippets:
   - `children` — the expanded editor body, rendered inside the row's card when open.
 
+  Rest spread:
+  - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
+
   Invariants:
-  - ONE SCAFFOLD, not a copy per variant: there are six call sites, and three `{#if}` branches each
+  - ONE SCAFFOLD, not a copy per variant: there are five call sites, and three `{#if}` branches each
     restating the shell is intra-file duplication SonarCloud's detector reads in `.svelte`.
   - THE ROW IS A `<div>` and `RowDisclosure` is the sole trigger, with the delete control as its
     SIBLING: a whole-row `<button>` would nest buttons, which `createElement` accepts and no mounted
@@ -53,9 +56,9 @@
     onDelete = null,
     deleteLabel = '',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     children = undefined,
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   // A NARRATIVE gravity axis, never shared with `systemValidation.js` or the notice channel.
@@ -76,7 +79,6 @@
   const clampLines = $derived(
     Number.isFinite(Number(bodyClamp)) && Number(bodyClamp) > 0 ? Math.floor(Number(bodyClamp)) : 0
   );
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <!-- ONE chip run in one of two places. The TENSE chip leads the severity chip, so a positional
@@ -96,10 +98,10 @@
 {/snippet}
 
 <div
-  class="fab-complication-row is-{variant} is-gravity-{gravity.tone}"
+  class={['fab-complication-row', `is-${variant}`, `is-gravity-${gravity.tone}`, extraClass]}
   class:is-expanded={expanded}
   data-complication-row={variant}
-  {...hookAttributes}
+  {...rest}
 >
   <div class="fab-complication-row-line">
     <span class="fab-complication-severity is-{gravity.tone}" aria-hidden="true"
@@ -140,8 +142,8 @@
         {expanded}
         {controls}
         {disabled}
-        label={disclosureLabel || name}
-        dataAttr="data-complication-disclosure"
+        ariaLabel={disclosureLabel || name}
+        data-complication-disclosure
         onToggle={() => onToggle(!expanded)}
       />
       {#if onDelete}
@@ -212,20 +214,20 @@
 
   .fab-complication-row-line {
     display: flex;
-    gap: 11px;
+    gap: var(--fab-space-3);
     align-items: center;
-    padding: 11px 13px;
+    padding: var(--fab-space-3);
   }
 
   .fab-complication-row.is-readonly-gm .fab-complication-row-line {
-    gap: 9px;
-    padding: 7px 10px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
   }
 
   /* No padding of its own: the band or group card the player row sits in already carries the
      inset, and paying it twice costs a 300px column ~20px of prose width. */
   .fab-complication-row.is-player .fab-complication-row-line {
-    gap: 9px;
+    gap: var(--fab-space-2);
     padding: 0;
     align-items: flex-start;
   }
@@ -238,7 +240,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     font-size: 11px;
   }
 
@@ -264,7 +266,7 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -343,7 +345,7 @@
   .fab-complication-row-activities {
     display: flex;
     flex: 0 0 auto;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
     color: var(--fab-text-secondary);
     font-size: 10px;
@@ -358,8 +360,8 @@
   .fab-complication-row-detail {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 13px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
   }
 </style>

@@ -16,7 +16,7 @@ import {
   selectOptionLabels,
   selectTriggerText,
 } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -39,8 +40,8 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/AccessTabView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/AccessTabView.svelte'

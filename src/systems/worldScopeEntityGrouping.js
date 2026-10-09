@@ -174,7 +174,7 @@ function partition(systems, entityType, refusedPairs) {
   const componentsBySystem = new Map();
   for (const system of systems) {
     if (isPlainObject(system) && trimmedString(system.id)) {
-      componentsBySystem.set(trimmedString(system.id), arrayOf(system.components));
+      componentsBySystem.set(trimmedString(system.id), arrayOf(system.components)); // ratchet-exempt(world-scope): basis
     }
   }
 

@@ -81,8 +81,7 @@
     <EmptyState
       note
       hint={localize('FABRICATE.App.Gathering.Detail.NoRequirements')}
-      dataAttr="data-gathering-no-requirements"
-      dataValue=""
+      data-gathering-no-requirements
     />
   {:else}
     <div class="gathering-task-details-grid">

@@ -12,8 +12,10 @@
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Field from '../../../components/Field.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -48,8 +50,6 @@
        drop-scoped writers are bound to the row below rather than forwarded as they arrive. */
     suggestions,
     characterModifierLibrary,
-    characterModifierSearchOpenUp,
-    characterModifierSearchAnchor = $bindable(),
     characterModifierSearchTerm = $bindable(),
     gatheringConditionAvailableOptions,
     gatheringConditionLabel,
@@ -86,7 +86,7 @@
 
 {#if task}
   {#if !editing}
-    <section class="fabricate-card manager-inspector-card" data-gathering-task-inspector>
+    <InspectorCard data-gathering-task-inspector="">
       <div class="manager-inspector-title-row is-hero-large">
         <img class="manager-recipe-preview" src={gatheringTaskImage(task)} alt="" />
         <div class="manager-inspector-copy">
@@ -111,9 +111,9 @@
         {truncateDescription(task.description) ||
           text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
       </p>
-    </section>
+    </InspectorCard>
 
-    <section class="fabricate-card manager-inspector-card">
+    <InspectorCard>
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}
       </h3>
@@ -151,9 +151,9 @@
           >
         </div>
       </div>
-    </section>
+    </InspectorCard>
 
-    <section class="fabricate-card manager-inspector-card" data-task-drops-summary>
+    <InspectorCard data-task-drops-summary="">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}
       </h3>
@@ -179,12 +179,9 @@
           {/each}
         </div>
       {/if}
-    </section>
+    </InspectorCard>
 
-    <section
-      class="fabricate-card manager-inspector-card manager-task-environment-usage-card"
-      data-task-environment-usage
-    >
+    <InspectorCard class="manager-task-environment-usage-card" data-task-environment-usage="">
       <h3 class="manager-card-title">
         {text(
           'FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard',
@@ -214,13 +211,13 @@
           {/each}
         </div>
       {/if}
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if editing}
     {#if (editingTask?.resolutionMode || 'd100') === 'd100' && selectedDrop}
       <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
-        <section class="fabricate-card manager-inspector-card manager-drop-editor-header-card">
+        <InspectorCard class="manager-drop-editor-header-card">
           <h3 class="manager-card-title">
             {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
           </h3>
@@ -239,7 +236,7 @@
             </div>
           </div>
           <div class="manager-drop-editor-actions">
-            <ManagerButton
+            <Button
               aria-label={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
                 'Duplicate'
@@ -253,26 +250,27 @@
                   'Duplicate'
                 )}</span
               >
-            </ManagerButton>
-            <ManagerButton
+            </Button>
+            <Button
               role="danger"
               aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}
               onclick={() => onDeleteDrop(selectedDrop.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
-            </ManagerButton>
+            </Button>
           </div>
-        </section>
+        </InspectorCard>
 
         <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
 
         <div class="manager-drop-inspector-scroll">
-          <section class="fabricate-card manager-inspector-card manager-drop-editor-card">
+          <InspectorCard class="manager-drop-editor-card">
             <div class="manager-drop-editor-values">
-              <label
-                class="fabricate-field manager-field manager-drop-rate-editor"
-                data-gathering-drop-inspector-rate
+              <Field
+                as="label"
+                class="manager-drop-rate-editor"
+                data-gathering-drop-inspector-rate=""
               >
                 <span
                   >{text(
@@ -298,11 +296,12 @@
                   stopPropagation={true}
                   onChange={(dropRate) => onUpdateDrop(selectedDrop.id, { dropRate })}
                 />
-              </label>
+              </Field>
 
-              <label
-                class="fabricate-field manager-field manager-drop-count-editor"
-                data-gathering-drop-inspector-count
+              <Field
+                as="label"
+                class="manager-drop-count-editor"
+                data-gathering-drop-inspector-count=""
               >
                 <span
                   >{text(
@@ -323,9 +322,9 @@
                   onblur={(event) => onDropCountBlur(selectedDrop, event)}
                   onkeydown={(event) => onDropCountKeydown(selectedDrop, event)}
                 />
-              </label>
+              </Field>
             </div>
-          </section>
+          </InspectorCard>
 
           <GatheringModifierEditor
             subject="drop"
@@ -333,8 +332,6 @@
             idPrefix={`drop-${selectedDrop.id}`}
             {suggestions}
             {characterModifierLibrary}
-            {characterModifierSearchOpenUp}
-            bind:characterModifierSearchAnchor
             bind:characterModifierSearchTerm
             {gatheringConditionAvailableOptions}
             {gatheringConditionLabel}
@@ -373,14 +370,14 @@
         </div>
       </div>
     {:else if (editingTask?.resolutionMode || 'd100') === 'd100'}
-      <section class="fabricate-card manager-inspector-card" data-gathering-task-drop-inspector>
+      <InspectorCard data-gathering-task-drop-inspector="">
         <h3 class="manager-card-title">
           {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
         </h3>
         <p class="manager-muted">
           {text('FABRICATE.Admin.Manager.Environment.Tasks.NoDrops', 'No drops have been added.')}
         </p>
-      </section>
+      </InspectorCard>
     {/if}
   {/if}
 {:else}

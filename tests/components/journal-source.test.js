@@ -21,7 +21,6 @@ const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
-const builderSource = read('../../src/ui/presenters/RunJournalBuilder.js');
 const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
 const enLang = JSON.parse(read('../../lang/en.json'));
@@ -46,8 +45,7 @@ describe('FabricateAppRoot Journal wiring', () => {
 
   it('feeds an active-run count badge from the shared store navCount', () => {
     assert.ok(rootSource.includes('services?.journal?.navCount'), 'badge count comes from the store navCount getter');
-    assert.ok(rootSource.includes('fabricate-app-nav-count'), 'badge element uses the namespaced class');
-    assert.ok(rootSource.includes('{#if tab.count > 0}'), 'badge only renders for a positive count');
+    assert.ok(rootSource.includes('tab.count > 0'), 'badge only renders for a positive count');
   });
 
   it('registers shell-level Journal refresh so the badge stays fresh while the tab is closed', () => {
@@ -83,7 +81,7 @@ describe('JournalView layout + effects', () => {
     assert.ok(viewSource.includes('.journal-detail-pane {\n      min-height: 220px;'), 'Detail remains reachable below both lists');
   });
 
-  it('composes the required shared search, kind, status, and independent pager controls', () => {
+  it('composes the required shared search, status, and independent pager controls', () => {
     assert.ok(viewSource.includes('<div class="journal-search-field">'));
     assert.equal(
       viewSource.includes('<Field as="div" class="journal-search-field">'),
@@ -100,10 +98,14 @@ describe('JournalView layout + effects', () => {
       ),
       'the search primitive can fit the compact search/kind grid without overlapping the kind control'
     );
-    assert.ok(viewSource.includes('<ManagerSearchField'));
+    assert.ok(/<SearchField[\s/>]/.test(viewSource));
     assert.ok(viewSource.includes('class="journal-search-control"'));
-    assert.ok(viewSource.includes('size="30"'));
-    assert.ok(viewSource.includes('<div class="journal-kind-field">'));
+    // The journal search is the 38px shell like every non-compact search (issue 1782, D3): the
+    // `size="30"` it passed named no rung and is gone.
+    assert.ok(
+      !/<SearchField\b(?:(?!\/>)[\s\S])*?\bsize=/.test(viewSource),
+      'the journal search passes no size'
+    );
     assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
     assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');
     assert.ok(
@@ -264,10 +266,11 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
   });
 
   it('every resolution-mode label key resolves to a real localized string', () => {
-    const keys = [...builderSource.matchAll(/'(FABRICATE\.App\.Journal\.Mode\.[A-Za-z]+)'/g)].map(
+    const modeSource = read('../../src/ui/presenters/journalCheckText.js');
+    const keys = [...modeSource.matchAll(/'(FABRICATE\.App\.Journal\.Mode\.[A-Za-z]+)'/g)].map(
       (match) => match[1]
     );
-    assert.ok(keys.length >= 5, 'extracted the MODE_LABEL_KEYS values from the builder');
+    assert.ok(keys.length >= 6, 'extracted the mode label keys from journalCheckText');
     for (const key of new Set(keys)) {
       assert.equal(
         typeof resolveLangKey(key),
@@ -285,7 +288,7 @@ describe('Journal global CSS treatments', () => {
   });
 
   it('adds the namespaced nav-count badge with no colour literals', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-nav-count'), 'nav-count rule present');
+    assert.ok(cssSource.includes('.fabricate-nav .fabricate-app-nav-count'), 'nav-count rule present');
     assert.ok(cssSource.includes('background: var(--fab-success);'), 'badge tokenized');
   });
 });

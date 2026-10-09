@@ -3,6 +3,7 @@
  * read from its display projection only: Target, Pre-rolled and Margin, or for a fixed roll-high
  * target Needed and Margin. `localize` is key-only, as every card module's is.
  */
+import { preRollBenefit } from '../../systems/checkModifierRouter.js';
 import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
 import { fill } from '../../utils/fillPlaceholders.js';
 
@@ -24,6 +25,7 @@ const KEYS = Object.freeze({
   modifiers: 'FABRICATE.Check.Evidence.Modifiers',
   situational: 'FABRICATE.Check.Evidence.Situational',
   preRoll: 'FABRICATE.Check.Evidence.PreRoll',
+  preRollLowering: 'FABRICATE.Check.Advantage.PreRollLowering',
   marginUnder: 'FABRICATE.Check.Evidence.MarginUnder',
   toolLabel: 'FABRICATE.Check.Evidence.ToolLabel',
   modifierLabel: 'FABRICATE.Check.Evidence.ModifierLabel',
@@ -72,7 +74,7 @@ function fixedOver(display) {
   return display.evaluation.direction === 'over' && !Array.isArray(display.evidence.targetTerms);
 }
 
-/** The pre-rolls that raised the target, in the order they settled. */
+/** The pre-rolls that moved the target, in the order they settled. */
 function targetPreRolls(evidence) {
   return (evidence.preRolls ?? []).filter((entry) => entry.destination === 'target');
 }
@@ -86,7 +88,7 @@ function benefitTotals(evidence) {
   for (const term of evidence.targetTerms ?? []) {
     if (term.kind === 'benefit') add(term.source, term.value);
   }
-  for (const entry of targetPreRolls(evidence)) add(entry.source, entry.total);
+  for (const entry of targetPreRolls(evidence)) add(entry.source, preRollBenefit(entry));
   return totals;
 }
 
@@ -139,7 +141,8 @@ function targetText(evidence, loc) {
   return fill(loc(KEYS.targetTerms), { target: evidence.target, terms: terms.join(', ') });
 }
 
-function preRollLabel(entry, loc) {
+/** A pre-roll's recorded label, else its source's generic name. */
+export function preRollLabel(entry, loc) {
   if (entry.label) return entry.label;
   if (entry.source === 'tool') return loc(KEYS.toolLabel);
   if (entry.source === 'situational') return loc(KEYS.situationalLabel);
@@ -147,7 +150,7 @@ function preRollLabel(entry, loc) {
 }
 
 /** An expression without the one pair of brackets the resolver wraps a rolled modifier in. */
-function bareExpression(expression) {
+export function bareExpression(expression) {
   const inner = /^\((.*)\)$/.exec(expression)?.[1];
   if (inner === undefined) return expression;
   let depth = 0;
@@ -161,7 +164,7 @@ function bareExpression(expression) {
 function preRolledText(evidence, loc) {
   return targetPreRolls(evidence)
     .map((entry) =>
-      fill(loc(KEYS.preRoll), {
+      fill(loc(entry.negate ? KEYS.preRollLowering : KEYS.preRoll), {
         label: preRollLabel(entry, loc),
         formula: bareExpression(entry.expression),
         total: entry.total,

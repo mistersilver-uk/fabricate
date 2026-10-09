@@ -3,21 +3,27 @@
   RollResultBox shows the outcome of the player's most recent craft of the current
   recipe (store.lastRollResult[recipeId]). It is defensive about the result shape:
   it surfaces a success/failure tone, the rolled total and outcome label when
-  present, a summed check's outcome sentence, an optional message, the executed check's evidence
-  rows, and any awarded items. Renders nothing when there is no recorded result.
+  present, a summed or counted check's outcome sentence, an optional message, the executed check's
+  evidence rows, and any awarded items. A pool reduced to zero states no total. Renders nothing
+  when there is no recorded result.
 -->
 <script>
-  import Medallion from '../../../components/Medallion.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { statesEvidence } from '../../../../presenters/checkEvidenceRows.js';
+  import { countBotched, statesCountEvidence } from '../../../../presenters/countEvidenceRows.js';
   import CheckEvidenceRows from './CheckEvidenceRows.svelte';
-  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
+  import AwardPill from './AwardPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { result = null } = $props();
 
   const success = $derived(result?.success !== false);
   const outcome = $derived(result?.outcome ?? result?.checkResult?.outcome ?? null);
-  const total = $derived(result?.total ?? result?.checkResult?.total ?? null);
+  // A pool reduced to zero rolled nothing, so it states no total rather than 0 (issue 2006).
+  const zeroPool = $derived(
+    result?.check?.count?.zeroPool === true || result?.checkResult?.data?.zeroPool === true
+  );
+  const total = $derived(zeroPool ? null : (result?.total ?? result?.checkResult?.total ?? null));
   const message = $derived(typeof result?.message === 'string' ? result.message : '');
   const items = $derived(
     Array.isArray(result?.items)
@@ -29,17 +35,18 @@
   // What the outcome means for the award, beside the check's evidence; a failure that still
   // awarded items says nothing rather than claim nothing was produced.
   const summary = $derived.by(() => {
-    if (!statesEvidence(result?.check)) return '';
+    if (!statesEvidence(result?.check) && !statesCountEvidence(result?.check)) return '';
     if (success) return localize('FABRICATE.App.Crafting.Run.ResultProduced');
-    return items.length === 0 ? localize('FABRICATE.App.Crafting.Run.NothingProduced') : '';
+    if (items.length > 0) return '';
+    return countBotched(result.check)
+      ? localize('FABRICATE.Check.CountEvidence.Botched')
+      : localize('FABRICATE.App.Crafting.Run.NothingProduced');
   });
 </script>
 
 {#if result}
-  <section
-    class="crafting-roll-box"
-    class:is-success={success}
-    class:is-failure={!success}
+  <InspectorCard
+    class={`crafting-roll-box ${success ? 'is-success' : 'is-failure'}`}
     data-recipe-section="roll-result"
     data-roll-success={success ? 'true' : 'false'}
   >
@@ -67,34 +74,21 @@
     {#if items.length > 0}
       <ul class="crafting-roll-awards">
         {#each items as item, index (item.name + index)}
-          <li class="crafting-roll-award">
-            <Medallion {...resolveCraftingArt(item.img)} alt="" size={24} />
-            <span class="crafting-roll-award-name">{item.name}</span>
-            <span class="crafting-roll-award-qty">×{item.qty ?? 1}</span>
-          </li>
+          <AwardPill {item} variant="roll" />
         {/each}
       </ul>
     {/if}
-  </section>
+  </InspectorCard>
 {/if}
 
 <style>
-  .crafting-roll-box {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-roll-box.is-success {
+  /* The box is the shared card's; the outcome is its tone fill. */
+  :global(.crafting-roll-box.is-success) {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
   }
 
-  .crafting-roll-box.is-failure {
+  :global(.crafting-roll-box.is-failure) {
     border-color: var(--fab-danger-border);
     background: var(--fab-danger-soft);
   }
@@ -105,11 +99,11 @@
     gap: 8px;
   }
 
-  .crafting-roll-box.is-success .crafting-roll-head i {
+  :global(.crafting-roll-box.is-success) .crafting-roll-head i {
     color: var(--fab-success-text);
   }
 
-  .crafting-roll-box.is-failure .crafting-roll-head i {
+  :global(.crafting-roll-box.is-failure) .crafting-roll-head i {
     color: var(--fab-danger-text);
   }
 
@@ -146,36 +140,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-  }
-
-  .crafting-roll-award {
-    /* Cap to the column so a long name ellipsizes instead of widening/wrapping the pill. */
-    max-width: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 8px 2px 2px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface);
-    font-size: 12px;
-  }
-
-  /* Every pill is one line tall regardless of name length: the 24px thumb never varies,
-     so the ONLY thing that changed a pill's height was a long name WRAPPING to a second
-     line. Pin the name to a single ellipsized line so all pills share the thumb-driven
-     height (mirrors the salvage summary fix, issue 687). `min-width:0` lets the flex item
-     shrink far enough for the ellipsis to engage. */
-  .crafting-roll-award-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .crafting-roll-award-qty {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--fab-text-muted);
   }
 </style>

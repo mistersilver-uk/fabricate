@@ -4,7 +4,7 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
 import { JOURNAL_RUN_CLAIM_PAGE_ID } from '../../../src/systems/journalRunAuthority.js';
 
-import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import { buildLabActors, buildDocumentIndex, seedLearnableBook } from './labActors.js';
 import {
   buildLabContent,
   ICON_BASE,
@@ -13,8 +13,9 @@ import {
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
-import { stockJournalPrototype } from './labJournalPrototype.js';
-import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
+import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
+import { registerLabMacros } from './labMacros.js';
+import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
   buildLabRunStates,
@@ -27,9 +28,180 @@ const FABRICATE_NAMESPACE = 'fabricate';
 
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
+
+/** The lab recipe `id` and its crafting system, or a thrown error naming the `state` needing it. */
+function recipeAndSystem(content, id, state) {
+  const recipe = content.recipes.find((entry) => entry.id === id);
+  const system = content.systems.find((entry) => entry.id === recipe?.craftingSystemId);
+  if (!recipe || !system) throw new Error(`view lab: ${state} requires recipe ${id}`);
+  return { recipe, system };
+}
+
+/** `reward-kinds` (issue 1773): Bend Horseshoe also pays a labelled, rolled bounty and teaches
+ *  Forge Longsword, under a Smithing that takes part in currency. */
+function seedRewardKinds(content) {
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-kinds');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push(
+    {
+      id: 'sm-r-horseshoe-bounty',
+      kind: 'currency',
+      unit: 'gp',
+      quantity: 5,
+      quantityFormula: '2d6',
+      label: 'Guild bounty',
+      reason: 'Paid by the smiths’ guild for the commission',
+    },
+    { id: 'sm-r-horseshoe-lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 }
+  );
+}
+
+/** `reward-craft`: the `reward-kinds` horseshoe under a knowledge-visibility Smithing, so the craft
+ *  clears the pre-flight, also re-teaching itself, which Brenna knows (`seedRewardCraftLearned`). */
+function seedRewardCraft(content) {
+  seedRewardKinds(content);
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-craft');
+  system.visibilityMode = 'knowledge';
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-known',
+    kind: 'knowledge',
+    recipeId: 'sm-r-horseshoe',
+    quantity: 1,
+  });
+}
+
+/** `reward-missing`: the `reward-craft` horseshoe also teaching a recipe Smithing no longer holds. */
+function seedRewardMissing(content) {
+  seedRewardCraft(content);
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-missing');
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-retired',
+    kind: 'knowledge',
+    recipeId: 'sm-r-retired-lore',
+    quantity: 1,
+  });
+}
+
+function seedRewardCraftLearned(actors) {
+  const brenna = actors.find((actor) => actor.id === 'lab-actor-brenna');
+  const learned = brenna?.flags?.fabricate?.fabricate?.learnedRecipes ?? {};
+  seedFabricateFlag(brenna, ['fabricate', 'learnedRecipes'], {
+    ...learned,
+    'sm-r-horseshoe': { sourceItemUuid: null, learnedAt: 1_200_000 },
+  });
+}
+
+/** `reward-group` (issue 1773): Bend Horseshoe also leaves the player a pick of up to two — an
+ *  ingot, a guild bounty or the longsword's recipe — under a knowledge-visibility Smithing that
+ *  takes part in currency, so the craft clears the pre-flight and its outputs preview the group. */
+function seedRewardGroup(content) {
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-group');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  system.visibilityMode = 'knowledge';
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-reward',
+    awardStrategy: 'upTo',
+    awardCount: 2,
+    alternatives: [
+      { id: 'ingot', componentId: 'sm-iron-ingot', quantity: 2 },
+      { id: 'bounty', kind: 'currency', unit: 'gp', quantity: 12, label: 'Guild bounty' },
+      { id: 'lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 },
+    ],
+  });
+}
+
+/** A rolled group's member, drawn when its selection roll lands in `from`–`to`. */
+const drawn = (id, componentId, quantity, from, to) => ({
+  id,
+  componentId,
+  quantity,
+  selectionRange: { from, to },
+});
+
+/** `reward-group-rolled` (issue 1773): Bend Horseshoe's outputs also draw by roll — one of two on
+ *  a d6 ladder, and up to two of three — so its preview states both rolled captions. */
+function seedRewardGroupRolled(content) {
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-group-rolled');
+  recipe.resultGroups[0].results.push(
+    {
+      id: 'sm-r-horseshoe-draw',
+      chooser: 'rolled',
+      selectionFormula: '1d6',
+      alternatives: [
+        drawn('scrap', 'sm-iron-ingot', 1, 1, 3),
+        drawn('bar', 'sm-iron-ingot', 2, 4, 6),
+      ],
+    },
+    {
+      id: 'sm-r-horseshoe-draws',
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCount: 2,
+      selectionFormula: '1d6',
+      alternatives: [
+        drawn('coal', 'sm-coal', 1, 1, 2),
+        drawn('more-coal', 'sm-coal', 2, 3, 4),
+        drawn('ingot', 'sm-iron-ingot', 1, 5, 6),
+      ],
+    }
+  );
+}
+
+/** `reward-tiers`: the Runeblade's masterwork tier also pays a labelled commission. */
+function seedRewardTiers(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'reward-tiers');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push({
+    id: 'rw-r-blade-commission',
+    kind: 'currency',
+    unit: 'gp',
+    quantity: 25,
+    label: 'Guild commission',
+  });
+}
+
+/** `unnamed`: the horseshoe recipe's result names no component, as an item-only one does (1516). */
+function seedUnnamedResult(content) {
+  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
+  const [result] = recipe?.resultGroups?.[0]?.results ?? [];
+  if (!result) return;
+  delete result.componentId;
+  result.itemUuid = 'Item.sm-horseshoe';
+}
+
+/** `history-just-resolved-rewards`: the waxed cord's stage also pays a labelled credit, under a
+ *  workshop that takes part in currency, so the banner the execute raises states it. */
+function seedJustResolvedRewards(content) {
+  const id = journalPrototypeRecipeId('cord');
+  const { recipe, system } = recipeAndSystem(content, id, 'history-just-resolved-rewards');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push({
+    id: 'jp-cord-fee',
+    kind: 'currency',
+    unit: 'gp',
+    quantity: 3,
+    label: 'Chandler’s fee',
+  });
+}
+
+const RESULT_ROW_STATES = Object.freeze({
+  unnamed: seedUnnamedResult,
+  'reward-kinds': seedRewardKinds,
+  'reward-craft': seedRewardCraft,
+  'reward-missing': seedRewardMissing,
+  'reward-group': seedRewardGroup,
+  'reward-group-rolled': seedRewardGroupRolled,
+  'reward-tiers': seedRewardTiers,
+});
+
+function seedResultRowState(content, state) {
+  RESULT_ROW_STATES[state]?.(content);
+}
+
 function seedGatheringTaskMode(content, mode) {
   // Roll-under evaluations: `routed-under` reads Brenna's Intelligence (issue 2073), and
-  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005). Declared
+  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005); and
+  // `routed-count` counts five d10s at 7 or more, exploding once from 9 (issue 2006). Declared
   // here because a fixture test evaluates this function's text on its own.
   const underEvaluations = {
     'routed-under': {
@@ -38,12 +210,43 @@ function seedGatheringTaskMode(content, mode) {
       target: { source: 'attribute', expression: '@abilities.int.mod' },
     },
     'routed-under-fixed': { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    'routed-count': {
+      product: 'count',
+      direction: 'over',
+      pool: {
+        die: 10,
+        base: '5',
+        threshold: '7',
+        required: 2,
+        explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      },
+    },
   };
-  const modes = ['straight', 'routed', 'routed-unmatched', ...Object.keys(underEvaluations)];
+  // Issue 1522's three Results strips: a legacy Progressive task, a Check task under a check with no
+  // tiers, and a d100 task whose two drop rows share a component under a one-drop reward rule.
+  const keepsDrops = { progressive: 'progressive', 'reward-rule': 'd100' };
+  const modes = [
+    'straight',
+    'routed',
+    'routed-unmatched',
+    'routed-no-tiers',
+    ...Object.keys(keepsDrops),
+    ...Object.keys(underEvaluations),
+  ];
   if (!modes.includes(mode)) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
+  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
+  if (keepsDrops[mode]) {
+    task.resolutionMode = keepsDrops[mode];
+    if (mode === 'reward-rule') {
+      task.dropRows.push({ ...task.dropRows[0], id: 'hb-slowbloom-drop-again', dropRate: 20 });
+    }
+    slice.tasks = slice.tasks.map(replaceTask);
+    content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+    return;
+  }
   task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
   task.resultGroups = [
     {
@@ -64,14 +267,16 @@ function seedGatheringTaskMode(content, mode) {
         type: 'relative',
         thresholdMode: 'meet',
         ...(evaluation && { evaluation }),
-        relativeOutcomes: [
-          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-        ],
+        relativeOutcomes:
+          mode === 'routed-no-tiers'
+            ? []
+            : [
+                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+              ],
       },
     };
   }
-  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
   slice.tasks = slice.tasks.map(replaceTask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
 }
@@ -79,11 +284,42 @@ function seedGatheringTaskMode(content, mode) {
 /**
  * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
  * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
- * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers.
+ * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers. `routed-count` counts
+ * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006), and
+ * `routed-count-unordered` needs three from tiers authored out of order (issue 2135).
  */
 function seedRuneworkCheckMode(content, mode) {
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
   const routed = system?.craftingCheck?.routed;
+  if (routed && mode?.startsWith('routed-count')) {
+    const unordered = mode === 'routed-count-unordered';
+    const extra = unordered
+      ? { 'rw-masterwork': 1, 'rw-standard': 0, 'rw-ruined': -2 }
+      : { 'rw-masterwork': 2, 'rw-standard': 0, 'rw-ruined': -2 };
+    const order = unordered ? ['rw-standard', 'rw-ruined', 'rw-masterwork'] : null;
+    const outcomes = order
+      ? order.map((id) => routed.relativeOutcomes.find((outcome) => outcome.id === id))
+      : routed.relativeOutcomes;
+    system.craftingCheck = {
+      ...system.craftingCheck,
+      routed: {
+        ...routed,
+        evaluation: {
+          product: 'count',
+          direction: 'over',
+          pool: {
+            die: 10,
+            base: '5',
+            threshold: '7',
+            required: unordered ? 3 : 2,
+            cancel: { enabled: true, faces: { kind: 'worst' } },
+          },
+        },
+        relativeOutcomes: outcomes.map((outcome) => ({ ...outcome, dc: extra[outcome.id] })),
+      },
+    };
+    return;
+  }
   if (!routed || !['routed-under', 'routed-under-multiply'].includes(mode)) return;
   const multiply = mode === 'routed-under-multiply';
   const adjustments = { 'rw-masterwork': 0.2, 'rw-standard': 0.5, 'rw-ruined': null };
@@ -128,6 +364,19 @@ const CHECK_OVERRIDE_STATES = Object.freeze({
   // A kept override authored under `add`, invalidated by a switch to `multiply` (issue 2078): the
   // field itself, not just readiness, must name it.
   invalid: { source: 'attribute', kind: 'multiply', salvage: [15, -2], task: [15, -2] },
+  // Counting checks (issue 2006, frame 25): the successes needed override, a Standard preset, a
+  // custom count, and the system default, each beside a kept DC override the count never reads.
+  'count-preset': { count: true, salvage: [15, null, 3], task: [12, null, null] },
+  'count-custom': { count: true, salvage: [15, null, 6], task: [12, null, null] },
+  'count-default': { count: true, salvage: [15, null, null], task: [12, null, null] },
+  count: { count: true, salvage: [15, null, null], task: [12, null, null] },
+});
+
+/** The counting evaluation the count override states read: d10s, success on 8 or more. */
+const OVERRIDE_COUNT = Object.freeze({
+  product: 'count',
+  direction: 'over',
+  pool: { die: 10, base: '4', threshold: '8', required: 2 },
 });
 
 /** A relative routed check over `evaluation`, as the salvage and gathering states seed it. */
@@ -143,25 +392,70 @@ const routedCheck = (evaluation) => ({
   evaluation,
 });
 
+/** Herbalism's progressive check without its formula: a system blocker (issue 1522). */
+function blockHerbalism(content) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const check = system.craftingCheck;
+  system.craftingCheck = { ...check, progressive: { ...check.progressive, rollFormula: '' } };
+}
+
+/** Bend Horseshoe asks for five of any ingot, which Brenna alone holds as two stacks — five iron,
+ *  four steel — so its slot opens the held-stack picker with one stack short (issue 1644). Not ore:
+ *  Vosk's iron ore shares Brenna's lab item uuid, and a stack's id must be unique. */
+function seedTagStacks(content) {
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'tagStacks');
+  const anyIngot = { match: { type: 'tags', tags: ['ingot'], tagMatch: 'any' }, quantity: 5 };
+  recipe.ingredientSets = [
+    { id: 's1', ingredientGroups: [{ id: 's1-g1', name: 'Ingot', options: [anyIngot] }] },
+  ];
+}
+
+/** Prospect the Seam's depleted-marker art, for the art picker's filled frame (issue 1522). */
+function seedDepletedImage(content) {
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
+  const withImage = (entry) =>
+    entry.id === 'sm-task-prospect'
+      ? {
+          ...entry,
+          nodes: {
+            ...entry.nodes,
+            depletedBehavior: {
+              swapImage: `${ICON_BASE}/environment/wilderness/cave-entrance-mountain.webp`,
+            },
+          },
+        }
+      : entry;
+  slice.tasks = slice.tasks.map(withImage);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(withImage);
+}
+
 function seedCheckOverride(content, state) {
   const spec = CHECK_OVERRIDE_STATES[state];
   if (!spec) return;
-  const evaluation = {
-    product: 'sum',
-    direction: spec.direction ?? 'under',
-    target: {
-      source: spec.source,
-      expression: '@skills.med.mod + 8',
-      adjustmentKind: spec.kind,
-      baseAdjustment: null,
-    },
-  };
+  const evaluation = spec.count
+    ? OVERRIDE_COUNT
+    : {
+        product: 'sum',
+        direction: spec.direction ?? 'under',
+        target: {
+          source: spec.source,
+          expression: '@skills.med.mod + 8',
+          adjustmentKind: spec.kind,
+          baseAdjustment: null,
+        },
+      };
   const multiply = spec.kind === 'multiply';
   const tiers = [
-    ['Easy', 10, multiply ? 1 : 2],
-    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0],
-    ['Hard', 20, multiply ? 0.2 : -2],
-  ].map(([name, dc, adjustment]) => ({ id: `lab-ov-${name.toLowerCase()}`, name, dc, adjustment }));
+    ['Easy', 10, multiply ? 1 : 2, 2],
+    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0, 3],
+    ['Hard', 20, multiply ? 0.2 : -2, 4],
+  ].map(([name, dc, adjustment, successes]) => ({
+    id: `lab-ov-${name.toLowerCase()}`,
+    name,
+    dc,
+    adjustment,
+    ...(spec.count && { successes }),
+  }));
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
   // A routed state gives `simple` a fixed target, so an override reading it would edit the DC.
   const simpleEvaluation = spec.routed
@@ -181,7 +475,11 @@ function seedCheckOverride(content, state) {
   };
   if (spec.routed) system.salvageResolutionMode = 'routed';
   system.gatheringCraftingCheck = { routed: routedCheck(evaluation) };
-  const overrides = ([dcOverride, adjustmentOverride]) => ({ dcOverride, adjustmentOverride });
+  const overrides = ([dcOverride, adjustmentOverride, successesOverride = null]) => ({
+    dcOverride,
+    adjustmentOverride,
+    successesOverride,
+  });
   const sword = content.components.find((entry) => entry.id === 'sm-longsword');
   sword.salvage = { ...sword.salvage, ...overrides(spec.salvage) };
   const retask = (entry) =>
@@ -191,6 +489,21 @@ function seedCheckOverride(content, state) {
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
   slice.tasks = slice.tasks.map(retask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(retask);
+}
+
+/**
+ * The Smithing crafting check graded roll-under against its fixed target (issue 2103), so the
+ * stage browser's future step label reads a Target rather than a DC.
+ */
+function seedJournalUnderCheck(content) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    simple: {
+      ...system.craftingCheck.simple,
+      evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    },
+  };
 }
 
 /** 14 days into the world's calendar, so relative timestamps render as something. */
@@ -375,6 +688,14 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.noSceneRegions] Give the active scene NO regions, for the Map Region
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
+ * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
+ *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
+ *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
+ *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
+ *   for two groups drawn by roll, or `reward-tiers` for a Runeblade tier paying a commission.
+ * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
+ *   {@link seedLearnableBook}.
+ * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -393,6 +714,11 @@ export async function buildLabWorld({
   checkOverride = null,
   journalCaseState = null,
   checkPreviewState = null,
+  resultRowState = null,
+  learnableBook = false,
+  systemBlocked = false,
+  depletedImage = false,
+  tagStacks = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -400,16 +726,25 @@ export async function buildLabWorld({
   ) {
     seedJournalNoCheckFixture(content);
   }
+  if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedResultRowState(content, resultRowState);
+  if (journalCaseState === 'history-just-resolved-rewards') seedJustResolvedRewards(content);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
+  if (systemBlocked) blockHerbalism(content);
+  if (depletedImage) seedDepletedImage(content);
+  if (tagStacks) seedTagStacks(content);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
+  if (['reward-craft', 'reward-group'].includes(resultRowState)) seedRewardCraftLearned(actors);
   seedCheckPreviewState(content, actors, checkPreviewState);
+  if (learnableBook) seedLearnableBook(content, actors);
   const documents = buildDocumentIndex(content, actors);
+  registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();
   const localize = (key) =>
     longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
@@ -620,8 +955,15 @@ function createLabRunAuthorityLedger(retainedClaim = false) {
  * KEPT.
  */
 function seedRetainedClaim(ledger) {
-  const { claimId, requestId, requestKind, requestStatus, failureReason, failureMessage, claimedAt } =
-    LAB_RETAINED_CLAIM;
+  const {
+    claimId,
+    requestId,
+    requestKind,
+    requestStatus,
+    failureReason,
+    failureMessage,
+    claimedAt,
+  } = LAB_RETAINED_CLAIM;
   ledger.flags.fabricate.journalRunAuthorityState = {
     version: 1,
     requests: {

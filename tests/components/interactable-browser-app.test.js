@@ -37,7 +37,7 @@ const iconButtonSource = readFileSync(
   'utf8'
 );
 const searchFieldSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/components/ManagerSearchField.svelte'),
+  resolve(__dirname, '../../src/ui/svelte/components/SearchField.svelte'),
   'utf8'
 );
 const selectSource = readFileSync(
@@ -131,18 +131,6 @@ describe('InteractableBrowserRoot body', () => {
   it('lists Tools and Gathering Tasks sections', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.ToolsHeading'), 'renders a Tools section');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.TasksHeading'), 'renders a Gathering Tasks section');
-  });
-
-  it('splits Tools and Gathering Tasks into an accessible two-tab switcher', () => {
-    // A real tablist of two keyboard-operable <button> tabs.
-    assert.ok(rootSource.includes("let activeTab = $state('tools')"), 'tracks the active tab in runes state');
-    assert.ok(rootSource.includes('role="tablist"'), 'renders a tablist container');
-    assert.ok((rootSource.match(/role="tab"/g) || []).length === 2, 'exactly two tabs');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tools'}"), 'tools tab reflects selection');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tasks'}"), 'tasks tab reflects selection');
-    assert.ok(rootSource.includes('role="tabpanel"'), 'each section is a tabpanel');
-    assert.ok(rootSource.includes('onkeydown={onTabKeydown}'), 'tabs are keyboard-operable (arrow/Home/End)');
-    assert.ok(rootSource.includes("{#if activeTab === 'tools'}"), 'only the active tab section renders');
   });
 
   it('filters BOTH tools and tasks by the shared search box', () => {
@@ -368,17 +356,17 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('surfaces a search filter and the Alt-override discoverability hint', () => {
-    // The bare `<input type="search">` is `ManagerSearchField` now (issue 1520).
+    // The bare `<input type="search">` is `SearchField` now (issue 1520).
     assert.ok(
       rootSource.includes("ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}"),
       'the caller names the search control'
     );
-    // THE ELEMENT, not the string. `ManagerSearchField`'s own docblock writes `<input
+    // THE ELEMENT, not the string. `SearchField`'s own docblock writes `<input
     // type="search">` twice in prose - describing the CSS convention it replaced and one of the
     // hand-rolled twins it declines to convert - so a bare `includes` reads the documentation and
     // stays green after the markup has been changed to a text input. Proved by mutation.
     assert.ok(
-      /<input\n\s+type="search"/.test(searchFieldSource),
+      /<input\n(?:(?!\/>)[\s\S])*?\n\s+type="search"/.test(searchFieldSource),
       'the shared field renders a search input'
     );
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'), 'Alt-override hint shown in the browser');
@@ -386,15 +374,16 @@ describe('InteractableBrowserRoot body', () => {
 
   // THE FILTER BAR IS ONE CONTROL RUNG AND ONE CONTROL WIDTH (issue 1520 review).
   it('puts its filter controls on one rung and gives the picker trigger the field width', () => {
-    const searchTag = /<ManagerSearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
+    const searchTag = /<SearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
     assert.ok(searchTag, 'the filter bar still renders the shared search field');
+    // The field is 38 by default (issue 1782), so the bar asks it for no rung.
     assert.ok(
-      searchTag[0].includes('size={38}'),
-      `the search field is asked for the 38px rung:\n${searchTag?.[0]}`
+      !/\bsize=/.test(searchTag[0]),
+      `the search field is handed no \`size\`, a prop it retired:\n${searchTag?.[0]}`
     );
     assert.ok(
-      /\.fabricate-search\.manager-search\.is-size-38 input\s*\{[^}]*height:\s*38px/.test(sheetSource),
-      'and that rung is 38px in the sheet'
+      /\.fabricate-search\.fabricate-search:not\(\.is-compact\)\s*\{[^}]*height:\s*38px/.test(sheetSource),
+      'and its default shell is 38px in the sheet'
     );
     assert.ok(
       /\.fabricate-select \.fabricate-select-trigger-form\s*\{[^}]*min-height:\s*38px/.test(sheetSource),

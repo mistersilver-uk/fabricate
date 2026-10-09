@@ -30,11 +30,11 @@ const mountPicker = (props) =>
   harness.mount({
     options: [],
     triggerLabel: 'Tag',
-    triggerAriaLabel: 'Add tag',
-    dialogAriaLabel: 'Add tag',
+    ariaLabel: 'Add tag',
+    panelLabel: 'Add tag',
     searchPlaceholder: 'Search tags...',
     emptyHint: 'No tags defined',
-    onChoose: () => {},
+    onSelect: () => {},
     ...props,
   });
 

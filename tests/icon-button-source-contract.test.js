@@ -3,20 +3,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
 
-import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
+import {
+  definePrimitiveSourceContract,
+  defineSoleWriterClauses,
+} from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
-/** The class only the primitive may write. */
-const CONTRACT_CLASS = 'manager-icon-button';
-
-/** The class `styles/fabricate.css` roots the control's rules at (issue 1502). */
-const ROOT_CLASS = 'fabricate-icon-button';
+/**
+ * The class only the primitive may write, and the root `styles/fabricate.css` paints the control
+ * from (issues 1502 and 1507).
+ */
+const CONTRACT_CLASS = 'fabricate-icon-button';
 
 const PRIMITIVE = 'src/ui/svelte/components/IconButton.svelte';
 
 /**
- * The `.svelte` files under `src/` that may still write the class, each with its reason and the
- * exact number of times it writes it.
+ * The `.svelte` files under `src/` that may write the class, each with its reason and the exact
+ * number of times it writes it.
  */
 const CLASS_EXCEPTIONS = Object.freeze([
   Object.freeze({
@@ -29,27 +32,14 @@ const CLASS_EXCEPTIONS = Object.freeze([
       '`//` comments inside `<script>` — quote-aware, and confined to script so a bare URL in ' +
       'markup survives — so the count is now exactly the one place that writes it',
   }),
-  Object.freeze({
-    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    count: 3,
-    why:
-      'deferred with a named reason. The root\'s six became three: issue 1707 wrote the ' +
-      'twice-authored modifier panel once, so the drop and event copies of the condition-modifier ' +
-      'add and the two reference deletes collapsed into one of each. The other three were ' +
-      'de-duplicated, not converted, and no sweep may count them as progress. The three that ' +
-      'remain are this shared panel\'s own attach control and its two delete controls, so ' +
-      'converting them is one decision about one shared unit rather than the tail of an 82-site ' +
-      'sweep. Pinned by count so a later partial pass fails here instead of silently halving a ' +
-      'deferral. Each one still leads its `class` with the root token (issue 1502), because the ' +
-      'sheet is rooted at it and a carrier without it would lose its entire paint.',
-  }),
 ]);
 
 /**
  * `component/ComponentIdentityStrip.svelte` WAS the third exemption and is DELIBERATELY GONE,
  * written out rather than deleted so the resolution is legible. Issue 1477 removed the premise
- * rather than doing that work. `CraftingSystemManagerRoot.svelte` is gone the same way: it wrote
- * the class 6x and now writes it 0x, because issue 1707 moved all six into the row above.
+ * rather than doing that work. `CraftingSystemManagerRoot.svelte` wrote the class 6x until issue
+ * 1707 moved them, de-duplicated to three, into `environment/GatheringModifierEditor.svelte`;
+ * issue 1782 converted one and issue 1777 the last two, so the primitive is the only writer.
  */
 
 const contract = definePrimitiveSourceContract({
@@ -59,12 +49,12 @@ const contract = definePrimitiveSourceContract({
   primitive: PRIMITIVE,
   exemptions: CLASS_EXCEPTIONS,
 
-  // 35 components render the primitive as this lands; 28 is a real floor with headroom.
+  // 40 components render the primitive at issue 1777 (35 as it landed); 28 is a real floor.
   callSiteFloor: 28,
 
   primitiveEmits: {
-    // Three tokens, each asserted separately (issue 1502).
-    source: Object.freeze([`'${CONTRACT_CLASS}'`, `'${ROOT_CLASS}'`, 'data-keyboard-focus="true"']),
+    // Two tokens, each asserted separately (issue 1502).
+    source: Object.freeze([`'${CONTRACT_CLASS}'`, 'data-keyboard-focus="true"']),
     otherwise:
       'the primitive no longer emits something it is the single source of, so a clause here is ' +
       'policing a token that reaches nothing',
@@ -82,12 +72,12 @@ const contract = definePrimitiveSourceContract({
 
   classOnlyRemedy:
     'a manager icon button is an `<IconButton>`, never a hand-written ' +
-    '`class="manager-icon-button"`. A per-site modifier travels as a pass-through on the ' +
+    '`class="fabricate-icon-button"`. A per-site modifier travels as a pass-through on the ' +
     '`class` prop, the accessible name is the required `ariaLabel` prop, and a per-site ' +
     '`data-*` hook rides the rest spread — see `IconButton.svelte`',
 
   restatementRemedy:
-    'the primitive emits `type="button"` and `manager-icon-button` itself, and takes the ' +
+    'the primitive emits `type="button"` and `fabricate-icon-button` itself, and takes the ' +
     'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
     'convention this component exists to close',
 
@@ -97,37 +87,12 @@ const contract = definePrimitiveSourceContract({
     '`=""`. 17 attributes were written bare before this conversion; spell it `data-x=""`',
 });
 
-test('every deferred hand-rolled carrier writes the root class the sheet paints from', () => {
-  // The six deferred sites are not `<IconButton>`s, so they inherit nothing from the primitive
-  // (issue 1502).
-  const carriers = CLASS_EXCEPTIONS.filter((entry) => entry.file !== PRIMITIVE);
-  assert.ok(
-    carriers.length > 0,
-    'the deferred-carrier exemption is gone, so this clause holds over nothing'
-  );
-
-  for (const carrier of carriers) {
-    const source = contract.components[carrier.file] ?? '';
-    assert.ok(source.length > 0, `${carrier.file} is not in the corpus`);
-
-    // TOKEN-AWARE, and ORDER-aware, rather than a leading-substring search over the `class`
-    // attribute. Two reasons, and the second is why the prefix form was rejected outright.
-    const attributes = [...source.matchAll(/class="([^"]*)"/g)].map((match) =>
-      match[1].split(/\s+/).filter(Boolean)
-    );
-    const rooted = attributes.filter(
-      (tokens) => tokens[0] === ROOT_CLASS && tokens[1] === CONTRACT_CLASS
-    ).length;
-
-    assert.equal(
-      rooted,
-      carrier.count,
-      `${carrier.file} holds ${carrier.count} deferred hand-rolled icon buttons and leads ` +
-        `${rooted} class attributes with \`${ROOT_CLASS}\` then \`${CONTRACT_CLASS}\`, in ` +
-        'that order. Each one must, or it loses every rule in `styles/fabricate.css` that ' +
-        'paints it, silently — the control keeps its shape in the DOM and loses it on screen'
-    );
-  }
+defineSoleWriterClauses({
+  label: 'icon-button',
+  primitive: PRIMITIVE,
+  exemptions: CLASS_EXCEPTIONS,
+  components: contract.components,
+  tokens: [CONTRACT_CLASS],
 });
 
 test('every icon button is given an accessible name', () => {
@@ -143,7 +108,7 @@ test('every icon button is given an accessible name', () => {
   );
 
   const offenders = contract.callSiteTags
-    .filter(([, tag]) => !/\bariaLabel=/.test(tag))
+    .filter(([, tag]) => !/(?:^|\s)(?:ariaLabel=|\{ariaLabel\})/.test(tag))
     .map(([file, tag]) => `${file}: ${tag.replaceAll(/\s+/g, ' ').slice(0, 120)}`);
 
   assert.deepEqual(

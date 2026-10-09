@@ -8,6 +8,7 @@ import { get } from 'svelte/store';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
+import { censusDelta, censusOf, writeCensus } from '../helpers/domCensus.js';
 import { shippedString, useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { downtimeProvider } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -16,12 +17,17 @@ import {
   settleDowntimeProvider,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { DOWNTIME_NAV_CENSUS } from './manager-downtime-nav-census.js';
 import {
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
+
+const DOWNTIME_NAV_CENSUS_FILE = resolve(import.meta.dirname, 'manager-downtime-nav-census.js');
+// The first state the census walks, and the one the others are pinned as a difference from.
+const DOWNTIME_NAV_CENSUS_BASE = 'the Core preview with its group opened off the route';
 
 let Component;
 let mounted;
@@ -276,7 +282,8 @@ export function registerDowntimeCases() {
       ['true', null, null, null]
     );
     assert.equal(
-      target.querySelectorAll('[aria-current="page"]').length,
+      // The rail's own: the breadcrumb trail's leaf is the current page of ITS nav (issue 1777).
+      target.querySelector('.manager-rail').querySelectorAll('[aria-current="page"]').length,
       1,
       'the route is current once — the children mark themselves within the set, not as pages'
     );
@@ -505,7 +512,7 @@ export function registerDowntimeCases() {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
-    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip.
+    // `[data-world-downtime-lock]` on the rail, not `.manager-editor-tab-lock` on the strip.
     assert.ok(
       !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
@@ -2507,6 +2514,78 @@ export function registerDowntimeCases() {
       assert.ok(!downtimeRollup(), 'Core does not summarise its own preview to itself');
       assert.equal(downtimePremiumState(), 'preview', 'and the loud gold sell is untouched');
     });
+  });
+
+  // The group's rendered DOM in each mode and disclosure state (issue 1777): the preview's padlocks
+  // and note, a companion's badges, rollup and names, and which row is current, by value.
+  it('emits the same Downtime group DOM, attribute for attribute, in each of its states', async () => {
+    const openCore = () =>
+      mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    const press = async (control) => {
+      control().click();
+      await settleRouteExit();
+    };
+    const openToggle = () => target.querySelector('[data-world-downtime-toggle]');
+    const states = {
+      [DOWNTIME_NAV_CENSUS_BASE]: async () => {
+        openCore();
+        await press(openToggle);
+      },
+      'the Core preview with its group closed': async () => openCore(),
+      'the Core preview on one of its own tabs': async () => {
+        openCore();
+        await press(() => worldNavItem('downtime'));
+      },
+      'a badged companion with its group closed': () => mountBadgedDowntimeManager(),
+      'a badged companion on one of its own tabs': async () => {
+        await mountBadgedDowntimeManager();
+        await press(() => worldNavItem('downtime'));
+      },
+      'the Core preview with its group open on a collapsed rail': async () => {
+        openCore();
+        await press(openToggle);
+        await press(railToggleControl);
+      },
+      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
+      'a badged companion with its group open on a collapsed rail': async () => {
+        await mountBadgedDowntimeManager();
+        await press(openToggle);
+        await press(railToggleControl);
+      },
+    };
+
+    const censuses = {};
+    for (const [state, open] of Object.entries(states)) {
+      useShippedLocalization();
+      await open();
+      const group = target.querySelector('[data-world-downtime-section]');
+      assert.ok(Boolean(group), `the Downtime group renders in "${state}"`);
+      censuses[state] = censusOf(group);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+    const base = censuses[DOWNTIME_NAV_CENSUS_BASE];
+    const observed = {
+      base,
+      deltas: Object.fromEntries(
+        Object.entries(censuses)
+          .filter(([state]) => state !== DOWNTIME_NAV_CENSUS_BASE)
+          .map(([state, census]) => [state, censusDelta(base, census)])
+      ),
+    };
+    if (process.env.UPDATE_DOWNTIME_NAV_CENSUS) {
+      writeCensus(DOWNTIME_NAV_CENSUS_FILE, 'downtime-nav', observed);
+      return;
+    }
+    assert.deepEqual(
+      observed,
+      DOWNTIME_NAV_CENSUS,
+      'the Downtime group’s emitted DOM moved. Re-derive the literal with ' +
+        'UPDATE_DOWNTIME_NAV_CENSUS=1 node --conditions=browser --test ' +
+        'tests/components/manager-mounted.test.js and say in the commit what moved and why.'
+    );
   });
 
   // AC-15, the reachable half. `manager-contract.test.js` counts the two badge render sites; this

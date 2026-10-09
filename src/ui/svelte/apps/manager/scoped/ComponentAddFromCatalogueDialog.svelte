@@ -17,9 +17,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { componentSourceLine } from './componentScoped.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
-  import ManagerModal from '../ManagerModal.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import Button from '../../../components/Button.svelte';
+  import Modal from '../../../components/Modal.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
 
   let {
@@ -58,8 +58,8 @@
 
   /**
    * Land keyboard focus on the picker's search field once the portaled panel has mounted. A
-   * QUERY rather than a `bind:this`, because neither `ManagerModal` nor `ManagerSearchField`
-   * publishes an element seam and a wrapper would break `.manager-search`'s flex sizing; it goes
+   * QUERY rather than a `bind:this`, because neither `Modal` nor `SearchField`
+   * publishes an element seam and a wrapper would break `.fabricate-search`'s flex sizing; it goes
    * through this dialog's own two hooks. `queueMicrotask` because the panel is PORTALED.
    */
   function focusIntoDialog() {
@@ -183,7 +183,7 @@
   );
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={format(
     'FABRICATE.Admin.Manager.Component.AddFrom.Title',
@@ -195,12 +195,12 @@
     'New rules inherit the world category and essence values until this system overrides them; nothing else is copied.'
   )}
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
-  rootAttributes={{ 'data-component-add-from-catalogue-dialog': '' }}
+  dialogProps={{ 'data-component-add-from-catalogue-dialog': '' }}
   width="580px"
   onClose={dismiss}
 >
   {#snippet body()}
-    <ManagerSearchField
+    <SearchField
       bind:value={query}
       placeholder={text(
         'FABRICATE.Admin.Manager.Component.AddFrom.SearchPlaceholder',
@@ -210,7 +210,7 @@
         'FABRICATE.Admin.Manager.Component.AddFrom.SearchLabel',
         'Search catalogue components'
       )}
-      inputAttrs={{ 'data-component-add-from-catalogue-search': '' }}
+      inputProps={{ 'data-component-add-from-catalogue-search': '' }}
     />
 
     {#if refusedCount > 0}
@@ -267,7 +267,7 @@
               data-component-add-from-catalogue-row={row.id}
             >
               <SelectionCheckbox
-                size="sm"
+                density="compact"
                 wrapper="contents"
                 checked={selectedIds.has(row.id)}
                 disabled={applying}
@@ -308,10 +308,10 @@
         count: selectedCount,
       })}
     </span>
-    <ManagerButton data-component-add-from-catalogue-cancel disabled={applying} onclick={dismiss}>
+    <Button data-component-add-from-catalogue-cancel disabled={applying} onclick={dismiss}>
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-    </ManagerButton>
-    <ManagerButton
+    </Button>
+    <Button
       role="primary"
       data-component-add-from-catalogue-apply
       disabled={applying || selectedCount === 0}
@@ -322,12 +322,12 @@
         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
       {/if}
       <span>{applyLabel}</span>
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
-  /* `ManagerModal` owns the panel, header and footer rail; this block owns the two between them. */
+  /* `Modal` owns the panel, header and footer rail; this block owns the two between them. */
 
   .manager-component-add-from-list {
     display: flex;

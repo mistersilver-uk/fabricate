@@ -17,6 +17,8 @@
   import RecipeToolsSection from './RecipeToolsSection.svelte';
 
   let {
+    // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
+    modeCallout = undefined,
     recipe = null,
     isMultiStep = false,
     // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
@@ -67,26 +69,31 @@
   data-recipe-tab="tools"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Tools', 'Tools')}
 >
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">
-      {text('FABRICATE.Admin.Manager.Recipe.ToolsSection', 'Tools')}
-    </h2>
-    <p class="manager-muted">
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.ToolsIntro',
-        'Required for crafting — configure their behavior in Tool Studio.'
-      )}
-    </p>
+  <div class="fab-stack" data-gap="3" data-tab-heading>
+    <div class="manager-recipe-tab-intro">
+      <h2 class="manager-recipe-tab-title">
+        {text('FABRICATE.Admin.Manager.Recipe.ToolsSection', 'Tools')}
+      </h2>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.ToolsIntro',
+          'Required for crafting — configure their behavior in Tool Studio.'
+        )}
+      </p>
+      {#if collapsed}
+        <p class="manager-muted" data-recipe-collapsed-note>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
+            'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
+          )}
+        </p>
+      {/if}
+    </div>
+    {@render modeCallout?.()}
   </div>
 
-  {#if collapsed}
-    <p class="manager-muted" data-recipe-collapsed-note>
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
-        'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
-      )}
-    </p>
-  {:else if isMultiStep && steps.length > 0}
+  <!-- A collapsed chain authors nothing here; the heading block's note says why. -->
+  {#if isMultiStep && steps.length > 0 && !collapsed}
     <!-- The recipe-level tools are GLOBAL — required for every step (§D2). -->
     <div class="manager-recipe-tools-global" data-recipe-tools-global>
       <div class="manager-recipe-tools-global-head">
@@ -157,7 +164,7 @@
         {/each}
       {/snippet}
     </RecipeStepAccordion>
-  {:else}
+  {:else if !collapsed}
     <RecipeToolsSection
       {toolIds}
       {toolsLibrary}

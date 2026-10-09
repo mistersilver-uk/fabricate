@@ -5,6 +5,12 @@ import {
 } from '../../systems/checkModifierResolver.js';
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
+import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
+import {
+  craftingOutcomeBand,
+  netRange,
+  withCountBotch,
+} from '../../systems/runJournalOutcomeBands.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 import { salvageToolsFor } from '../../systems/scopedEntityReads.js';
 
@@ -48,10 +54,39 @@ function salvageBenefits({ system, component, recipeManager, actor }) {
 }
 
 /**
+ * A count check's Salvage line for the salvaging character (issue 2006): the banner's `rule`, the
+ * successes needed, the die and the per-die test at that character's threshold, or `{ unresolved }`
+ * when the pool cannot read them. Null where no single count applies.
+ */
+function countSalvageTarget({ mode, config, component, actor, evaluation, localize }) {
+  const need = salvageCheckNeed({ mode, config, checkUsable: true, component });
+  if (need.kind !== 'successes') return null;
+  const rule = localize('FABRICATE.App.Inventory.Salvage.Count.BannerSimpleRule');
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const pool = resolvePool({ evaluation, thresholdMode: config?.thresholdMode, rollData });
+  if (!pool.ok) {
+    const label = localize('FABRICATE.App.Inventory.Detail.KindSalvage');
+    const key =
+      pool.refusedInput === 'threshold'
+        ? 'FABRICATE.Check.Roll.TargetUnresolved'
+        : 'FABRICATE.Check.Roll.PoolUnresolved';
+    return { rule, unresolved: localize(key, { label }) };
+  }
+  const { die, comparison, threshold } = countFormulaValues(pool.policy);
+  const key =
+    need.count === 1
+      ? 'FABRICATE.Check.CountEvidence.SalvageLineOne'
+      : 'FABRICATE.Check.CountEvidence.SalvageLine';
+  const text = localize(key, { count: need.count, die, symbol: comparison, threshold });
+  return { rule, direction: evaluation.direction, text };
+}
+
+/**
  * The Salvage tab's target for a summed pass/fail or relative check other than sum/over/fixed
  * (issue 2005): the banner's `rule`, and the check card's `{ direction, text, source }` or
  * `{ unresolved }` for the salvaging character, naming the modifiers and held Tool bonus the
- * prompt adds. Null for sum/over/fixed, a count, stages or ranges.
+ * prompt adds. A count check states its successes needed and per-die test instead. Null for
+ * sum/over/fixed, stages or ranges.
  */
 export function salvageCheckTarget({
   mode,
@@ -63,6 +98,9 @@ export function salvageCheckTarget({
   localize,
 }) {
   const evaluation = activeCheckEvaluation(config);
+  if (evaluation.product === 'count') {
+    return countSalvageTarget({ mode, config, component, actor, evaluation, localize });
+  }
   const routedType = config?.type === 'fixed' ? 'fixed' : 'relative';
   if (evaluation.product !== 'sum' || isFixedSumOver(evaluation)) return null;
   if (mode === 'progressive' || (mode === 'routed' && routedType === 'fixed')) return null;
@@ -107,4 +145,38 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
   // Only a summed check reaches here: a count check returned above.
   return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
+}
+
+/**
+ * A routed fixed tier's authored [start, end] through `netRange`, as the Journal states it
+ * (issue 2152); a row missing a bound has no band.
+ */
+function withFixedBands(rows) {
+  return rows.map((row) => ({
+    ...row,
+    band: row.start !== null && row.end !== null ? netRange(row.start, row.end) : null,
+  }));
+}
+
+/**
+ * Routed salvage rows under a counting check, each with the Journal's band in net successes and
+ * a Botch row while cancelling is on (issue 2137), from the same presenter and the salvage's own
+ * successes needed. Rows of any other check are returned as they are.
+ * A routed fixed check's rows are banded in their authored range instead (issue 2152).
+ */
+export function withSalvageBands(rows, { config, component, localize }) {
+  if (config?.type === 'fixed') return withFixedBands(rows);
+  const need = salvageCheckNeed({ mode: 'routed', config, checkUsable: true, component });
+  if (need.kind !== 'successes') return rows;
+  const outcomes = config.relativeOutcomes;
+  const banded = rows.map((row, index) => ({
+    ...row,
+    band: craftingOutcomeBand(outcomes[index], config, need.count),
+  }));
+  return withCountBotch(
+    banded,
+    config,
+    localize('FABRICATE.Check.CountEvidence.Botch'),
+    need.count
+  );
 }

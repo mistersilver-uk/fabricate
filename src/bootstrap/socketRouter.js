@@ -91,9 +91,14 @@ function resolveComplicationActor(actorUuid) {
   }
 }
 
+/** This client's manager, on `game.fabricate`: the bare `fabricate` global is the macro API. */
+function craftingSystemManager() {
+  return game.fabricate?.craftingSystemManager ?? null;
+}
+
 /** The GM-side re-read resolves against this client's own components (issue 1286). */
 function complicationComponentsFor(craftingSystemId) {
-  return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
+  return craftingSystemManager()?.getComponentsForSystem?.(craftingSystemId) ?? [];
 }
 
 /** Never read from the payload; guarded, since a throw would reject the fire-and-forget apply. */
@@ -190,9 +195,7 @@ async function runComplicationDelivery({
  * (issue 1286). Read from this client's copy, defaulting closed.
  */
 function complicationChatOutputEnabled(craftingSystemId) {
-  return (
-    fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true
-  );
+  return craftingSystemManager()?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
 }
 
 /** A configuration fault: `skipped` (unresolvable uuid) or `failed` (the body threw). */

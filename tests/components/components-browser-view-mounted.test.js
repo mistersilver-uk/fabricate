@@ -15,6 +15,7 @@ import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLib
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
@@ -797,8 +798,8 @@ const inspector = createComponentScopeHarness({
   // The overlay closure the kebab binds, and the category vocabulary the `Category` block reads.
   rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
   compiledExtras: [
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   ],
 });
 
@@ -890,6 +891,22 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     assert.ok(
       Boolean(card.querySelector('[data-component-open-catalogue]')),
       'and it EXITS to the catalogue entry, which is where that identity is authored'
+    );
+  });
+
+  it('and the card states no sharing for a component this system alone holds', async () => {
+    // Issue 2218: `coal` is held by Forge alone, `ingot` by Forge and Alchemy.
+    const noteOf = (root) =>
+      root.querySelector('.manager-component-shared-identity-note').textContent.trim();
+
+    assert.equal(
+      noteOf(await mountCoal()),
+      'Name, art and description are authored in the world catalogue.'
+    );
+    inspector.remount();
+    assert.match(
+      noteOf(await mountCoal({ worldEntry: entry('ingot') })),
+      /shared with 1 other system\.$/
     );
   });
 
@@ -1023,6 +1040,8 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     foot.querySelector('[data-component-edit-system-rules]').click();
     flushSync();
     assert.deepEqual(opened, [['coal']]);
+    // The pinned verb is a full-width primary `Button` (issue 1521).
+    assertInspectorVerbs(foot.closest('section'), [['[data-component-edit-system-rules]', 'primary']]);
 
     assert.ok(
       Boolean(root.querySelector('[data-component-inspector-menu]')),
@@ -1050,13 +1069,11 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
 
 describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
   /**
-   * The reference draws this bar's search field and both filter selects at 38px
-   * (`proto:1053-1055`). 38 is a published rung (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 /
-   * 44, with 32 / 36 / 40 retired); the field publishes it as a size prop, and the two filter
-   * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
+   * The search's row is one 38px shell (issue 1782): the field is 38 by default and both filter
+   * selects take `Select`'s `form` rung, the same box; the second row's sort keeps `toolbar`.
    */
-  const FIELD_SELECTOR = '.manager-search.is-size-38 input';
-  const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
+  const FIELD_SELECTOR = '.fabricate-search:not(.is-compact) input';
+  const SELECT_SELECTOR = '.manager-component-toolbar .fabricate-select-trigger-form';
 
   function metalWithFire() {
     return [
@@ -1070,7 +1087,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     ];
   }
 
-  it('opts the search field into the 38px rung, through the selector the sheet paints', async () => {
+  it('draws the search field at the 38px shell, through the selector the sheet paints', async () => {
     const root = await browser.mount({
       itemCards: metalWithFire(),
       categoryVocabulary: ['Metal', 'Herb'],
@@ -1082,7 +1099,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     assert.ok(
       // `:scope` here and not on the two constants above.
       field === root.querySelector(':scope [data-component-search] input'),
-      'and it is this bar’s own search input, not another field that happens to carry the rung'
+      'and it is this bar’s own search input, not another field the selector happens to reach'
     );
   });
 
@@ -1102,7 +1119,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       'the category and essence filters both reach the rung, in bar order'
     );
     assert.ok(
-      !root.querySelector('[data-component-sort]').closest('.is-size-38'),
+      root.querySelector('[data-component-sort]').classList.contains('fabricate-select-trigger-toolbar'),
       'and the sort trigger on the second row stays at the `toolbar` rung’s own 34'
     );
     for (const select of rung) {
@@ -1139,7 +1156,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     }
   });
 
-  it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
+  it('and the bar still wears `fabricate-filter-bar`, which is what makes that host real', async () => {
     // Non-vacuity for the selector above: it is two classes and an element.
     const root = await browser.mount({
       itemCards: metalWithFire(),
@@ -1149,7 +1166,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     const bar = root.querySelector('[data-component-toolbar]');
     assert.ok(Boolean(bar), 'the bar renders');
     assert.ok(
-      bar.classList.contains('manager-toolbar'),
+      bar.classList.contains('fabricate-filter-bar'),
       'the section carries the shared bar class the 38px select rule is scoped to'
     );
     assert.ok(
@@ -1257,13 +1274,14 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
       selectedSystemId: 'sys-1',
     });
     // Category names are distinct names and drop the tick; the essence and sort lists keep it.
-    for (const [hook, name, ticked] of [
-      [CATEGORY, 'Filter components by category', false],
-      [ESSENCE, 'Filter components by essence', true],
-      [SORT, 'Sort components', true],
+    // The two filters share the search's row and take its 38px `form` rung; the sort does not.
+    for (const [hook, name, ticked, size] of [
+      [CATEGORY, 'Filter components by category', false, 'form'],
+      [ESSENCE, 'Filter components by essence', true, 'form'],
+      [SORT, 'Sort components', true, 'toolbar'],
     ]) {
       assert.equal(assertSelectHasResolvedName(root, hook), name);
-      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), 'toolbar');
+      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), size);
       assert.equal(
         openSelectPanel(root, hook).classList.contains('fabricate-select-popover-ticked'),
         ticked,

@@ -1,6 +1,6 @@
 // Shared, pure tone+icon+label vocabulary for the player-facing Journal run
 // status presentation. The frozen map supplies the active/detail chips and
-// HistoryRow's labeled outcome glyph. HistoryRow explicitly requests unknown,
+// the Finished list's labeled outcome glyph, which explicitly requests unknown,
 // recovery or inProgress for incomplete evidence rather than assuming success.
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the
@@ -101,6 +101,19 @@ export function runStatusPresentation(status) {
 // The two are deliberately separate: one is fixed by choosing and the other by acquiring, and
 // telling a player to choose when nothing they can choose will help is the worse of the two
 // failures. `accent` is the neutral "your move" family; `warning` is the blocked one.
+// A reward an earlier stage left to pick (issue 1773). It outranks every other member: until it
+// is settled the run can neither go on nor be dismissed. A viewer who cannot pick is not asked to.
+const REWARD_ATTENTION = Object.freeze({
+  kind: 'reward',
+  tone: 'accent',
+  icon: 'fa-gift',
+  labelKey: 'FABRICATE.App.Journal.Status.awaitingReward',
+});
+const REWARD_ELSEWHERE_ATTENTION = Object.freeze({
+  ...REWARD_ATTENTION,
+  labelKey: 'FABRICATE.App.Journal.Status.rewardPending',
+});
+const PICKS_ELSEWHERE = new Set(['notOwner', 'notEntitled']);
 const CHOICE_ATTENTION = Object.freeze({
   kind: 'choice',
   tone: 'accent',
@@ -154,6 +167,11 @@ const ACQUISITION_ATTENTION = Object.freeze({
  * @returns {(RunStatusPresentation & {kind: string})|null}
  */
 export function runAttentionPresentation(run) {
+  if (run?.awardChoicePending === true) {
+    return PICKS_ELSEWHERE.has(run.awardChoiceBlocker)
+      ? REWARD_ELSEWHERE_ATTENTION
+      : REWARD_ATTENTION;
+  }
   if (run?.awaitingChoice === true) return CHOICE_ATTENTION;
   // Ranked under the two BLOCKED states: a stage that can be begun is asked for only once
   // nothing else is owed, which `beginStep` already answers — it is the projection's own

@@ -6,23 +6,46 @@ import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
   GATHERING_ROUTE_MODEL_PATTERN,
+  GATHERING_TASK_EDITOR_PATTERN,
+  TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 /**
  * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
  * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
- * state; a `resolved` case chooses a character in the task's own Preview-as picker.
+ * state; a `resolved` case chooses a character in the task's own Preview-as picker, and `claim`
+ * adds the field's own state. `count` is issue 2006's: one successes needed Stepper, no presets.
  */
 const OPEN_PROSPECT_TASK = Object.freeze([
   { selector: '#manager-gathering-nav-tasks' },
   {
     selector:
-      '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+      '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
-const taskOverrideCase = ({ id, label, field, frame, sees }) =>
+/** A click on one of the task editor's tabs (issue 1522); Overview is where it opens. */
+const taskTab = (tab) => ({ selector: `[data-gathering-task-tab="${tab}"]` });
+const OPEN_SLOWBLOOM_TASK = Object.freeze([
+  { selector: '#manager-gathering-nav-tasks' },
+  {
+    selector:
+      '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+  },
+]);
+/** Blanks the task's name, the one Overview error the Validation tab can draw. */
+const BLANK_NAME = Object.freeze([{ selector: '[data-gathering-task-field="name"]', fill: '' }]);
+
+/** Select Slowbloom's drop through its component button: the row's centre is its chance slider. */
+const SELECT_SLOWBLOOM_DROP = Object.freeze({
+  selector:
+    '[data-gathering-task-drop-id="hb-slowbloom-drop"] [data-gathering-task-drop-component-cell] button',
+});
+const AVAILABLE_SPRING_ROW = '[data-section="available-to-add"] [data-record-id="hb-task-spring"]';
+/** A straight task's result rows; a step or a single-element check reads the first. */
+const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
+const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
     label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
@@ -35,14 +58,15 @@ const taskOverrideCase = ({ id, label, field, frame, sees }) =>
     steps: [
       'Gathering',
       ...OPEN_PROSPECT_TASK,
+      taskTab('requirements'),
       { selector: '[data-gathering-task-dc]', scroll: true },
       ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', TASK_PREVIEW) : []),
     ],
     expectView: 'gathering-task-edit',
-    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"]${claim} [data-override-player-sees="${sees}"]`,
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/component\/(OverridePlayerSees\.svelte|overridePlayerSees\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/PreviewAsPicker\.svelte$/,
     ],
@@ -101,7 +125,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTasksBrowserView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTasksBrowserView)\.svelte|headerBreadcrumbs\.js)$/,
       // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
       // moved out of the root: without this the leaf publishes environment-editor frames instead.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
@@ -152,17 +176,118 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
     ],
+    // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
+    themeVariants: ['hearth-herb'],
     expectView: 'gathering-task-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
+  // The editor's other two tabs (issue 1522): Requirements full width, and a d100 task's Results,
+  // the one tab whose rail holds the selected-drop editor.
+  ...[
+    [
+      'requirements',
+      '[data-gathering-task-panel="requirements"] [data-gathering-task-availability]',
+    ],
+    [
+      'results',
+      '.fabricate-manager:not([data-gathering-task-layout]) aside.manager-inspector [data-gathering-task-drop-inspector]',
+    ],
+  ].map(([tab, claim]) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${tab}`,
+      label: `Manager — Gathering task editor ${tab} tab`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism' },
+      steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, taskTab(tab)],
+      expectView: 'gathering-task-edit',
+      expectSelector: claim,
+      expectCenterHit: `[data-gathering-task-tab="${tab}"]`,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
+  // Each standing statement and warning the editor routes to a Callout or a Notice (issue 1522),
+  // on the tab that draws it, and the empty Results tab of a legacy Progressive task.
+  ...[
+    [
+      'progressive-legacy',
+      'progressive',
+      'overview',
+      '[data-gathering-task-panel="overview"] [data-gathering-progressive-legacy] + [data-gathering-task-resolution]',
+    ],
+    [
+      'progressive-results',
+      'progressive',
+      'results',
+      '[data-gathering-task-panel="results"] [data-gathering-task-results="progressive"]',
+    ],
+    [
+      'routed-no-tiers',
+      'routed-no-tiers',
+      'results',
+      '[data-notice-position="stack"] [data-gathering-routed-no-tiers]',
+    ],
+    [
+      'reward-rule',
+      'reward-rule',
+      'results',
+      '[data-notice-position="stack"] [data-gathering-task-reward-rule-notice]',
+    ],
+  ].map(([suffix, mode, tab, claim]) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${suffix}`,
+      label: `Manager — Gathering task editor, ${suffix.replaceAll('-', ' ')}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism', gatheringTaskMode: mode },
+      steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, ...(tab === 'overview' ? [] : [taskTab(tab)])],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager ${claim}`,
+      expectCenterHit: `[data-gathering-task-tab="${tab}"]`,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
+  // The Validation tab's three verdicts (issue 1522), full width on a d100 and a routed task: a
+  // clean d100 task, a d100 task warned of a repeated component, and a routed task whose blank
+  // name and unmatched tier block Save, at the normal and the narrow width.
+  ...[
+    ['validation', {}, [], 'pass', null],
+    ['validation-warnings', { gatheringTaskMode: 'reward-rule' }, [], 'warn', null],
+    ['validation-blocking', { gatheringTaskMode: 'routed-unmatched' }, BLANK_NAME, 'block', null],
+    [
+      'validation-narrow',
+      { gatheringTaskMode: 'routed-unmatched' },
+      BLANK_NAME,
+      'block',
+      { width: 1000, height: 720 },
+    ],
+  ].map(([suffix, flags, edits, verdict, position]) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${suffix}`,
+      label: `Manager — Gathering task editor, ${suffix.replaceAll('-', ' ')}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism', ...flags },
+      ...(position && { position }),
+      steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, ...edits, taskTab('validation')],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager[data-gathering-task-layout="full"] [data-gathering-task-panel="validation"] [data-editor-validation-summary="${verdict}"]`,
+      expectCenterHit: '[data-gathering-task-tab="validation"]',
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
     { suffix: 'narrow', width: 1000, height: 720 },
@@ -180,7 +305,7 @@ export const CASES = Object.freeze([
         { selector: '#manager-gathering-nav-tasks' },
         {
           selector:
-            '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+            '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
         },
         ...chooseSelectOption('[data-gathering-task-node-respawn]', 'overTime'),
         { selector: '[data-gathering-task-node-interval]', fill: '1440' },
@@ -201,10 +326,30 @@ export const CASES = Object.freeze([
         '[data-gathering-task-node-interval-unit]',
       ].map((target) => ({ container: '[data-gathering-task-nodes]', target })),
       kinds: ['manager', 'environments', 'responsive'],
-      sourceMatches: [
-        GATHERING_ROUTE_MODEL_PATTERN,
-        /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
+  // The depleted-marker art picker (issue 1522): the art and its pencil, and the empty slot.
+  ...[
+    ['filled', { depletedImage: '1' }, '[data-gathering-task-depleted-image]'],
+    ['empty', {}, '[data-gathering-task-depleted-image]'],
+  ].map(([state, flags, hit]) =>
+    managerCase({
+      id: `manager-gathering-task-depleted-image-${state}`,
+      label: `Manager — Gathering task depleted marker image, ${state}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-smithing', ...flags },
+      steps: [
+        'Gathering',
+        ...OPEN_PROSPECT_TASK,
+        { selector: '[data-gathering-task-depleted-behavior]', scroll: true },
       ],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager [data-gathering-task-depleted-image]${state === 'filled' ? ' img' : ':not(:has(img))'}`,
+      expectCenterHit: hit,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
     })
   ),
   // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
@@ -222,7 +367,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-node-respawn]' },
     ],
@@ -235,10 +380,7 @@ export const CASES = Object.freeze([
     // The panel sits inside the application root rather than clipped by the card it opened from.
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'environments'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
-      ...ANCHORED_POPOVER_SOURCES,
-    ],
+    sourceMatches: [GATHERING_TASK_EDITOR_PATTERN, ...ANCHORED_POPOVER_SOURCES],
   }),
   // The stamina row's two pickers reached no frame at all until this case (issue 1510), and they
   // are the only converted controls in this editor whose panel is TICKED. The row exists only under
@@ -258,8 +400,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      taskTab('requirements'),
       { selector: '[data-gathering-add-stamina-modifier]' },
       // The row renders no caption, so its own accessible name is the address (issue 1510).
       { selector: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]' },
@@ -274,7 +417,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -305,10 +448,11 @@ export const CASES = Object.freeze([
           {
             selector:
               `[data-gathering-${kind}-id="${kind === 'task' ? 'hb-task-slowbloom' : 'hb-event-wolves'}"]` +
-              ' .manager-icon-button[aria-label^="Edit"]',
+              ' .fabricate-icon-button[aria-label^="Edit"]',
           },
           ...(kind === 'task'
             ? [
+                taskTab('requirements'),
                 { selector: '[data-gathering-task-availability-pill="biomes"] [data-chip-remove]' },
                 { selector: toolCard },
                 { selector: `${toolPill} [data-chip-remove]`, press: 'Space' },
@@ -343,6 +487,7 @@ export const CASES = Object.freeze([
           // frame for the task's tool-reference handlers (issue 1721).
           ...(suffix === 'normal' ? [GATHERING_ROUTE_MODEL_PATTERN] : []),
           /^src\/ui\/svelte\/apps\/manager\/Gathering(TaskEditView|EventEditView)\.svelte$/,
+          ...(kind === 'task' ? [GATHERING_TASK_EDITOR_PATTERN] : []),
         ],
       });
     })
@@ -358,8 +503,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      taskTab('results'),
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -367,8 +513,48 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte|headerBreadcrumbs\.js)$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  // A Direct task's result on Rolled beside a second on Fixed (issue 1516): the gathering surface of
+  // the result row.
+  managerCase({
+    id: 'manager-gathering-task-editor-straight-rolled',
+    label: 'Manager — Gathering task Direct yields, a rolled amount',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'straight' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      taskTab('results'),
+      { selector: '[data-gathering-task-results]', scroll: true },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-formula]`, fill: '1d4+1' },
+      { selector: '[data-gathering-task-results="straight"] [data-recipe-add="result-item"]' },
+      { selector: '.manager-travel-option:has-text("Moonleaf")' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `${STRAIGHT_RESULT} [data-recipe-option-formula]:not([aria-invalid])`,
+    expectLayout: {
+      containerSelector: '[data-gathering-task-results="straight"]',
+      oneLineRows: STRAIGHT_RESULT,
+      alignedRight: `${STRAIGHT_RESULT} .manager-recipe-option-remove`,
+      alignedLeft: `${STRAIGHT_RESULT} [role="radiogroup"]`,
+    },
+    expectContained: [
+      { container: STRAIGHT_RESULT, target: `${STRAIGHT_RESULT} .manager-recipe-option-remove` },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_TASK_EDITOR_PATTERN,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/(Recipe(ResultGroupCard|ResultsSection)|PickerRow|PickerRowAmount)\.svelte$/,
     ],
   }),
   ...['selector', 'straight', 'routed'].map((mode) =>
@@ -387,8 +573,9 @@ export const CASES = Object.freeze([
         { selector: '#manager-gathering-nav-tasks' },
         {
           selector:
-            '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+            '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
         },
+        ...(mode === 'selector' ? [] : [taskTab('results')]),
         {
           selector:
             mode === 'selector'
@@ -402,12 +589,14 @@ export const CASES = Object.freeze([
         mode === 'selector'
           ? '[data-gathering-task-resolution-mode]'
           : `[data-gathering-task-results="${mode}"]`,
-      // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976).
-      expectScrollable: 'main.manager-gathering-task-edit-view',
+      // The editor's tab panel, not the body, scrolls below the 1120px rung (issues 1976, 1522).
+      // Overview overflows it; a Results tab holding one result card does not.
+      expectScrollable: mode === 'selector' ? '[data-gathering-task-panel="overview"]' : undefined,
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
         GATHERING_ROUTE_MODEL_PATTERN,
-        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte|headerBreadcrumbs\.js)$/,
+        GATHERING_TASK_EDITOR_PATTERN,
         /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
       ],
     })
@@ -423,8 +612,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      taskTab('results'),
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -432,7 +622,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte|headerBreadcrumbs\.js)$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
@@ -447,8 +638,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      taskTab('results'),
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -456,7 +648,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte|headerBreadcrumbs\.js)$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
@@ -473,8 +666,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      taskTab('requirements'),
       { selector: '[data-gathering-task-availability]', scroll: true },
       { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
     ],
@@ -487,26 +681,23 @@ export const CASES = Object.freeze([
       // The biome options are the modifier handlers' vocabulary read (issue 1721).
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(EventEditView|TaskEditView)\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  // A d100 task's Results tab at the stacking width (issue 1522): the side rail stays, and the drop
+  // rail stacks beneath the editor, so the tab bar sits where Overview left it.
   managerCase({
     id: 'manager-gathering-task-editor-stacked',
-    label: 'Manager — Gathering task editor stacked',
+    label: 'Manager — Gathering task editor stacked, Results',
     smokeLabels: ['manager-gathering-task-editor-stacked'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: [
-      'Gathering',
-      { selector: '#manager-gathering-nav-tasks' },
-      {
-        selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
-      },
-      // At 1000px the library stacks, so the scroll to reach Edit carries into the editor's own container.
-      { selector: '[data-gathering-task-core-editor]', scroll: true },
-    ],
+    steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, taskTab('results')],
     expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager:not([data-gathering-task-layout]) .manager-body > aside.manager-inspector [data-gathering-task-drop-inspector]',
+    expectCenterHit: '[data-gathering-task-tab="results"]',
     // 1000x720, the width its smoke counterpart stacks at; 1280x820 was the normal geometry.
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'responsive'],
@@ -514,7 +705,32 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
+  }),
+  // The ranked drop table at the intermediate width (issue 1782), where the retired column grid took
+  // its narrow track set: the `DataTable` that replaced it, its rank column and rockers over two rows.
+  managerCase({
+    id: 'manager-gathering-task-drops-ranked-narrow',
+    label: 'Manager — Gathering task drop table, ranked, at the intermediate width',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'reward-rule' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      { selector: '[data-gathering-task-drops-table]', scroll: true },
+    ],
+    position: { width: 1180, height: 1000 },
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager [data-gathering-task-drops-table].is-ranked-mode [data-gathering-task-drop-rank-cell]',
+    expectCenterHit:
+      '[data-gathering-task-drops-table] [data-gathering-task-drop-move="down"]:not([disabled])',
+    expectNoHorizontalOverflow: '[data-gathering-task-drops-table] .fabricate-data-table-scroll',
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
   }),
   managerCase({
     id: 'manager-environment-edit-placeholder',
@@ -527,7 +743,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
     ],
     expectView: 'environment-edit',
@@ -565,7 +781,7 @@ export const CASES = Object.freeze([
         'Gathering',
         {
           selector:
-            '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+            '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
         },
         ...[
           ['realm', 'hb-realm-verdant'],
@@ -608,7 +824,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-environment-field="dangerLevel"]' },
     ],
@@ -640,7 +856,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-events' },
     ],
@@ -649,6 +865,143 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-entry.is-selected)' +
       ' [data-record-inspector="event"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  // Issue 1522: a composition row's overrides open in place in that row, and the scene link is
+  // authored on the Overview tab's own card, so the rail beside both is read-only.
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].flatMap(({ suffix, width, height }) =>
+    [
+      ['task', 'lab-smithing', 'sm-env-mine', 'tasks', 'sm-task-prospect'],
+      ['event', 'lab-herbalism', 'hb-env-grove', 'events', 'hb-event-storm'],
+    ].map(([kind, system, environment, tab, record]) => {
+      const row = `[data-environment-tab="${tab}"] .fabricate-sortable-list-row.is-expanded[data-record-id="${record}"]`;
+      const input = `${row} [data-drop-rate-adjustment-input]`;
+      return managerCase({
+        id: `manager-environment-edit-${kind}-row-open-${suffix}`,
+        label: `Manager — Environment edit ${kind} row overrides open ${suffix}`,
+        reaches: 'beyond',
+        smokeLabels: [],
+        query: { system },
+        position: { width, height },
+        steps: [
+          'Gathering',
+          {
+            selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+          },
+          { selector: `#environment-tab-${tab}` },
+          { selector: `[data-sortable-disclosure="${record}"]` },
+          { selector: input, scroll: true },
+        ],
+        expectView: 'environment-edit',
+        expectSelector: `.fabricate-manager ${row} [data-composition-override-body="${kind}"]`,
+        expectNoHorizontalOverflow: `[data-environment-tab="${tab}"]`,
+        expectCenterHit: input,
+        kinds: ['manager', 'environments', ...(suffix === 'narrow' ? ['responsive'] : [])],
+        sourceMatches: [
+          GATHERING_ROUTE_MODEL_PATTERN,
+          ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+          /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+        ],
+      });
+    })
+  ),
+  ...[
+    ['linked', 'hb-env-grove', { width: 1280, height: 820 }, '[data-overview-scene-unlink]'],
+    [
+      'unlinked-narrow',
+      'hb-env-ridge',
+      { width: 1000, height: 720 },
+      '[data-overview-section="scene"] [data-manager-item-drop-zone]',
+    ],
+  ].map(([state, environment, position, hit]) =>
+    managerCase({
+      id: `manager-environment-edit-scene-${state}`,
+      label: `Manager — Environment edit Linked scene card, ${state}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism' },
+      position,
+      steps: [
+        'Gathering',
+        {
+          selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+        },
+        { selector: '[data-overview-section="scene"]', scroll: true },
+      ],
+      expectView: 'environment-edit',
+      expectSelector:
+        state === 'linked'
+          ? '.fabricate-manager [data-overview-section="scene"] [data-overview-scene-linked]'
+          : '.fabricate-manager [data-overview-section="scene"] [data-item-drop-zone="scene"]:not([data-overview-scene-linked])',
+      expectNoHorizontalOverflow: '[data-overview-section="scene"]',
+      expectCenterHit: hit,
+      kinds: ['manager', 'environments', ...(state === 'linked' ? [] : ['responsive'])],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+        /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      ],
+    })
+  ),
+  // A row outside the ordered list opens the same body through its own grid track, at the floor.
+  managerCase({
+    id: 'manager-environment-edit-available-row-open-narrow',
+    label: 'Manager — Environment edit Available-to-add row overrides open narrow',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    position: { width: 1000, height: 720 },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+      { selector: '[data-composition-disclosure="hb-task-spring"]' },
+      { selector: `${AVAILABLE_SPRING_ROW} [data-drop-rate-adjustment-input]`, scroll: true },
+    ],
+    expectView: 'environment-edit',
+    expectSelector: `.fabricate-manager ${AVAILABLE_SPRING_ROW} [data-composition-override-body="task"]`,
+    expectNoHorizontalOverflow: '[data-environment-tab="tasks"]',
+    expectCenterHit: `${AVAILABLE_SPRING_ROW} [data-drop-rate-adjustment-input]`,
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  // The ranked event strip's 94px lead: the grip, the badge and the disclosure over each row.
+  managerCase({
+    id: 'manager-environment-edit-events-ranked',
+    label: 'Manager — Environment edit Events tab, highest-ranked event selection',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      ...chooseSelectOption('#manager-gathering-rule-events', 'highestRankedDrop'),
+      { selector: '#manager-gathering-nav-environments' },
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-events' },
+    ],
+    expectView: 'environment-edit',
+    expectSelector:
+      '.fabricate-manager [data-environment-tab="events"] .manager-environment-comp-head.has-rank-controls',
+    expectCenterHit: '[data-environment-tab="events"] [data-sortable-grip]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
@@ -674,7 +1027,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // The facts this case exists to show are computed and rendered here.
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       // And drawn by the leaf they moved into (issue 1707 phase 2).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
@@ -692,7 +1045,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-encounters' },
       {
         selector:
-          '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-event-id="hb-event-wolves"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       // The danger pills into frame (issue 1515).
       { selector: '[data-gathering-event-danger-pills]', scroll: true },
@@ -725,9 +1078,10 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
-      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      taskTab('results'),
+      SELECT_SLOWBLOOM_DROP,
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -737,11 +1091,132 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      // Its drop row sits on the Results tab (issue 1522).
+      GATHERING_TASK_EDITOR_PATTERN,
+    ],
+  }),
+  // The two compact typeaheads' lists open (issue 1782), which no case drew: the component browser's
+  // tag filter and the drop's character-modifier search, each a `Typeahead` over the search field.
+  managerCase({
+    id: 'manager-gathering-task-component-tag-suggestions',
+    label: 'Manager — Gathering task component browser, the tag list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      { selector: '[data-gathering-component-tag-search]', scroll: true },
+      { selector: '[data-gathering-component-tag-search] input', fill: 'p' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list[data-gathering-component-tag-suggestions]' +
+      ' [data-gathering-component-tag-suggestion]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_TASK_EDITOR_PATTERN,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-modifier-suggestions',
+    label: 'Manager — Gathering task drop, the character-modifier list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      SELECT_SLOWBLOOM_DROP,
+      { selector: '[data-gathering-drop-character-modifiers]', scroll: true },
+      { selector: '[data-gathering-drop-character-modifier-search] input', fill: 'i' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list[data-gathering-drop-character-modifier-suggestions]' +
+      ' [data-gathering-drop-character-modifier-suggestion]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-condition-modifier-attached',
+    label: 'Manager — Gathering task drop with an attached condition modifier',
+    // Beyond the smoke: it attaches a biome modifier, so a condition modifier's one-line rule row
+    // is on screen, which the empty card above never draws (issue 1782).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      taskTab('results'),
+      SELECT_SLOWBLOOM_DROP,
+      {
+        selector: '[data-gathering-drop-condition-modifier-picker="biome"] .fabricate-icon-button',
+      },
+      { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"] [data-gathering-drop-modifier-id]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-character-modifier-attached',
+    label: 'Manager — Gathering task drop with an attached character modifier',
+    // Beyond the smoke: it attaches a library modifier, so the reference row's operator select
+    // and its sign tone are on screen, which no other frame draws (issue 1777).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      taskTab('results'),
+      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      { selector: '[data-gathering-drop-character-modifier-search] input', fill: 'Herb' },
+      {
+        selector: '[data-gathering-drop-character-modifier-suggestion="hb-mod-herbalism-training"]',
+      },
+      { selector: '[data-gathering-drop-character-modifier-ref]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager .manager-inspector [data-gathering-drop-character-modifier-ref]' +
+      ' .manager-character-modifier-operator-select.is-positive .fabricate-select-trigger',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   taskOverrideCase({
@@ -786,5 +1261,15 @@ export const CASES = Object.freeze([
     field: 'adjustmentOverride',
     frame: 24,
     sees: 'adjustment-invalid',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-count',
+    label: 'counting successes, one successes needed stepper',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-gathering-task-successes-override][placeholder="System default"])' +
+      ':has([data-gathering-task-override-kept])',
   }),
 ]);

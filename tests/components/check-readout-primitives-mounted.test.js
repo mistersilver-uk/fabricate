@@ -32,8 +32,7 @@ describe('IconFactRow: the line density, row tones and meta hook', () => {
       subtitle: 'by trigger',
       density: 'line',
       tone: 'danger',
-      dataAttr: 'data-checks-simulator-fact',
-      dataValue: 'tools',
+      'data-checks-simulator-fact': 'tools',
       metaAttr: 'data-checks-simulator-fact-meta',
     });
     const node = target.querySelector('[data-checks-simulator-fact="tools"]');
@@ -86,16 +85,23 @@ describe('Medallion: the glyph ink (R2)', () => {
 
   it('inks the glyph success or danger on the unchanged slate tile, and ignores anything else', async () => {
     const base = { icon: 'fas fa-circle-check', size: 30, variant: 'glyph-chip' };
+    // `is-corner-7` is the 30px art rung's corner, which the ink does not touch.
     assert.deepEqual(await classesFor({ ...base, ink: 'success' }), [
       'fab-medallion',
       'is-glyph-chip',
+      'is-corner-7',
       'is-ink-success',
     ]);
     assert.deepEqual(await classesFor({ ...base, ink: 'danger' }), [
       'fab-medallion',
       'is-glyph-chip',
+      'is-corner-7',
       'is-ink-danger',
     ]);
-    assert.deepEqual(await classesFor({ ...base, ink: 'accent' }), ['fab-medallion', 'is-glyph-chip']);
+    assert.deepEqual(await classesFor({ ...base, ink: 'accent' }), [
+      'fab-medallion',
+      'is-glyph-chip',
+      'is-corner-7',
+    ]);
   });
 });

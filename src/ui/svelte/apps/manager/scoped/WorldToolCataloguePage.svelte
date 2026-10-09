@@ -13,7 +13,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../../../components/Chip.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import {
     toolBreakageSummary,
@@ -464,19 +464,17 @@
   />
 {/snippet}
 
-<!--
-  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT, which is what makes the panel a place a
-  GM ACTS from. The frame owns the pinning and this snippet owns the verb.
--->
+<!-- The inspector's one primary verb, which the frame pins to its foot. No glyph: the external-link
+     mark belongs to the row buttons, which leave; this opens the record the panel describes. -->
 {#snippet toolInspectorFoot(entry)}
-  <!-- NO GLYPH: the external-link mark belongs to the ROW buttons, which leave the catalogue;
-       this opens the record the panel above it is already describing. -->
-  <InspectorActionButton
-    tone="primary"
-    label={text('FABRICATE.Admin.Manager.Scoped.Tool.OpenEntry', 'Edit tool')}
+  <Button
+    role="primary"
+    fullWidth
     data-scoped-tool-open-entry
-    onClick={() => onOpenEntry(entry.id)}
-  />
+    onclick={() => onOpenEntry(entry.id)}
+  >
+    {text('FABRICATE.Admin.Manager.Scoped.Tool.OpenEntry', 'Edit tool')}
+  </Button>
 {/snippet}
 
 <!--
@@ -548,8 +546,8 @@
 
   /* `:global()` AND CHAINED (issue 1427's rule): this class sits on an `<InspectorCard>` tag, so
      Svelte stamps no hash onto it and prunes the local selector, which `lint:svelte:warnings`
-     fails on. `.manager-inspector-card` is chained for the specificity the hash carried. */
-  :global(.manager-inspector-card.manager-world-tool-break-card) {
+     fails on. `.fabricate-card` is chained for the specificity the hash carried. */
+  :global(.fabricate-card.manager-world-tool-break-card) {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

@@ -11,7 +11,10 @@ import {
   projectKnowledgeSnapshot,
   projectLearnedRecipeRow,
 } from '../../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
@@ -19,6 +22,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-knowledge-view-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -64,8 +68,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRecipeItemsTab.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRecipesTab.svelte',
     // THE manager's labelled push-button (issue 1118). Both resets and the owned-copy row`s Expend use render it.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    // The `Field` the search field's labelled form renders (issue 1782).
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/KnowledgeView.svelte',

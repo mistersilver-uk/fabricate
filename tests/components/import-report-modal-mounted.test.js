@@ -24,9 +24,9 @@ const harness = createMountedComponentHarness({
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/Modal.svelte',
     // THE manager's labelled push-button (issue 1118). The footer Close renders it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',
   ],
@@ -109,7 +109,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.equal(modal(), null);
   });
 
-  it('renders through the shared ManagerModal chrome, not a bare dialog', async () => {
+  it('renders through the shared Modal chrome, not a bare dialog', async () => {
     await harness.mount({ open: true, content: REPORTED_CONTENT });
     const root = modal();
     assert.ok(root, 'expected the report to be portaled');
@@ -204,7 +204,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.equal(closed, 2);
   });
 
-  it('keeps the chrome the roll prompt\'s additive ManagerModal props leave at their defaults', async () => {
+  it('keeps the chrome the roll prompt\'s additive Modal props leave at their defaults', async () => {
     let closed = 0;
     const opener = document.createElement('button');
     document.body.append(opener);
@@ -213,7 +213,7 @@ describe('ImportReportModal (mounted)', () => {
     const root = modal();
     assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
     assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
-    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    // Maintainer rulings 2026-09-28: Modal draws one frame, the library's banded Modal.
     assert.ok(root.querySelector('.manager-modal-body > .manager-import-report-list'), 'in a padded body');
     const close = root.querySelector('[data-manager-modal-close]');
     assert.ok(close.classList.contains('is-size-26'), 'the banded frame’s 26px close');

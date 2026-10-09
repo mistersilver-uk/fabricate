@@ -31,10 +31,14 @@ Select a row in either list to read its detail.
 The lists and selected detail scroll independently, with sort controls and page controls kept outside the scrolling lists.
 In a narrow window they stack in the order Active, Finished, then detail.
 
-Use **Search runs** and **Kind** to filter both lists.
-Kind distinguishes Crafting, Alchemy, Gathering, and Salvage.
+Use **Search runs** and the **Run types** filter to narrow both lists.
+The filter sits under the search field as a menu button that names your choice, such as "Crafting, Salvage", "All run types", or "No run types".
+Open it to see **Crafting**, **Gathering**, **Salvage**, and **Alchemy**, each with a checkbox and its count of runs.
+Any combination is allowed, and each tick applies immediately and returns both lists to their first page.
+**Show all run types** clears the filter, and is disabled when every type is already shown.
+All run types start shown each time the window opens.
 The Active status filter selects one of **All**, **Ready**, **In progress**, or **Paused**.
-Its counts describe the selected kind before search or paging, so a search can show fewer rows than the status count.
+Its counts describe the run types shown before search or paging, so a search can show fewer rows than the status count.
 
 Both lists start with four runs per page and have independent page sizes and page controls.
 You can choose 4, 6, 12, or 25 runs per page.
@@ -64,11 +68,19 @@ Where a run needs something from **you**, a second badge sits beside the status 
   A route, an option, or an essence allocation has not been made yet.
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
+  **Needs tools** clears while a [tool station]({% link canvas-interactables.md %}#virtual-present-station-tools) you activated supplies the missing tool, and returns when that station is no longer active.
+
+A small bolt before the status badge, labelled **Finishes this stage as time passes**, means the run's current stage will complete on its own once its wait is over.
+It shows only for a run that is set to complete as time passes, is not paused, and is still waiting on its time gate.
+It also needs the run to owe no reward pick and to have nothing that would stop it, such as missing materials, tools, or a player check.
+Crafting runs show it; gathering runs do not yet.
+A later stage may still stop and wait for you.
+For a crafting run with no check, a step completes on its own when the run is set to, and otherwise you can complete it by hand.
 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.
 
-A live count badge on the **Journal** tab shows how many active runs the selected character has.
+A live count badge on the corner of the **Journal** icon in the window's left rail shows how many active runs the selected character has.
 The badge stays accurate even while the Journal tab is closed, and it disappears when there are no active runs.
 It also keeps pace when another player or your GM starts, advances, or finishes a run for that character, so the count and the run lists update on their own once that character's data reaches your client, with no need to reload the window.
 
@@ -149,6 +161,45 @@ After execution, history reports actual awards as **Crafted**, **Brought back**,
 
 A result whose amount is rolled shows its dice expression rather than a plain number while it is still only a preview, because no preview can know what the roll will be.
 Once the run has actually awarded it, the same result states the roll that produced it beside the quantity delivered, such as "Rolled 1d6 = 4", and a roll of zero or lower states that nothing was produced rather than showing an empty quantity.
+
+A recipe's result can also pay out currency or teach a recipe's knowledge instead of producing an item.
+A currency result shows its amount with the unit's name, such as "2d6 gp" in a preview and the rolled amount once awarded.
+A knowledge result shows as **Recipe knowledge**, and once awarded the history states that the recipe was learned, or that it was already known.
+A recipe you are not entitled to see is named **Unknown recipe** rather than by its real name.
+A currency result shows the name the GM gave it, such as "Finder's fee", and the reason they wrote, in place of the unit's name.
+The GM sets these on the recipe's Results tab; see [Result Kinds]({% link crafting/recipes/index.md %}#result-kinds-items-currency-and-recipe-knowledge).
+
+### Choosing a reward
+
+A recipe's result can be a group of alternatives from which the player chooses.
+The recipe preview shows it as "You choose one of…" or "You choose up to N of…".
+A group that the dice decide shows as "One of these, by roll", and you have nothing to pick.
+
+When a run reaches a result that you choose, the run owes you a pick and nothing from that result is yours until you make it.
+The run shows **Choose your reward** and waits.
+Pick the alternatives you want in the run's detail in the Journal.
+A line above the tiles states the ceiling, such as "Choose up to 2 rewards".
+You may tick fewer, and unticking one frees a slot for another.
+Then use the claim button, such as **Claim 2 rewards**, to take what you ticked.
+
+An alternative you cannot claim is shown as a disabled tile with the reason beside it.
+Examples are "You already know Bend Horseshoe." for a recipe you have learned, or a note that a component or currency is no longer available.
+When nothing in the group can be claimed, the only action left is **Close without a reward**.
+It awards nothing and moves the run to Finished.
+
+A pending reward is signalled in several places so it is hard to miss:
+
+- The run's row in the Journal list reads **Choose your reward** and is ranked ahead of other active runs.
+  A viewer who cannot make the pick sees **Reward pending** instead.
+- The run's notice in the detail repeats **Choose your reward**.
+- The crafting outcome says "Pick it there to claim it." and offers **Open in Journal**.
+- The chat card says "A reward is waiting to be chosen in the Journal".
+
+The owner of the character and the GM can settle the pick.
+Another player is told this character's owner or the GM chooses it.
+A player who is not entitled to see the run's evidence is told "Your GM can choose this reward for you."
+Only one settle runs at a time for a run.
+If a reload interrupts a settle, Fabricate resolves it for you on the next load.
 
 ### Reading a closed run
 

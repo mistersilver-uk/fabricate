@@ -228,13 +228,30 @@ A tool's durable identity is stamped on its source Item as `Item.flags.fabricate
 ```javascript
 {
   (id, // string
+    kind, // "component" | "currency" | "knowledge" (default "component")
     componentId, // string (managed component reference)
     itemUuid, // string (direct Foundry item reference)
     quantity, // number (default 1) -- the AUTHORED, fixed amount
     quantityFormula, // string | null -- a non-empty value means the amount is ROLLED instead
+    unit, // string | null -- a currency result's unit id
+    recipeId, // string | null -- a knowledge result's taught recipe id
+    label, // string | null -- a currency result's optional note
+    reason, // string | null -- a currency result's optional reason
     propertyMacroUuid); // string | null
 }
 ```
+
+{: .note }
+
+> `kind` says what the result awards (issue 1773).
+> A `component` result awards an item, as every result did before this field existed, and an absent `kind` means `component`.
+> A `currency` result names a `unit` and credits an amount of it, fixed by `quantity` or rolled by `quantityFormula`, to the crafting character.
+> A `knowledge` result names a `recipeId` and teaches that recipe's knowledge to the crafting character, so it takes no amount.
+> Only a `currency` result carries `label` or `reason`, and only a `component` result runs a `propertyMacroUuid`.
+> `Result.validate()` reports a result whose fields do not fit its kind.
+> A GM authors these kinds on a recipe's Results tab with the **+ Result** menu; see [Result Kinds]({% link crafting/recipes/index.md %}#result-kinds-items-currency-and-recipe-knowledge).
+> A recipe's progressive stages and the gathering task editor can only author components.
+> Gathering and salvage results stay components: gathering refuses another kind, and salvage drops it.
 
 {: .note }
 
@@ -250,6 +267,8 @@ Result data is validated as part of recipe validation and consumed by the crafti
 > The formula is a roll expression, resolved once per result per award against the crafting character, and it can reference the character's own roll data.
 > `Result.validate({ Roll })` accepts `Roll` as an injected dependency and rejects a formula with no character reference whose maximum possible roll can never exceed zero.
 > With no `Roll` supplied, validation reports nothing about `quantityFormula`.
+> `Recipe.validate({ Roll, progressive })` and `Recipe.validateStructure({ Roll, progressive })` pass `Roll` down to every result.
+> With `progressive: true` they skip formula checks, because a progressive award drops every formula.
 > An empty, whitespace-only, or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state of every result created before this field existed.
 
 **Related methods:**

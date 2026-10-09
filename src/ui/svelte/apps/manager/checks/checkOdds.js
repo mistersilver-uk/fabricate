@@ -65,8 +65,8 @@ const refuse = (reason) => ({ enumerable: false, reason });
 
 /**
  * A term that carries a dice term's shape, whatever class it is, and deliberately STRUCTURAL:
- * the View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this
- * untestable outside a live client.
+ * the odds tests replay recorded `Roll.parse` terms as plain objects, which no `instanceof`
+ * test against core's term classes would recognise.
  * @param {object} term A parsed roll term. @returns {boolean} True when it looks like a die. */
 function isDiceTermLike(term) {
   if (!term || typeof term !== 'object') return false;

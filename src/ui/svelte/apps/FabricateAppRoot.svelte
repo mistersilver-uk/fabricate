@@ -33,6 +33,7 @@
   import InventoryView from './inventory/InventoryView.svelte';
   import ActorSelectTopBar from './ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
+  import NavSidebar from '../components/NavSidebar.svelte';
   import Notice from '../components/Notice.svelte';
   import WorldClockChip from '../components/WorldClockChip.svelte';
   import { worldTimeLabel } from '../util/worldTimeLabel.js';
@@ -112,16 +113,25 @@
     })
   );
   const activeNavTab = $derived(tabs.find((tab) => tab.routeKey === activeTab) ?? null);
-  // The roving `tabindex` needs a tab stop that always EXISTS. `activeTab` can name no rendered
-  // entry — `SvelteFabricateApp`'s `CORE_TABS` admits `alchemy` unconditionally while
-  // `showAlchemy` is computed independently, so an open on `alchemy` while Alchemy is
-  // unavailable lands exactly there — and binding the stop to `activeTab` alone then makes
-  // EVERY rail button `tabindex="-1"` and takes the whole navigation out of the Tab order.
-  // Before this rail was a tablist the buttons were all default-`0`, so that is a new failure
-  // mode rather than a pre-existing one. `aria-selected` deliberately STAYS bound to
-  // `activeTab`: the APG's fallback is about which button is the tab stop, never about which
-  // tab is selected, and reporting a selection the panel does not show would be worse.
-  const focusableTab = $derived(activeNavTab ?? tabs[0] ?? null);
+  // Every rail id is NAMESPACED: a bare Core id such as `journal` shares a document with Foundry's
+  // own chrome, and an IDREF resolves to its first match in document order.
+  const navItems = $derived(
+    tabs.map((tab) => ({
+      id: tab.routeKey,
+      domId: `player-nav-tab-${tab.routeKey}`,
+      hooks: { 'data-player-nav-tab': tab.routeKey },
+      icon: tab.iconClass,
+      label: tab.text,
+      ariaLabel: tab.accessibleName,
+      tooltip: tab.tooltip,
+      tooltipId: `player-nav-tooltip-${tab.routeKey}`,
+      markers:
+        tab.count > 0
+          ? [{ kind: 'count', value: tab.count, hooks: { 'data-nav-count': tab.routeKey } }]
+          : [],
+      current: activeTab === tab.routeKey,
+    }))
+  );
 
   // ---------------------------------------------------------------------------------------
   // Companion surfaces (issue 1198)
@@ -341,21 +351,6 @@
     tick().then(() => railButton(nextKey)?.focus?.());
   });
 
-  // The rail is `aria-orientation="vertical"`, so the arrow pair is Up/Down rather than the
-  // Manager tab strip's Left/Right. Selection follows focus, which is the tablist default.
-  function onNavKeydown(event, index) {
-    let next;
-    if (event.key === 'ArrowDown') next = (index + 1) % tabs.length;
-    else if (event.key === 'ArrowUp') next = (index - 1 + tabs.length) % tabs.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = tabs.length - 1;
-    else return;
-    event.preventDefault();
-    const nextTab = tabs[next];
-    onSelectTab?.(nextTab.routeKey);
-    tick().then(() => railButton(nextTab.routeKey)?.focus?.());
-  }
-
   // Shell-level Journal refresh: keep the store (and thus the nav badge) fresh
   // even while the Journal tab is closed. A scene change or world-time advance
   // quietly re-fetches; the store guards its own one-time initial load via
@@ -499,58 +494,13 @@
      published a frame and still passed. The manager half has been held to its route from the
      start; this gives the player half the same footing. -->
 <div class="fabricate-app-shell" data-active-tab={activeTab} bind:this={shell}>
-  <div
-    class="fabricate-app-nav"
-    role="tablist"
-    aria-orientation="vertical"
-    aria-label={localize('FABRICATE.App.Nav.Tablist')}
-  >
-    <!-- Every id this block introduces is NAMESPACED. A bare Core id such as `crafting` or
-         `journal` shares a document with Foundry's own chrome, which does use bare id
-         selectors, and an IDREF resolves to the first match in document order — so a
-         collision would silently mislabel the panel with nothing able to see it, because
-         happy-dom has no sidebar to collide with. -->
-    {#each tabs as tab, index (tab.routeKey)}
-      <button
-        type="button"
-        class="fabricate-app-nav-item"
-        class:active={activeTab === tab.routeKey}
-        role="tab"
-        id={`player-nav-tab-${tab.routeKey}`}
-        data-player-nav-tab={tab.routeKey}
-        aria-selected={activeTab === tab.routeKey}
-        aria-controls="player-nav-panel"
-        aria-label={tab.accessibleName}
-        aria-describedby={tab.tooltip ? `player-nav-tooltip-${tab.routeKey}` : undefined}
-        tabindex={tab.routeKey === focusableTab?.routeKey ? 0 : -1}
-        data-keyboard-focus="true"
-        onclick={() => onSelectTab?.(tab.routeKey)}
-        onkeydown={(event) => onNavKeydown(event, index)}
-      >
-        <i class={tab.iconClass} aria-hidden="true"></i>
-        <span class="fabricate-app-nav-label">{tab.text}</span>
-        {#if tab.count > 0}
-          <span class="fabricate-app-nav-count" data-nav-count={tab.routeKey}>{tab.count}</span>
-        {/if}
-      </button>
-    {/each}
-  </div>
-
-  <!-- The `aria-describedby` targets, emitted as SIBLINGS of the tablist rather than inside
-       it. A `tablist`'s only permitted owned role is `tab`, so a `tooltip` child is unallowed
-       content that axe-core's `aria-required-children` reports, and a screen reader deriving
-       "tab N of M" from the owned children can count the extra nodes. Nothing is lost by
-       moving them: an IDREF is resolved document-wide, not within the referring element's
-       subtree, so the association each rail button declares is unchanged. -->
-  {#each tabs as tab (tab.routeKey)}
-    {#if tab.tooltip}
-      <span
-        id={`player-nav-tooltip-${tab.routeKey}`}
-        class="fabricate-app-nav-tooltip"
-        role="tooltip">{tab.tooltip}</span
-      >
-    {/if}
-  {/each}
+  <NavSidebar
+    variant="icon"
+    label={localize('FABRICATE.App.Nav.Tablist')}
+    items={navItems}
+    panelId="player-nav-panel"
+    onSelect={(routeKey) => onSelectTab?.(routeKey)}
+  />
 
   <div class="fabricate-app-main">
     <!-- The active station-tool chip rides in the shared header bar's right-side
@@ -605,8 +555,7 @@
               detail={localize('FABRICATE.App.Extension.FaultDescription', {
                 providerId: activeSurface.provider.id,
               })}
-              dataAttr="data-player-extension-fault"
-              dataValue={activeSurface.surfaceId}
+              data-player-extension-fault={activeSurface.surfaceId}
             />
           </div>
         {:else if activeSurface}
@@ -657,112 +606,6 @@
     color: var(--fab-text);
     background: var(--fab-surface);
   }
-
-  /* `scrollbar-gutter: stable` reserves the gutter whether or not the rail is currently
-     scrolling, so crossing the entry count that starts the scroll does not reflow the column
-     and shift every button sideways. See `.fabricate-app-nav-item`'s width for the other half
-     of this. */
-  .fabricate-app-nav {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 84px;
-    padding: 8px;
-    border-right: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-
-  /* `width: min(64px, 100%)`, NOT a bare `64px`. The rail is a fixed 84px column with 8px of
-     padding, so its content box is 68px — and Foundry's reset applies `* { scrollbar-width:
-     thin }`, which on a classic (non-overlay) scrollbar platform takes ~11-12px of layout
-     width the moment the rail scrolls. A non-shrinkable 64px button against a ~56px content
-     box overflows, and because `overflow-y: auto` forces `overflow-x` to compute to `auto`
-     that is a VISIBLE horizontal scrollbar inside an 84px column rather than a silent clip.
-     It is reachable: at the 1024x640 window floor the rail fits exactly 8 entries, and 9 —
-     Core's 5 tabs plus a 4-tab companion — scrolls. Yielding the gutter keeps the promise the
-     seam's spec makes about no horizontal overflow at the minimum window size.
-     `.fabricate-app-nav-label`'s `max-width: 100%` follows the button down, so the ellipsis
-     rule below still holds at the narrower width.
-
-     THE VIEW LAB CANNOT CATCH THIS. Its `expectNoHorizontalOverflow` compares `scrollWidth`
-     against `clientWidth`, and headless Chromium renders OVERLAY scrollbars, which consume no
-     layout width at all — a green capture proves no CONTENT overflow and says nothing about a
-     scrollbar gutter. The guard is the declaration assertion in
-     `tests/components/fabricate-app-root-mounted.test.js`. */
-  .fabricate-app-nav-item {
-    position: relative;
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 6px;
-    width: min(64px, 100%);
-    height: 64px;
-    text-align: center;
-    border: 1px solid transparent;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--fab-text-muted);
-    cursor: pointer;
-  }
-
-  .fabricate-app-nav-item i {
-    font-size: 20px;
-    line-height: 1;
-  }
-
-  /* `overflow` and `text-overflow` are what ADMIT a third-party label. Core authors its own
-     five strings and its longest consumes almost exactly the ~52px text box a fixed 64px
-     button leaves; a companion's label and its localizations are unbounded, and
-     `.fabricate-app-nav` is `overflow-y: auto`, so `overflow-x` computes to `auto` and an
-     unbounded label would spill and put a horizontal scrollbar in the 84px column. The
-     untruncated text is what `accessibleName` and `tooltip` are for. */
-  .fabricate-app-nav-label {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 11px;
-    line-height: 1.1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* The `aria-describedby` target for a provider tab that supplies a tooltip. It is taken
-     OUT OF FLOW and clipped rather than rendered: the rail is an 84px column with a fixed
-     64px button grid, so a visible tooltip is the same overhang that failed the Manager
-     strip's horizontal-overflow assertion, and the seam's contract is that a supplied
-     tooltip is EXPOSED through `aria-describedby`, not that Core paints it. No pixels move
-     for the five shipped Core buttons, which supply no tooltip and render no such node.
-     Being out of flow and clipped to 1x1 is also why these nodes could be lifted out of the
-     tablist (where a `tooltip` child is unallowed owned content) without moving a pixel. */
-  .fabricate-app-nav-tooltip {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .fabricate-app-nav-item:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .fabricate-app-nav-item.active {
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    border-color: var(--fab-accent);
-  }
-
-  /* Focus rings (Foundry orange suppressed on :focus, accent ring on
-     :focus-visible) are handled globally for the .fabricate-app area in
-     styles/fabricate.css. */
 
   .fabricate-app-main {
     flex: 1 1 auto;

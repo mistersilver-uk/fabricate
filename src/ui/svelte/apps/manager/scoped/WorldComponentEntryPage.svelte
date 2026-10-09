@@ -16,7 +16,7 @@
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
@@ -558,12 +558,11 @@
         'FABRICATE.Admin.Manager.Scoped.Component.EntryMissingHint',
         'This entry is open on a component the world corpus no longer holds. Return to the catalogue and choose one.'
       )}
-      dataAttr="data-scoped-entry-state"
-      dataValue="missing"
+      data-scoped-entry-state="missing"
     >
-      <ManagerButton data-scoped-entry-back onclick={() => onBackToCatalogue()}>
+      <Button data-scoped-entry-back onclick={() => onBackToCatalogue()}>
         {text('FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogue', 'Back to the catalogue')}
-      </ManagerButton>
+      </Button>
     </EmptyState>
   {:else}
     <!--
@@ -581,8 +580,8 @@
           ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Component.EntryTabsLabel"
           ariaLabel="Component definition sections"
           idStem="scoped-component-entry"
-          hookAttribute="data-scoped-entry-tab"
-          badgeAttribute="data-scoped-entry-tab-badge"
+          tabDataAttr="data-scoped-entry-tab"
+          badgeDataAttr="data-scoped-entry-tab-badge"
         />
 
         <div
@@ -606,7 +605,7 @@
               data-scoped-entry-identity-card=""
             >
               <div class="manager-component-entry-identity-body">
-                <Medallion art={shownImage} alt="" icon={PAGE_ICON} size={56} glyph={26} />
+                <Medallion art={shownImage} alt="" icon={PAGE_ICON} size={38} glyph={15} />
                 <div class="manager-component-entry-identity-copy">
                   <div class="manager-component-entry-identity-name-row">
                     {#if sourceLinked}
@@ -762,16 +761,16 @@
                     triggerClass="manager-component-entry-category-trigger"
                     valueClass="manager-component-entry-category-value"
                     triggerLabel={worldCategory || noCategoryLabel}
-                    triggerAriaLabel={text(
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
                       'World category'
                     )}
-                    dialogAriaLabel={text(
+                    panelLabel={text(
                       'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
                       'World category'
                     )}
-                    triggerData={{ 'data-scoped-entry-category-input': '' }}
-                    onChoose={(option) => commitWorldCategory(option)}
+                    triggerProps={{ 'data-scoped-entry-category-input': '' }}
+                    onSelect={(option) => commitWorldCategory(option)}
                   />
                   <p class="manager-component-entry-note" data-scoped-entry-category-note>
                     {categoryNote}

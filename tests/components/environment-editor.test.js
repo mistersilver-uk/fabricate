@@ -39,6 +39,8 @@ const VALIDATION = `${ENV_DIR}/EnvironmentValidationTab.svelte`;
 const OVERVIEW = `${ENV_DIR}/EnvironmentOverviewTab.svelte`;
 const SUMMARY_INSPECTOR = `${ENV_DIR}/EnvironmentSummaryInspector.svelte`;
 const RIGHT_INSPECTOR = `${ENV_DIR}/EnvironmentRightInspector.svelte`;
+const OVERRIDE_BODY = `${ENV_DIR}/CompositionOverrideBody.svelte`;
+const SCENE_CARD = `${ENV_DIR}/EnvironmentSceneLinkCard.svelte`;
 // The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362.
 const EDITOR_TABS = 'src/ui/svelte/components/EditorTabs.svelte';
 const SHELL_VOCABULARY = '../../../../systems/gatheringComposition.js';
@@ -69,7 +71,7 @@ describe('environment editor localization', () => {
       ['Composition', 'Automatic'],
       ['Composition', 'IncludedByMatch'],
       ['Inspector', 'TaskEnvironmentMatching'],
-      ['Inspector', 'Overrides'],
+      ['Inspector', 'DropRateAdjustments'],
       ['Validation', 'Readiness'],
       ['Evidence', 'Biome'],
       ['Tabs', 'Tasks'],
@@ -106,10 +108,11 @@ describe('environment editor localization', () => {
       ['Composition.ForceAdd', 'Force add'],
       ['Composition.LibraryDisabledNote', 'Enable in library first'],
       ['Composition.ForceIncluded', 'Force included'],
-      ['Composition.OverrideOn', 'On'],
-      ['Composition.OverrideOff', 'Off'],
-      ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
-      ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
+      // The spec's default-vs-override chip, which must not read like the row's On/Off switch.
+      ['Composition.OverrideOn', 'Adjusted'],
+      ['Composition.OverrideOff', 'Default'],
+      ['Composition.OverrideOnTitle', 'Drop rates adjusted in this environment'],
+      ['Composition.OverrideOffTitle', 'Default drop rates'],
       ['Composition.WeightPercentage', 'Selection share'],
       ['Composition.ColEvent', 'Event'],
       ['Composition.QuickRemove', 'Remove'],
@@ -139,7 +142,12 @@ describe('environment editor localization', () => {
       ['Inspector.BaseChanceModifier', 'Base chance modifier'],
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
-      ['Inspector.ClearAdjustment', 'Clear'],
+      ['Inspector.ClearAdjustmentNamed', 'Clear {name}'],
+      ['Inspector.DropRateAdjustmentNamed', '{name}: Drop-rate adjustment (-100% to +100%)'],
+      ['Inspector.DropRateAdjustments', 'Drop-rate adjustments'],
+      ['Inspector.ApplyDropRateAdjustments', 'Apply drop-rate adjustments'],
+      ['Overview.OpenSceneNamed', 'Open scene: {name}'],
+      ['Overview.SceneNotFound', 'Scene not found'],
       [
         'Tasks.ManualIntro',
         'Only tasks you add are available to players, whether or not they match this environment.',
@@ -441,23 +449,17 @@ describe('environment composition editor structure', () => {
     { names: ['eventSelectionMode'] }
   );
 
-  defineStructureContract(
-    'and the editor defaults the rule defensively',
-    SHELL,
-    { defaults: [['eventSelectionMode', 'allDrops']] }
-  );
+  defineStructureContract('and the editor defaults the rule defensively', SHELL, {
+    defaults: [['eventSelectionMode', 'allDrops']],
+  });
 
-  defineStructureContract(
-    'and the events tab defaults the rule defensively',
-    EVENTS_TAB,
-    { defaults: [['eventSelectionMode', 'allDrops']] }
-  );
+  defineStructureContract('and the events tab defaults the rule defensively', EVENTS_TAB, {
+    defaults: [['eventSelectionMode', 'allDrops']],
+  });
 
-  defineStructureContract(
-    'and the list defaults the rule defensively',
-    LIST,
-    { defaults: [['eventSelectionMode', 'allDrops']] }
-  );
+  defineStructureContract('and the list defaults the rule defensively', LIST, {
+    defaults: [['eventSelectionMode', 'allDrops']],
+  });
 
   defineStructureContract('the editor forwards the event rule to the events tab', SHELL, {
     passesProps: [['EnvironmentEventsTab', 'eventSelectionMode']],
@@ -484,19 +486,23 @@ describe('environment composition editor structure', () => {
     }
   );
 
-  defineStructureContract('the runtime preview inspector carries the full runtime counts', SUMMARY_INSPECTOR, {
-    attributes: [
-      ['data-runtime-fact', 'available-tasks'],
-      ['data-runtime-fact', 'excluded-tasks'],
-      ['data-runtime-fact', 'candidate-tasks'],
-      ['data-runtime-fact', 'available-events'],
-      ['data-runtime-fact', 'excluded-events'],
-      ['data-runtime-fact', 'included-not-matching'],
-      ['class', 'manager-fact-grid manager-environment-runtime-grid'],
-    ],
-    spellsNo: ['manager-fact-grid-inline'],
-    spells: ['manager-fact-line', 'manager-fact-label'],
-  });
+  defineStructureContract(
+    'the runtime preview inspector carries the full runtime counts',
+    SUMMARY_INSPECTOR,
+    {
+      attributes: [
+        ['data-runtime-fact', 'available-tasks'],
+        ['data-runtime-fact', 'excluded-tasks'],
+        ['data-runtime-fact', 'candidate-tasks'],
+        ['data-runtime-fact', 'available-events'],
+        ['data-runtime-fact', 'excluded-events'],
+        ['data-runtime-fact', 'included-not-matching'],
+        ['class', 'manager-fact-grid manager-environment-runtime-grid'],
+      ],
+      spellsNo: ['manager-fact-grid-inline'],
+      spells: ['manager-fact-line', 'manager-fact-label'],
+    }
+  );
 
   defineStructureContract(
     'exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls',
@@ -595,7 +601,7 @@ describe('environment composition editor structure', () => {
       renders: ['EnvironmentSummaryInspector', 'RecordInspector', 'EmptyState'],
       compares: ['overview', 'event'],
       names: ['selectedKind', 'recordKind', 'recordEntry'],
-      passesProps: [['EmptyState', 'dataAttr']],
+      passesProps: [['EmptyState', 'data-record-inspector-empty']],
       spells: ['NoActiveTasks', 'NoActiveEvents'],
     }
   );
@@ -666,11 +672,9 @@ describe('environment composition editor structure', () => {
     'Inspector.EventExplanation',
   ];
 
-  defineStructureContract(
-    'and references none of the retired inspector strings',
-    INSPECTOR,
-    { spellsNo: DELETED_INSPECTOR_KEYS }
-  );
+  defineStructureContract('and references none of the retired inspector strings', INSPECTOR, {
+    spellsNo: DELETED_INSPECTOR_KEYS,
+  });
 
   it('the retired inspector strings are gone from en.json, and EventChance stays', () => {
     for (const deleted of DELETED_INSPECTOR_KEYS) {
@@ -693,10 +697,41 @@ describe('environment composition editor structure', () => {
     { reads: ['entry.runtimeState'], compares: ['available'], calls: ['selectRecord'] }
   );
 
-  defineStructureContract('the linked scene card lives in the inspector under the summary', SUMMARY_INSPECTOR, {
-    writes: ['data-environment-summary-scene'],
-    spells: ['manager-environment-scene-dropzone'],
+  // Issue 1522: the rail only reads the link, which the Overview tab's own card authors.
+  defineStructureContract(
+    'the summary reads the linked scene and writes no link',
+    SUMMARY_INSPECTOR,
+    {
+      writes: ['data-environment-summary-scene', 'data-rail-route-out'],
+      spellsNo: ['manager-environment-scene-dropzone', 'is-drop-active'],
+      namesNo: ['dragDrop', 'resolveDropData', 'onUpdate', 'unlinkScene'],
+      calls: ['linkedScene', 'viewScene'],
+    }
+  );
+
+  defineStructureContract('the Overview tab renders the Linked scene card', SHELL, {
+    renders: ['EnvironmentSceneLinkCard'],
+    passesProps: [['EnvironmentSceneLinkCard', 'text']],
   });
+
+  defineStructureContract('and the card links a Scene through the shared drop zone', SCENE_CARD, {
+    renders: ['ItemDropZone'],
+    passesValues: [
+      ['ItemDropZone', 'documentType', 'Scene'],
+      ['ItemDropZone', 'kind', 'scene'],
+    ],
+    passesProps: [['ItemDropZone', 'onUnlink']],
+    spells: ['data-overview-scene-linked'],
+    passesPropsNo: [['ItemDropZone', 'uuid']],
+    namesNo: ['oncontextmenu'],
+    calls: ['linkedScene'],
+  });
+
+  defineStructureContract(
+    'keeping the rail`s Scene guard verbatim',
+    { file: SCENE_CARD, fn: 'handleSceneDrop' },
+    { calls: ['resolveDropData', 'onUpdate'], compares: ['Scene'], keys: ['sceneUuid'] }
+  );
 
   defineStructureContract(
     'matching evidence supports compact chips and the inspector evidence table',
@@ -739,10 +774,14 @@ describe('environment composition editor structure', () => {
     { names: ['renderedDangerOptions'], calls: ['map'] }
   );
 
-  defineStructureContract('the derived list is handed to the shared picker as its option list', OVERVIEW, {
-    renders: ['Select'],
-    names: ['dangerSelectOptions'],
-  });
+  defineStructureContract(
+    'the derived list is handed to the shared picker as its option list',
+    OVERVIEW,
+    {
+      renders: ['Select'],
+      names: ['dangerSelectOptions'],
+    }
+  );
 
   defineStructureContract(
     'manual mode renders one Available-to-add group instead of Excluded and Non-matching sections',
@@ -810,15 +849,26 @@ describe('environment composition editor structure', () => {
     { compares: ['notMatching', 'libraryDisabled'], reads: ['entry.compositionState'] }
   );
 
+  // Issue 1522: the rail leaf reads the record, and its overrides open in the composition row.
   defineStructureContract(
-    'inspector renders matching evidence and active drop-rate adjustment overrides',
+    'the record inspector renders evidence and no override control',
     INSPECTOR,
     {
       renders: ['MatchingEvidenceChips'],
-      attributes: [
-        ['data-record-inspector-section', 'evidence'],
-        ['data-record-inspector-section', 'overrides'],
-      ],
+      rendersNo: ['StatusToggle', 'IconButton', 'Stepper'],
+      attributes: [['data-record-inspector-section', 'evidence']],
+      attributesNo: [['data-record-inspector-section', 'overrides']],
+      writesNo: ['data-node-count-inc', 'data-node-count-dec', 'data-drop-rate-adjustment-input'],
+      namesNo: ['onUpdateEnvironment', 'setTaskDropAdjustment', 'setEventAdjustment'],
+      calls: ['recordNodePool'],
+    }
+  );
+
+  defineStructureContract(
+    'a composition row`s body renders the drop-rate adjustment overrides',
+    OVERRIDE_BODY,
+    {
+      renders: ['StatusToggle', 'Stepper', 'IconButton'],
       writes: [
         'data-task-drop-rate-adjustments-toggle',
         'data-event-drop-rate-adjustments-toggle',
@@ -835,24 +885,33 @@ describe('environment composition editor structure', () => {
         'Inspector.BaseChanceModifier',
       ],
       names: [
-        'taskDropRateAdjustmentsEnabled',
-        'eventDropRateAdjustmentsEnabled',
-        'onTaskAdjustmentInput',
-        'onEventAdjustmentInput',
+        'onAdjustmentInput',
         'setEventAdjustment',
         'setTaskDropAdjustment',
+        'setNodeCount',
         'adjustmentValueClass',
       ],
+      spellsExactly: ['taskDropRateAdjustmentsEnabled', 'eventDropRateAdjustmentsEnabled'],
       spellsNo: ['is-disabled-overrides'],
     }
   );
 
   defineStructureContract(
+    'the list opens that body in every section through the shared disclosure',
+    LIST,
+    {
+      renders: ['CompositionOverrideBody', 'RowDisclosure', 'SortableList'],
+      passesProps: [['SortableList', 'body']],
+      writes: ['data-composition-disclosure'],
+    }
+  );
+
+  defineStructureContract(
     'the icon-only clear action keeps its accessible copy, as a named prop not a rest spread',
-    INSPECTOR,
+    OVERRIDE_BODY,
     {
       passesProps: [['IconButton', 'ariaLabel']],
-      spells: ['Inspector.ClearAdjustment'],
+      spells: ['ClearAdjustmentNamed'],
     }
   );
 
@@ -870,7 +929,7 @@ describe('environment composition editor structure', () => {
     TABS,
     {
       passesValues: [
-        ['EditorTabs', 'hookAttribute', 'data-environment-tab-button'],
+        ['EditorTabs', 'tabDataAttr', 'data-environment-tab-button'],
         ['EditorTabs', 'idStem', 'environment'],
         ['EditorTabs', 'ariaLabelKey', 'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label'],
         ['EditorTabs', 'containerClass', 'manager-environment-tabs'],

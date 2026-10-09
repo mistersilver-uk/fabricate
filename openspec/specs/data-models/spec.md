@@ -102,18 +102,19 @@ CraftingSystem = {
     // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
     // arithmetic over the per-component override and the slot's own `dc`. That is a
     // statement about DC resolution ALONE and not a licence to drop the fields:
-    // `simple.tiers` is the preset source for the per-component salvage DC control and
-    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
-    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // `simple.tiers` is the preset source for the per-component salvage DC control, in
+    // EVERY resolution mode including routed — see the Dynamic DC Macro Contract. No salvage editor
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
-    simple: SimpleCheck,               // { rollFormula, evaluation, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, evaluation, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    simple: SimpleCheck,               // { rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,             // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
@@ -137,8 +138,10 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
@@ -195,8 +198,10 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,         // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
 
@@ -244,6 +249,7 @@ CraftingSystem = {
   //   SimpleCheck = {
   //     rollFormula: string,                       // default ""
   //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     dc: number,                                // default 15; the default DC
   //     thresholdMode: "meet" | "exceed",          // default "meet"
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
@@ -254,6 +260,7 @@ CraftingSystem = {
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
   //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
@@ -275,8 +282,15 @@ CraftingSystem = {
   //       explode: { enabled: boolean, faces: { kind: "best" | "from", value: number | null }, once: boolean },
   //       cancel: { enabled: boolean, faces: { kind: "worst" | "from", value: number | null } },
   //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
-  //                         readMacroUuid: string, spendMacroUuid: string, max: number },
+  //                         readMacroUuid: string, spendMacroUuid: string, max: number,
+  //                         label: string },
   //     },
+  //   }
+  //
+  //   // Normalized by `normalizeCheckAdvantage`; see § Check advantage record.
+  //   CheckAdvantage = {
+  //     mode: "off" | "keep" | "bonus", extraDice: number, bonusExpression: string,
+  //     offerDisadvantage: boolean, countEnabled: boolean, countDice: number,
   //   }
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
@@ -432,18 +446,31 @@ CraftingSystem = {
 ### Check evaluation record
 
 Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Every `progressive` subobject also carries `thresholdMode: "meet" | "exceed"`, defaulting to `meet` and read only as a `count` evaluation's per-die test (#2067); the Checks Studio draft and schema-6 export/import preserve it.
 Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
-Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max fields.
-The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
+Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max/label fields.
+The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1 and an empty resource name.
+The additional-dice `label` is a string, trimmed, default `''`, and retained whatever `enabled` or `source` is; it is the resource's name on player surfaces (issue 2008 ruling R2, amending decision 22's key set by one optional key).
 Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
 An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
 Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
+Each of the eight subobjects also carries `offerSituationalBonus`, `true` unless explicitly `false`, which survives drafts, draft clones, the mode-change copy across the `routedByIngredients` boundary, save, schema-6 export/import and the prepared `checkConfig`.
+It decides only whether the roll prompt shows the situational-bonus field; `allowsSituationalModifier` stays the authority gate, so a programmatic, companion or prepared bonus still applies when it is `false`.
 Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
 Under an attribute target source the runtime reads these sibling adjustments: the selected recipe tier's `adjustment`, the component's `salvage.adjustmentOverride` or the task's `adjustmentOverride` applies when non-null, and a null one inherits `target.baseAdjustment` (see `resolution-modes/spec.md` § Check Target Resolution).
 An added adjustment is any finite number and a multiplier is a finite number above zero; a relative outcome tier's `adjustment` is its multiplier under an attribute/multiply check, where a null one marks the Otherwise tier and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
 A `product: "count"` check ignores the target and adjustment fields entirely and reads its required count from the selected recipe tier's non-null `successes`, the component's non-null `salvage.successesOverride` or the task's non-null `successesOverride`; each falls back to `pool.required` when null, and 0 is a valid required count.
 It also never reads `dc` or any adjustment field, fixed or attribute.
+
+### Check advantage record
+
+Each of the eight normalized check subobjects MUST carry `advantage` as a sibling of `evaluation`, never inside it.
+It holds `mode: "off" | "keep" | "bonus"` (default `keep`; an unknown token reads `keep`), integer `extraDice` 1–4 (default 1), string `bonusExpression` (default `"1d6"` when absent or not a string; any string, including `""`, is kept verbatim), `offerDisadvantage` (true unless explicitly false), `countEnabled` (true unless explicitly false) and integer `countDice` 1–5 (default 1).
+Integers clamp into range, and a non-integer takes its default.
+All six keys are retained whatever the evaluation; summing reads only the first four and counting only the last two.
+The defaults reproduce the rolled formula of a check whose authored first dice group is a plain `1d20`, so no migration runs.
+Checks Studio drafts carry the normalized record, a pass/fail slot move carries it with the evaluation, schema-6 export and import preserve it without a migration, and the private versioned descriptor's `checkConfig` snapshots it.
 
 ### Requirements
 
@@ -848,6 +875,8 @@ type CurrencyConfig = {
    No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
    The paths that are not recipe-keyed are the two published world-scoped members of requirements 10 to 14, the affordability check and the currency credit — and one of those two WRITES.
    Both read the world half alone through the same `getCurrencyConfig` seam and compose nothing.
+   A recipe's currency result is a recipe-keyed credit.
+   It composes the system's `requirements.currency.enabled` through `getCurrencyRequirementConfig` and then reuses the credit effect writer.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
 10. The published affordability check (`game.fabricate.checkAffordability`) and the published currency credit (`game.fabricate.creditCurrency`), both members of the companion contract — see `companion-api` — answer against the WORLD configuration ALONE and consult no crafting system's `requirements.currency.enabled` toggle.
@@ -1319,8 +1348,8 @@ This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whol
 `essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
-Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
-SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "refreshed by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration and by the component import that registers it (requirement 12b), feeds no display precedence, and is REFRESHED by nothing thereafter: the world entry editors write it, and nothing copies it again from this record or from the linked source Item.
 
 ### Properties
 
@@ -1407,7 +1436,9 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
    When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
 8. `salvage.ingredientQuantity` must be a positive integer.
-9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
+9. A managed component refreshes its stored `name`, `img`, and display-safe plain-text `description` from an updated Item only when the component claims that Item's OWN uuid, as its `registeredItemUuid`, its `originItemUuid` or one of its `aliasItemUuids`.
+   The updated Item's `_stats.compendiumSource` and `_stats.duplicateSource` are never refresh keys.
+   A sidebar duplicate, a derivative, an unregistered world copy and an actor-owned copy are siblings of the linked source Item, not the linked source.
    9a.
    A component's or recipe-item definition's stored `description` is the RESOLVED plain text of its source document's description.
    A content-link directive resolves to the referenced document's name whether or not the author supplied a label.
@@ -1425,13 +1456,14 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
+    The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
     Every bulk component-import path — compendium pack import, folder import, and the folder-mapping commit — must persist its whole run with a SINGLE `craftingSystems` world-setting write, and the number of writes must not grow with the number of imported items or with the number of mapped folders.
     Each write replaces the entire setting and is replicated to every connected client, so a per-item write makes a bulk import quadratic in corpus size.
     The bound covers the per-folder category/tag set-apply as well as the item import: a mapping commit that imports across several folders still writes once in total, not once per folder.
     Batching must not change any per-item outcome: the same added / updated / skipped classification, the same counts, the same aggregated broken-source fallbacks, the same durable role-flag stamp on each source document, and the same overwrite-on-redrop application of a folder's mapping to already-present components.
-    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing at all.
+    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing to `craftingSystems`; whether it writes `fabricate.componentScope` is requirement 12c's.
     An item that fails part-way through a run must still surface its error to the caller, and the items imported before it must be carried by the run's single write rather than lost.
     A single-item import is its own batch of one and must persist immediately.
     The bound is on the number of PERSISTENCE OPERATIONS a run issues, not on the identity of the key it writes, so a backend that addresses records individually inherits it unchanged.
@@ -1440,6 +1472,18 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     A bare whole-corpus flush is explicitly NOT a violation of that half.
     A run that names nothing is telling the repository it does not know what moved, which is exactly what a deferred-persistence batch flushes with, and narrowing it would drop the in-place mutations such a batch relies on being flushed.
     What the whole-corpus flush costs is a COMPARISON rather than a write: it diffs every system's extracted records against the index, emitting no extra write and no extra replication.
+    12b.
+    A component import registers a World Component as `### Component scope` requirement 6 states.
+    12c.
+    A bulk import persists its registrations with a single `fabricate.componentScope` write, issued after its `craftingSystems` write and only when that write resolved or was not needed, and a run that registers nothing writes nothing to that setting.
+    A single-item import is its own batch of one here too: it writes its registration after its own `craftingSystems` write.
+    A caller that defers its `craftingSystems` write registers only through a registrations array it hands to `flushWorldComponentRegistrations` after that write; without one, the import registers and adopts nothing.
+    The registrations belong to the run that recorded them, and a registration is written only for a record the persisted `craftingSystems` setting holds, so a record a rejected or still-pending write left only in memory is registered by the import that next finds it persisted.
+    The residual is two overlapping runs over one system: when one run saves before the other flushes, the other registers the first run's freshly adopted record as one the system already held, so its membership keeps the record's own values instead of inheriting the world's.
+    A non-GM flush registers and writes nothing, and is answered rather than refused.
+    Each registration is decided again when the write is issued, against the scope as it then stands and the system's current records, so a record deleted in the meantime registers nothing and a scope edit made in the meantime survives.
+    A rejected `fabricate.componentScope` write is reported on the run's result as `worldRegistrationError`, the import handlers warn the GM once, and it never replaces an error the import is already raising.
+    It leaves an in-system record with no World Component, which the next import of that Item registers.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -1771,17 +1815,34 @@ A TOOL-REPLACEMENT grant item created from a Component-discriminated `onBreak.re
 A direct-Item replacement preserves the resolved Item source identity and never receives fabricated Component identity.
 These creation-time stamps write the same `roles[systemId]` leaves the one-shot component restamp and the **Repair item data** action write, with the same values, so they are idempotent-compatible; they add no migration and fix only items created after the one-shot back-fill has run.
 
-- A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
+- A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is neither a clone nor a derivative of that compendium source**.
   A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
   So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
-- This clone-gate is a REGISTRATION and source-repair rule only.
-  It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
+  A DERIVATIVE is a non-clone source whose compendium source resolves to a document none of whose names it shares, compared trimmed, whitespace-collapsed and case-insensitive.
+  The source is compared by its stored name alone; the compendium document by its stored name and, when a translation module records one on it, its original name.
+  The source's own recorded original name is not read, because an Item built from a translated entry inherits that entry's record.
+  When the compendium source does not resolve, or a name is empty, the source is not a derivative.
+  A derivative keys purely on its own uuid, as a clone does: its compendium source is excluded from the canonical uuid, from the find-existing references and from the aliases the registration adds.
+  The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference.
+- Find-existing prefers the definition that claims the source's own uuid over one that claims only its compendium source.
+  A pack Item's own uuid is read in both spellings, with and without the document-type segment.
+  Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
+  For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
+- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  A component's find-existing reads no durable leaf: it keys on the source references alone, and registration overwrites whatever leaf a world source carries.
+  A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
+- The derivative gate never un-merges.
+  A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
+- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; neither reaches the runtime matcher.
+  Source repair applies the clone gate and own-uuid precedence only, so an unregistered derivative whose compendium source a definition still claims is stamped with that definition's id.
+  An actor-owned drag copy may carry `_stats.duplicateSource`, depending on the core build, and its `compendiumSource` is legitimate provenance there either way (tier 3).
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
+  A derivative's `_stats.compendiumSource` is left on the Item.
 - Existing stored `originItemUuid` values are never recomputed.
-  A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
+  A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item, while the registered copy keeps the entry's name.
 
-Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: the second registration is a non-clone whose `compendiumSource` still matches, so find-existing dedups.
-It is cleanly distinguishable from the duplicate case by the absence of `_stats.duplicateSource`.
+Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: both copies carry the compendium entry's name, so the second registration is neither a clone nor a derivative, its `compendiumSource` still matches, and find-existing dedups.
+It is distinguished from a clone by the absence of `_stats.duplicateSource` and from a derivative by that name.
 
 ### Repair and Auto-Stamp
 
@@ -1791,7 +1852,7 @@ It is cleanly distinguishable from the duplicate case by the absence of `_stats.
   This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
   It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
 - A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
-  World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
+  A world/pack SOURCE item resolves first to the definition claiming its own uuid, and only otherwise through its clone-gated compendium source (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
   Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
   Components, tools, AND recipe items are reconciled PER SYSTEM: the repair resolves each item against one system's definition set with that system's id, and writes or clears ONLY that system's `roles[systemId]` leaf for the kind (`componentId` / `toolId` / `recipeItemDefinitionId`), so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
   For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by an exact (case/whitespace-normalized) name match, unique WITHIN the system being reconciled, to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions within that system is skipped as ambiguous.
@@ -1946,7 +2007,7 @@ Ingredient = {
   extractEffects: boolean,
 
   match: {
-    type: "component" | "tags" | "currency",
+    type: "component" | "tags" | "currency" | "essence",
 
     // type = "component"
     componentId?: string,
@@ -2052,6 +2113,8 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
 9. Each essence-block plan entry carries `essenceGroupIds: string[]` naming every essence requirement it funds, alongside `ingredient` (the first funded option, retained for back-compat).
    A reader resolving an essence requirement's consumed item MUST prefer `essenceGroupIds`, because one block entry names one `ingredient` and its sibling essence requirements would otherwise resolve to no consumed item.
    Consumption-plan entries are not persisted, so no migration follows.
+10. `resolveIngredientSelection` reports `essenceCeiling`, a frozen `{ essenceId: amount }` map of the essence the held stacks carry against the untouched ledger before any group claims, on both exits (the assignment found by the search and the greedy fallback); it is `{}` when the set carries no essence option.
+   It is the bound the resolver prunes an essence option against, reported for display only: it never caps or steers resolution.
 
 ## Alchemy Signature Uniqueness (Validation Contract)
 
@@ -2121,6 +2184,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 >
 > **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
 > The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
+> That rule binds the crafting-system envelope import; a component import, which brings Items into one system, is governed by `### Component scope` requirement 6.
 >
 > **STILL NOT LIVE**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
 > **What `## CraftingSystem` REQUIREMENT 36's OWN RETIREMENT retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and that requirement states which and why.
@@ -2410,6 +2474,7 @@ SystemMembershipRecord = {
 
     **THE FIRST GM-AUTHORED WORLD ENTITY FLIPS `isSeeded()`, AND THAT IS A BASIS INPUT.**
     Issue 1362 ships the first writer that is not the migration, so `isSeeded("entities")` can now become true on a world that has never been migrated: `worldScope.<type>.createEntity` persists the setting, and the write replicates to every client.
+    Component import is the second such writer (issue 2218): the first registration it writes seeds `fabricate.componentScope` on a world the migration never wrote, and it flips `isSeeded("entities")` on the same terms.
     The basis stays KNOWN-COMPLETE across that transition, and it is worth stating why rather than leaving a destructive-prune gate to be re-derived.
     The basis is the UNION of the world set with the system's SURVIVING legacy array, so the moment the world half starts vouching the legacy half has not stopped: a world that authors one component still carries every in-system component it had, and both id sets are in the basis.
     The predicate is PER SUB-KEY, so a component write cannot vouch for essences or tools — each entity type has its own setting and its own `isSeeded("entities")`.
@@ -2548,6 +2613,27 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    Still open, and still the tool family's follow-up: the tool family's `removeFromSystem` is the generic verb and has neither the cascade nor the ordering, and no verb here can report a compensation that itself fails.
    **AND THE ADD PATH ROLLS BACK THE RECORD IT WROTE.** A seed refused for a duplicate source reference removes the membership record THIS CALL wrote and reports `false`; a record authored earlier is left alone, so an unrelated collision cannot delete a GM's own membership.
    The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
+6. Every component-import path — single item, compendium pack, folder, the folder-mapping commit, the Compendium Directory action and `addItemFromUuid` — registers the component as a World Component the target system holds: a world entity carrying the component's identity and source link, and a membership record for `(component, system)` (issue 2218).
+   The in-system record's id is the world entity's id.
+   An Item embedded in an actor registers nothing, and an unresolvable uuid that addresses an embedded document registers nothing either.
+   Two records share a source when their source references intersect, and a pack Item's uuid is compared without its document-type segment, so the type-less spelling earlier bulk imports stored matches the document's own.
+   An id match alone binds nothing: a component whose id a world entity carries without sharing its source is left unregistered, because ids are not globally unique.
+   6a.
+   The membership record inherits every section, with two exceptions that apply only against a world default the World Component already carries: a record created for a component the system already held never changes what that component resolves, and a category the same run's folder mapping staged is kept rather than replaced by the world's.
+   For a component the system already held, each section the world default authors with a value different from the in-system record's is written as an override carrying the record's own value: `category` verbatim, and `essences` wherever the two normalized maps differ.
+   For a record the run added, a category other than the reserved `general` that differs from an authored world category is written as an override, and every other section inherits, as it does for a component added from the catalogue.
+   A World Component the import itself creates carries no world default, so its record inherits every section and resolves the in-system record's own values until a world default is authored.
+   6b.
+   An imported Item that shares a source reference with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
+   The new record keeps the identity the import read from its Item and the entity keeps its stored one, so the two can differ from the start; `## Scoped Entity Definitions` requirement 15 answers the in-system record's and names the pair in its drift report.
+   The match is made before the new record's id is minted and takes the first sharing entity in roster order.
+   It reads the World Component's stored source link, which is not refreshed when a system re-points its own record.
+   Where the target system already holds a record under that id, nothing is written at world scope.
+   6c.
+   A component the import finds already present with no World Component gains one, created from the in-system record.
+   6d.
+   The exception to 6c is a component whose source reference a World Component under a different id already shares: it is left unregistered, because binding it would re-key a component that recipes, salvage results, gathering drop rows, tool links and owned-item identity flags may name, and an import re-keys nothing.
+   Its recovery is to delete the other World Component where no system holds it, then import again.
 
 ### Essence scope
 
@@ -3085,12 +3171,12 @@ Result = {
    The RESOLVED amount of a rolled result is a separate value, and only it may be zero.
    A zero resolved amount is an EMPTY AWARD: the result creates no item, and the award states the roll that produced nothing rather than omitting the result.
    Zero is the floor, so a negative total clamps to it.
-3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true, and only on a `component` result.
 4. `kind` is a closed set, and an absent `kind` IS `"component"`.
    Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
    An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
-5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
-   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world unit id; where it is `"knowledge"`, `recipeId` is required and names a recipe of the same crafting system, and `quantityFormula` is not valid.
+   A `"knowledge"` result grants through the knowledge grant `game.fabricate.grantRecipeKnowledge` is built on, never by writing an item, and an already-known recipe writes nothing.
 6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
    An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
 7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
@@ -3104,14 +3190,15 @@ Result = {
 The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
 This section states only what is persisted.
 
-8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+8. `alternatives` PRESENT makes this result a choice group, and every alternative, including the one the group was converted from, is an entry in that array.
    The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
    `alternatives` holds two or more entries; a group reduced to one is a plain result again.
-   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+   Alternatives do not nest: an alternative MUST NOT carry `alternatives` of its own.
 9. `chooser` defaults to `"playerChooses"` and is read only on a group.
-   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every alternative's `selectionRange`.
+   `selectionFormula` is not written under `"playerChooses"`.
 10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
-    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither, and neither is written there.
     `awardCount` must be positive.
     `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
 11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
@@ -3119,18 +3206,22 @@ This section states only what is persisted.
     `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
 12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
     A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
-13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
-    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+13. `selectionRange` is read only on an alternative of a group whose `chooser` is `"rolled"`, and is not written on an alternative of any other group; `from` and `to` are inclusive whole numbers.
+    The ranges of a group's alternatives are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest alternative and a roll above the highest selects the highest, so no authored group can produce nothing.
+    A roll selects the alternative with the highest `from` at or below it, and a roll below every `from` selects the lowest.
+    Ranges MUST NOT overlap and `from` MUST NOT exceed `to`.
+    Without repeats, each later roll is read against the alternatives not yet awarded.
     Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
     A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+    A non-component `kind` is not valid inside a `progressive` result group either.
 15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
     The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
 16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
     `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
     Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
-17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade either drops a group's settings or, where the older build requires a `componentId`, fails the recipe's validation until the result is removed, and the release's upgrade note says so, because an older build cannot.
 
 ## Versioned Run Lifecycle
 
@@ -3159,6 +3250,7 @@ RunLifecycle = {
     }>,
     outcome?: object | null,
   },
+  awardChoiceJournal?: object, // the `executionJournal` shape, holding the latest award-choice settle
 }
 ```
 
@@ -3179,11 +3271,24 @@ Applied effects form a prefix; at most one effect is applying, and later effects
 6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
 A normal observing-client refresh during live execution does not itself trigger recovery.
 Committed requests return their recorded outcome.
+A resumed versioned crafting stage rebuilds its Tool pairs from the plan in Tool order: each planned Tool item pairs with the first unpaired Tool it matches, and a Tool left without one was planned as the virtual station Tool (§ Session-Scoped Active Canvas Tool).
+Until the Tool effect is applied, a missing or unmatched planned item refuses the resume with `STAGE_RECONSTRUCTION_FAILED`, rather than lending its usage or breakage to another Tool; once applied, the replay from the receipt does not refuse.
 7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
 It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
 Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+10. A terminal run accepts one kind of mutation, settling a pending award choice, once per choice.
+Each settle advances `runRevision` and journals into `awardChoiceJournal`, which holds the latest settle and never replaces `executionJournal`.
+Each settle's receipts are appended to the step that held its choice, so a later settle replacing the journal loses none of them.
+A clean-up that forfeits an owed choice (Crafting Runs Flag requirement 5) also advances `runRevision`, without a journal entry.
+An active run's settle journals there too, so the stage's committed journal, its `award-results` receipt and its committed replay are untouched.
+The settle runs under a grant issued for `chooseAward`, a grant issued for another operation is refused, and a new request for a settled choice awards nothing.
+Its effects are `award-choice` (kind `awardChoice`, planned `{ choiceId, picks }`, every pick's amount resolved before the first write), `settle-choice` (kind `settleAwardChoice`) and `post-chat` (kind `postCraftChat`).
+A fresh settle is refused before its plan exists when a pick is unclaimable or fails the craft-time pre-flight, and every pick's amount and reward plan is resolved then, so `award-choice` only writes.
+A resumed settle runs the plan it persisted and is not judged again.
+The two journals exclude each other: neither a settle nor a stage plans while the other's plan is unfinished, each refusing `EXECUTION_IN_PROGRESS`, and the world-time sweep skips a run whose settle is planned.
+Reload reconstruction reads `awardChoiceJournal` as it reads `executionJournal`, so an award choice interrupted mid-effect is recovery-required.
 
 ### Authority Ledger and Recovery Boundary
 
@@ -3214,6 +3319,11 @@ Explicit setup remains available as an idempotent ensure that returns the existi
 The ledger holds safe durable request outcomes and one-use prepare-token bindings, status, expiry and issuing GM and instance identities; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
 The complete prepared evaluation and recipient-specific preparation reply MUST remain in the issuing authority instance and MUST be removed on consume, release or expiry.
 A missing private snapshot after reload or GM handoff MUST refuse the token before evaluation or effects; the caller may prepare again.
+A token past its expiry MUST be marked released in the ledger the next time the authority issues or consumes a token, so an expired token never stays active.
+An interactive caller whose token is refused after its roll prompt MUST prepare again by re-sending its original command, at most three times per command, and MUST settle the answer already given under the fresh token when the fresh prompt descriptor is equivalent.
+Two descriptors are equivalent when every field but the additional-dice offer is equal, the offer is present in both or neither and keeps its maximum, resource name, availability reason and reach, and its fresh limit still admits the dice the answer bought.
+A fresh descriptor that is not equivalent MUST reopen the prompt with a notice that the roll's details changed, and dismissing that prompt MUST release the fresh token.
+The refusal reaches the player only when the retry limit is exhausted, and a preparation that itself fails MUST answer its own reason.
 Another tab of the same elected GM MUST stay silent before claim and reply for a token or preparation replay issued by its peer, while committed execution MAY replay its safe durable outcome without another effect or roll handoff.
 Under the active-GM claim, bootstrap MUST scrub legacy persisted private bindings and recipient-specific response fields and invalidate their prepared tokens.
 `keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
@@ -3429,6 +3539,33 @@ CraftingRunStepState = {
     img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 
+  // What a `currency` and a `knowledge` result awarded (issue 1773); absent on a step written before
+  // it and on a step whose routed set held neither. `amount: 0` is an empty award with no write.
+  // `unitName` and `recipeName` are captured at award time, as `createdResults` names are.
+  currencyCredits?: Array<{
+    resultId: string, alternativeId?: string, unit: string, amount: number,
+    rolled?: { formula: string, total: number }, label?: string, reason?: string, unitName?: string,
+  }>,
+  knowledgeGrants?: Array<{
+    resultId: string, alternativeId?: string, recipeId: string,
+    outcome: "granted" | "alreadyKnown", recipeName?: string,
+  }>,
+
+  // What a result-side choice group awarded, and the pick a group whose chooser is the player
+  // still owes (issue 1773); absent on a step written before it and on one whose set held no group.
+  // `choiceId` is the carrier's `Result.id`, `count` the resolved N rather than the authored count.
+  groupAwards?: Array<{
+    choiceId: string, chooser: "playerChooses" | "rolled", awardStrategy: "anyOne" | "upTo",
+    count: number, countRoll?: { formula: string, total: number },
+    selections: Array<{ alternativeId: string, roll?: { formula: string, total: number } }>,
+  }>,
+  pendingAwardChoices?: Array<{
+    choiceId: string, resultGroupId: string | null, resultRowId?: string,
+    awardStrategy: "anyOne" | "upTo", count: number, countRoll?: { formula: string, total: number },
+    alternatives: Array<object>, // the alternatives as snapshotted at award time, without ranges
+    picks?: string[], settledAt?: number, outcome?: "awarded" | "forfeited",
+  }>,
+
   failureReason?: string,
 }
 ```
@@ -3450,9 +3587,19 @@ CraftingRunStepState = {
    A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
    Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
+   A summed result with a target, other than a roll-high one against a fixed DC, also records `data.targetSource` (`fixed` or `attribute`) and `data.targetTerms`, an ordered array of `{ kind: 'anchor' | 'adjustment' | 'multiplier' | 'benefit', value, source?, label? }`.
+   The first term is the anchor — the fixed anchor, or the character value after any macro — followed by the difficulty step and then each settled roll-under benefit with its router `source` (`tool`, `library`, `situational` or `advantage`); an `adjustment` or `multiplier` term carries `label` when a tier supplied it (the recipe's selected check tier, or the relative tier the roll matched), and anchor and benefit terms carry none.
+   Folding the terms in order — an adjustment added and a multiplier applied, each rounded down, then each benefit — and then every `preRolls` entry whose `destination` is `target` reproduces `data.target` exactly.
+   A character-value result also records `data.targetExpression`, the typed formula trimmed, and `data.targetActor`, the rolling character's name, each only when present.
+   None of these is recorded for a result with no target (a fixed range, an Otherwise tier or progressive), a refusal, a legacy record or a secret prepared check.
    A `product: "count"` result's `data.dc` is always null, `data.target` is the effective per-die threshold (never null, even for a fixed-range or progressive result), `data.comparison` is the per-die comparison, `data.successes` and numeric `data.cancelled` count qualifying and cancelling dice, `total` is the raw net (qualified minus cancelled), and `margin` is `total` minus the required count of the tier the roll matched — simple: the required count; relative: required plus `outcome.dc`; null for a fixed-range, progressive or zero-pool result, all before forcing or stepping.
    A zero-pool count result carries `zeroPool: true` with a null `total`, `successes`, `cancelled` and `margin`, no main Roll, and the same populated `target` and `comparison` a rolled result on the same check would carry.
    A count refusal carries `misconfigured: true`, `data.targetRefusal` naming the reason and `data.refusedInput` naming the input (`'base' | 'threshold' | 'die' | 'explode' | 'cancel' | 'pool'`), and no executed evidence, exactly as a sum target refusal does.
+   An executed count result's `data.boughtDice`, when present, is `{ count, source }`: the integer dice bought for that roll, at least 1, and `'path' | 'macro'` (`resolution-modes/spec.md` § Additional Dice).
+   It is omitted when no die was bought and never written as 0 or null.
+   It never carries the resource path, a macro UUID, the resource name or an amount.
+   An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
+   A main Roll that throws after a spend refuses with `data.targetRefusal: 'roll-failed'`, the error in its message and `data.boughtDice`, never a failed check.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
@@ -3461,6 +3608,25 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+9. `currencyCredits` and `knowledgeGrants` are each absent on a step written before issue 1773, and an older build ignores them.
+   They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency, knowledge or choice-group result, and by the unversioned award paths right after their items.
+   A credit is written through the world strategy's own writer.
+   Under `actorProperty` the credit and the marker `{ runId, effectId: 'award-rewards', resultId, index }` ride one `actor.update`; an `actorInventory` credit is proven by the balance delta and a `macro` credit by nothing, and neither writes a marker.
+   `runId` is the run's id on every path that holds a run, and `index` is the credit's position in the step's reward plan.
+   A craft refuses a reward its world cannot honour before anything is consumed, at the run's start and again when a later stage starts: an unconfigured unit, currency off, a credit the writer would refuse without writing (a synthetic-token crafter, `creditNotConfigured`, `currencySourceMissing`, `balanceUnreadable`), a taught recipe outside the system, and `knowledgeNotObservable`.
+   An interrupted reward step is recovery-required and never replayed; on the unversioned paths the credits and grants it confirmed stay in `currencyCredits` and `knowledgeGrants`, never as `createdResults` rows.
+10. `groupAwards` and `pendingAwardChoices` are each absent on a step written before issue 1773, and an older build ignores them, so an unsettled choice is stranded there.
+   `award-results` writes them into its receipt, and the step persists them when it finalizes; `award-rewards` is planned whenever the routed set holds a choice group, because a group's draw is rolled after the plan is persisted.
+   A rolled group's draws award through each alternative's own kind, so a drawn credit or grant names the carrier as `resultId` and the alternative as `alternativeId`.
+   An N of 0 records an empty `groupAwards` entry and leaves no pending choice.
+   A pending choice records the carrier's linked `resultRowId`, so an Item its settle awards carries the same `resultRowId` a stage draw does.
+   A pending choice is settled exactly once, writing `picks`, `settledAt` and `outcome` onto its entry and appending the award's receipts and a `groupAwards` entry to the same step.
+   For a settled choice whose chooser is the player, that entry's `selections` lists the picks in pick order, none carrying a `roll`, and its `count` is the resolved N; a forfeited choice's entry lists none.
+   A settled entry stays in `pendingAwardChoices` as the record of its choice.
+   A choice with no claimable alternative settles `forfeited`; claimability is judged at settle time, and an alternative whose component or Item is gone, whose credit the world writer would refuse, or whose taught recipe is gone, outside the system, unobservable or already known is not claimable.
+   While an unsettled choice has a claimable alternative, a later stage's start and execute refuse with the blocker `awardChoicePending`, and the world-time sweep skips the run by that same predicate.
+   A run holding an unsettled choice survives the history limit, and a prune that would drop it forfeits the choice instead (Crafting Runs Flag, requirement 5).
+   A versioned step carries no `historySettlement`, so nothing reads an owed step's awards as complete before the settle.
 
 #### Optional historical evidence
 
@@ -3508,10 +3674,14 @@ Requirements:
 2. `history` contains only terminal runs (`succeeded`, `failed`, `cancelled`).
 3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
+   A terminal run holding an unsettled award choice is never evicted by the cap, whatever its age, and the cap counts only the other runs.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
+   Where that clean-up would drop a run still owing an award choice, it settles the choice `forfeited` instead and keeps the run until the next clean-up, which drops it as any other.
+   The forfeit is recorded against the run's recorded recipe id and system.
 6. Run-flag writes must be document-coherent.
    A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
    A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+   The same cap applies to that union and keeps such a run.
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
    The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 
@@ -3558,7 +3728,8 @@ Requirements:
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
    It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
    Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
-4. `granted` and `grantedBy` are optional scalars written only by the companion contract's knowledge grant (see `companion-api` and `recipe-visibility`).
+4. `granted` and `grantedBy` are written by the knowledge grant and by a `knowledge` result's award (see `companion-api` and `recipe-visibility`).
+   The award's `grantedBy` is the awarding recipe's name, trimmed, cut between code points to at most 64 UTF-16 units, the length the grant accepts, and then trimmed at its end, because it names a record rather than a module and a cut name still names it.
    `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
    `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
    The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.
@@ -3659,8 +3830,11 @@ RunModel = {
   completionMode: "manual" | "worldTime",
   pauseState: { pausedAt: number, remainingSeconds: number } | null,
   pausedDurationSeconds: number,
-  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, disabledReason },
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, chooseAward, disabledReason },
   awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
+  awardChoicePending: boolean,           // the run still owes an unsettled award choice; false when it owes none.
+  awardChoices: AwardChoiceModel[],      // each owed choice for an entitled viewer; [] for one not entitled; absent when none is owed
+  awardChoiceBlocker: string | null,     // why this viewer may not settle now: notOwner, notEntitled, an authority reason, recoveryRequired, executionInProgress
   recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
   derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
@@ -3703,6 +3877,21 @@ When the system's `features.refundOnPlayerCancel` policy is on (default), the re
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
 Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
+
+### AwardChoiceModel
+
+```js
+AwardChoiceModel = {                     // one award choice a run still owes (issue 1773)
+  choiceId: string,
+  stepIndex: number,
+  awardStrategy: "anyOne" | "upTo",
+  count: number,                         // the resolved N
+  countRoll: { formula, total } | null,
+  ceiling: number,                       // 1 under anyOne, else min(N, alternative count)
+  alternatives: Array<{ id, kind, name, img, glyph, quantity, quantityFormula, amountText,
+    unclaimable: string | null }>,       // why it cannot be claimed now, judged by the settle's own rule: one of alreadyKnown, recipeMissing, knowledgeNotObservable, componentMissing, currencyDisabled, unitMissing, other
+}
+```
 
 ### StepModel
 
@@ -3748,6 +3937,10 @@ StepModel = {
   selectionAvailability: object | null,  // current-stage live solver projection only
   craftingYield: object | null,          // current-stage authored output only
   yieldPreview: object | null,           // entitled future-stage authored output, never historical awards
+  currencyCredits?: object[],            // entitled; the four award keys of CraftingRunStepState, each absent when unrecorded
+  knowledgeGrants?: object[],
+  groupAwards?: object[],
+  pendingAwardChoices?: object[],
   inputPreview: {                        // entitled future-stage authored inputs, never selection intent
     source: "preview",
     stageIndex: number,
@@ -3785,7 +3978,7 @@ StepModel = {
    A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
    **No control may be offered in a state where the command behind it refuses.**
    The projection and the stage commands MUST answer readiness from ONE shared predicate rather than classify it independently, so an enabled control and the command's disposition cannot disagree.
-   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
+   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool that is neither held by the stage's actors nor supplied by the viewer's Active Canvas Tool (§ Session-Scoped Active Canvas Tool), and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
    Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
    The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
    One cause is knowable only asynchronously and so remains the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer.
@@ -3794,11 +3987,12 @@ StepModel = {
    The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
    Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
    An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused for the same causes.
-   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired` or `sourcesUnavailable` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired`, `sourcesUnavailable` or `awardChoicePending` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `awardChoicePending` is the cause while an earlier stage owes an award choice with a claimable alternative, the same predicate the engine's stage start refuses on; it is distinct from `choiceRequired`, because what is owed is a reward to pick rather than a stage input.
    `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
    The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
    Both report `awaitingChoice`, because either way what the run is waiting on is the player's own decision, and both read as guidance rather than as a refusal.
-   A live stage's tool rows MUST state whether each tool is held, because a tool the stage lacks is a cause it is refused for.
+   A live stage's tool rows MUST state whether each tool is available — held, or supplied by the viewer's Active Canvas Tool — because a tool the stage lacks is a cause it is refused for.
    A started stage whose locked route no longer resolves has no pick left to make and MUST NOT be reported as waiting on a choice it has no control to make; it reports the recipe edit (`routeUnavailable`) and keeps cancellation as its way out.
    Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
 
@@ -3806,6 +4000,9 @@ StepModel = {
    Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
    Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
    User-specific terminal dismissals filter the composite key before counts without deleting native history.
+   `actions.chooseAward` is offered on a crafting run that still owes an award choice, to a GM or to the actor's owner when entitled to the run's evidence, while the authority is available and neither of the run's journals is recovery-required or planned, so one settle runs at a time.
+   A settle interrupted between its journal writes is resolved when the GM reconciles it or boot recovery runs: its plan is discarded when nothing applied, so the choice can be sent again under any request, and it becomes recovery-required otherwise.
+   A terminal run that still owes a choice is listed and counted under `activeRuns` and is not dismissible, unless its settle is recovery-required, which the run's `recoveryEvidence` then reports.
 
 4. **Stage browsing is not execution.**
    Browsing MUST NOT mutate the persisted step index or selections.
@@ -4183,13 +4380,27 @@ Activating a Tool interactable injects a **virtual-present** tool into the craft
 
 Requirements:
 
-1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`.
-   A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
+1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds, toolIds }`, keyed by the station's library `toolId` and any linked `componentId` (`## Tool` requirement 9).
+   A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` or `toolId` string.
 2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
-3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record.
-   With no active tool the payload is null (inert).
+3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance: every `show(tab, { activeCanvasTool })` replaces it, a plain `show(tab)` clears it, and `close()` clears it.
+   It is system-scoped per the rule above, and with no active tool the payload is null (inert).
+   Station presence belongs to the player's app session, not to a run: the payload is never written to a crafting or gathering run record, a stage's `selectionPlan`, or the run authority's ledger (request records, replies or prepare-token bindings).
+   What a command did with it is ordinary execution evidence: under check-driven Tool breakage a stage that used the station's Tool records it in `usedTools` with `virtual: true`, and a prepared check retains the Tool-bonus contributions it was described with.
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
+   The chip names the station's Tool by the Tool display-name precedence of `## Tool` requirement 13 — its **Display label** (`label`, resolved for the station's crafting system), then its name snapshot, then its linked managed component's name — and falls back to the generic localized label only when none of those resolves.
    The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
+5. Crafting carries the station per call.
+   The player app supplies `presentTools` to recipe detail hydration (`hydrateCraftingRecipe`), selected-set evaluation (`evaluateSelectedSet`), craft submission (`craftRecipe`), the step advance (`advanceCraftingRun`), the Journal listing (`listJournalForActor`), and every `runType: 'crafting'` Journal run command as that command's `payload.presentTools`.
+   On the active GM, a version-1 crafting `start`, `beginStep`, `describeCheck` and `execute` evaluate Tool presence with that command's own payload and nothing else; no command inherits a station from an earlier command of the same run.
+   A started stage re-validates its Tools when it resolves, so a stage begun at a station resolves only while a station supplying that Tool is active again; a check described with the station is redeemed by an `execute` that must carry it too.
+   The Journal projection and the stage commands answer Tool readiness from the one shared predicate (`RunJournal` requirement 2) under the same viewer's station, so a control the projection enables with the station is one the command accepts with it.
+   Replacing or clearing the active station refreshes the open recipe's hydrated detail and the Journal's stage readiness without a loading indicator, keeping the open recipe selected.
+6. `presentTools` is a client-asserted claim, as on gathering's versioned start.
+   The active-GM authority does not re-verify that the sender's token occupies an activated station, and the re-resolution it performs under its execution claim (§ Authority Ledger and Recovery Boundary) does not include it.
+   The claim can satisfy only Tool presence within its own crafting system; it never causes usage, breakage, consumption or an award.
+7. The station does not reach salvage, companion pooled holdings (`presentTools: null`), alchemy submission (`submitAlchemyAttempt`), or the world-time automatic advance, which has no player command to carry one and so blocks or refuses a Tool-bearing stage without spending.
+   The shopping-list aggregate is not a target of this requirement (deferred).
 
 ### Item → Tool Drop Resolution
 
@@ -4217,22 +4428,25 @@ They are unrelated mechanisms.
 
 The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
 Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
-Both resolve their target through `CraftingEngine._resolveCheckTarget`, which calls `CraftingEngine._resolveCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
-No other check reaches either symbol.
+Both resolve their target through `resolveCraftingCheckTarget` (`src/systems/craftingCheckRefusal.js`), which calls `craftingCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol; the player listing's `craftingCheckRefuses` reads the same pre-roll resolution to decide `checkUnrollable` (#2139) and never runs the macro.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
 Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `GatheringEngine._resolveGatheringRoutedTarget`, which delegate a fixed target to those DC resolvers and run no macro.
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
 No DC-resolution path outside the crafting check reads any of the three.
 They are not inert for that reason.
-Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
-Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` has one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets.
+Under a fixed target a preset is a named tier's `dc`; under a character-value target it is a named tier's `adjustment` that is valid for the active adjustment kind (any finite number added, a multiplier above zero); under a count check it is a named tier's non-null `successes`.
+Because salvage never runs a DC macro, the control's system-default option names the slot's static DC whatever `simple.dcMode` says, so `simple.dcMode` is round-tripped by the shared editors only.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, so arithmetic DC resolution does not license removing it.
+Gathering task overrides have no preset source at all: gathering authors no recipe tiers, so a task's check override is a single number field.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
-Before the configured macro runs, `_resolveCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
-Under a fixed target source the anchor is the anchor DC `_resolveCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
+Before the configured macro runs, `resolveCraftingCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
+Under a fixed target source the anchor is the anchor DC `craftingCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
 The anchor DC is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
 `CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
-`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+`craftingCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
 
 When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved target and no macro runs.
 When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
@@ -4257,6 +4471,34 @@ This keeps player-initiated workflows from being blocked by Foundry's current-us
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
 Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
+
+### Additional Dice Macro Contract
+
+A count check whose `pool.additionalDice` is enabled with `source: 'macro'` names a read macro and a spend macro (`resolution-modes/spec.md` § Additional Dice).
+Both must be `script` macros, checked at the call site before either runs: a read macro of any other type makes additional dice unavailable (`resourceMacroFailed`), and a spend macro of any other type refuses the spend (`spendRefused`) without running.
+Both run through the shared executor on the client that executes the roll: the acting player's for an immediate roll, bulk salvage included, the claim-holding GM authority for a prepared check, and the executing GM for a Standalone Check Roll.
+Each receives one payload object, exposed with identity as `scope`, `context` and `args`.
+Macros must read the payload.
+The executor binds only `scope`, `context` and `args`, unlike core `Macro#execute`, so a bare `actor`, `token`, `speaker` or `character` is not defined on any path and the macro throws.
+`game.user` is the executing client's user: the GM on a prepared check or a Standalone Check Roll.
+The read payload is `{ actor, user, craftingSystem, activity, recipe, component, task, evaluation, rolls }`:
+
+- `actor` is the acting actor;
+- `user` is the acting user: the rolling client's user on an immediate roll, the attested sender on a prepared check, and the calling GM on a Standalone Check Roll;
+- `activity` is `'crafting' | 'salvage' | 'gathering'`, and `null` on a Standalone Check Roll;
+- `craftingSystem` is the attempt's crafting system, and `recipe`, `component` and `task` its subject, each `null` when the attempt has none to name;
+- on a prepared check and on a Standalone Check Roll, `craftingSystem`, `recipe`, `component` and `task` are `null`, and on the one read a bulk choice is offered from, so is any of them its covered rows do not share;
+- `evaluation` is a structured clone of the normalized evaluation;
+- `rolls` is 1, or the number of rolls one bulk choice covers.
+
+The read macro returns the amount available.
+A finite number of 0 or more is floored; anything else, a numeric string included, or a throw, makes additional dice unavailable (`resourceMacroFailed`) for that attempt, which still rolls without them.
+The spend first runs the read macro again: a failed re-read refuses `resourceMacroFailed`, and an amount now below this roll's dice refuses `resourceChanged`.
+The spend payload is the read payload plus `dice`, the dice bought for this roll, and `delta`, which is `−dice` in resource units at one unit per die; a macro applying another exchange rate converts it.
+The spend macro returns a truthy value once it has deducted.
+A falsy result or a throw aborts that roll before its main dice (`spendRefused`).
+Whatever the macro already changed stands, and Fabricate never refunds or retries.
+On a prepared check it must settle within the 15-second command budget; the executor itself enforces no timeout.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
@@ -4640,7 +4882,7 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
 

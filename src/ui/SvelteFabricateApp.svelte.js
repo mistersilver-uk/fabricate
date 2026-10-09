@@ -73,6 +73,41 @@ function offeredRoutes(extensionSurfaces) {
   return routes;
 }
 
+/** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
+ *  (issue 1773). */
+function journalRunNavigator(services, selectTab) {
+  return (runId) => {
+    if (runId) services.journal?.select?.(runId, 'crafting');
+    selectTab('journal');
+  };
+}
+
+// componentId is a per-system id, so the system is carried with it: a station from system A must
+// not satisfy a system-B Tool sharing the string. The library Tool id is carried too (issue 1119),
+// since an item-sourced Tool has no componentId.
+function presentToolsFor(activeCanvasTool) {
+  const { componentId, toolId, systemId } = activeCanvasTool ?? {};
+  if (!systemId || (!componentId && !toolId)) return null;
+  return {
+    systemId,
+    componentIds: componentId ? [componentId] : [],
+    toolIds: toolId ? [toolId] : [],
+  };
+}
+
+// The station rides every crafting Journal command as that command's own payload; nothing else
+// carries it to the active GM (issue 2265).
+function withStationCommand(command, presentTools) {
+  if (!presentTools || command?.runType !== 'crafting') return command;
+  return { ...command, payload: { ...command.payload, presentTools } };
+}
+
+function sameStation(current, next) {
+  return ['systemId', 'toolId', 'componentId'].every(
+    (key) => (current?.[key] ?? null) === (next?.[key] ?? null)
+  );
+}
+
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = typeof ref.sceneId === 'string' ? ref.sceneId : null;
@@ -189,22 +224,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   }
 
   _buildServices() {
-    // BOTH the componentId and its owning system are threaded, because componentId is a PER-SYSTEM
-    // id: a tool from system A must not satisfy a system-B task whose required tool happens to
-    // share the string. The payload also carries the station's library TOOL id (issue 1119), since
-    // an item-sourced Tool has no componentId and a componentId-only payload was inert for every
-    // station the Tool Studio can author. This is the single app-to-engine threading boundary here.
-    const presentTools = () => {
-      const componentId = this._activeCanvasTool?.componentId;
-      const toolId = this._activeCanvasTool?.toolId;
-      const systemId = this._activeCanvasTool?.systemId;
-      if (!systemId || (!componentId && !toolId)) return null;
-      return {
-        systemId,
-        componentIds: componentId ? [componentId] : [],
-        toolIds: toolId ? [toolId] : [],
-      };
-    };
+    // Read per call, so every seam follows a re-show or close of the station session.
+    const presentTools = () => presentToolsFor(this._activeCanvasTool);
+    const withStation = (opts) => ({ ...opts, presentTools: presentTools() });
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
@@ -228,12 +250,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
       // Synchronous, because the store's `selectedRecipe` $derived reads it without an async
       // round-trip; null when the facade is absent or the viewer may not see the recipe.
-      hydrateCraftingRecipe: (opts = {}) => game?.fabricate?.hydrateCraftingRecipe?.(opts) ?? null,
+      hydrateCraftingRecipe: (opts = {}) =>
+        game?.fabricate?.hydrateCraftingRecipe?.(withStation(opts)) ?? null,
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
       // Learn one recipe from an owned recipe-item book (Inventory learn button).
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
-      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(withStation(opts)) ?? null,
       // An ACTOR ID, never a uuid, so the facade's `_resolveCraftingSources` gate — the only
       // ownership check on this path — is not bypassed (issue 675).
       salvageComponent: (opts = {}) => game?.fabricate?.salvageComponent?.(opts) ?? null,
@@ -246,7 +269,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // first run's already-dismissed toast (issue 859).
       createProgressReporter: () => createDefaultProgressReporter(),
       // Synchronous, so the store's `selectedCraftability` $derived reads it without a round-trip.
-      evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.(opts) ?? null,
+      evaluateSelectedSet: (opts = {}) =>
+        game?.fabricate?.evaluateSelectedSet?.(withStation(opts)) ?? null,
       listAlchemyForActor: (opts = {}) => game?.fabricate?.listAlchemyForActor?.(opts) ?? null,
       submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(opts) ?? null,
       getSelectedAlchemySystemId: () => game?.fabricate?.getSelectedAlchemySystemId?.() ?? '',
@@ -285,9 +309,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setHideUnavailableEnvironments: (value) =>
         game?.fabricate?.setHideUnavailableEnvironments?.(value),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
-      listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      listJournalForActor: (opts = {}) =>
+        game?.fabricate?.listJournalForActor?.(withStation(opts)) ?? null,
       executeJournalRunCommand: (opts = {}) =>
-        game?.fabricate?.executeJournalRunCommand?.(opts) ?? null,
+        game?.fabricate?.executeJournalRunCommand?.(withStationCommand(opts, presentTools())) ?? null,
       dismissJournalRun: (opts = {}) => game?.fabricate?.dismissJournalRun?.(opts) ?? null,
       getDismissedJournalRunKeys: (opts = {}) =>
         game?.fabricate?.getDismissedJournalRunKeys?.(opts) ?? new Set(),
@@ -299,7 +324,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       reconcileJournalRunAuthority: (opts = {}) =>
         game?.fabricate?.reconcileJournalRunAuthority?.(opts)
         ?? Promise.resolve(authorityUnavailableRefusal()),
-      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) =>
+        game?.fabricate?.advanceCraftingRun?.(withStation(opts)) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
@@ -328,13 +354,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // All three tab stores read the SAME actor and source selection, so they agree on what the
     // player owns; only the workbench and discipline state is local to this one.
     services.alchemy = createAlchemyStore({ services });
-    // Both stores are the singletons the Crafting tab reads, so the selection is already applied
-    // by the time that tab renders.
+    // Both stores are the Crafting tab's singletons, so the selection lands before it renders.
     services.navigateToCraftingRecipe = (recipeId) => {
       if (recipeId) services.crafting?.select?.(recipeId);
       this._selectTab('crafting');
     };
     services.journal = createJournalStore({ services });
+    services.navigateToJournalRun = journalRunNavigator(services, (tab) => this._selectTab(tab));
     return services;
   }
 
@@ -497,6 +523,24 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
   }
 
+  // Quiet reloads, so the open recipe and Journal selection stay put; a pending stage reorder is
+  // persisted first because the crafting reload re-reads stored orders. Never throws: the grant
+  // path discards `show()`'s promise.
+  async _refreshStationReads() {
+    const reads = [
+      () => this._services?.crafting?.flushProgressiveOrder?.(),
+      () => this._services?.crafting?.load?.(true),
+      () => this._services?.journal?.load?.(true),
+    ];
+    for (const read of reads) {
+      try {
+        await read();
+      } catch {
+        // A failed read keeps its previous state and never skips the reads after it.
+      }
+    }
+  }
+
   _fireCloseCallback() {
     const callback = this._onCloseCallback;
     this._onCloseCallback = null;
@@ -521,6 +565,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     const nextOnClose = typeof onClose === 'function' ? onClose : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
+      const stationChanged = !sameStation(existing._activeCanvasTool, nextCanvasTool);
       existing._activeCanvasTool = nextCanvasTool;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
@@ -536,6 +581,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       });
       existing._selectTab(initialTab);
       existing.bringToFront();
+      if (stationChanged) await existing._refreshStationReads();
       return existing;
     }
     const app = new SvelteFabricateApp({

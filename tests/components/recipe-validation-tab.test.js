@@ -20,6 +20,11 @@ const harness = createMountedComponentHarness({
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // …which reads a result choice group's problems through its edits (issue 1773).
+    'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/utils/choiceGroupShape.js',
+    'src/utils/rollFormulaRollability.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
     'src/utils/recipeActivationMessages.js',
     'src/utils/scalars.js'
@@ -30,7 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // Each issue row's "View" renders through the manager's push-button primitive
     // (issue 1118).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // THE validation surface (issue 1444). This tab hands it the readiness and renders
     // none of the markup itself, so omitting it here CANCELS the suite.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
@@ -198,6 +203,92 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('flags a result teaching a recipe its system no longer holds (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Teacher',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'g1', results: [{ id: 'k', kind: 'knowledge', recipeId: 'r-gone' }] }]
+      },
+      systemRecipes: [{ id: 'r-teacher', name: 'Teacher' }]
+    });
+    const row = target.querySelector('[data-check="taughtRecipesResolve"]');
+    assert.equal(row?.dataset.satisfied, 'false', 'the taught-recipe check fails');
+    assert.match(
+      target.querySelector('[data-issue="missingTaughtRecipe"]').textContent,
+      /no longer in this system/,
+      'and says why, with the set it names'
+    );
+    harness.remount();
+  });
+
+  it('flags a rolled choice of rewards with no selection roll and no ranges (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Rewarding',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              { id: 'c', chooser: 'rolled', alternatives: [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }] }
+            ]
+          }
+        ]
+      }
+    });
+    assert.equal(target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied, 'false');
+    assert.match(target.querySelector('[data-check="choiceGroupsValid"]').textContent, /Every choice of rewards is complete/);
+    assert.match(target.querySelector('[data-issue="choiceGroupRanges"]').textContent, /range of whole numbers on every alternative/);
+    harness.remount();
+  });
+
+  it('words each choice-of-rewards problem as its own (issue 1773)', async () => {
+    const pair = [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }];
+    const target = await harness.mount({
+      recipe: {
+        name: 'Rewarding',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              { id: 'one', alternatives: [pair[0]] },
+              { id: 'odd', alternatives: pair, chooser: 'gm' },
+              { id: 'roll', alternatives: pair, chooser: 'rolled' },
+              { id: 'many', alternatives: pair, awardStrategy: 'upTo' }
+            ]
+          }
+        ]
+      }
+    });
+    const said = (id) => target.querySelector(`[data-issue="${id}"]`)?.textContent ?? '';
+    assert.match(said('choiceGroupTooFew'), /fewer than two alternatives/);
+    assert.match(said('choiceGroupSettings'), /does not recognise/);
+    assert.match(said('choiceGroupSelection'), /has no selection roll/);
+    assert.match(said('choiceGroupRanges'), /no two overlapping/);
+    assert.match(said('choiceGroupCount'), /needs one count/);
+    harness.remount();
+  });
+
+  it('flags a choice of rewards in a progressive system’s result set (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Staged',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'g1', results: [{ id: 'c', alternatives: [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }] }] }]
+      },
+      progressive: true
+    });
+    assert.equal(target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied, 'false');
+    assert.match(target.querySelector('[data-check="choiceGroupsValid"]').textContent, /awards every stage in order/);
+    harness.remount();
+  });
+
   it('reports an alchemy recipe with no blockers as ready (issue 549)', async () => {
     const target = await harness.mount({
       recipe: { name: 'Mana Potion', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },
@@ -339,7 +430,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
     rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       'src/ui/svelte/components/Chip.svelte',
-      'src/ui/svelte/components/ManagerButton.svelte',
+      'src/ui/svelte/components/Button.svelte',
       'src/ui/svelte/components/EditorValidationSurface.svelte'
     ],
     componentPath: 'src/ui/svelte/components/EditorValidationSurface.svelte'
@@ -415,6 +506,27 @@ describe('EditorValidationSurface row action (mounted)', () => {
       rowIds(target),
       ['blockC', 'passA', 'warnB', 'passE', 'blockD', 'passF'],
       'and the groups themselves keep their authored order'
+    );
+    surfaceHarness.remount();
+  });
+
+  it('lists every issue before the passes when a site asks for issues first (issue 2130)', async () => {
+    const target = await surfaceHarness.mount({
+      issuesFirst: true,
+      groups: [
+        groupOf('checks', [
+          { id: 'passA', status: 'pass', title: 'A' },
+          { id: 'warnB', status: 'warn', title: 'B' },
+          { id: 'blockC', status: 'block', title: 'C' },
+          { id: 'passE', status: 'pass', title: 'E' },
+          { id: 'warnF', status: 'warn', title: 'F' }
+        ])
+      ]
+    });
+    assert.deepEqual(
+      rowIds(target),
+      ['blockC', 'warnB', 'warnF', 'passA', 'passE'],
+      'blocking, then warning, then pass, each rank keeping the order the site authored'
     );
     surfaceHarness.remount();
   });

@@ -9,7 +9,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientSetCard from './RecipeIngredientSetCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     ingredientSets = [],
@@ -113,15 +113,10 @@
       />
     </div>
     {#if canAddSet}
-      <ManagerButton
-        role="dashed"
-        fullWidth
-        data-recipe-add="ingredient-set"
-        onclick={() => addSet()}
-      >
+      <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   {:else}
     <ul class="manager-recipe-ingredient-sets">
@@ -148,14 +143,9 @@
         </li>
       {/each}
     </ul>
-    <ManagerButton
-      role="dashed"
-      fullWidth
-      data-recipe-add="ingredient-set"
-      onclick={() => addSet()}
-    >
+    <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
-    </ManagerButton>
+    </Button>
   {/if}
 </section>

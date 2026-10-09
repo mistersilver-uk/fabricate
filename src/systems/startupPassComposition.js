@@ -38,12 +38,10 @@ export function composeStartupPassList({
   const validRecipes = new Set(recipeManager.getRecipes({}).map((r) => r.id));
   const validSystems = new Set(craftingSystemManager.getSystems().map((s) => s.id));
   const validSalvageComponentsBySystem = new Map(
-    craftingSystemManager
-      .getSystems()
-      .map((system) => [
-        system.id,
-        new Set((system.components || []).map((component) => component.id)),
-      ])
+    craftingSystemManager.getSystems().map((system) => [
+      system.id,
+      new Set((system.components || []).map((component) => component.id)), // ratchet-exempt(world-scope): destructive-basis
+    ])
   );
   // One flat id set, because the progressive-order map's `salvage:<componentId>` keys are not
   // system-scoped.

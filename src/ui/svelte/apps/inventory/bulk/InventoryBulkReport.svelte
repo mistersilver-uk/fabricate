@@ -5,15 +5,10 @@
   two aggregate lists the player actually cares about — what arrived in their pack
   and what did not.
 
-  ## Row copy is derived from what was AWARDED, not from the success flag alone
-
-  A routed salvage returns `success: true` for a success tier that has no
-  `outcomeRouting` entry, and such a tier awards NOTHING. Reading the flag alone
-  would print "Recovered" beside an empty "Added to your pack" — a visible lie, and
-  one that would land in a published screenshot. So a succeeded item that awarded
-  zero items takes its own copy ("Succeeded — nothing to recover") on the SAME
-  success tone: the outcome table below stays the spine, this is one extra branch
-  off it.
+  Row copy is derived from what was awarded, not from the success flag alone: a routed
+  salvage returns `success: true` for a success tier with no `outcomeRouting` entry, and
+  such a tier awards nothing. So a succeeded item that awarded zero items takes its own
+  copy ("Succeeded — nothing to recover") on the same success tone.
 
   ## Why `info` and `warning` are not folded into `danger`
 
@@ -248,16 +243,14 @@
     icon={bannerIcon}
     title={bannerTitle}
     detail={bannerSummary}
-    dataAttr="data-inventory-bulk-banner"
-    dataValue={status}
+    data-inventory-bulk-banner={status}
   />
 
   {#if cancelled}
     <EmptyState
       note
       hint={localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
-      dataAttr="data-inventory-bulk-cancelled"
-      dataValue=""
+      data-inventory-bulk-cancelled
     />
   {/if}
   {#if runError}
@@ -310,8 +303,7 @@
     <EmptyState
       note
       hint={localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
-      dataAttr="data-inventory-bulk-nothing-added"
-      dataValue=""
+      data-inventory-bulk-nothing-added
     />
   {/if}
 

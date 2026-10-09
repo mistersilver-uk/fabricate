@@ -20,8 +20,8 @@ export const DEFAULT_SEED = 1071;
 
 /**
  * The harness version. Bump it when a generator changes shape in a way that legitimately moves
- * every committed count, so a baseline diff carries the reason with it. 2 — `pickDistinct` became a
- * partial Fisher-Yates instead of bounded rejection sampling.
+ * every class-1 count, so the drift test reports each profile as incomparable rather than risen. 2
+ * — `pickDistinct` became a partial Fisher-Yates instead of bounded rejection sampling.
  */
 export const HARNESS_VERSION = 2;
 
@@ -301,7 +301,7 @@ export const SCALE_PROFILES = Object.freeze({
       'issue 1228 the workbench evaluated reveal for every recipe TWICE (chooser summary plus ' +
       'the active panel) with no snapshot, so it walked the whole inventory 2N times; at these ' +
       'bounds that is already six figures of offered documents, which is enough for a ' +
-      'reintroduction to move the committed count by orders of magnitude.',
+      'reintroduction to move its class-1 count by orders of magnitude.',
     scale: {
       components: 500,
       recipes: 500,
@@ -577,7 +577,7 @@ export const FOUNDRY_ONLY_SCALE_PROFILE_NAMES = Object.freeze(
 /**
  * The profiles the HEADLESS benchmark sweep runs: every registered profile that is not
  * foundry-only. This is the list `scripts/benchmark-performance.mjs` defaults to and the list the
- * committed class-1 baselines are required for.
+ * drift test compares against the base commit.
  */
 export const SWEPT_SCALE_PROFILE_NAMES = Object.freeze(
   SCALE_PROFILE_NAMES.filter((profile) => SCALE_PROFILES[profile].foundryOnly !== true)

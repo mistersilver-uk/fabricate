@@ -15,20 +15,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // be read out of `styles/fabricate.css` are read out of the component source instead.
 const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/components/EmptyState.svelte');
 export const calloutPath = resolve(__dirname, '../../src/ui/svelte/components/Callout.svelte');
-// The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
-const explainerCardPath = resolve(
-  __dirname,
-  '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
-);
+// The shared side-panel icon fact row (issue 881) follows the same rule:
 const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
 const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
 const calloutSource = readFileSync(calloutPath, 'utf8');
-export const explainerCardSource = readFileSync(explainerCardPath, 'utf8');
 const iconFactRowSource = readFileSync(iconFactRowPath, 'utf8');
 
 export const emptyStateStyles = scopedStyles(emptyStateSource);
 export const calloutStyles = scopedStyles(calloutSource);
-export const explainerCardStyles = scopedStyles(explainerCardSource);
 export const iconFactRowStyles = scopedStyles(iconFactRowSource);
 
 // The stacked body rule, read out of the 1120px container query rather than off the base
@@ -44,33 +38,37 @@ export function stackedBodyRule() {
 }
 
 // The rail nav was unreachable in a SHORT window.
-function shortWindowRailMarkup(navItems) {
-  const items = Array.from({ length: navItems }, (item, index) => {
-    const last = index === navItems - 1 ? ' data-last-nav' : '';
-    return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
-  }).join('');
+function shortWindowRailMarkup(navItems, systemName) {
   return `<div class="fabricate-manager" data-manager-view="systems">
       <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
-      <header class="manager-header"><h1>Crafting systems</h1></header>
+      <header class="fabricate-page-header manager-header"><h1>Crafting systems</h1></header>
       <div class="manager-body">
         <aside class="manager-rail">
           <p class="manager-rail-title" data-manager-rail-section>GM management</p>
           <section class="manager-rail-block">
             <div class="manager-scope-card" data-scope-card>
               <div class="manager-scope-card-head"><p class="manager-kicker">Crafting system</p><button class="manager-rail-toggle manager-scope-collapse" data-manager-rail-toggle>&lsaquo;</button></div>
-              <select class="manager-scope-select"><option>Lab Smithing</option></select>
+              <div class="fabricate-picker manager-travel-picker fabricate-select manager-scope-select"><button class="fabricate-select-trigger fabricate-select-trigger-inline"><span class="fabricate-select-value">${systemName}</span><i class="fas fa-chevron-down"></i></button></div>
               <button class="manager-scope-return">All crafting systems</button>
             </div>
           </section>
-          <nav class="manager-nav">${items}</nav>
+          <nav class="fabricate-nav manager-nav">${Array.from({ length: navItems }, (item, index) => {
+            const last = index === navItems - 1 ? ' data-last-nav' : '';
+            return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
+          }).join('')}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
-        <aside class="manager-inspector"><section class="fabricate-card manager-inspector-card">Inspector</section></aside>
+        <aside class="manager-inspector"><section class="fabricate-card">Inspector</section></aside>
       </div>
     </div>`;
 }
 
-export async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
+export async function readShortWindowRailGeometry({
+  width = 1280,
+  height = 560,
+  navItems = 14,
+  systemName = 'Lab Smithing',
+} = {}) {
   const context = await openLayoutContext({
     viewport: { width, height },
     deviceScaleFactor: 1,
@@ -78,7 +76,7 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
   const page = await context.newPage();
   try {
     await page.setContent(
-      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
+      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems, systemName)}</div>`
     );
     return await page.evaluate(() => {
       const rail = document.querySelector('.manager-rail');
@@ -93,7 +91,14 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
 
       const navRect = nav.getBoundingClientRect();
       const scopeRect = scope.getBoundingClientRect();
+      const trigger = document.querySelector('.manager-scope-select .fabricate-select-trigger');
+      const value = trigger.querySelector('.fabricate-select-value');
       return {
+        triggerHeight: trigger.getBoundingClientRect().height,
+        triggerRadius: getComputedStyle(trigger).borderTopLeftRadius,
+        triggerRight: trigger.getBoundingClientRect().right,
+        valueClipped: value.scrollWidth > value.clientWidth,
+        valueTextOverflow: getComputedStyle(value).textOverflow,
         navOverflowY: getComputedStyle(nav).overflowY,
         navScrollable,
         navScrolledBy: nav.scrollTop,
@@ -105,6 +110,42 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
         scopeTopBefore,
         scopeTopAfter: scopeRect.top,
         scopeBottom: scopeRect.bottom,
+        scopeRight: scopeRect.right,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+/** The title strip's computed box, read in a real browser against the shipped sheet (issue 1777). */
+export async function readTitleBarGeometry() {
+  const context = await openLayoutContext({
+    viewport: { width: 1280, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style>` +
+        '<div class="fabricate fabricate-manager" data-manager-view="systems">' +
+        '<div class="manager-titlebar" data-manager-titlebar>' +
+        '<span class="manager-titlebar-badge">PREMIUM</span>' +
+        '<span class="manager-titlebar-status"><i class="manager-titlebar-status-icon"></i>' +
+        '<span class="manager-titlebar-status-text">Simple</span></span></div></div>'
+    );
+    return await page.evaluate(() => {
+      const style = getComputedStyle(document.querySelector('.manager-titlebar'));
+      return {
+        padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
+        columnGap: style.columnGap,
+        borders: [
+          style.borderTopWidth,
+          style.borderRightWidth,
+          style.borderBottomWidth,
+          style.borderLeftWidth,
+        ],
+        radius: style.borderTopLeftRadius,
       };
     });
   } finally {
@@ -157,18 +198,18 @@ function elementForCompound(compound) {
 }
 
 /**
- * The ancestor chain a manager-button selector names, or `null` when it names none.
+ * The ancestor chain a fabricate-button selector names, or `null` when it names none.
  *
  * @param {string} selector one selector from a rule's prelude
  * @returns {{id: string, root: object, chain: Array<object>}|null|'unmaterializable'}
  */
 function ancestorContextIn(selector) {
   const one = selector.trim().replaceAll(/\s+/g, ' ');
-  if (!one.includes('.manager-button')) return null;
+  if (!one.includes('.fabricate-button')) return null;
   // A comma inside `:is(…)`/`:not(…)` would have been split by the caller.
   if ((one.match(/\(/g) || []).length !== (one.match(/\)/g) || []).length) return null;
   const compounds = one.split(/\s*>\s*|\s+/).filter(Boolean);
-  if (!compounds.at(-1).includes('.manager-button')) return null;
+  if (!compounds.at(-1).includes('.fabricate-button')) return null;
   const ancestors = compounds.slice(1, -1);
   if (ancestors.length === 0) return null;
   if (/[+~]/.test(one)) return 'unmaterializable';

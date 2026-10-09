@@ -20,7 +20,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -144,7 +144,7 @@
         'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
         'Select a recipe item to see its page.'
       )}
-      dataAttr="data-item-page-empty"
+      data-item-page-empty
     />
   {:else}
     <p class="manager-kicker">
@@ -194,24 +194,21 @@
       <StatBox
         value={recipeCount}
         label={text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
-        dataAttr="data-item-page-stat"
-        dataValue="recipes"
+        data-item-page-stat="recipes"
         valueDataAttr="data-item-page-recipe-count"
       />
       <StatBox
         value={midValue}
         label={midLabel}
         tone="info"
-        dataAttr="data-item-page-stat"
-        dataValue={isItemMode ? 'uses' : 'learning'}
+        data-item-page-stat={isItemMode ? 'uses' : 'learning'}
         valueDataAttr="data-item-page-mid-value"
         labelDataAttr="data-item-page-mid-label"
       />
       <StatBox
         value={item.learnedByCount || 0}
         label={text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
-        dataAttr="data-item-page-stat"
-        dataValue="learned-by"
+        data-item-page-stat="learned-by"
         valueDataAttr="data-item-page-learned-by"
       />
     </div>
@@ -289,7 +286,7 @@
       </div>
     </InspectorCard>
 
-    <ManagerButton
+    <Button
       role="primary"
       class="manager-books-scrolls-edit-action"
       data-item-page-edit
@@ -297,7 +294,7 @@
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.EditRecipeItem', 'Edit recipe item')}</span>
-    </ManagerButton>
+    </Button>
   {/if}
 </div>
 
@@ -361,7 +358,7 @@
     width: 24px;
     height: 24px;
     flex: none;
-    border-radius: var(--fab-books-control-radius);
+    border-radius: 6px;
     background: var(--fab-bg-3);
     color: var(--fab-accent);
     font-size: 0.65rem;
@@ -383,15 +380,15 @@
   }
 
   /* `:global()` AND CHAINED (issue 1427), for the reason the `.manager-books-scrolls-edit-action`
-     rule below states for `<ManagerButton>`. The quick-limits card is an `<InspectorCard>` now,
+     rule below states for `<Button>`. The quick-limits card is an `<InspectorCard>` now,
      so `manager-books-scrolls-quick-limits` rides the `class` prop onto an element THIS
      component does not write, and Svelte stamps its `svelte-<hash>` only onto the ones it does.
      This half of the sweep was the LOUD one — the component spreads no attributes onto a regular
      element, so the compiler pruned the descendant rule and `lint:svelte:warnings` named it. The
      bare rule beside it did NOT warn and was equally dead, so both are repaired.
-     `.manager-inspector-card` is chained rather than left off so the selector stays at (0,2,0),
+     `.fabricate-card` is chained rather than left off so the selector stays at (0,2,0),
      exactly where the scoped form put it. */
-  :global(.manager-inspector-card.manager-books-scrolls-quick-limits) {
+  :global(.fabricate-card.manager-books-scrolls-quick-limits) {
     margin: 0;
   }
 
@@ -402,7 +399,7 @@
      and the compiler emits a bare `.svelte-<hash>` instead, taking the rule from (0,3,0) to
      (0,4,0). Measured, not assumed. Inside the `:global()` it stays at (0,3,0), and the ancestor
      compound is written by nothing but this component, so the match set is unchanged. */
-  :global(.manager-inspector-card.manager-books-scrolls-quick-limits .manager-rule-row) {
+  :global(.fabricate-card.manager-books-scrolls-quick-limits .manager-rule-row) {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -410,7 +407,7 @@
   }
 
   /* `:global()` AND CHAINED (issue 1118), for the two reasons `BulkEditPanelShell` gives at
-     length. `:global()` because this is a `<ManagerButton>` now, and Svelte stamps its
+     length. `:global()` because this is a `<Button>` now, and Svelte stamps its
      `svelte-<hash>` class onto the elements this component WRITES rather than onto a child
      component's internals — a scoped selector would have matched nothing while the compiler,
      `lint:svelte:warnings` and every hand-stamped fixture all reported clean, and this
@@ -419,7 +416,9 @@
      bare `:global(.manager-books-scrolls-edit-action)` would be (0,1,0); naming the ancestor
      and both primitive classes puts all three declarations at (0,4,0), which is decided by
      specificity rather than by which sheet the browser loaded last. */
-  :global(.fabricate-manager .manager-button.fab-manager-button.manager-books-scrolls-edit-action) {
+  :global(
+    .fabricate-manager .fabricate-button.fab-manager-button.manager-books-scrolls-edit-action
+  ) {
     width: 100%;
     justify-content: center;
     margin-top: auto;

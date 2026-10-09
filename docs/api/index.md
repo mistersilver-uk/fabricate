@@ -43,8 +43,8 @@ game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
 game.fabricate.listCraftingForActor({ rememberedActorId, componentSourceActorIds }) // Player-visible crafting listing (summary phase)
-game.fabricate.hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds }) // Exact detail model for one recipe (detail phase)
-game.fabricate.craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds, interactive }) // Craft the selected recipe
+game.fabricate.hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds, presentTools }) // Exact detail model for one recipe (detail phase)
+game.fabricate.craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds, interactive, presentTools }) // Craft the selected recipe
 game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
 game.fabricate.salvageComponents({ actorId, targets, interactive, onProgress }) // Salvage many owned components in one run
 game.fabricate.destroyComponents({ actorId, targets, onProgress }) // Permanently destroy many owned components in one run
@@ -173,12 +173,17 @@ Hooks.once('fabricate.ready', async () => {
   Each row's material verdict (its `browseStatus`) and the listing's own `counts.available` are **optimistic** — an upper bound read from an indexed availability snapshot, not exact evaluation.
   A recipe whose ingredient sets contend for the same held stacks can read available in the list and still refuse once hydrated or crafted.
   A row reporting unavailable is definitive; the optimism only ever runs in the makeable direction.
-- `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds })` is the **detail phase**.
+- `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds, presentTools })` is the **detail phase**.
   It returns the exact rich model — per-set craftability, ingredient assignment, check resolution, outcome tiers, steps and progressive stages — for the one recipe the player has opened.
   `recipeId` arrives from a client and is not trusted: the recipe's visibility, its `enabled` flag, and its crafting system's blocked state are all re-evaluated from scratch rather than taken from the summary pass.
   The call returns `null`, never throws, when the recipe does not exist, is disabled, sits in a blocked crafting system, or the viewer may not see it.
   An id is not a permission.
-- `craftRecipe({ actorId, recipeId, ingredientSetId, ingredientEssenceAllocation, componentSourceActorIds, interactive })` executes the attempt, delegating to the same pipeline documented in [CraftingEngine]({% link api/crafting-engine.md %}).
+  `presentTools` is optional and defaults to `null`.
+  It has the shape `{ systemId, componentIds, toolIds }`, and the player app supplies it from the active canvas Tool station so the station's Tool counts as present for recipes in that station's crafting system only.
+  Pass `null` or omit it when there is no station.
+- `craftRecipe({ actorId, recipeId, ingredientSetId, ingredientEssenceAllocation, componentSourceActorIds, interactive, presentTools })` executes the attempt, delegating to the same pipeline documented in [CraftingEngine]({% link api/crafting-engine.md %}).
+  `presentTools` is the same optional station payload described for `hydrateCraftingRecipe`, and a borrowed station Tool is never worn down or used up.
+  It applies to this call only: the active GM checks it against each command the craft sends and never stores it on the run, so a later step needs the station again.
   Exact craft-time validation is always authoritative, independent of what either listing phase reported.
 
 ### Gathering Runtime Facade
@@ -728,8 +733,8 @@ This additive `features` field leaves `schemaVersion` at `1`.
 Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
 `version` names this descriptor's shape, not its rows.
 Activating a mode appends a row without changing it, so match rows rather than comparing versions.
-At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`.
-`additionalDice` stays `false`, so additional dice have no standalone execution route.
+At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`.
+`additionalDice` is `true`, so a count evaluation whose pool has additional dice enabled may buy them through this member too, as described below.
 On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
 On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
 An unresolved or non-numeric target refuses the outcome `targetUnresolved` before any roll, and an invalid multiplier refuses `evaluationInvalid`.
@@ -737,13 +742,26 @@ A sum-under request against a fixed target with no finite `dc` also refuses `eva
 On a count row Fabricate ignores both `formula` and `dc` and grades the rolled dice pool's net successes against `evaluation.pool.required` alone.
 An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome `poolUnresolved` before any roll, and any other invalid pool setting (`die`, `explode`, `cancel`, or the settled pool itself) refuses `evaluationInvalid` before Fabricate constructs a Roll.
 A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
+An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
+A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
+Advantage and Disadvantage move the pool by the default rule's one die: an interactive count request that forwards `advantage: 'advantage'` adds a die, `'disadvantage'` removes one, and the pool floor and `zeroPoolFails` apply after that adjustment.
+A count evaluation whose pool has additional dice enabled may buy them through a top-level `additionalDice` request key: a non-negative integer, honoured only on a **non-interactive** request and only from `callSite: 'gmAction'`.
+A non-zero `additionalDice` on a `broadcast` request refuses `additionalDiceRefused` with reason `broadcastCallSite` before any read, and a `broadcast` interactive request shows the prompt's additional-dice control as unavailable for that same reason.
+A non-zero `additionalDice` on an **interactive** request refuses `invalidRollDecision` instead: there the player buys through Fabricate's own roll prompt, or you forward a pre-resolved `rollDecision.additionalDice`, validated the same way and the only additional-dice key a forwarded decision carries.
+A non-zero `additionalDice` on any evaluation other than an enabled count refuses `notOffered`.
+
+A refused purchase, or a refused spend, answers the outcome `additionalDiceRefused`: a `success: false` refusal with no executed fields, answered before any main roll.
+Its `messageData` is `{ label, reason, actor, resource, n, limit, available }`, with `reason` one of the closed `ADDITIONAL_DICE_REFUSALS` list, and `message` is already that reason's own sentence for the resource name you authored and the source you chose.
+An executed answer additionally carries `boughtDice`, the integer dice bought for that roll, `0` when none were bought.
+A main roll that still fails after a successful spend, for example once Foundry's own dice-explosion limit is hit, answers `evaluationInvalid` with `messageData.boughtDice`, because the spend already stands and nothing is refunded.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
 Both outcomes are stable refusals before Fabricate prompts or rolls.
 
-Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
-Every refusal omits those fields, including evaluation refusals.
+Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes`, `cancelled` and `boughtDice` (`0` when none were bought).
+Every refusal omits those fields, including evaluation refusals, with one exception: a post-spend `evaluationInvalid` still carries `boughtDice` alone, because that spend already happened and stands.
+`additionalDiceRefused` is answered before any spend and carries no executed fields at all.
 
 A graded answer against a resolved target, meaning an attribute row or any sum-under row, reports through `FABRICATE.Check.Roll.PassedTarget` or `FailedTarget` instead of the plain `Passed`/`Failed` keys, with `messageData` `{ label, total, target }` taken from the roll's own executed target, never from the request `dc`.
 Only the fixed sum-over row keeps `Passed`/`Failed` with `{ label, total, dc }`.
@@ -1967,7 +1985,8 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
 | World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
 | World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default, with other presets `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
-| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces — the unimplemented recipe Graph placeholder in the crafting manager, the GM Manager's `World > Downtime` route, and a companion's `downtime` tabs in the player window — disabled by default |
+| World setting | `fabricate.experimentalFeatures` | Reveals in-development Fabricate surfaces: the unimplemented recipe Graph placeholder in the crafting manager, the GM Manager's `World > Downtime` route, a companion's `downtime` tabs in the player window, and the GM Manager's Premium crafting-icons advert on the world Component catalogue and Component Rules screens. Disabled by default. |
+| World setting | `fabricate.premiumIconsAdDismissed` | Whether a GM has dismissed the GM Manager's Premium crafting-icons advert for this world (`Boolean`, default `false`). Written `true` only by the advert's dismiss control. Nothing else writes or clears it. |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |

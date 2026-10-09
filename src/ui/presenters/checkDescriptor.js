@@ -6,6 +6,7 @@
  * rolled one as pending; a value that cannot be read says so.
  */
 import { attributeTargetBasis, resolveActivityTarget } from '../../systems/checkTarget.js';
+import { countRequired } from '../../systems/countCheck.js';
 import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
 
 const COMPARISON_KEYS = Object.freeze({
@@ -30,6 +31,19 @@ function selectedTier(config, recipe) {
   return recipe?.checkTierId
     ? (tiers.find((tier) => tier?.id === recipe.checkTierId) ?? null)
     : null;
+}
+
+/**
+ * `{ successesNeeded }` for a count check before any macro, never a DC (issue 2006): the recipe
+ * tier's non-null `successes`, else the pool's. Empty for a sum check, a progressive or routed
+ * fixed-range check, which grade against no count, and a macro-set count.
+ */
+export function countSuccessesNeeded({ config, recipe, evaluation, mode }) {
+  if (evaluation.product !== 'count' || mode === 'progressive' || config?.dcMode === 'dynamic') {
+    return {};
+  }
+  if (mode !== 'simple' && mode !== 'routedByIngredients' && config?.type === 'fixed') return {};
+  return { successesNeeded: countRequired(evaluation, selectedTier(config, recipe)?.successes) };
 }
 
 /** `{actor} {expression} {value}`, then the adjustment named by its tier, else as difficulty. */

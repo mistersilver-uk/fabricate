@@ -282,8 +282,8 @@ export class CompendiumImporter {
       }
 
       // --- Phase 2: Remap component UUIDs ---
-      const components = Array.isArray(systemData.components) ? systemData.components : [];
-      summary.components.total = components.length;
+      const components = Array.isArray(systemData.components) ? systemData.components : []; // ratchet-exempt(world-scope): import
+      summary.components.total = components.length; // ratchet-exempt(world-scope): import
 
       this._emitProgress({
         pct: 0.05,
@@ -576,7 +576,7 @@ export class CompendiumImporter {
   async _persistScopedEntityRosters(packData, summary) {
     const legs = this._readScopeMergeLegs(packData);
     // The merged component roster, or `null` when that scope will not be written (undecidable).
-    const componentLeg = legs.components;
+    const componentLeg = legs.components; // ratchet-exempt(world-scope): import
     const worldComponentIds = componentLeg.writable
       ? mergedEntityIds(componentLeg.base, componentLeg.incoming)
       : null;
@@ -914,6 +914,7 @@ export class CompendiumImporter {
   /** Fold the component source-item resolution into the unified reference report. */
   _foldComponentReferences(summary) {
     const refs = summary.unresolvedReferences;
+    // ratchet-exempt(world-scope): import
     for (const entry of summary.components.remapped) {
       refs.push({
         kind: REFERENCE_KINDS.SOURCE_ITEM,
@@ -924,6 +925,7 @@ export class CompendiumImporter {
         disposition: entry.method === 'exact' ? 'retained' : 'remapped',
       });
     }
+    // ratchet-exempt(world-scope): import
     for (const entry of summary.components.unresolved) {
       refs.push({
         kind: REFERENCE_KINDS.SOURCE_ITEM,
@@ -948,7 +950,7 @@ export class CompendiumImporter {
       if (!Array.isArray(systemConfig?.tasks)) continue;
       const validationErrors = await validateGatheringDropReferences({
         tasks: systemConfig.tasks,
-        system: { components: systemInput.components || [] },
+        system: { components: systemInput.components || [] }, // ratchet-exempt(world-scope): import
         systemId,
       });
       errors.push(...validationErrors);
@@ -973,7 +975,7 @@ export class CompendiumImporter {
   ) {
     const existingComponentsById = new Map();
     if (existingSystem) {
-      const items = existingSystem.items || existingSystem.components || [];
+      const items = existingSystem.items || existingSystem.components || []; // ratchet-exempt(world-scope): import
       for (const item of items) {
         existingComponentsById.set(item.id, item);
       }
@@ -1023,6 +1025,7 @@ export class CompendiumImporter {
       // Check exact UUID match
       const exactDoc = await this._resolveUuidDocument(originItemUuid);
       if (exactDoc) {
+        // ratchet-exempt(world-scope): import
         summary.components.remapped.push({
           componentId: compId,
           componentName: compName,
@@ -1051,6 +1054,7 @@ export class CompendiumImporter {
         if (!mergedFallbacks.includes(originItemUuid)) {
           mergedFallbacks.push(originItemUuid);
         }
+        // ratchet-exempt(world-scope): import
         summary.components.remapped.push({
           componentId: compId,
           componentName: compName,
@@ -1074,6 +1078,7 @@ export class CompendiumImporter {
       }
 
       // Unresolved
+      // ratchet-exempt(world-scope): import
       summary.components.unresolved.push({
         componentId: compId,
         componentName: compName,
@@ -1081,6 +1086,7 @@ export class CompendiumImporter {
       });
 
       if (mergedFallbacks.length > 0) {
+        // ratchet-exempt(world-scope): import
         summary.components.retained.push({
           componentId: compId,
           componentName: compName,

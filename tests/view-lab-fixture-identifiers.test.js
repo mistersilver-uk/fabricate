@@ -9,7 +9,11 @@ import test from 'node:test';
 import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
-import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
+import {
+  buildLabActors,
+  buildDocumentIndex,
+  seedLearnableBook,
+} from './view-lab/world/labActors.js';
 import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
@@ -19,6 +23,7 @@ import {
   installLabRunStates,
 } from './view-lab/world/labRunStates.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
@@ -37,6 +42,8 @@ import {
 
 const content = buildLabContent();
 const actors = buildLabActors(content);
+// A case can reach the fixtures a world flag seeds, so the identifier sets include them.
+seedLearnableBook(content, actors);
 installFoundryShim({
   documents: buildDocumentIndex(content, actors),
   content,
@@ -148,9 +155,11 @@ const IDENTITY_SOURCES = {
   // Composite keys. The listing builds these itself, so the guard has to build them the same way
   // or it would reject the very values the DOM carries.
   'data-inventory-card': new Set(
-    content.systems.flatMap((system) =>
-      (system.components ?? []).map((component) => `${system.id}:${component.id}`)
-    )
+    content.systems.flatMap((system) => [
+      ...(system.components ?? []).map((component) => `${system.id}:${component.id}`),
+      // `InventoryListingBuilder` keys a held recipe item `recipeitem:<system>:<definition>`.
+      ...(system.recipeItemDefinitions ?? []).map((entry) => `recipeitem:${system.id}:${entry.id}`),
+    ])
   ),
   // The carrier's key is `item.uuid || item.id`, and an owned item's uuid is the component's
   // `originItemUuid` — which `component()` DEFAULTS to `Item.<id>` but two components override to a
@@ -198,6 +207,24 @@ test('every query.system names a real lab crafting system', () => {
     'these cases open on a crafting system the lab world does not define, so the manager falls back ' +
       'to whichever system it had and the case photographs the wrong one:\n  ' +
       unknown.join('\n  ')
+  );
+});
+
+test('every query.checkPreviewState names a state the lab seeds', () => {
+  // An unknown state seeds nothing, so the case photographs the system's own checks instead.
+  const unknown = [];
+  let named = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    const state = viewCase.query?.checkPreviewState;
+    if (!state) continue;
+    named += 1;
+    if (!Object.hasOwn(LAB_CHECK_PREVIEW_STATES, state)) unknown.push(`${viewCase.id}: ${state}`);
+  }
+  assert.ok(named > 0, 'no case names a checkPreviewState, so this sweep proves nothing');
+  assert.deepEqual(
+    unknown,
+    [],
+    `these cases name no seeded check state:\n  ${unknown.join('\n  ')}`
   );
 });
 
@@ -428,7 +455,12 @@ test('each history-data state projects the evidence that defines it, through a f
   assert.equal(shared.gatheringYield.rollModel, 'shared');
   assert.equal(shared.gatheringYield.roll, 40);
   assert.deepEqual(
-    shared.gatheringYield.entries.map((entry) => [entry.rawRoll, entry.effectiveRoll, entry.cleared, entry.qty]),
+    shared.gatheringYield.entries.map((entry) => [
+      entry.rawRoll,
+      entry.effectiveRoll,
+      entry.cleared,
+      entry.qty,
+    ]),
     [
       [40, 55, true, 2],
       [40, 55, true, 2],
@@ -445,8 +477,8 @@ test('each history-data state projects the evidence that defines it, through a f
       [null, 3],
     ]
   );
-  const savedRows = journalFixture('history-data-recovered-materials')
-    .containers.craftingRuns.history[0].steps[0].consumedIngredients;
+  const savedRows = journalFixture('history-data-recovered-materials').containers.craftingRuns
+    .history[0].steps[0].consumedIngredients;
   assert.deepEqual(
     savedRows.map((row) => row.name),
     [null, null, null],
@@ -655,7 +687,7 @@ test('shared smoke Journal walk uses selection-button identity and composite det
   assert.ok(start > 0 && end > start);
   const walk = source.slice(start, end);
   assert.ok(walk.includes('.journal-run-card[data-run-id]'));
-  assert.ok(walk.includes('.journal-history-row [data-history-run-id]'));
+  assert.ok(walk.includes('.journal-history-list [data-history-run-id]'));
   assert.ok(walk.includes('[data-journal-detail][data-run-key]'));
   assert.ok(walk.includes('[data-journal-history-detail]'));
   assert.doesNotMatch(
@@ -1049,7 +1081,8 @@ test('no Journal fixture arms a clock the product could not have armed', () => {
     const { containers } = journalFixture(state);
     for (const run of Object.values(containers.craftingRuns.active)) {
       for (const [index, step] of (run.steps ?? []).entries()) {
-        if (step?.timeGate && !step?.preparedConsumption) offenders.push(`${state}: ${run.id}[${index}]`);
+        if (step?.timeGate && !step?.preparedConsumption)
+          offenders.push(`${state}: ${run.id}[${index}]`);
       }
     }
   }

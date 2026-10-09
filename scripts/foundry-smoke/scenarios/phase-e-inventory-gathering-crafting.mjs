@@ -1,9 +1,6 @@
 /** Phase E's first half: the shared app, the inventory and salvage captures, the gathering states and the Crafting tab; it returns the app-shell locator the second half continues against. */
 
-import {
-  assertProgressiveStageListSound,
-  handleRollPromptIfPresent,
-} from '../pageOps/managerViews.mjs';
+import { assertProgressiveStageListSound, answerRollPrompt } from '../pageOps/managerViews.mjs';
 import {
   assertNoScreenshotOverlays,
   assertPointerTarget,
@@ -380,13 +377,14 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  async function clickReadyGatheringAttempt() {
+  // `prompts` is by construction: an immediate (d100) gather opens the interactive roll prompt,
+  // and a timed one only starts its waiting run.
+  async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
       .first()
       .click();
-    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
-    await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
+    if (prompts) await answerRollPrompt(ctx, 'player-gathering-roll-prompt');
     // The attempt keeps a ready button disabled until its listing reload lands, and that reload
     // re-keys the task rows; selecting a row before it settles races a detached element.
     await page.waitForFunction(
@@ -426,7 +424,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: true });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -444,7 +442,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: false });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
@@ -453,8 +451,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     });
 
     await selectGatheringEnvironment('Moonlit Blind Grove');
+    // The blind gather is the centre header's one primary (issue 1518).
     await appShell
-      .locator('[data-gathering-blind-card]')
+      .locator('[data-gathering-blind-attempt]')
       .first()
       .waitFor({ state: 'visible', timeout: 10_000 });
     await captureCurrentPlayerGathering('player-gathering-blind');
@@ -583,11 +582,10 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         .locator('[data-crafting-craft][data-crafting-craft-disabled="false"]')
         .first();
       if ((await craftButton.count()) > 0) {
-        await craftButton.click().catch(() => {});
-        // A UI craft now opens the interactive roll prompt: capture it, then
-        // click Roll so the run summary resolves and the overlay clears. The prompt can open several
-        // seconds after the click once a full D0 walk has loaded the world.
-        await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt', { timeout: 15_000 });
+        await craftButton.click();
+        // A UI craft of this checked recipe opens the interactive roll prompt: capture it, then
+        // click Roll so the run summary resolves and the overlay clears.
+        await answerRollPrompt(ctx, 'player-crafting-roll-prompt');
         await appShell
           .locator('[data-crafting-run-summary]')
           .first()
@@ -633,7 +631,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .first();
         await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5000 });
-        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always present.
+        // The open choice slot's panel holds its alternative tiles (issue 1518).
         await appShell
           .locator('[data-recipe-section="requirement-rail"]')
           .first()
@@ -642,7 +640,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .locator('[data-requirement-slot][data-slot-kind="choice"]')
           .first();
         await ensureSlotOpen(altSlotTile).catch(() => {});
-        const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
+        const altSection = appShell.locator('[data-requirement-panel]').first();
         await altSection.waitFor({ state: 'visible', timeout: 10_000 });
         // Pointer hit-test (issue 917): the whole 80px slot-tile column is the control, under the
         // rail's wrapping flex row. happy-dom computes no cascade, so only a real frame can prove
@@ -661,18 +659,24 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await screenshot(page, 'player-crafting-essence-alternative');
         await screenshot(page, 'player-crafting-alternatives');
 
-        // Nice-to-have "switched" variant: click the second alternative so the
-        // selection tick moves, evidencing the player choosing the other option.
-        const altOptions = appShell.locator('.crafting-alt-option');
-        if ((await altOptions.count()) > 1) {
-          await altOptions
-            .nth(1)
-            .click({ timeout: 5000 })
-            .catch(() => {});
-          await page.waitForTimeout(250);
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'player-crafting-alternatives-switched');
-        }
+        // The player presses the second alternative tile: a real hit-tested click, then its press.
+        const altTile = appShell
+          .locator('[data-requirement-panel] [data-requirement-alternative].crafting-alt-option')
+          .nth(1);
+        const altButton = altTile.locator('button');
+        await assertPointerTarget(
+          page,
+          altButton,
+          '[data-requirement-alternative] button',
+          'Requirement chooser alternative tile'
+        );
+        await altButton.click({ timeout: 5000 });
+        await altTile
+          .locator('[aria-pressed="true"]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-crafting-alternatives-switched');
         // Restore the unfiltered recipe list for the subsequent stacked frame.
         await recipeSearch.fill('').catch(() => {});
         await page.waitForTimeout(200);
@@ -758,9 +762,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll('#fabricate-app [data-essence-meter]')].map((node) => ({
               essenceId: node.dataset.essenceMeter,
               state: node.dataset.essenceMeterState,
-              ratio: String(
-                node.querySelector('.essence-pool-meter-ratio')?.textContent ?? ''
-              ).trim(),
+              ratio: String(node.querySelector('[data-essence-total]')?.textContent ?? '').trim(),
             }))
           );
         // Container-level wait: the rail's slot row, not a particular tile. An over-specific
@@ -785,9 +787,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Requirement rail states were ${JSON.stringify(railStates)}, expected ${JSON.stringify(expectedRailStates)}`
           );
         }
-        const openChoosers = await appShell
-          .locator('[data-recipe-section="alternatives"], [data-recipe-section="essence-pool"]')
-          .count();
+        const openChoosers = await appShell.locator('[data-requirement-panel]').count();
         if (openChoosers !== 1) {
           throw new Error(
             `Requirement rail had ${openChoosers} choosers open, expected exactly one`
@@ -814,9 +814,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             ).length,
             // Issue 1506: the fallback glyph is the shared art tile's glyph face.
             glyphTiles: rail.querySelectorAll('[data-medallion="glyph"]').length,
-            openChoosers: document.querySelectorAll(
-              '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
-            ).length,
+            openChoosers: document.querySelectorAll('#fabricate-app [data-requirement-panel]')
+              .length,
           };
         });
         if (!tagReport) throw new Error('Tag-requirement rail did not render');
@@ -913,15 +912,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
           );
         }
-        // Issue 917 re-point: the chip's class is `.essence-contribution`
-        // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never existed and
-        // always counted zero.
-        const duskContributions = await appShell
-          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
-          .count();
+        // Issue 1644: the shared pool states a carrier's yield as one reading, `+N <essence>` per
+        // pool it funds, so the dual carrier's row must name two contributions.
+        const duskReading = await appShell
+          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal")')
+          .first()
+          .textContent();
+        const duskContributions = (String(duskReading).match(/\+\d/g) ?? []).length;
         if (duskContributions < 2) {
           throw new Error(
-            `Dual carrier showed ${duskContributions} contribution chips, expected one per essence it funds`
+            `Dual carrier stated ${duskContributions} contributions, expected one per essence it funds`
           );
         }
         await assertNoScreenshotOverlays(page);

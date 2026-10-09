@@ -102,7 +102,8 @@ export const SOURCE_TRIGGER_SITES = [
   SOURCE_TRIGGER_SHELL(
     'essences',
     '<main class="manager-main">Browser</main>',
-    `<section class="manager-essence-inspector-section" data-essence-section="source">
+    `<section class="fab-rail" role="group" aria-labelledby="essence-source-label" data-essence-section="source">
+       <p class="fab-rail-label" id="essence-source-label">Source</p>
        <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
          ${SOURCE_TRIGGER_MARKUP('inspector-trigger')}
        </div>
@@ -126,7 +127,7 @@ export const SOURCE_TRIGGER_SITES = [
          </div>
        </form>
      </main>`,
-    '<section class="fabricate-card manager-inspector-card">Inspector</section>'
+    '<section class="fabricate-card">Inspector</section>'
   ),
   // THE PICKER'S OWN RULE, outside any drop zone.
   `<div style="width:1280px;height:200px">
@@ -158,10 +159,8 @@ export const SOURCE_TRIGGER_SITES = [
 //      panel and declares `min-width: 240px`, `max-width: 340px` and `border-radius: 10px`. The
 //      `.fabricate-select*` family lives in THIS SHEET, in the same `layer(modules)` (issue
 //      1504), so there is no layer axis to win on: the panel variant is written in the same
-//      two-compound shape and wins on SOURCE ORDER, exactly as the shipped
-//      `.manager-recipe-or-popover` variant does for the same two declarations. These are the
-//      declarations that prove it landed: an inline panel opening at 240px over a list of
-//      two-digit numbers is the defect.
+//      two-compound shape and wins on SOURCE ORDER. These are the declarations that prove it
+//      landed: an inline panel opening at 240px over a list of two-digit numbers is the defect.
 export const framePath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'
@@ -245,35 +244,38 @@ export function selectPanelFixture(area, rung, { ticked }) {
 
 // THE CONVERTED PAGER'S SEVEN SITES.
 export const CONVERTED_PAGER_SITES = Object.freeze([
+  // The inventory grid's re-theme is deleted (issue 1518), so its pager paints itself.
   Object.freeze({
     probe: 'inventory',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'inventory-grid-pagination',
     component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
+  // No re-theme: the pager paints itself (issue 1518).
   Object.freeze({
     probe: 'recipes',
-    padding: '8px',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'crafting-browser-pagination',
     component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
+  // Nor do the gathering pagers.
   Object.freeze({
     probe: 'environments',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'gathering-env-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'tasks',
@@ -281,9 +283,9 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'events',
@@ -291,16 +293,16 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'journal',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'journal-list-section',
-    component: 'src/ui/svelte/apps/journal/HistoryList.svelte',
+    component: 'src/ui/svelte/apps/journal/JournalListShell.svelte',
     // The recomposed Journal footer uses the Pagination rung's own fill.
     fill: 'bg-2',
     floored: true,

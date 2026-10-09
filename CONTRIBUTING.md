@@ -317,6 +317,8 @@ Useful flags: `--json`, `--include <moduleId>`, `--bucket <name>`, `--channel <n
 - `node scripts/rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
 It reads both committed release configs to derive which repository secrets each tester group's segment is written to, so no Patreon tier name is hard-coded here.
 It is **dry-run by default** and writes nothing until `--apply`; `--group <name>` narrows to one group, and refuses when that group's secret also serves groups you did not name.
+Each new segment is `<label>-<32 hex characters>`, where the label defaults to the current UTC month and year (`oct2026`) so a feed's month is readable from its URL; `--label <text>` overrides it, for example when rotating at the end of one month for the next.
+The label is part of the secret value, so a rotation sets it with no committed config edit, and it adds no entropy: all of the unguessability is in the hex.
 Useful flags: `--group <name>`, `--config <path>`, and `--premium-config <path>` when the premium sibling is not checked out beside this repository.
 `--no-premium` inspects this repository alone and is **refused together with `--apply`**, because rotating one repository leaves the other on the old segment and splits one cohort across two prefixes.
 Rotation is a cohort migration, never hygiene: it deletes nothing and republishes nothing, so every superseded prefix keeps serving its last manifest and the cohort on it silently stops receiving updates rather than failing.
@@ -530,26 +532,25 @@ Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`)
 All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
-npm run lint           # ESLint over the whole repository (fails on any warning)
-npm run lint:fix       # …and auto-fix what can be fixed
-npm run lint:debt      # what is still wrong in the files eslint.debt.js carries (what CI runs)
+npm run lint           # ESLint over the whole repository, compared with the base commit (what CI runs)
+npm run lint:fix       # …and auto-fix the rules your change made worse
 npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
 npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
-npm run format         # Prettier-format the whole repository
-npm run format:check   # verify formatting (what CI runs)
+npm run format         # Prettier-format the files format:check fails
+npm run format:check   # verify formatting against the base commit (what CI runs)
 npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
 
-ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.
-Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` names `src/**/*.svelte`, so an unformatted component fails CI.
-`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
+ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
+Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.
+`npm run lint:svelte` runs the same base comparison over every `*.svelte` file under `src/` alone, so a component's script and markup are held to their base findings exactly as the `.js` around them under `src/ui/**` is, and a `ratchet-exempt(lint)` marker counts in both.
 That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
 The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
 That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
-A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
+A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
 Svelte COMPILER warnings are gated too, as of issue 924: `onwarn` in `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings` runs the graph-independent sweep in `scripts/check-svelte-warnings.mjs` as its own step of the `lint` CI job.
 The sweep is the authoritative half — a Vite build compiles only the entry graph, so it is blind to a component nothing imports — and both read their compiler options from `svelte.config.js`, so a disagreement between them means graph reachability and never drift in `compilerOptions`.
 That qualifier is load-bearing: `emitCss` is a `vite-plugin-svelte` option rather than a compiler one, and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` sees it, so the build would go quiet on a class the sweep still reports.
@@ -558,14 +559,14 @@ Stylelint still excludes `.svelte` (scoped `<style>` blocks are not linted) and 
 **But SonarCloud's DUPLICATION detector does read `.svelte`, and that distinction is not academic** — issue 1050 read this sentence as "Svelte is invisible to SonarCloud", concluded the duplication risk lived in `tests/**`, and shipped a PR whose quality gate failed at 5.3% on new code with 93 of its 98 duplicated lines in a single `.svelte` file.
 A token-level CPD run at SonarJS's 100-token minimum reproduces the gate closely; a line-based approximation does not, and neither does reasoning from the rule surface.
 So a change that repeats a component's markup — the same field pair written for two scopes, one row rendered per case — is a duplication risk exactly like repeated `.js`, and the remedy is the same: render it once from one component.
-`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .` — the whole repository, as of issue #1660.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.` — the whole repository, as of issue #1660.
 They used to enumerate about eighty paths each, so a new file was linted by nothing until somebody remembered to add it, which is the trap that let a new BUG and a new VULNERABILITY reach SonarCloud in issue 933.
-The not-yet-clean files are carried by `eslint.debt.js`, which switches off **per file** only the rules that file fails and leaves every other rule armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
-Formatting debt is the marked section of `.prettierignore`.
-`npm run lint:debt` reports what is left in a baselined file and fails on an entry that reports nothing any more; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.
-`tests/lint-coverage.test.js` pins each debt group's size exactly (not as a ceiling — a ceiling banks a free slot on every payment), asserts the glob still reaches everything the old enumeration did, and asserts `no-undef` is never baselined.
-When you bring a file to green, delete its entry and lower the pinned count in the same commit; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
-The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
+The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
+Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.
+`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because it lints the whole tree.
+`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.
+When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
+The `scripts/**` debt stays for a measured reason: the Foundry smoke harness alone accounted for 844 of the roughly one thousand ESLint findings there when the glob landed, and it pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
 A new `.sh` under `scripts/` is the one thing still added by hand — to `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js`, which with its `bash -n` parse is the only gate shell gets anywhere in this repository.
 `npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
 Use `npm run lint:fix` / `npm run lint:css:fix` / `npm run format` to auto-fix.
@@ -612,33 +613,37 @@ Stylelint has **no** robust rule for detecting two near-identical rule blocks th
 A handful of standard rules are deliberately turned off with justification in `stylelint.config.js` (e.g. `no-descending-specificity` — reordering the single large global sheet is regression-prone and unreviewable; the cosmetic `selector-not-notation` / `media-feature-range-notation` modernizers — pure churn for no enforcement value).
 The Svelte components' scoped `<style>` blocks are not linted here (they compile to hashed classes and are owned by the Svelte toolchain).
 
-### The gate is a glob, and the debt is a list
+### The gate is a glob, and the debt is the base commit
 
-`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.`, the whole repository, as of issue #1660.
 
 They used to enumerate about eighty paths each.
 Linting had been introduced path by path so each step landed green, and the cost of that was a gate that could only be widened by hand: a file left off the list was linted by nothing, and the miss surfaced at SonarCloud after push rather than at any local gate (issue #933).
-The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.
+The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are held at their base findings instead.
 
-`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.
-Every other rule stays armed on it.
+`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.
+Every rule stays armed on every file.
 That is deliberately not an `ignores` entry: ignoring a file takes it out of ESLint's reach entirely, `no-undef` included, while the linted-file *count* goes up — which reads as progress in a diff and is a regression in fact.
 `src/main.js` is the file that settles the point; `tests/main-undefined-identifiers.test.js` exists because a `ReferenceError` shipped in it past lint, tests and build.
 
-So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.
+So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.
 
-- `npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.
-  It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.
-- `tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.
-- Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.
+- `npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.
+  The cross-file import rules (`import-x/named`, `no-unresolved`, `namespace`, `default`, `export` and `no-cycle`) fail at any count too, since they report in a file the change did not touch.
+  A marker excuses only a finding new against the base, so marking one the base already had makes no room for another.
+  It is a step of the `lint` CI job rather than a unit test because it lints the whole tree, and more than a minute of CPU-bound work does not belong in the unit-test job.
+- `tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.
+- Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.
 
-When you bring a file to green, delete its entry and lower the pinned count in the same commit.
+When you bring a file to green, commit it; there is no entry to delete and no count to lower.
+The debt is visible, not hidden: an editor shows it as errors, and a bare `npx eslint .` or `npx prettier --check .` exits non-zero, so the gate is the npm script and never the bare tool.
+`npm run lint:fix` fixes only the rules your change made worse, and `npm run format` formats only the files `format:check` fails, so neither rewrites debt you did not touch.
 
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
-Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.
 
-`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+The base comparison counts warnings as it counts errors, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a new `{@debug}` tag or `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
 Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
 The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
@@ -648,7 +653,7 @@ It is pinned explicitly rather than left to ESLint's default because it is load-
 A directive that slips off its violation resurfaces the violation as an unsuppressed error; one that lands suppressing nothing is caught by this option.
 Both failure shapes fail the gate, which is what makes a mechanical reformat of a component safe.
 Where a suppression must sit on a particular line, fence the element with `<!-- prettier-ignore -->` — it has to be the LAST comment before the element to take effect.
-The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
+The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
 The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
 
 ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
@@ -674,19 +679,37 @@ A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code
 SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
 Both are tracked as their own follow-ups.
 
-Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):
+Carried as debt rather than gated away (held at their base findings; `npx eslint <file>` shows what is left):
 
-- the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.
-  Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.
-- 60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them
+- the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.
+  Every rule is now enforced there, `no-undef` at any count.
+- the plain `.js` files under `src/ui/**` that are not yet clean; the rest are gated outright, as are the `.svelte` components beside them
 - `src/main.js` and three root `src/gathering*.js` modules
-- 15 of the 33 files under `scripts/**`
+- part of `scripts/**`, for the reason below
 - the `examples/macros/*.js` documentation macros, and two root config files
 
-`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.
+`scripts/**` is worth understanding before you add a script, because the reason part of it still carries debt is a measurement rather than an oversight.
 The Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings across that directory, and it pins its Phase D0 selectors by class, index and button text with no unit coverage over any of them.
 Adding a script now lints it — that is the whole point of the glob — so the only thing left to remember is that a new `.sh` file joins `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js` by hand.
 Shell is parsed by no linter and formatted by no formatter here, and that list plus its `bash -n` parse is the only gate a shell script gets.
+
+### Reading a ratchet failure
+
+A ratchet is a test that bounds a population of offenders: oversized units, comment share, source pins, design-system debt, world-scope reads and orphaned `lang/` keys.
+`npm run lint` and `npm run format:check` hold ESLint and Prettier findings the same way.
+Each compares the working tree with a base commit it computes at test time: `RATCHET_BASE` when that is set, as CI sets it to the commit the pushed change sits on, and otherwise the merge base of `HEAD` with `origin/main`.
+No ledger, baseline or pinned total is checked in, so there is nothing to regenerate or tighten.
+
+A failure names the family, the base commit and each regression, as an entry that is new or one that rose from its base value to its head value.
+Fix the code, or, when the regression is legitimate, record why at the site with a `ratchet-exempt(<family>): <reason>` comment in the file's own comment form: `//` in JavaScript, `/* */` in CSS, `<!-- -->` in HTML and Markdown, and any of the three in a Svelte file.
+`lang-orphan` alone takes no marker, because `lang/en.json` cannot carry a comment, so an orphaned key is wired up or deleted.
+The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
+A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
+A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.
+
+A stale `origin/main` can give a false positive: run `git fetch origin main`.
+When a ratchet names code you did not touch, your local `origin/main` usually predates the commit your branch started from, so the comparison counts other people's changes as yours.
+Locally, with no `origin/main` and no `RATCHET_BASE`, the ratchets skip and name that fix; in CI they fail instead, and `RATCHET_BASE=none` is the explicit opt-out the beta and release jobs use.
 
 ## The View Lab (Foundry-free window captures)
 
@@ -717,6 +740,12 @@ A case also declares `reaches`: `exact` when the frame lands on its smoke counte
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
 
+Every case renders the default `fabricate` palette unless it says otherwise.
+A case that lists palette ids in `themeVariants` gains one variant per palette, registered directly after it: the same case under the id `<case-id>-<palette>`, with `theme` set to that palette, `reaches: 'beyond'` and no smoke labels.
+The capture carries `theme` to the page as a query flag, and the page applies it with the production `applyFabricateTheme` to the document element and to every `.fabricate` root, including the roots that mount after the page is ready.
+An id that is not a shipped palette fails, both when the registry loads and in the page, so a variant can never quietly render the default palette.
+Whatever selects a case also selects its palette variants, but surface coverage never contains one, because a palette is not a surface.
+
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
 By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
@@ -729,8 +758,9 @@ A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunk
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
-A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
-The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.
+A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, selects every player-window case, as it did before run-state attribution.
+The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
@@ -753,11 +783,17 @@ Where a View Lab frame and a smoke frame of the same view disagree, the smoke fr
 Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
 
 - For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
-How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.
+How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.
 Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
+A changed file that is neither a render file nor a lab input, such as an engine module, selects exactly the cases whose `sourceMatches` name it, and never a representative set, surface coverage or the fallback frame.
+It never arms `check-screenshots`, but its cases are still rendered and published, so an engine fix shipped alone carries the frames it changes as evidence the gate does not demand.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
 The per-frame rate is the durable figure; the whole-corpus total scales with the registry.
+Those are serial figures.
+Cases now render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context, and the frames, the manifest's order and the distinct-evidence check do not depend on which render finishes first.
+The speed-up is about twofold rather than proportional to the workers, because Chromium's software GPU process saturates the CPU: 59 cases took 367s serially and 186s six at a time on a six-core machine.
+In CI the selection is also split across runners: `.github/workflows/pr-screenshots.yml` renders up to twelve shards of about thirty cases each side by side (`scripts/lib/viewLabShards.js`), keeps every `distinctEvidenceGroup` on one shard, verifies the harvested chrome once in a job beside them, fills a cold Foundry archive cache once before any of them start, and merges and publishes once.
 An unknown case id aborts in a second naming the id, so a typo costs nothing.
 Browse the result at `ui-screenshot-artifact/apps/index.html`, which groups frames by screen and offers a multi-tag filter; `npm run viewlab:index` regenerates it.
 It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.

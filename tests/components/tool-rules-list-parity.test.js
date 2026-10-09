@@ -22,6 +22,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/Rail.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
@@ -71,10 +72,10 @@ function documentFor(body) {
       body { margin: 0; }
       .application { font-size: 14px; }
       /* TRANSITIONS OFF, and this is load-bearing rather than tidy. The manager tool row
-         carries a 120ms background transition, so a computed background read in the same
-         tick as a hover returns the START value - which made the hover assertion below pass
-         against the very defect it exists to report. Measuring the ENDPOINT is the only
-         honest reading of a cascade question. */
+         carries a --fab-motion-control background transition, so a computed background read
+         in the same tick as a hover returns the START value - which made the hover assertion
+         below pass against the very defect it exists to report. Measuring the ENDPOINT is the
+         only honest reading of a cascade question. */
       *, *::before, *::after { transition: none !important; animation: none !important; }
     </style>
   </head>
@@ -110,7 +111,7 @@ function row(probe, extraClass, name, enabled = false) {
     </button>
     <div class="manager-tools-library-actions">
       <span class="manager-tools-row-recipes" data-probe="${probe}-recipes"><strong>1</strong><small>Recipes</small></span>
-      <button type="button" class="fabricate-toggle manager-status-toggle manager-tools-enabled-toggle ${enabled ? 'is-on' : 'is-off'}" aria-pressed="${enabled}" aria-label="Enable Tool" data-probe="${probe}-switch"><span class="manager-status-toggle-track" aria-hidden="true" data-probe="${probe}-switch-track"><span class="manager-status-toggle-knob" data-probe="${probe}-switch-knob"></span></span></button>
+      <button type="button" class="fabricate-toggle manager-tools-enabled-toggle ${enabled ? 'is-on' : 'is-off'}" aria-pressed="${enabled}" aria-label="Enable Tool" data-probe="${probe}-switch"><span class="manager-status-toggle-track" aria-hidden="true" data-probe="${probe}-switch-track"><span class="manager-status-toggle-knob" data-probe="${probe}-switch-knob"></span></span></button>
       <button type="button" class="manager-tools-edit-rules" data-probe="${probe}-edit"><span>Edit rules</span><i class="fas fa-arrow-up-right-from-square"></i></button>
     </div>
   </article>`;
@@ -141,7 +142,7 @@ const listScreen = (rows = SIX_ROWS) => `
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main" data-tool-library data-probe="pane">
       <div class="manager-tools-main-content" data-probe="toolbar-stack">
-        <section class="fabricate-card manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
+        <section class="fabricate-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
           <div class="manager-tools-authority-heading">
             <span><i class="fas fa-sliders"></i></span>
             <div class="manager-tools-authority-title">
@@ -156,8 +157,8 @@ const listScreen = (rows = SIX_ROWS) => `
           </div>
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
-          <section class="fabricate-filter-bar manager-toolbar" aria-label="Which Tools this list shows" data-probe="filter-bar">
-            <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+          <section class="fabricate-filter-bar" aria-label="Which Tools this list shows" data-probe="filter-bar">
+            <label class="fabricate-search" data-probe="search"><i class="fas fa-search" aria-hidden="true"></i><input type="search" placeholder="Search tools"></label>
             <div class="manager-segmented is-compact is-accent" role="radiogroup" data-tool-membership-filter="true">
               <label class="manager-segment is-active" data-tool-membership-option="in"><input type="radio" class="manager-segment-input" name="b" checked><span class="manager-segment-label">In this system</span><span class="manager-segment-count">3</span></label>
               <label class="manager-segment" data-tool-membership-option="all"><input type="radio" class="manager-segment-input" name="b"><span class="manager-segment-label">All world tools</span><span class="manager-segment-count">11</span></label>
@@ -180,32 +181,36 @@ const listScreen = (rows = SIX_ROWS) => `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
           <div><h2>Smith's Hammer</h2><span class="manager-chip is-positive">Enabled here</span></div>
         </div>
         <p class="manager-muted">A hammer.</p>
-        <p class="manager-kicker manager-tool-inspector-section-kicker" data-probe="section-kicker">Effective rules here</p>
-        <div class="manager-tool-inspector-rules">
-          <div class="manager-icon-fact-row is-tiled is-rule" data-tool-inspector-rule="breakage" data-probe="rule-row">
-            <i class="fas fa-hourglass-half"></i>
-            <span><strong data-probe="rule-title">8% break</strong><small data-probe="rule-subtitle">Tracked per copy</small></span>
+        <section class="fab-rail" role="group" aria-labelledby="rules-kicker" data-probe="section">
+          <p class="fab-rail-label" id="rules-kicker" data-probe="section-kicker">Effective rules here</p>
+          <div class="manager-tool-inspector-rules">
+            <div class="manager-icon-fact-row is-tiled is-rule" data-tool-inspector-rule="breakage" data-probe="rule-row">
+              <i class="fas fa-hourglass-half"></i>
+              <span><strong data-probe="rule-title">8% break</strong><small data-probe="rule-subtitle">Tracked per copy</small></span>
+            </div>
           </div>
-        </div>
-        <p class="manager-kicker manager-tool-inspector-section-kicker">Inheritance</p>
-        <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
-          <div class="manager-tool-inspector-inherit-row" data-probe="inherit-row" data-tool-inspector-inherit="breakage">
-            <span data-probe="inherit-label">Breakage</span>
-            <span class="manager-chip is-info" data-probe="inherit-pill">Inherited</span>
+        </section>
+        <section class="fab-rail" role="group" aria-labelledby="inheritance-kicker">
+          <p class="fab-rail-label" id="inheritance-kicker">Inheritance</p>
+          <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
+            <div class="manager-tool-inspector-inherit-row" data-probe="inherit-row" data-tool-inspector-inherit="breakage">
+              <span data-probe="inherit-label">Breakage</span>
+              <span class="manager-chip is-info" data-probe="inherit-pill">Inherited</span>
+            </div>
           </div>
-        </div>
+        </section>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button manager-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
         <div class="manager-tool-inspector-foot" data-probe="foot">
-          <button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
+          <button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
         </div>
       </section>
     </aside>
@@ -282,6 +287,7 @@ const READ_PROBES = () =>
           rowGap: style.rowGap,
           padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
           minWidth: style.minWidth,
+          marginBottom: style.marginBottom,
           width: Math.round(box.width),
           height: Math.round(box.height),
           fractionalHeight: box.height,
@@ -319,19 +325,19 @@ function inspectorColumn(sections, footState) {
   ).join('');
   const foot =
     footState === 'member'
-      ? `<button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
-      : `<button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
+      ? `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
+      : `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
   return `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body" style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; height: 600px">
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button manager-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
         </div>
         <div class="manager-tool-inspector-foot" data-probe="foot">${foot}</div>
       </section>
@@ -366,18 +372,18 @@ const READ_PINNED_BAND = () => {
 
 test('the Tools browser writes ONE search field, and it is inside the search card', () => {
   // THE FIXTURE ABOVE IS A COPY, AND THIS IS THE DRIFT GUARD BESIDE IT. `LIST_SCREEN` writes
-  // two `.manager-tools-library-card` sections and one `.manager-search` by hand, so it goes on
+  // two `.manager-tools-library-card` sections and one `.fabricate-search` by hand, so it goes on
   // measuring the same three rules however the real view is edited. This clause reads the SOURCE.
   const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
   const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');
   const styleAt = source.indexOf('<style>');
   const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
 
-  const fields = [...markup.matchAll(/<ManagerSearchField(?![\w-])/gu)];
+  const fields = [...markup.matchAll(/<SearchField(?![\w-])/gu)];
   assert.equal(
     fields.length,
     1,
-    `ToolsBrowserView renders ${fields.length} \`<ManagerSearchField>\`, not one. Every extra ` +
+    `ToolsBrowserView renders ${fields.length} \`<SearchField>\`, not one. Every extra ` +
       'one under a `.manager-tools-library-card` takes the three rewritten Tools-browser rules, ' +
       'which the retired `[data-manager-tools-search]` form would not have reached. Re-decide ' +
       'the rewrite — do not widen it by adding a field.'
@@ -399,7 +405,7 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   );
   assert.ok(
     fields[0].index > cardAt && fields[0].index < cardEnds,
-    'the one `<ManagerSearchField>` must sit INSIDE the `data-manager-tools-search` card. ' +
+    'the one `<SearchField>` must sit INSIDE the `data-manager-tools-search` card. ' +
       'Outside it the attribute form and the class form stop selecting the same field, which is ' +
       'the premise the rewrite was measured on.'
   );
@@ -412,7 +418,7 @@ test('the Tools browser renders its search and its filter through the shared bar
   const styleAt = source.indexOf('<style>');
   const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
 
-  const bars = [...markup.matchAll(/<ManagerToolbar(?![\w-])/gu)];
+  const bars = [...markup.matchAll(/<FilterBar(?![\w-])/gu)];
   assert.equal(bars.length, 1, `ToolsBrowserView renders ${bars.length} filter bars, not one`);
 
   const cardOpens = '<section class="manager-tools-library-card" data-manager-tools-search>';
@@ -429,22 +435,22 @@ test('the Tools browser renders its search and its filter through the shared bar
       'overrides in `styles/fabricate.css` reach the field through.'
   );
 
-  const barEnds = markup.indexOf('</ManagerToolbar>', bars[0].index);
+  const barEnds = markup.indexOf('</FilterBar>', bars[0].index);
   assert.ok(barEnds > bars[0].index, 'the filter bar closing tag was not found');
   const inBar = (needle) => {
     const at = markup.indexOf(needle, bars[0].index);
     return at > bars[0].index && at < barEnds;
   };
   assert.ok(
-    inBar('<ManagerSearchField'),
+    inBar('<SearchField'),
     'the search field renders inside the filter bar: a browse screen`s search and its filters ' +
       'ARE that band, and a control left outside it is a second bar the recipe does not have'
   );
   assert.ok(
-    inBar('dataAttr="data-tool-membership-filter"'),
+    /\sdata-tool-membership-filter(?=[\s/>])/u.test(markup.slice(bars[0].index, barEnds)),
     'the membership filter renders inside the filter bar for the same reason - it narrows the ' +
-      'list below, which is what a filter is. It is addressed by the `<SegmentedControl>` prop ' +
-      'that stamps its hook rather than by the retired `manager-tools-membership-filter` class: ' +
+      'list below, which is what a filter is. It is addressed by the hook its `<SegmentedControl>` ' +
+      'tag writes rather than by the retired `manager-tools-membership-filter` class: ' +
       'issue 1515 replaced this view`s hand-rolled radiogroup with the shared primitive, and a ' +
       'class assertion left behind would have gone on passing against the deleted markup`s name'
   );
@@ -663,19 +669,19 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
   try {
     const measured = await page.evaluate(READ_PROBES);
 
-    // `proto:2512` — the search field states its own type. It declared none.
-    assert.equal(measured.search.fontSize, '11.5px', 'the search field states the design size');
-    assert.equal(measured.search.fontWeight, '500', 'and the design weight');
-    // `proto:2510` height 32 → the ladder's nearest surviving rung.
-    assert.equal(measured.search.height, 30, 'the search box sits on the control-height ladder');
-    assert.equal(measured.search.borderRadius, '8px', 'proto:2510 radius');
+    // The search field is the library's `<Search>` (issue 1782, maintainer ruling 2), which
+    // overrides `proto:2510`-`2512`'s 32 / radius 8 / 11.5px box: 38 / radius 9 / 500 12.5px.
+    assert.equal(measured.search.fontSize, '12.5px', 'the search field states the library size');
+    assert.equal(measured.search.fontWeight, '500', 'and the library weight');
+    assert.equal(measured.search.height, 38, 'the search box is the library’s 38px shell');
+    assert.equal(measured.search.borderRadius, '9px', 'at the 34-38px band’s corner');
 
     // `proto:2519` — `Sort by` is the kicker treatment in the SUBTLE ink, not the muted one.
     assert.equal(measured['sort-label'].fontSize, '8.5px', 'proto:2519 size');
     assert.equal(measured['sort-label'].fontWeight, '700', 'proto:2519 weight');
 
-    // `proto:2520` / `proto:2521` — both controls are the same height as the search field and
-    // read in the SECONDARY ink, one rung down from the muted they had.
+    // `proto:2520` / `proto:2521` — both controls sit on their own row at the 30px `inline` rung,
+    // in the SECONDARY ink.
     for (const probe of ['sort-select', 'sort-direction']) {
       assert.equal(measured[probe].height, 30, `${probe} sits on the same rung`);
       assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the design size`);
@@ -839,11 +845,13 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
       '--fab-bg-0',
       '--fab-bg-1',
       '--fab-text-subtle',
+      '--fab-text-muted',
     ]);
     const resolved = {
       bg0: tokens['--fab-bg-0'],
       bg1: tokens['--fab-bg-1'],
       subtle: tokens['--fab-text-subtle'],
+      muted: tokens['--fab-text-muted'],
     };
 
     // `proto:2548` — the aside is `--bg2` over a `--bg1` pane. On our ramp that is
@@ -859,15 +867,25 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
       assert.equal(measured[probe].color, resolved.subtle, `${probe} is the subtle ink`);
       assert.notEqual(measured[probe].letterSpacing, 'normal', `${probe} is tracked`);
     }
+    // A rail section keeps the card's own rhythm and a flush kicker (issue 1782).
+    // ITS KICKER IS THE MANAGER EYEBROW the panel's own head draws, property for property, so a
+    // converted kicker cannot drift from the `.manager-kicker` it replaced.
+    for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'color']) {
+      assert.equal(measured['section-kicker'][property], measured.kicker[property], property);
+    }
+    // The inspector's 14px gap snapped up to `--fab-space-4` (issue 1523).
+    assert.equal(measured.section.rowGap, '16px', 'kicker to body at the card rhythm');
+    assert.equal(measured['section-kicker'].marginBottom, '0px', 'and its kicker sits flush');
 
     // `proto:2559-2562` — the rules inset RECESSES below the aside now that the aside has
     // moved up a rung. It had been painted lighter than its own container.
     assert.equal(measured['rule-row'].background, resolved.bg0, 'proto:2559 inset fill');
-    assert.equal(measured['rule-row'].borderRadius, '10px', 'proto:2559 radius');
+    assert.equal(measured['rule-row'].borderRadius, '9px', 'proto:2559 draws 10px; the well rung is 9');
     assert.equal(measured['rule-title'].fontSize, '11.5px', 'proto:2561 title size');
     assert.equal(measured['rule-title'].fontWeight, '600', 'proto:2561 title weight');
     assert.equal(measured['rule-subtitle'].fontSize, '9.5px', 'proto:2561 subtitle size');
-    assert.equal(measured['rule-subtitle'].color, resolved.subtle, 'proto:2561 subtitle ink');
+    // Muted, not the prototype's subtle: issue 1521's correction, as `Kicker` and `EmptyState` ink.
+    assert.equal(measured['rule-subtitle'].color, resolved.muted, 'the subtitle inks muted');
 
     // `proto:2569-2571` — the inheritance row LEFT-PACKS its pill beside the label. It was
     // `space-between`, which threw the pill to the far edge of the column.
@@ -881,7 +899,7 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
 
     // `proto:2576` — the world-Tool route is a bordered secondary at the toolbar rung.
     assert.equal(measured['edit-world'].height, 30, 'proto:2576 height, on the ladder');
-    assert.equal(measured['edit-world'].borderRadius, '8px', 'proto:2576 radius');
+    assert.equal(measured['edit-world'].borderRadius, '7px', 'proto:2576 draws 8px; the 30px rung is 7');
     assert.equal(measured['edit-world'].fontSize, '10.5px', 'proto:2576 label size');
     assert.equal(measured['edit-world-glyph'].fontSize, '9px', 'proto:2576 glyph size');
 

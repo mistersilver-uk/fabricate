@@ -674,8 +674,15 @@ test("the roll prompt's rule line names the same face rules as the chat card", a
       .map((clause) => [
         /explode/.test(clause) ? 'explode' : 'cancel',
         /once/.test(clause),
-        /[≥≤] \d+/.exec(clause)?.[0] ?? 'extreme',
+        faceBound(clause),
       ]);
+  // The card writes a bound as `≥ 9`; the prompt reuses the Studio's `9 or above`.
+  const faceBound = (clause) => {
+    const symbol = /[≥≤] \d+/.exec(clause)?.[0];
+    if (symbol) return symbol;
+    const words = /(\d+) or (above|under)/.exec(clause);
+    return words ? `${words[2] === 'above' ? '≥' : '≤'} ${words[1]}` : 'extreme';
+  };
   const cases = [
     { explode: explodeRule(BEST), cancel: cancelRule(WORST) },
     { explode: explodeRule({ kind: 'from', value: 9 }, true), cancel: cancelRule({ kind: 'from', value: 2 }) },
@@ -698,4 +705,17 @@ test("the roll prompt's rule line names the same face rules as the chat card", a
     surface.restore();
   }
   assert.equal(surface.views.length, cases.length);
+});
+
+test('the replay policy keeps the bought original dice only when some were bought (issue 2008)', async () => {
+  const dice = countDice({ faces: [11, 15, 8] });
+  const policy = settledPolicy({ die: 20, base: '3', threshold: '10', direction: 'under' });
+  const bought = dice.CountRoll.fromPolicy({ ...policy, bought: 1 });
+  assert.equal(bought.options.fabricateCount.bought, 1);
+  assert.equal(bought._formula, '3d20', 'the bought die is one of the one term, never a second');
+  assert.equal((await bought.evaluate()).total, 1, 'an older reader ignores the extra key');
+  for (const none of [0, undefined, 1.5]) {
+    const roll = dice.CountRoll.fromPolicy({ ...policy, bought: none });
+    assert.equal('bought' in roll.options.fabricateCount, false, `bought ${none} is omitted`);
+  }
 });

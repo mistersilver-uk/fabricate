@@ -1,15 +1,15 @@
 /** THE PILL FAMILY IS ROUTED, PER DESTINATION (issue 1515). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** The six views that carried the family. */
+/** The six views that carried the family; the task editor's sets live in its cards (issue 1522). */
 const VIEWS = Object.freeze({
-  taskEdit: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+  taskEdit: 'src/ui/svelte/apps/manager/gathering-task',
   eventEdit: 'src/ui/svelte/apps/manager/GatheringEventEditView.svelte',
   environmentOverview: 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte',
   worldCurrency: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
@@ -63,11 +63,18 @@ function selfClosingElements(source, name) {
   return [...source.matchAll(new RegExp(`<${name}\\b[\\s\\S]*?/>`, 'g'))].map((match) => match[0]);
 }
 
+/** A view's source, or every component under a view directory as one source. */
+function viewSource(path) {
+  const full = resolve(repoRoot, path);
+  if (!statSync(full).isDirectory()) return readFileSync(full, 'utf8');
+  return readdirSync(full)
+    .filter((name) => name.endsWith('.svelte'))
+    .map((name) => readFileSync(resolve(full, name), 'utf8'))
+    .join('\n');
+}
+
 const sources = Object.fromEntries(
-  Object.entries(VIEWS).map(([key, path]) => [
-    key,
-    withoutComments(readFileSync(resolve(repoRoot, path), 'utf8'))
-  ])
+  Object.entries(VIEWS).map(([key, path]) => [key, withoutComments(viewSource(path))])
 );
 
 test('the routing scan is alive, so every assertion below can fail', () => {

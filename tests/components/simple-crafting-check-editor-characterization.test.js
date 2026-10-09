@@ -68,7 +68,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -76,9 +76,25 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+    // The Difficulty card's count callouts (issue 2006). Manifest only.
+    'src/ui/svelte/components/Callout.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+    // The counting pool and the shared character-value field (issue 2006). Manifest only.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+    // The additional-dice group and its option well (issue 2008). Manifest only.
+    'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+    'src/ui/svelte/components/Well.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     // The tier card renders the product's ONE ordered list (issue 1512), which draws its controls
     // through the icon button and its opener through the row disclosure.
     'src/ui/svelte/components/SortableList.svelte',
@@ -88,6 +104,8 @@ const harness = createMountedComponentHarness({
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
     'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/components/RuleSentence.svelte',
+    'src/ui/svelte/components/RuleRow.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     // THE SHARED ONE-OF-N PICKER and its compiled graph (issue 1510), rendered by this editor's
     // Preview-against control and by the trigger editor's five. Manifest only.

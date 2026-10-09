@@ -244,7 +244,7 @@
   <!-- `Callout` is the manager's standing-statement primitive and already draws exactly this. -->
   {#if intro}
     <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements". -->
-    <Callout tone="neutral" text={intro} dataAttr="data-tool-requirements-intro" />
+    <Callout tone="neutral" text={intro} data-tool-requirements-intro data-tab-heading />
   {/if}
 
   <ToolInheritCard
@@ -343,7 +343,7 @@
                      is already a `<label>`. The input is NESTED rather than the row becoming a
                      `role="checkbox"` wrapper, which is the trap the row's own header records. -->
                 <SelectionCheckbox
-                  size="sm"
+                  density="compact"
                   wrapper="contents"
                   value={option.id}
                   checked={(prerequisites.ids || []).includes(option.id)}
@@ -368,7 +368,7 @@
           selectedValue={prerequisites.gateMode}
           groupName="tool-gate-mode"
           columns={2}
-          dataGroup="tool-gate-mode"
+          data-radio-card-group="tool-gate-mode"
           onChange={(gateMode) => patchPrerequisites({ gateMode })}
         />
       {:else}
@@ -544,7 +544,7 @@
     min-width: 0;
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
   }
 
   /* THE HAIRLINE BETWEEN THE TWO SECTIONS, and NOT a gap, written on the SECOND section so a tab
@@ -623,7 +623,7 @@
   /* THE HAND-TYPED ROW'S SENTENCE, a SIBLING of that row rather than a third line inside it, as
      the Checks Studio states its own per-entry fault; the radio names it through
      `aria-describedby`. Only the WEIGHT is stated here, resetting the 700 inherited from
-     `.manager-field`: this is the field's VALUE, not its caption. */
+     `.fabricate-field`: this is the field's VALUE, not its caption. */
   .manager-tool-bonus-hand-typed {
     margin: 0;
     font-weight: 500;

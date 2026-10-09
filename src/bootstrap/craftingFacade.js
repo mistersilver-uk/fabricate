@@ -10,6 +10,7 @@ import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
 import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
+import { withStationPresence } from '../systems/stationPresence.js';
 import {
   activeRunStepState,
   buildStepRecipeView,
@@ -23,28 +24,39 @@ import { findMatchingComponent } from '../utils/essenceResolver.js';
 
 import { localizeGathering } from './gatheringRuntime.js';
 
+/** One redaction-safe projection for GM and player viewers; Foundry globals are injected here. */
+function createCraftingListingBuilder(facade, recipeManager) {
+  return new CraftingListingBuilder({
+    recipeManager,
+    recipeVisibility: facade.recipeVisibilityService,
+    resolutionModeService: facade.resolutionModeService,
+    craftingSystemManager: facade.craftingSystemManager,
+    // Read only to name the step a run is parked on (issue 917); the field is never reassigned.
+    craftingRunManager: facade.craftingRunManager,
+    localize: (key, data) =>
+      data === undefined
+        ? (game.i18n?.localize?.(key) ?? key)
+        : (game.i18n?.format?.(key, data) ?? key),
+    nowWorldTime: () => game.time?.worldTime ?? 0,
+    resolveCheckFormula: (formula, actor, craftingModifier, evaluation) =>
+      resolveCheckFormulaDisplay(formula, actor, craftingModifier, undefined, evaluation),
+    // The resolver `InventoryListingBuilder` uses, so "looks makeable" and the owned count
+    // cannot disagree (issue 1075).
+    resolveComponentForItem: findMatchingComponent,
+  });
+}
+
+/** The cached builder, or one built for this call over the station's presence view. */
+function craftingDetailBuilder(facade, presentTools) {
+  const recipeManager = withStationPresence(facade.recipeManager, presentTools);
+  return recipeManager === facade.recipeManager
+    ? facade._getCraftingListingBuilder()
+    : createCraftingListingBuilder(facade, recipeManager);
+}
+
 export const craftingFacade = {
-  /** One redaction-safe projection for GM and player viewers; Foundry globals are injected here. */
   _getCraftingListingBuilder() {
-    if (this._craftingListingBuilder) return this._craftingListingBuilder;
-    this._craftingListingBuilder = new CraftingListingBuilder({
-      recipeManager: this.recipeManager,
-      recipeVisibility: this.recipeVisibilityService,
-      resolutionModeService: this.resolutionModeService,
-      craftingSystemManager: this.craftingSystemManager,
-      // Read only to name the step a run is parked on (issue 917); the field is never reassigned.
-      craftingRunManager: this.craftingRunManager,
-      localize: (key, data) =>
-        data === undefined
-          ? (game.i18n?.localize?.(key) ?? key)
-          : (game.i18n?.format?.(key, data) ?? key),
-      nowWorldTime: () => game.time?.worldTime ?? 0,
-      resolveCheckFormula: (formula, actor, craftingModifier, evaluation) =>
-        resolveCheckFormulaDisplay(formula, actor, craftingModifier, undefined, evaluation),
-      // The resolver `InventoryListingBuilder` uses, so "looks makeable" and the owned count
-      // cannot disagree (issue 1075).
-      resolveComponentForItem: findMatchingComponent,
-    });
+    this._craftingListingBuilder ??= createCraftingListingBuilder(this, this.recipeManager);
     return this._craftingListingBuilder;
   },
 
@@ -83,15 +95,21 @@ export const craftingFacade = {
   /**
    * The rich model for one recipe beside `listCraftingForActor`'s summary rows (issue 1075).
    * `recipeId` is untrusted: sources and visibility are re-evaluated; a hidden id answers `null`.
+   * `presentTools` is the Active Canvas Tool's payload, or null.
    */
-  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
+  hydrateCraftingRecipe({
+    recipeId = null,
+    actorId = null,
+    componentSourceActorIds = null,
+    presentTools = null,
+  } = {}) {
     this._requireReady();
     if (!recipeId) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
-    return this._getCraftingListingBuilder().buildRecipeDetail({
+    return craftingDetailBuilder(this, presentTools).buildRecipeDetail({
       recipeId,
       craftingActor,
       componentSourceActors,
@@ -167,6 +185,7 @@ export const craftingFacade = {
     ingredientEssenceAllocation = null,
     componentSourceActorIds = null,
     interactive = false,
+    presentTools = null,
   } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
@@ -185,6 +204,7 @@ export const craftingFacade = {
       ingredientOptionOverrides,
       ingredientEssenceAllocation,
       interactive,
+      presentTools,
     });
   },
 
@@ -215,6 +235,7 @@ export const craftingFacade = {
     stepId = null,
     actorId = null,
     componentSourceActorIds = null,
+    presentTools = null,
   } = {}) {
     this._requireReady();
     const liveRecipe = this.recipeManager?.getRecipe?.(recipeId);
@@ -253,6 +274,7 @@ export const craftingFacade = {
         craftingActor,
         optionOverrides,
         essenceAllocation,
+        presentTools,
       }) ?? null
     );
   },
@@ -374,7 +396,7 @@ export const craftingFacade = {
    * The one player-triggerable advance boundary. A non-owner gets a "needs owner" message, not a
    * throw. The recipe comes from the resolved run, never the caller (issue 966).
    */
-  async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
+  async advanceCraftingRun({ actorId, runId, interactive = false, presentTools = null } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
@@ -393,6 +415,7 @@ export const craftingFacade = {
       runId,
       componentSourceActors: resolved.componentSourceActors,
       interactive,
+      presentTools,
     });
   },
 

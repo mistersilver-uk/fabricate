@@ -25,7 +25,10 @@ const {
 } = await import('../src/config/settings.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
-const { createServices, makeSystem } = await import('./helpers/adminStoreServices.js');
+const { createServices, makeRecipe, makeSystem } = await import('./helpers/adminStoreServices.js');
+const { gatheringTaskReadiness } = await import(
+  '../src/ui/svelte/apps/manager/gathering-task/gatheringTaskReadiness.js'
+);
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -217,6 +220,7 @@ test('admin gathering task validation reads only the selected result source', as
   assert.deepEqual(store.validateGatheringLibraryTask(straight), {
     valid: true,
     errors: [],
+    nameErrors: [],
     resultErrors: []
   });
 
@@ -229,6 +233,7 @@ test('admin gathering task validation reads only the selected result source', as
   assert.deepEqual(store.validateGatheringLibraryTask(invalidD100Results), {
     valid: true,
     errors: [],
+    nameErrors: [],
     resultErrors: []
   });
 
@@ -293,6 +298,70 @@ test('admin gathering task validation reads only the selected result source', as
   });
   assert.equal(duplicateFailure.valid, false);
   assert.ok(duplicateFailure.resultErrors.some(error => error.includes('failure tier "Miss"')));
+});
+
+test('1522: the store files a blank name apart from the result errors, and the editor routes on that field', async () => {
+  const system = makeSystem({
+    features: { gathering: true },
+    gatheringCraftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        relativeOutcomes: [{ id: 'rich', name: 'Rich Vein', success: true, dc: 5 }],
+        fixedOutcomes: []
+      }
+    }
+  });
+  const store = createAdminStore(createServices(system));
+  await store.selectSystem('sys1');
+  const NAME = 'Task name is required';
+  const cases = {
+    d100: { id: 'd', name: ' ', resolutionMode: 'd100', dropRows: [{ id: 'drop', quantity: 1, dropRate: 100 }] },
+    routed: { id: 'r', name: '', resolutionMode: 'routed', dropRows: [], resultGroups: [] }
+  };
+  for (const [mode, task] of Object.entries(cases)) {
+    const validation = store.validateGatheringLibraryTask(task);
+    assert.deepEqual(validation.nameErrors, [NAME], `${mode}: the name error has its own field`);
+    const others = validation.errors.filter(error => error !== NAME);
+    assert.ok(others.length > 0, `${mode}: precondition, the task has result errors too`);
+    assert.deepEqual(validation.errors, [NAME, ...others], `${mode}: errors stays the union`);
+    assert.equal(validation.valid, false);
+
+    const { rows, counts } = gatheringTaskReadiness({ task, mode, validation });
+    const blocking = rows.filter(row => row.status === 'block');
+    assert.deepEqual(
+      blocking.filter(row => row.group === 'overview').map(row => [row.id, row.message]),
+      [['name', NAME]],
+      `${mode}: one Overview row`
+    );
+    assert.deepEqual(
+      blocking.filter(row => row.group === 'results').map(row => row.message),
+      others,
+      `${mode}: one Results row per result error`
+    );
+    assert.equal(counts.blocking, validation.errors.length);
+  }
+  const routedError = store.validateGatheringLibraryTask(cases.routed).errors[1];
+  assert.match(routedError, /check tier "Rich Vein" requires exactly one matching result group/);
+});
+
+test('1522: the editor blocks exactly when the store refuses Save', async () => {
+  const store = createAdminStore(createServices(makeSystem({ features: { gathering: true } })));
+  await store.selectSystem('sys1');
+  const ore = { id: 'ore', componentId: 'ore', quantity: 1 };
+  const straight = { id: 's', name: 'Ore', resolutionMode: 'straight', dropRows: [] };
+  const tasks = [
+    { ...straight, resultGroups: [{ id: 'g', name: 'Ore', results: [ore] }] },
+    { ...straight, resultGroups: [] },
+    { ...straight, name: '', resultGroups: [{ id: 'g', name: 'Ore', results: [ore] }] },
+    { id: 'd', name: 'Forage', resolutionMode: 'd100', dropRows: [] },
+    { id: 'p', name: '', resolutionMode: 'progressive' }
+  ];
+  for (const task of tasks) {
+    const validation = store.validateGatheringLibraryTask(task);
+    const { counts } = gatheringTaskReadiness({ task, mode: task.resolutionMode, validation });
+    assert.equal(counts.blocking > 0, !validation.valid, JSON.stringify(validation.errors));
+  }
 });
 
 test('admin gathering task validation rejects invalid active results before persistence', async () => {
@@ -423,4 +492,26 @@ test('admin production reporting reads only the active gathering result source',
   assert.deepEqual(producers('legacy-drop').map(entry => entry.id), ['task-legacy']);
   assert.deepEqual(producers('inactive-drop'), []);
   assert.deepEqual(producers('inactive-result'), []);
+});
+
+test('admin production reporting counts a component a recipe offers only as an alternative', async () => {
+  const choice = {
+    id: 'cg',
+    alternatives: [
+      { id: 'a', componentId: 'ingot', quantity: 1 },
+      { id: 'b', componentId: 'gem', quantity: 1 }
+    ]
+  };
+  const recipe = makeRecipe({ id: 'r-either', resultGroups: [{ id: 'g', results: [choice] }] });
+  const scope = makeWorldScopeStoreFake(['ingot', 'gem'].map(id => ({ id, name: id })));
+  const services = createServices(makeSystem(), [recipe], [], {
+    getComponentScopeStore: () => scope.store
+  });
+  const store = createAdminStore(services);
+
+  await store.selectSystem('sys1');
+  const entries = get(store.viewState).worldScope.component.entries;
+  const gem = entries.find(entry => entry.id === 'gem');
+  assert.deepEqual(gem?.producedBy?.map(entry => entry.id), ['r-either']);
+  assert.equal(gem?.recipeCount, 1, 'an alternative alone is a reference the delete guard sees');
 });

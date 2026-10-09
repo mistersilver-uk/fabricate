@@ -29,7 +29,7 @@
   import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
@@ -282,7 +282,7 @@
     <IconPicker
       value={draft?.icon || ''}
       disabled={inert}
-      buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
       onChange={(icon) => onDraftChange(setBulkEssenceIcon(draft, icon))}
     />
   </div>
@@ -299,7 +299,7 @@
         'FABRICATE.Admin.Manager.Essence.BulkEdit.ColourWorldNote',
         'One or more of the selected essences takes its colour from the Essence Catalogue, where it is shared by every system, so colour is not edited here.'
       )}
-      dataAttr="data-essence-bulk-colour-world"
+      data-essence-bulk-colour-world
     />
   {:else}
     <BulkEditSection
@@ -325,7 +325,7 @@
          palette renders INLINE with the No-colour cell on, its only route back to unset; both are
          gated props, so the environments biome popover is untouched. -->
     <div class="manager-essence-bulk-colour" data-essence-bulk-colour={colourValue || 'unchanged'}>
-      <ManagerColorPopover
+      <TintPicker
         layout="inline"
         allowNone
         allowCustom={false}
@@ -352,7 +352,7 @@
     fill={true}
     groupName="essence-bulk-status"
     ariaLabel={text('FABRICATE.Admin.Manager.Essence.Status.Label', 'Status')}
-    dataAttr="data-essence-bulk-status"
+    data-essence-bulk-status
     optionDataAttr="data-essence-bulk-status-option"
     onChange={(value) => onDraftChange(setBulkEssenceStatus(draft, value))}
   />
@@ -365,7 +365,7 @@
       'FABRICATE.Admin.Manager.Essence.BulkEdit.PerEssenceNote',
       'Names, descriptions, linked sources and property macros stay per-essence — edit those individually.'
     )}
-    dataAttr="data-essence-bulk-per-essence-note"
+    data-essence-bulk-per-essence-note
   />
 </BulkEditPanelShell>
 

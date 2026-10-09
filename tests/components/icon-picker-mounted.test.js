@@ -39,7 +39,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     ICON_PICKER,
@@ -244,7 +244,7 @@ describe('IconPicker trigger, across the primitive`s spread', () => {
   it('keeps the caller`s own name, class, style and context menu, and gains the primitive`s contract', async () => {
     const root = await harness.mount({
       value: 'fas fa-cog',
-      buttonTitle: 'Change icon',
+      ariaLabel: 'Change icon',
       iconOnly: true,
       triggerClass: 'manager-vocabulary-icon-trigger',
       triggerStyle: 'color: rgb(1, 2, 3)',

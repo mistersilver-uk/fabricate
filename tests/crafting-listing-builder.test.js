@@ -851,6 +851,48 @@ describe('CraftingListingBuilder — success-counting check (issue 2004)', () =>
   });
 });
 
+describe('CraftingListingBuilder — a count check\'s successes needed (issue 2006)', () => {
+  const countCheck = (extra = {}) => ({
+    rollFormula: '1d20', dc: 15,
+    tiers: [{ id: 'hard', name: 'Hard', dc: 18, successes: 3 }, { id: 'open', name: 'Open', dc: 12, successes: null }],
+    evaluation: { product: 'count', direction: 'over', pool: { die: 10, base: '4', threshold: '8', required: 2 } },
+    ...extra,
+  });
+  const neededFor = ({ mode = 'simple', slot = 'simple', check = countCheck(), checkTierId = null } = {}) => {
+    const system = makeSystem({
+      resolutionMode: mode,
+      features: { craftingChecks: true },
+      craftingCheck: { simple: {}, routed: {}, progressive: {}, [slot]: check },
+    });
+    const builder = makeBuilder({ system, entries: [{ recipe: makeRecipe({ checkTierId }), access: { reason: 'ok' } }] });
+    const { summaries } = builder.buildListing({ craftingActor: null, viewer: PLAYER });
+    const detail = builder.buildRecipeDetail({ recipeId: summaries[0].id, craftingActor: null, viewer: PLAYER });
+    return detail.check;
+  };
+
+  it('reads the recipe tier\'s successes, else the pool\'s, and never a DC', () => {
+    const plain = neededFor();
+    assert.deepEqual([plain.successesNeeded, plain.dc], [2, null]);
+    assert.equal(neededFor({ checkTierId: 'hard' }).successesNeeded, 3, 'the tier\'s successes, not its DC 18');
+    assert.equal(neededFor({ checkTierId: 'open' }).successesNeeded, 2, 'a tier with none falls back to the pool');
+    assert.equal(
+      neededFor({ mode: 'routedByCheck', slot: 'routed', check: countCheck({ type: 'relative' }) }).successesNeeded,
+      2,
+      'a relative ladder is anchored on the count'
+    );
+  });
+
+  it('names no count where nothing grades against one, and leaves a summed check unchanged', () => {
+    const absent = (check) => !Object.hasOwn(check, 'successesNeeded');
+    assert.ok(absent(neededFor({ mode: 'routedByCheck', slot: 'routed', check: countCheck({ type: 'fixed' }) })));
+    assert.ok(absent(neededFor({ mode: 'progressive', slot: 'progressive' })));
+    assert.ok(absent(neededFor({ check: countCheck({ dcMode: 'dynamic', macroUuid: 'Macro.x' }) })), 'a macro sets it');
+    const summed = neededFor({ check: countCheck({ evaluation: undefined }) });
+    assert.ok(absent(summed));
+    assert.equal(summed.dc, 15);
+  });
+});
+
 describe('CraftingListingBuilder — outcome tiers', () => {
   function routedSystem() {
     return makeSystem({
@@ -953,6 +995,11 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.equal(model.outcomeTiers.length, 3);
     const [shared, master, ruined] = model.outcomeTiers;
     assert.deepEqual(shared.names, ['Flawed', 'Standard', 'Fine']);
+    // Every merged tier's id rides along, so a roll routed through any of them finds this row.
+    assert.equal(shared.id, 't-flawed');
+    assert.deepEqual(shared.ids, ['t-flawed', 't-standard', 't-fine']);
+    assert.deepEqual(master.ids, ['t-master']);
+    assert.deepEqual(ruined.ids, ['t-ruined']);
     assert.equal(shared.success, true);
     assert.deepEqual(shared.awardedResults, [
       { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
@@ -963,6 +1010,45 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     ]);
     assert.deepEqual(ruined.names, ['Ruined']);
     assert.deepEqual(ruined.awardedResults, []);
+  });
+
+  // A success tier whose roll routes to no group awards nothing too, and still never shares the
+  // failure tier's row: the success flag is part of the collapse key (issue 1644).
+  it('keeps a success tier awarding nothing apart from an earlier failure tier', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      components: [{ id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp' }],
+      craftingCheck: {
+        simple: {},
+        routed: {
+          rollFormula: '1d20',
+          type: 'fixed',
+          fixedOutcomes: [
+            { id: 't-ruined', name: 'Ruined', success: false },
+            { id: 't-lucky', name: 'Lucky', success: true },
+            { id: 't-master', name: 'Masterwork', success: true },
+          ],
+        },
+        progressive: {},
+      },
+    });
+    const recipe = makeRecipe({
+      resultGroups: [
+        { id: 'g-steel', name: 'Steel', checkOutcomeIds: ['t-master'], results: [{ componentId: 'c2', quantity: 1 }] },
+        { id: 'g-none', name: 'None', checkOutcomeIds: ['t-elsewhere'], results: [{ componentId: 'c2', quantity: 2 }] },
+      ],
+    });
+    const { recipe: model } = buildOne({ system, entries: [{ recipe, access: { reason: 'ok' } }] });
+    const [ruined, lucky] = model.outcomeTiers;
+    assert.deepEqual(lucky.awardedResults, [], 'the lucky tier routes to nothing');
+    assert.deepEqual(
+      model.outcomeTiers.slice(0, 2).map((tier) => [tier.ids, tier.success]),
+      [
+        [['t-ruined'], false],
+        [['t-lucky'], true],
+      ]
+    );
+    assert.equal(ruined.awardedResults.length, 0);
   });
 
   it('collapses multiple no-award (failure) tiers into a single entry', () => {
@@ -988,6 +1074,7 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.deepEqual(success.names, ['Success']);
     assert.equal(failure.success, false);
     assert.deepEqual(failure.names, ['Ruined', 'Botched']);
+    assert.deepEqual(failure.ids, ['t2', 't3']);
     assert.deepEqual(failure.awardedResults, []);
   });
 });
@@ -1589,5 +1676,58 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
       { direction: 'under', text: 'Target 14 · stay at or under', source: 'Base 12 · modifiers +2' },
       'the card target includes the applied modifier, as the prompt chip does'
     );
+  });
+});
+
+describe('CraftingListingBuilder — a check that cannot roll for this character (issue 2139)', () => {
+  const UNROLLABLE = CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE;
+  const smith = { source: 'attribute', expression: '@skills.smith.level' };
+  const SERA = { id: 'actor-1', items: [], getRollData: () => ({ skills: { smith: { level: 12 } } }) };
+  const BARE = { id: 'actor-1', items: [], getRollData: () => ({}) };
+  const statusFor = (
+    actor,
+    { resolutionMode = 'simple', simple = {}, progressive = {}, craftability = makeCraftability() } = {}
+  ) => {
+    const builder = makeBuilder({
+      craftability,
+      system: makeSystem({
+        resolutionMode,
+        craftingCheck: { simple: { rollFormula: '1d20', dc: 12, ...simple }, routed: {}, progressive },
+      }),
+    });
+    const listing = builder.buildListing({ craftingActor: actor, viewer: PLAYER });
+    const detail = builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: actor, viewer: PLAYER });
+    return [listing.summaries[0].browseStatus, detail.browseStatus, detail.blockingReasons];
+  };
+
+  it('labels the row and the detail when the target path is missing, not Ready to craft', () => {
+    const simple = { evaluation: { direction: 'under', target: smith } };
+    assert.deepEqual(statusFor(BARE, { simple }), [
+      UNROLLABLE,
+      UNROLLABLE,
+      ['FABRICATE.App.Crafting.Blocking.CheckUnrollable'],
+    ]);
+    assert.deepEqual(statusFor(SERA, { simple }).slice(0, 2), [
+      CRAFTING_BROWSE_STATUS.AVAILABLE,
+      CRAFTING_BROWSE_STATUS.AVAILABLE,
+    ]);
+  });
+
+  it('ranks a check that cannot roll above missing materials, which gathering can clear', () => {
+    const simple = { evaluation: { direction: 'under', target: smith } };
+    const craftability = makeCraftability({ canCraft: false });
+    assert.deepEqual(statusFor(BARE, { simple, craftability }).slice(0, 2), [UNROLLABLE, UNROLLABLE]);
+    // The detail model reads exact craftability; this fixture's summary snapshot holds no shortfall.
+    assert.equal(statusFor(SERA, { simple, craftability })[1], CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
+  });
+
+  it('reads a counting pool path the character lacks the same way', () => {
+    const progressive = {
+      evaluation: { product: 'count', direction: 'over', pool: { base: '@skills.smith.level', threshold: '8' } },
+      checkBreakage: { triggers: [] },
+    };
+    const options = { resolutionMode: 'progressive', progressive };
+    assert.equal(statusFor(BARE, options)[0], UNROLLABLE);
+    assert.equal(statusFor(SERA, options)[0], CRAFTING_BROWSE_STATUS.AVAILABLE);
   });
 });

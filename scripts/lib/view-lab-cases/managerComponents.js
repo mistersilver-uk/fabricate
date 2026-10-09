@@ -6,16 +6,97 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
+  COMPONENT_EDITOR_MATCHES,
+  PREMIUM_ICONS_AD_PATTERN,
+  REQUIREMENT_SUGGESTION,
+  TYPEAHEAD_COMBOBOX_SOURCE,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+
+/** A simple salvage's result rows (issue 1516), all of them and the `n`th from the page. */
+const SALVAGE_LIST = '[data-salvage-group] .manager-recipe-ingredient-set-groups';
+const SALVAGE_ROWS = `${SALVAGE_LIST} > [data-salvage-result]`;
+const SALVAGE_ROW = (n) => `${SALVAGE_ROWS}:nth-child(${n})`;
+
+/**
+ * A flat salvage list's row geometry at 1024, where the list is too narrow for one line: the plate,
+ * kind, name and remove on the first, the toggle and amount on the second, every remove and toggle
+ * in a column.
+ */
+const SALVAGE_GEOMETRY = Object.freeze({
+  containerSelector: SALVAGE_LIST,
+  wrappedRows: {
+    rows: SALVAGE_ROWS,
+    lines: [
+      [
+        '.manager-recipe-option-lead',
+        '.manager-recipe-option-kind',
+        '[data-salvage-result-component]',
+        '[data-remove-salvage-result]',
+      ],
+      ['[role="radiogroup"]', '[data-salvage-result-quantity], [data-recipe-option-formula]'],
+    ],
+  },
+  alignedRight: `${SALVAGE_ROWS} .manager-recipe-option-remove`,
+  alignedLeft: `${SALVAGE_ROWS} [role="radiogroup"]`,
+});
+
+/**
+ * A progressive salvage's stage rows at 1024: the plate and kind, the name below them at its stated
+ * minimum, then the DC and Edit.
+ */
+const SALVAGE_STAGES = '.fabricate-sortable-list-row[data-salvage-result]';
+const SALVAGE_STAGE_GEOMETRY = Object.freeze({
+  containerSelector: '[data-salvage-result-groups]',
+  wrappedRows: {
+    rows: `${SALVAGE_STAGES} [data-recipe-option]`,
+    lines: [
+      ['.manager-recipe-option-lead', '.manager-recipe-option-kind'],
+      ['[data-salvage-result-component]'],
+      ['[data-salvage-result-difficulty]', '[data-salvage-result-edit]'],
+    ],
+  },
+  alignedRight: `${SALVAGE_STAGES} [data-remove-salvage-result]`,
+  minInlineSize: {
+    selector: `${SALVAGE_STAGES} [data-salvage-result-component]`,
+    pixels: 140,
+  },
+});
+
+/** The salvage rows' sources: the editor and the requirement row it draws them with. */
+const SALVAGE_ROW_SOURCES = Object.freeze([
+  ...COMPONENT_EDITOR_MATCHES,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/(PickerRow|PickerRowAmount)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
+]);
+
+/** Component Rules' header group, led by the Premium advert until it is dismissed. */
+const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
+
+/** The page heading keeps 320px beside the advert, measured on the lab's real header. */
+const PREMIUM_AD_HEADING_FLOOR = Object.freeze({
+  containerSelector: '[data-manager-view="components"] .manager-header',
+  minInlineSize: { selector: '[data-manager-view="components"] .manager-heading', pixels: 320 },
+});
+
+/** Open the editor on a component and bring its salvage results into view. */
+
+const salvageSteps = (componentId) => [
+  { selector: '#manager-nav-component-rules' },
+  { selector: `.manager-component-row[data-component-id="${componentId}"] [data-component-edit]` },
+  { selector: '[data-salvage-result-groups]', scroll: true },
+];
 
 /**
  * The salvage check override states (issue 2005), one per state the approved prototype's frames 23
  * and 24 depict, on Smithing's Longsword under `checkOverride` (`tests/view-lab/world/labWorld.js`).
- * `sees` is the Player sees state; a `resolved` case chooses a character in its Preview-as picker.
+ * `sees` is the Player sees state; a `resolved` case chooses a character in its Preview-as picker,
+ * and `claim` adds the field's own state. The `count-*` states are issue 2006's frame 25: a
+ * counting check's successes needed override beside a kept DC override it never reads.
  */
 const OVERRIDE_PREVIEW = '[data-salvage-dc-override] [data-override-preview-actor]';
-const overrideCase = ({ id, label, field, frame, sees }) =>
+const overrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
     label: `Manager — Component edit salvage override, ${label} (prototype state ${frame})`,
@@ -34,7 +115,7 @@ const overrideCase = ({ id, label, field, frame, sees }) =>
       ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', OVERRIDE_PREVIEW) : []),
     ],
     expectView: 'component-edit',
-    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"]${claim} [data-override-player-sees="${sees}"]`,
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/(CheckOverrideField\.svelte|OverridePlayerSees\.svelte|overridePlayerSees\.js|salvageDcPresets\.js|componentEditSelectOptions\.js)$/,
@@ -51,6 +132,10 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
+    // The lab world opts into experimental features, so the Premium advert leads the header,
+    // compact at 1280: the full face waits for the 1320 rung.
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    expectVisible: '[data-premium-icons-ad]',
     // Issue 1371 r13-list — the list opens on its first drawn row (maintainer ruling M14).
     expectContained: [
       {
@@ -62,12 +147,91 @@ export const CASES = Object.freeze([
         target: '[data-component-inspector-kicker]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-component-edit-system-rules]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/ui\/model\/(?:component|entity)BrowserModel\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
+      // Builds the attribution note the inspector's Shared identity card draws (issue 2218).
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+      PREMIUM_ICONS_AD_PATTERN,
     ],
+  }),
+  managerCase({
+    // Issue 2220: the header once a GM dismisses the advert, which only the × reaches.
+    id: 'manager-components-premium-ad-dismissed',
+    label: 'Manager — Components with the Premium advert dismissed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-premium-icons-ad-dismiss]' },
+    ],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-component-add-from-catalogue]:first-child`,
+    kinds: ['manager', 'components'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Issue 2220: the advert's compact face, three icons and no subline, beside the action.
+    id: 'manager-components-premium-ad-compact',
+    label: 'Manager — Components with the compact Premium advert',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Drawn rather than withheld; the geometry test proves this face drops its subline.
+    expectVisible: '[data-premium-icons-ad]',
+    expectClick: '[data-premium-icons-ad-link]',
+    expectContained: [
+      { container: '.manager-header', target: '[data-component-add-from-catalogue]' },
+    ],
+    position: { width: 1100, height: 820 },
+    kinds: ['manager', 'components'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Inside the old 1121-1179 band, where the full face left the lab header's heading 291-318px.
+    id: 'manager-components-premium-ad-1150',
+    label: 'Manager — Components header at 1150px',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    expectVisible: '[data-premium-icons-ad]',
+    expectLayout: PREMIUM_AD_HEADING_FLOOR,
+    position: { width: 1150, height: 820 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Issue 2220: the advert's full face, six icons and the subline, above the 1320 rung.
+    id: 'manager-components-premium-ad-full',
+    label: 'Manager — Components with the full Premium advert',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Only the full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
+    expectLayout: PREMIUM_AD_HEADING_FLOOR,
+    position: { width: 1330, height: 820 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
   }),
   managerCase({
     // Issue 1371 r18-colour — the row badges in the essence's own colour (maintainer ruling M29).
@@ -163,7 +327,12 @@ export const CASES = Object.freeze([
     // The switch is a new control on this card (issue 1371), so it owns a real pointer hit rather than a DOM assertion.
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      WORLD_SCOPE_MODEL_PATTERN,
+      // Builds the attribution note the identity callout draws (issue 2218).
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+    ],
   }),
   // The first open-panel frame in the component studio (issue 1510): the option list exists only
   // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
@@ -190,10 +359,7 @@ export const CASES = Object.freeze([
     // The panel sits inside the application root rather than clipped by it.
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'components'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      ...ANCHORED_POPOVER_SOURCES,
-    ],
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
     // The rules editor's read-only world tag card (issue 1371, round 3), which no frame reached.
@@ -226,7 +392,7 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     // The widened membership cohort (issue 1371): the ghost rows, their Add, and the toolbar counting the widened set.
@@ -254,6 +420,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -272,7 +439,7 @@ export const CASES = Object.freeze([
     expectView: 'components',
     expectSelector: '[data-component-add-from-catalogue-dialog]',
     kinds: ['manager', 'components'],
-    // The picker's own file, and not `ManagerModal.svelte`.
+    // The picker's own file, and not `Modal.svelte`.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
     ],
@@ -487,7 +654,49 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four complication and stage-strip cases below (issue 1286).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // Issue 1522: the refused save's blocking notice, a row of the entry column above the scroller.
+  managerCase({
+    id: 'manager-component-edit-save-failed',
+    label: 'Manager — Component edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-tag-toggle]' },
+      { selector: '[data-component-edit-save]' },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager #manager-component-edit-form > [data-notice-position] > [role="alert"]',
+    expectCenterHit: '#manager-component-edit-form > [data-notice-position] > [role="alert"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // Issue 1522: the Validation tab, whose failing rows each draw a View routed to the Rules tab.
+  managerCase({
+    id: 'manager-component-edit-validation',
+    label: 'Manager — Component edit validation',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]' },
+      { selector: '[data-component-edit-tab="validation"]' },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '.fabricate-manager [data-component-edit-validation]',
+    expectCenterHit:
+      '[data-component-validation-check="salvageRouting"] [data-component-validation-view]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/component\/componentRulesValidation\.js$/,
+    ],
   }),
   managerCase({
     // The other consumer of the shared frame, stacked (issue 1371 r19-entry2).
@@ -517,9 +726,9 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    position: { width: 980, height: 860 },
+    position: { width: 960, height: 860 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage',
@@ -536,9 +745,12 @@ export const CASES = Object.freeze([
       { selector: '[data-salvage-routing]', scroll: true },
     ],
     expectView: 'component-edit',
+    // The flat row in view after the scroll; its amount toggle is the requirement row's (issue 1516).
+    expectCenterHit:
+      '[data-salvage-group="rw-salv-partial"] [data-salvage-result] [data-recipe-option-amount-mode="rolled"]',
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: SALVAGE_ROW_SOURCES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-narrow',
@@ -559,9 +771,55 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector:
       '.fabricate-manager .fabricate-sortable-list-row[data-salvage-result] [data-sortable-move="up"]',
+    // The second stage's Edit link, in view after the scroll, is the row's trailing control (issue 1516).
+    expectLayout: SALVAGE_STAGE_GEOMETRY,
+    expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: SALVAGE_ROW_SOURCES,
+  }),
+  // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
+  managerCase({
+    id: 'manager-component-edit-salvage-progressive-dc',
+    label: 'Manager — Component edit progressive salvage, the DC card closing the stage list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-component-edit-section="difficulty"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-salvage-result-groups] [data-component-edit-section="difficulty"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The stage list's complication band at the declared floor (issue 1522).
+  managerCase({
+    id: 'manager-component-edit-salvage-stages-narrow',
+    label: 'Manager — Component edit progressive salvage, a stage’s complication band at the floor',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-stage-complications]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row.has-band [data-salvage-stage-complications]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-off',
@@ -577,7 +835,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-simple',
@@ -593,7 +851,108 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The fixed-or-rolled amount on salvage results (issue 1516): Steel Ingot Fixed, Tanned Leather
+  // rolled, a third row opened on Rolled with nothing typed, and a fourth holding an unrollable
+  // expression, captured after the field loses focus so its invalid paint is the resting one.
+  managerCase({
+    id: 'manager-component-edit-salvage-rolled-narrow',
+    label:
+      'Manager — Component edit salvage, rolled, opened and invalid amounts, at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      ...salvageSteps('sm-longsword'),
+      { selector: '[data-salvage-section] [data-add-salvage-result]' },
+      { selector: '.manager-travel-option:has-text("Flawless Ruby")' },
+      { selector: '[data-salvage-section] [data-add-salvage-result]' },
+      { selector: '.manager-travel-option:has-text("Deep Sapphire")' },
+      { selector: `${SALVAGE_ROW(2)} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${SALVAGE_ROW(2)} [data-recipe-option-formula]`, fill: '1d4+1' },
+      { selector: `${SALVAGE_ROW(3)} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${SALVAGE_ROW(4)} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${SALVAGE_ROW(4)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
+      // A click on the selected tab moves focus off the field without changing the screen.
+      { selector: '[data-component-edit-tab="rules"]' },
+    ],
+    expectView: 'component-edit',
+    // The first row Fixed, the next three on Rolled, and only the fourth marked invalid.
+    expectSelector:
+      `${SALVAGE_LIST}:not(:has(> [data-salvage-result]:nth-child(1) [data-recipe-option-formula]))` +
+      ':has(> [data-salvage-result]:nth-child(2) [data-recipe-option-formula])' +
+      ':has(> [data-salvage-result]:nth-child(3) [data-recipe-option-formula])' +
+      ':not(:has(> [data-salvage-result]:nth-child(3) [data-recipe-option-invalid]))' +
+      ' > [data-salvage-result]:nth-child(4) [data-recipe-option-invalid]',
+    expectAttributes: [
+      {
+        selector: `${SALVAGE_ROW(2)} [data-recipe-option-formula]`,
+        name: 'aria-invalid',
+        value: null,
+      },
+      {
+        selector: `${SALVAGE_ROW(4)} [data-recipe-option-formula]`,
+        name: 'aria-invalid',
+        value: 'true',
+      },
+    ],
+    expectLayout: SALVAGE_GEOMETRY,
+    expectContained: [1, 2, 3, 4].map((row) => ({
+      container: SALVAGE_ROW(row),
+      target: `${SALVAGE_ROW(row)} .manager-recipe-option-remove`,
+    })),
+    expectCenterHit: `${SALVAGE_ROW(4)} .manager-recipe-option-remove`,
+    expectNoHorizontalOverflow: SALVAGE_LIST,
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [
+      ...SALVAGE_ROW_SOURCES,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
+  }),
+  // A cleared stage searches again in place (issue 1516): its suggestion list opens beneath it,
+  // inside the editor's form, and its last suggestion must own its pointer target.
+  managerCase({
+    id: 'manager-component-edit-salvage-suggestions',
+    label: 'Manager — Component edit salvage, a cleared stage row’s suggestion list open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...salvageSteps('hb-cracked-alembic'),
+      { selector: '[data-salvage-stage="1"] [data-recipe-option-clear]' },
+      { selector: '[data-salvage-stage="1"] [data-recipe-option-search]', fill: 'r' },
+    ],
+    expectView: 'component-edit',
+    expectSelector: REQUIREMENT_SUGGESTION,
+    expectContained: [
+      { container: '.fabricate-manager', target: '.manager-recipe-option-suggestions' },
+    ],
+    expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
+    kinds: ['manager', 'components'],
+    sourceMatches: [...SALVAGE_ROW_SOURCES, TYPEAHEAD_COMBOBOX_SOURCE, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // A salvage row's kind select, open (issue 1516): one option, Component, ticked.
+  managerCase({
+    id: 'manager-component-edit-salvage-kind-list',
+    label: 'Manager — Component edit salvage, a result row’s kind list open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      ...salvageSteps('sm-longsword'),
+      { selector: `${SALVAGE_ROW(1)} [data-recipe-option-kind]` },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="component"] .fabricate-select-tick',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    expectCenterHit:
+      '.fabricate-manager > .fabricate-select-popover [data-popover-option="component"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [...SALVAGE_ROW_SOURCES, ...ANCHORED_POPOVER_SOURCES],
   }),
 
   // Five frames, all on `lab-herbalism`: the section gates on progressive resolution, which only herbalism has.
@@ -693,7 +1052,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
   managerCase({
@@ -714,7 +1073,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-recipe-result-complications] [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'recipes', 'complications'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultItemRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
     ],
   }),
@@ -776,5 +1135,34 @@ export const CASES = Object.freeze([
     field: 'adjustmentOverride',
     frame: 24,
     sees: 'adjustment-invalid',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-preset',
+    label: 'counting successes, a tier preset',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-salvage-dc-preset]:has-text("Standard — 3 successes needed"))' +
+      ':has([data-salvage-override-kept])',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-custom',
+    label: 'counting successes, a custom count',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim: ':has([data-salvage-successes-custom])',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-default',
+    label: 'counting successes, the system default',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-salvage-dc-preset]:has-text("System default — 2 successes needed"))' +
+      ':not(:has([data-salvage-successes-custom]))' +
+      ':has([data-salvage-override-kept])',
   }),
 ]);

@@ -59,6 +59,38 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
 | `alchemy`             | exactly 1       | per `checkMode` (see below) | none / required-when-simple / required-when-tiered | system `alchemy.checkMode`          |
 
+## Result-Side Choice Groups
+
+A result carrying `alternatives` is a choice group (`data-models/spec.md` § Result, requirements 8 to 15), and every non-progressive mode awards it in whichever result set the mode routed to, the reserved failure-role set included.
+A group's N resolves once, when the group is awarded, through the same roll seam a rolled amount does, floored at zero and capped at 64.
+A rolled group rolls its `selectionFormula` once for each alternative it draws, against the crafting character, never reusing the check the craft already made, and reads each roll off its alternatives' ranges as an ordered ladder.
+Without repeats each later roll reads only the alternatives not yet awarded; with repeats N is exact.
+A group whose chooser is the player awards nothing when the stage resolves: it persists a pending award choice that the player settles once, and the unversioned award paths refuse a recipe carrying one before anything is consumed.
+`progressive` carries no choice group, because it awards every ordered entry its roll affords (`data-models/spec.md` § Result, requirement 14).
+
+### Scenario: A failure-role set awards its group
+
+- **WHEN** a failed simple craft routes to a failure-role set holding a rolled choice group
+- **THEN** the group awards on the same terms as one in a success set
+
+### Scenario: A rolled group reads its ladder with a clamp and never a gap
+
+- **WHEN** a rolled group awards up to 2 and its count rolls 2
+- **THEN** its count is rolled once and its selection twice, each against the crafting character
+- **AND** a selection that falls between two ranges awards the alternative whose range starts highest at or below it, and one below every range awards the lowest
+
+### Scenario: Repeats decide whether a draw exhausts the group
+
+- **WHEN** a rolled group without repeats awards up to 5 from three alternatives
+- **THEN** it awards each alternative once and rolls its selection three times
+- **AND** with repeats it rolls five times and may award an alternative more than once
+
+### Scenario: A group whose chooser is the player awards at the player's pick
+
+- **WHEN** a versioned stage awards a group whose chooser is the player and whose N is at least one
+- **THEN** the stage completes holding a pending award choice and awards nothing from the group until it is settled
+- **AND** an unversioned craft carrying such a group is refused before it consumes anything
+
 ## Check Source
 
 - Every mode's check has a single supported source: a GM-authored roll formula (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively.
@@ -145,16 +177,19 @@ Measured against the shipped 14.365 stack over 355 emitted formulas, 25 validate
 `maximize: true` renders every term deterministic so nothing is skipped, and the finite test is load-bearing rather than decorative: `Roll#total` is `Number(this._total) || 0`, which passes `-Infinity` through, so this predicate also closes the `max(, 2)` empty-head trap BY CONSTRUCTION.
 The check fails OPEN with no dice engine (headless, tests), where nothing evaluates the formula anyway.
 The FLAT term is **sign-aware** — `Constant` is unsigned in the dice grammar, which is why `appendToolBonusTerms`' `sign` + `Math.abs` split is required and correct (`+ -3[Modifiers]` would not parse; `- 3[Modifiers]` does) — **label-sanitized**, **SKIPPED when the value is `0`**, and **formatted through a decimal-safe formatter that refuses exponent notation and non-finite values**, because `Constant = _ [0-9]+ ("." [0-9]+)?` has no exponent production and `+ 1e-7[Modifiers]` would parse as a `StringTerm` and throw at evaluate.
-Ordering: tool bonuses append first, then the modifier term, then the advantage transform, then the situational bonus.
+Ordering: tool bonuses append first, then the modifier term, then the situational bonus, then a bonus-die expression; the keep transform acts afterwards on the constructed `Roll`'s authored first dice group.
 - **Under active sum/over, a rolling modifier's dice enter `roll.dice`, and therefore the `diceGroup` trigger DSL's index space.**
 Modifier terms are APPENDED, so every die the authored formula declares keeps its existing `groupId` and no working trigger changes meaning.
 A trigger whose `groupId` already DANGLED — authored against a formula that has since lost a die — used to match nothing and can now resolve against a modifier's die.
 That is accepted rather than guarded: the only available guard is a group count re-parsed from the authored formula, and `parseDiceGroups` does not agree term-for-term with `roll.dice` on every formula, so a slice would sometimes drop an AUTHORED group from trigger matching, which is a worse failure than the one it fixes.
 The trigger editor offers only the authored formula's groups, so the state is reachable only by editing a formula after authoring a trigger against it.
 - **Advantage is a question about the AUTHORED check, never about what its modifiers appended.**
-`parsePlainDiceGroups` splits on parentheses and flavour brackets alike, so `(1d20)[Modifiers]` tokenizes as a plain `1d20`; without scoping, a `2d10` check carrying a `1d20` modifier would offer Advantage it does not have and the transform would rewrite the MODIFIER's die.
-Both `hasPlainD20` and `applyD20Advantage` are therefore applied to the post-shim authored formula, and the appended terms are re-attached afterwards.
-The `[Modifiers]` label is a **fixed ASCII literal and deliberately not localized**, because `parsePlainDiceGroups` tokenizes on flavour brackets and a localized label containing a `\d*d\d+` token would be read as a phantom crit-eligible die group by the same tokenizer that backs `hasPlainD20` and `applyD20Advantage`.
+Whether keep is offered, and which group it rewrites, is decided by `findKeepGroup` on the post-shim authored formula alone (issue 2007).
+Tool terms, library terms, the deferred `playerPicks` slot, the situational bonus, a bonus-die expression and `@` substitutions can never supply or become the kept group.
+A dice-free authored formula offers no keep, even when a rolling modifier follows it.
+The `[Modifiers]` label is a **fixed ASCII literal and deliberately not localized**, because `parsePlainDiceGroups` still backs crit-eligible group parsing and a localized label containing a `\d*d\d+` token would be read as a phantom crit-eligible die group by the same tokenizer.
+- **eval == display, even through the keep transform.**
+The posted, journaled, companion and handed-off formula is the evaluated `Roll`'s formula after the keep transform and its `resetFormula()`; with no keep transform applied it is the appended string as before.
 
 Both paths build the modifier context through the one shared `buildCheckModifierContext(system, activity, subject)`, so a displayed formula cannot disagree with the rolled one on any axis the context carries.
 The `activity` argument is load-bearing: the catalogue is shared but the SELECTION is not, so a two-argument call would resolve one activity's formula against another's rule.
@@ -244,11 +279,12 @@ This is a defensive guard rather than a fix: legacy salvage tokens are normalize
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) maps crafting modes through `RunJournalBuilder.MODE_LABEL_KEYS` and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
+The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) maps crafting modes through `journalCheckText.js`'s mode label keys and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
 | `simple`              | `FABRICATE.App.Journal.Mode.Standard`            | Standard (DC)         |
+| `simple`, no DC       | `FABRICATE.App.Journal.Mode.StandardCheck`       | Standard check        |
 | `routedByIngredients` | `FABRICATE.App.Journal.Mode.RoutedByIngredients` | Routed by Ingredients |
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
@@ -259,6 +295,8 @@ The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) ma
 
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
+- Only a summed roll-high check against a DC reads "Standard (DC)": a `simple` run whose check counts successes, rolls under its target or reads a character value reads "Standard check".
+An active run reads its active check; a terminal run reads its first attempted stage's recorded product and direction and its executed target.
 - Active crafting mode labels fall back to `simple` ("Standard (DC)") for an unknown or absent resolved mode rather than emitting a raw token.
 - Terminal recipe-backed crafting mode labels MUST use the first attempted stage carrying a captured resolution mode; an absent or unrecognized captured mode yields no mode label, never a fallback inferred from current configuration.
 Recipe-less alchemy fizzle history retains its Alchemy label.
@@ -288,10 +326,10 @@ It does not extend to arbitrary external macro effects, and it does not promise 
 
 ### Modifier Placement and Pre-roll Evidence
 
-After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational and advantage contributions by source and by scalar or rolling form.
-Sum/over appends in this exact order: authored post-shim formula, numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, authored-prefix advantage rewrite and parenthesized situational bonus.
-Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
-Under sum/under the authored-prefix advantage rewrite keeps the lowest d20 and disadvantage keeps the highest, because a sum that must come in under its target benefits from the lower die.
+After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational, advantage and bought-dice contributions by source and by scalar or rolling form.
+Sum/over appends in this exact order: authored post-shim formula (its first group kept on the Roll when chosen), numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, parenthesized situational bonus, then the bonus-die expression.
+Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage and bought dice always change the pool; bought dice are a count-only scalar contribution placed after advantage.
+Under sum/under the keep transform keeps the lowest `n` of the first group for advantage and the highest for disadvantage, for any die size, because a sum that must come in under its target benefits from the lower dice.
 The plan retains fractional and negative benefits without rounding; a count check's effective pool floors, with float noise rounded away first, only after every pool benefit aggregates, and its effective threshold stays fractional or out of range without clamping.
 `targetDelta`, `thresholdDelta` and `poolDelta` are amounts to add to the effective target, per-die threshold and pool; a count/over threshold benefit is therefore stored negated and a count/under one unchanged.
 A pre-roll `destination` is one of `target`, `threshold` or `pool`.
@@ -302,11 +340,32 @@ An already evaluated dice-bearing Tool contribution keeps its scalar benefit pai
 A versioned Journal crafting check collects these Tool contributions once, from the stage's validated Tools, when the issuing GM prepares the check, and its execution places that prepared snapshot rather than evaluating the Tools again.
 Serialization failure, or reconstruction failure before the main roll posts, aborts before the main check rather than paying a bonus whose evidence was lost.
 An entitled handoff reconstructs after GM execution and reports a failed chat post without rerolling or rolling back that check.
-The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
+The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order, plus `negate: true` on a disadvantaged bonus die, whose `total` stays the unsigned roll and whose settlement subtracts it; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
 When that bundled post has no explicit roll mode, it reads the posting client's current core mode with the supported-version key (`rollMode` on V13, `messageMode` on V14); an explicit mode takes precedence.
 An entitled prepared handoff carries the already evaluated serialized pre-rolls beside its existing `serializedRoll`, and reconstruction does not reroll; secret execution exposes no formula-bearing handoff or pre-roll evidence to its requester.
 Crafting and salvage prepare their Tool contributions, and every activity places its modifiers, by the check's own normalized evaluation, so the prepared plan and the grading runner always agree.
 Under sum/under the settled `targetDelta` raises or lowers the effective target exactly once, after target resolution and any tier arithmetic, and no benefit term is appended to the rolled formula.
+
+### Advantage and Disadvantage
+
+A check's advantage rule (issue 2007; shape in `data-models/spec.md` § Check advantage record) acts only on the button the player chose, and only when its offer includes that button; any other decision rolls normally, whatever its transport — prompt, bulk `rollDecision`, companion forward or a prepared snapshot.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+| Evaluation | `keep` | `bonus` | counting |
+|---|---|---|---|
+| `sum/over` | the authored first dice group `nDS`, when it qualifies, becomes `(n+extraDice)dS kh n` (`kl n` for disadvantage) | `+ (E)` appended after the situational bonus (`- (E)` for disadvantage) | — |
+| `sum/under` | `(n+extraDice)dS kl n` for advantage, `kh n` for disadvantage | `E` pre-rolled unsigned; its total raises the target for advantage, lowers it for disadvantage | — |
+| `count/*` | — | — | `poolDelta ± countDice`, whatever `modifierDestination` says; the pool floor and `zeroPoolFails` apply after it |
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- The first group qualifies only when it is a literal plain `Die` term with an integer count of at least 1 and integer faces of at least 2, no modifiers, and an additive position in the authored formula.
+An additive position is the formula's start, a leading unary `+` included, or a place after a top-level `+`, with only positive literal numbers multiplying the group from the left and multiplying or dividing it from the right; a unary minus, a subtraction before the group, a character value as a factor, and `%` each refuse it.
+It is mutated on the constructed `Roll` — `term.number`, a pushed keep modifier, then `resetFormula()` — and never by string rewriting.
+- A modified group (`1d6x`, `2d20kh1`) is refused rather than rewritten, because Foundry applies modifiers in array order and ranks a keep by raw face, never by success or `count`, so on a modified group the better keep would follow the comparator rather than the check's direction.
+- Later groups are never rewritten when the first is refused: there is no search past the first group, and a non-qualifying first group offers no keep at all.
+- The bonus expression must match the dice-and-numbers grammar (dice and numbers joined by `+`/`-`) and be proven rollable by the maximized evaluation (`formulaRolls`), never by `Roll.validate`, which `resolution-modes/spec.md` § Check Source already forbids as an evaluate-time predicate.
+- Odds, the simulator and the "avg" reading describe the Roll button only; an advantaged or disadvantaged roll is out of scope for them.
+- A versioned check answers by the advantage rule captured at prepare time, exactly as it answers by its other prepared snapshot fields.
 
 ## Check Evaluation Foundation
 
@@ -338,10 +397,64 @@ The registered count Roll (`FabricateCountRoll`) captures a versioned, reconstru
 Routing, ranking, clamping, forcing, stepping and the minimum gate treat a higher net as better whatever the check's per-die direction; the per-die direction never reaches them.
 A routed count check's relative threshold is `required + outcome.dc`, has no Otherwise tier and applies no D3 `total − targetDelta` shift.
 A progressive count check spends `max(0, net)` as its budget; `progressiveValue` reads that clamped budget while `rollTotal` reads the raw net, so the two can resolve a trigger differently on the same roll, and a count/under progressive slot is valid.
+A progressive count check qualifies each die by its own slot's `thresholdMode`, `meet` by default, and can qualify by `exceed` exactly as a simple or routed count check can; each slot keeps its own `thresholdMode`, and a summed progressive check reads no comparison (#2067).
 Gathering's legacy progressive mode executes a `product: 'count'` evaluation through the same progressive runner as every other activity; its d100 drop roll is untouched.
 Every usability gate and the one active-check predicate, `hasActiveCheck` (a count evaluation, or the trimmed post-shim formula each resolver already computes), recognize a structured count as active with no retained formula, and a count check never enters the formula path.
-A versioned crafting or gathering descriptor privately captures `decisionPolicy.count = { die, direction, base, threshold, required, comparison, explode, cancel, zeroPoolFails, modifierDestination }`, resolved before Tool preparation, with `decisionPolicy.dc` staying null; the prepared evaluator grades from that policy and the settled placement alone and never re-resolves the pool or threshold from the live actor, and the secret projection keeps the count projection and settled placement inside the authority only.
+A versioned crafting or gathering descriptor privately captures `decisionPolicy.count = { thresholdSource, die, direction, base, threshold, required, comparison, explode, cancel, zeroPoolFails, modifierDestination }`, plus `additionalDice` (`enabled`, `source`, `path`, `readMacroUuid`, `spendMacroUuid`, `max`, `label`) only while additional dice are enabled, resolved before Tool preparation, with `decisionPolicy.dc` staying null; the prepared evaluator grades from that policy and the settled placement alone, replays its additional-dice policy without re-reading the live configuration and never re-resolves the pool or threshold from the live actor, and the secret projection keeps the count projection and settled placement inside the authority only.
 `checkResolutionEvidence` accepts an agreeing count snapshot and result, returning `{ product: 'count', direction }` only when the snapshot and the executed `data` agree and the result carries a finite `total` or `zeroPool: true`.
+
+### Additional Dice
+
+A count check whose `pool.additionalDice.enabled` is true lets the roller buy up to `limit = min(max, floor(available / rolls))` dice per roll, where `max` is an integer from 1 to 20 and each die costs one unit of the resource (issue 2008).
+While it is off, no nested field is validated or read at roll time.
+On a `sum` check the policy is inert.
+The resource is either a finite, non-negative number stored at a document path in the acting actor's `_source`, never prepared data, written with `Actor#update`, or a read/spend macro pair (`data-models/spec.md` § Additional Dice Macro Contract).
+A read macro must be free of side effects, because the authority runs it whenever it describes a prepared count check with additional dice enabled.
+The budget is read only for an interactive decision or for a request or pre-resolved decision naming a non-zero count.
+A pre-resolved decision of 0, or a non-interactive call that omits the choice, reads no budget and runs no read macro, so on a prepared check the describe-time read is the only one.
+Additional dice are unavailable, with a stated reason, before the prompt opens when:
+
+- the source is missing (`sourceMissing`);
+- the stored value is absent, not a number (a numeric string included) or negative (`resourceUnreadable`);
+- an active effect overrides the path (`resourceOverridden`);
+- the acting user cannot update the actor (`resourceNotWritable`);
+- the read macro is not a script macro, throws or returns no amount (`resourceMacroFailed`); or
+- a companion request arrived on a `broadcast` call site (`broadcastCallSite`).
+
+The check still rolls without them, and only a non-zero choice refuses.
+A choice refuses `notOffered`, `choiceInvalid`, its unavailable reason or `choiceAboveLimit`, and a spend refuses `resourceChanged`, `spendRefused` or `spendUnconfirmed`; a value is never clamped.
+Those twelve reasons are one closed, exported list, `ADDITIONAL_DICE_REFUSALS`, whose first six are the unavailable reasons.
+A pre-resolved decision, a bulk row's or a prepared check's, is validated against a fresh read of the resource.
+Bought dice always add to the pool, whatever `modifierDestination` says.
+They settle with every other pool change, so the pool floor, `zeroPoolFails` and the 999-die limit apply to the total, dice bought below the one-die floor add nothing, and one count Roll carries them.
+They are not modifiers, and the pool's modifier terms never include them.
+An attempt is unreachable when, even with `limit` bought dice and every pending rolled contribution at its most favourable value, its pool is still a zero pool, or its dice times the most one die can contribute (0, 1, 2 with explode once, unbounded with a recursive explode) is below the needed count.
+
+- The needed count is the graded required count on a simple check, and the lowest succeeding tier's threshold on a routed check: 0 when a clamped relative check's lowest tier succeeds, and none when no tier succeeds.
+- A progressive check has none, so only its zero-pool limb applies.
+- Neither limb holds for a pending rolled contribution whose most favourable value cannot be computed purely.
+- A Tool bonus is rolled when the check is prepared, so the pool already carries its total; a rolled Tool contribution handed to the check runner unsettled is a pending rolled contribution, so it never makes unreachable an attempt that could succeed.
+- Each offered advantage action is its own attempt, including its count advantage dice.
+
+The shortfall is the fewest bought dice whose settled pool is no zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
+The interactive prompt disables an action whose attempt is unreachable unless the check has a trigger that can fire in count mode and forces success or, on a routed check, steps or targets a tier.
+A zero-pool attempt has no such rescue.
+A secret or unentitled prompt never disables an action and never shows the needed count.
+A progressive check and a prepared routed prompt never judge or show the needed count, but still disable an action whose pool stays at zero.
+A prompt learns all of this from its offer, `additionalDiceOffer = { available, limit, max, resourceLabel, unavailable, reach }`, allowlisted by `publicAdditionalDiceOffer` and carrying no path or macro UUID; `reach` (`{ needed, perDieMost, explode, rescued }`) is `null` for a secret or unentitled prompt, whose pool is redacted, and `reach.needed` is `null` for a progressive check and a prepared routed prompt.
+Non-interactive callers are not blocked.
+The cost is spent once per roll, immediately before that roll's main dice and after every refusal decidable without them, pre-roll refusals and `pool-too-large` included.
+A pool still at zero after bought dice fails as a zero pool and spends nothing.
+A path spend re-reads the stored value inside the spend and succeeds only when the update is acknowledged and the stored value fell by exactly the cost.
+A refused choice or spend aborts that roll with the dismissed-prompt zero-mutation result plus its reason, and a timed FINISH stays resumable.
+Spent resource is never refunded, whatever happens after the spend, a main Roll that throws or a stage that refuses after a GM-evaluated check included.
+Any throw after a successful spend, building or evaluating the count Roll included, keeps the spend and records `data.boughtDice` on the result.
+Spends on one client are serialized: a path spend per actor and path, and a macro spend by its spend-macro UUID alone, so one macro spending for two actors runs one spend at a time.
+Across clients a path spend is not atomic, because Foundry has no compare-and-set.
+One bulk choice buys the same number for every roll it covers, offered only while those rolls share one actor and one resource, and spends per roll.
+Each bulk footer action is disabled only when every roll the batch rolls would be disabled under it on its own prompt; a roll with no additional dice, or one whose pool a Check Modifier or a Tool could move, keeps every action enabled, and a routed roll is judged by its zero-pool limb alone.
+When a spend fails mid-batch, a roll's fresh read no longer affords the choice, or the resource becomes unavailable (`resourceUnreadable`, `resourceOverridden`, `resourceNotWritable` or `resourceMacroFailed`), the batch stops, its remaining rolls are skipped as `resourceExhausted`, and rolls already made stand; the row that stopped it carries its refusal and notice facts, and the batch names an unavailable reason once.
+The Checks Studio simulator places simulated bought dice through the same contribution, reading and spending nothing.
 
 ### Check Target Resolution
 
@@ -361,7 +474,7 @@ The reason names therefore differ by mode for a boolean or plain object, which t
 A target that cannot resolve is a **target refusal**, one of `expression-missing`, `unresolved-path`, `non-finite`, `dice`, `invalid`, `adjustment-invalid`, `progressive-under` and `formula-empty`.
 The refusal is answered before any Fabricate-controlled roll, Tool roll, spend or award, through the misconfigured channel (`success: false, misconfigured: true`) with `data.targetRefusal` set to the reason.
 Its message is a localized sentence naming the activity, such as "Crafting check cannot roll: the character value its target reads was not found.", and never the raw reason code.
-A versioned crafting or gathering descriptor refuses by throwing its lifecycle error with code `CHECK_TARGET_INVALID` and mutates nothing.
+A versioned crafting or gathering descriptor refuses by throwing its lifecycle error with code `CHECK_TARGET_INVALID` and mutates nothing, and the run authority answers it as `roll-unavailable` with the refusal sentence as its message (#2139).
 Only a check that reads a target validates one: a progressive check and a fixed-range routed check read no target, so their target source is inert and never refuses.
 An empty formula under sum/under refuses `formula-empty` rather than grading a total of 0 as a pass.
 
@@ -398,10 +511,18 @@ Versioned player checks use an authenticated prepare/resolve exchange: the playe
 The private prepared descriptor captures the JSON-safe modifier context with actor expression substitutions and the full permitted player choice before the prompt; the public projection carries only the already-applied display entries or deferred choice display, never the private catalogue or evaluation policy.
 The shared resolver supplies both the displayed static contribution and the contribution later appended to the authoritative roll, so a library or actor-data edit after preparation cannot change it.
 Only a simple pass/fail check projects a finite single target, its normalized meet-or-exceed comparison and its direction (`over` or `under`) to the public Journal prompt; routed and progressive classification inputs stay private.
+Every public prompt — the versioned crafting and gathering descriptors, the ordinary prompt input, the prepared Journal stage prompt and the unentitled public prompt allowlist — carries `offerSituationalBonus` as its own boolean beside `allowsSituationalModifier`, read from the prepared check and never folded into that authority gate; the prepared `decisionPolicy` is unchanged.
+Prompts, descriptors, result boxes and chat cards read one immutable display projection (`src/ui/presenters/checkDisplay.js`) rebuilt from an allowlist: the product and direction, the effective target, the comparison, the permitted source terms, where a modifier lands, the executed evidence and the executed visibility, and never the evaluation record, a policy or a path beyond the executed evidence `data-models/spec.md` § CraftingRunStepState requirement 5 records.
+A forced or stepped outcome keeps the target and comparison of the tier the roll matched, so its evidence names the threshold the dice were graded against rather than the tier the trigger chose.
 Initial secret prompts MUST omit protected subject, artwork, formula, DC and modifier details before transport.
 A secret check classifies inside the authority with its full settled modifier placement, so a sum/under `targetDelta` still moves its target, while the answer returned to the requester carries no placement, pre-roll evidence, formula or roll handoff.
 Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
 Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.
+A prepared count check snapshots its additional-dice policy at prepare time (issue 2008).
+The authority reads the budget for the attested sender and publishes only an allowlisted offer of numbers, a reason and the resource name, never a path or macro UUID; an unentitled or secret offer carries no reachability, and only an entitled simple check's offer carries the needed count.
+It validates the player's choice against that offer and a fresh read, and spends on its own client after the active-authority check, inside request replay deduplication, so a replayed settled request never spends again.
+Releasing a prepared check spends nothing.
+A refused choice or spend answers `additional-dice-refused` with its reason, and a non-success reply after a non-zero spend carries `boughtDice`, so the initiating client can state what was spent.
 
 ## Simple Mode
 
@@ -473,7 +594,9 @@ The clamp is relative-only; **fixed** tiers keep the "outside every range → no
 Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges and the roll total is matched by range, so the check DC and the meet/exceed `thresholdMode` comparison are unused in fixed mode — DC and the comparison are relative-only.
 A fixed-range check therefore reads no target, and its target source is inert: runtime never resolves or refuses it.
 Under sum/under the matched value is `total − targetDelta` against the inclusive ranges, so a benefit shifts the match toward the better, lower end; `data.total` stays raw and no threshold or margin is invented, and sum/over fixed ranges still match the raw total.
-A matched value that is not a whole number falls between two inclusive integer ranges and matches none, so a fractional appended scalar over, or a fractional `targetDelta` under, can leave the attempt rolled but unrouted; how such a value maps to a range awaits a ruling (#2059).
+The matched value floors before matching, in both directions, so a whole-number range `start`–`end` covers `[start, end + 1)`: a fractional appended scalar over, or a fractional `targetDelta` under, routes to the range its whole part lands in, as targets floor (#2059).
+A sum/over total of 10.5 therefore routes to 1–10, and under a `targetDelta` of 1.5 a total of 12 matches 10.5, which floors to 10 and routes to 1–10.
+Adjacent whole-number ranges therefore leave no fractional hole, so every value inside the span of a set readiness reports gap-free routes to a tier.
 **A fixed tier set MUST leave no GAP inside its own span**, and a set that does is the BLOCKING readiness issue `rangeGap` (`critical`), alongside the `rangeInvalid` and `rangeOverlap` its two siblings raise.
 A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, Rough 11–17, with 10 claimed by nobody — and it is reachable by ordinary authoring: edit one boundary and stop.
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.

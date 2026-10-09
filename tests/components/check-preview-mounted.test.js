@@ -10,6 +10,7 @@ import {
   CHECKS_TREE_COMPILED_MODULES,
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
+import { installCountDice } from '../helpers/countEngineDice.js';
 // The three record controls are driven by open-then-click on a portaled panel (issue 1510).
 import {
   assertSelectHasResolvedName,
@@ -266,9 +267,9 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
 
   it('rolls through the studio BUTTON PRIMITIVE, not a hand-written class string', async () => {
     // Reported as "the roll button does not match the studio's button". The cause is not a
-    // missing rule: `manager-button is-primary` matches no rule stating a type size, so the
+    // missing rule: `fabricate-button is-primary` matches no rule stating a type size, so the
     // label took Foundry's 14px app base while every converted button in the studio read at
-    // the primitive's 11.52px. `fab-manager-button` is what `ManagerButton` emits and is the
+    // the primitive's 11.52px. `fab-manager-button` is what `Button` emits and is the
     // only class the type-scale rule keys on, so its presence IS the conversion.
     const root = await mountChecks();
     const roll = root.querySelector('[data-checks-simulator-roll]');
@@ -276,7 +277,7 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
     assert.equal(roll.querySelectorAll('button').length, 0, 'and nests none');
     assert.ok(
       roll.classList.contains('fab-manager-button'),
-      'the roll action renders through ManagerButton'
+      'the roll action renders through Button'
     );
     assert.ok(roll.classList.contains('is-primary'), 'in the primary role it always had');
     assert.ok(
@@ -397,10 +398,10 @@ describe('the outcome-preview readout', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 12 · +0', 'margin'],
-      card: ['success', 'Success', 'Counts as a success · result group bound to this tier'],
+      card: ['success', 'Success', 'Counts as a success · result set bound to this tier'],
       note: null,
       rows: [
-        ['result-group', 'Result group produced', 'Success'],
+        ['result-group', 'Result set produced', 'Success'],
         ['ingredients', 'Ingredients consumed', 'as listed'],
       ],
     });
@@ -676,10 +677,13 @@ describe('the odds histogram', () => {
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    const bars = [...root.querySelectorAll('[data-checks-odds-bar]')];
+    const bars = [...root.querySelectorAll('[data-banded-bar-track]')];
     assert.ok(bars.length > 0, 'there are bars');
     for (const bar of bars) {
       assert.ok(bar.classList.contains('fab-fill-bar'), 'each bar IS the shared primitive');
+      // A histogram's tracks are hidden; its names and percentages are not (issue 1782).
+      assert.equal(bar.getAttribute('aria-hidden'), 'true', 'the track is decorative');
+      assert.ok(!bar.closest('[role="meter"]'), 'several rows are not a meter');
       const fill = bar.querySelector('.fab-fill-bar-fill');
       assert.ok(Boolean(fill), 'with the primitive’s own fill element');
       assert.ok(
@@ -791,8 +795,8 @@ describe('the modifier context reaches the derivations that DESCRIBE the roll', 
     const percents = async (props) => {
       const root = await mountChecks(props);
       await choosePreviewActor(root, 'sera');
-      return [...root.querySelectorAll('[data-checks-odds-percent]')].map(
-        (cell) => `${cell.getAttribute('data-checks-odds-percent')}:${cell.textContent.trim()}`
+      return [...root.querySelectorAll('[data-banded-bar-percent]')].map(
+        (cell) => `${cell.getAttribute('data-banded-bar-percent')}:${cell.textContent.trim()}`
       );
     };
     const without = await percents();
@@ -855,9 +859,9 @@ describe('the progressive PREVIEW SANDBOX', () => {
     // `1d20 + @prof` for Sera is `1d20 + 3`.
     const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
     await choosePreviewActor(root, 'sera');
-    const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
-      row.getAttribute('data-checks-odds-row'),
-      row.querySelector('[data-checks-odds-percent]').textContent.trim(),
+    const rows = [...root.querySelectorAll('[data-banded-bar-row]')].map((row) => [
+      row.getAttribute('data-banded-bar-row'),
+      row.querySelector('[data-banded-bar-percent]').textContent.trim(),
     ]);
     assert.deepEqual(rows, [
       ['award-0', '10%'],
@@ -865,7 +869,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
       ['award-2', '45%'],
     ]);
     assert.equal(
-      root.querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label').textContent
+      root.querySelector('[data-banded-bar-row="award-0"] .fab-banded-bar-name').textContent
         .trim(),
       '0 of 4',
       'an award of nothing is a real outcome and IS listed, out of the authored four'
@@ -951,8 +955,8 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
     assert.equal(odds(root).dataset.checksOddsDirection, 'under');
     assert.deepEqual(
-      [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
-        cell.dataset.checksOddsPercent,
+      [...root.querySelectorAll('[data-banded-bar-percent]')].map((cell) => [
+        cell.dataset.bandedBarPercent,
         cell.textContent.trim(),
       ]),
       [
@@ -977,9 +981,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw · Sera Vane',
       total: '9',
       line: ['target 12 · margin +3', 'margin'],
-      card: ['success', 'Regular', 'The recipe’s result group is produced'],
+      card: ['success', 'Regular', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Regular']],
+      rows: [['result-group', 'Result set produced', 'Regular']],
     });
 
     await choosePreviewActor(root, 'no-actor');
@@ -1079,9 +1083,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw',
       total: '9',
       line: ['target 10 · margin +1', 'margin'],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Success']],
+      rows: [['result-group', 'Result set produced', 'Success']],
     });
     assert.equal(root.querySelector('[data-checks-simulator-target]').dataset.checksSimulatorTarget, '10');
   });
@@ -1107,7 +1111,7 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       'the prototype’s exact heading, never "all 0 faces"'
     );
     // P(d20 <= 10 + d4) = 50 / 80.
-    assert.equal(root.querySelector('[data-checks-odds-percent="success"]').textContent.trim(), '62.5%');
+    assert.equal(root.querySelector('[data-banded-bar-percent="success"]').textContent.trim(), '62.5%');
   });
 
   it('never publishes a result rolled before its inputs changed', async () => {
@@ -1160,7 +1164,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       .map((rule) => rule.style.getPropertyValue(property))
       .filter(Boolean);
   const SUCCESS_ROWS = [
-    ['result-group', 'Result group produced', 'full'],
+    ['result-group', 'Result set produced', 'full'],
     ['ingredients', 'Ingredients consumed', 'as listed'],
   ];
   const withTriggers = (check, triggers) => ({ ...check, checkBreakage: { triggers } });
@@ -1179,7 +1183,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 10', ''],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: null,
       rows: SUCCESS_ROWS,
     });
@@ -1281,7 +1285,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(root);
     assert.deepEqual([readout.line, readout.card, readout.rows], [
       ['vs DC 16 · −4', 'margin'],
-      ['failure', 'Flawed', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Flawed', 'Counts as a failure · result set bound to this tier'],
       [['failure-result', 'Failure result if this gathering task defines one', 'per gathering task']],
     ]);
     harness.remount();
@@ -1361,7 +1365,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [stepTrigger('down', 2)]) })
     );
     assert.deepEqual([down.card, down.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['trigger', 'Trigger fired — the result steps down 2 tiers.'],
     ]);
   });
@@ -1371,7 +1375,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await simple(withTriggers({ ...SIMPLE_CHECK, dc: 15 }, [forceTrigger('success')]))
     );
     assert.deepEqual([rescued.card, rescued.note, rescued.rows], [
-      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['success', 'Success', 'The recipe’s result set is produced'],
       ['forced', 'Trigger fired — automatic success.'],
       SUCCESS_ROWS,
     ]);
@@ -1385,7 +1389,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [forceTrigger('failure')]) })
     );
     assert.deepEqual([forced.card, forced.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['forced', 'Trigger fired — forced to the worst failing tier.'],
     ]);
   });
@@ -1403,8 +1407,8 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(await mountChecks({ craftingCheck: fixed }));
     assert.deepEqual([readout.line, readout.card, readout.rows[0]], [
       ['in the 10–14 band', ''],
-      ['success', 'Mid', 'Counts as a success · result group bound to this tier'],
-      ['result-group', 'Result group produced', 'Mid'],
+      ['success', 'Mid', 'Counts as a success · result set bound to this tier'],
+      ['result-group', 'Result set produced', 'Mid'],
     ]);
   });
 
@@ -1499,9 +1503,9 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
         breakdown: '9 · raw · Sera Vane',
         total: '9',
         line: ['target 12 · margin +3', 'margin'],
-        card: ['success', 'Success', 'The recipe’s result group is produced'],
+        card: ['success', 'Success', 'The recipe’s result set is produced'],
         note: MARGIN_NOTES.under,
-        rows: [['result-group', 'Result group produced', 'Success']],
+        rows: [['result-group', 'Result set produced', 'Success']],
       });
     });
 
@@ -1533,13 +1537,179 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
   });
 });
 
+describe('the Preview’s additional-dice stepper (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+  const calls = { updates: [], macros: [] };
+  const balance = (id, name, resources = {}) => ({
+    id,
+    name,
+    type: 'character',
+    _source: { system: { resources } },
+    overrides: {},
+    getRollData: () => ({}),
+    update: async (change) => {
+      calls.updates.push(change);
+    },
+  });
+  const ACTORS = [balance('sera', 'Sera Vane', { momentum: { value: 2 } }),
+    balance('bare', 'Bare Hands'),
+  ];
+  const paid = (rule = {}) => ({
+    rollFormula: '',
+    dc: 10,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    evaluation: {
+      product: 'count',
+      direction: 'over',
+      pool: {
+        die: 10,
+        base: '2',
+        threshold: '8',
+        required: 1,
+        additionalDice: { enabled: true, source: 'path', path: PATH, max: 3, label: 'Momentum', ...rule },
+      },
+    },
+    checkBreakage: { triggers: [] },
+    tiers: [],
+  });
+  const MACROS = { source: 'macro', readMacroUuid: 'Macro.read', spendMacroUuid: 'Macro.spend' };
+  const saved = {};
+  let dice = null;
+
+  before(() => {
+    Object.assign(saved, { actors: globalThis.game.actors, foundry: globalThis.foundry });
+    Object.assign(saved, { fromUuid: globalThis.fromUuid });
+    Object.assign(globalThis.game, {
+      actors: { contents: ACTORS, get: (id) => ACTORS.find((a) => a.id === id) },
+    });
+    const getProperty = (object, key) => key.split('.').reduce((node, part) => node?.[part], object);
+    const hasProperty = (object, key) => getProperty(object, key) !== undefined;
+    // The drop zones resolve the macros' names; only a RUN executes the command, which records it.
+    const run = (uuid) => `globalThis.previewMacroRuns.push('${uuid}'); return 9;`;
+    Object.assign(globalThis, {
+      foundry: { utils: { getProperty, hasProperty } },
+      previewMacroRuns: calls.macros,
+      fromUuid: async (uuid) => ({ name: uuid, type: 'script', command: run(uuid) }),
+    });
+  });
+  after(() => {
+    Object.assign(globalThis.game, { actors: saved.actors });
+    Object.assign(globalThis, { foundry: saved.foundry, fromUuid: saved.fromUuid });
+    delete globalThis.previewMacroRuns;
+  });
+  afterEach(() => {
+    dice?.restore();
+    dice = null;
+    calls.updates.length = 0;
+    calls.macros.length = 0;
+  });
+
+  const field = (root) => root.querySelector('[data-checks-preview-additional-dice-field]');
+  const input = (root) => root.querySelector('input[data-checks-preview-additional-dice]');
+  const note = (root) => root.querySelector('[data-checks-preview-additional-dice-note]');
+  const tileMarks = (root) =>
+    [...root.querySelectorAll('[data-checks-simulator-face]')].map(
+      (tile) => tile.dataset.checksSimulatorFaceMarks
+    );
+
+  async function mountPaid(rule = {}) {
+    return mountChecks({ resolutionMode: 'simple', craftingCheckSimple: paid(rule) });
+  }
+
+  async function step(root, times) {
+    for (let index = 0; index < times; index += 1) {
+      field(root).querySelector('[data-stepper-increment]').click();
+      await settle();
+    }
+  }
+
+  async function rollFaces(root, faces) {
+    dice = installCountDice({ faces, chat: false });
+    await rollAndSettle(root);
+  }
+
+  it('captions a stepper above Roll, bounded by the Preview-as actor’s stored balance', async () => {
+    const root = await mountPaid();
+    await settle();
+    assert.equal(note(root).textContent.trim(), 'Choose a character to see how many they can add.');
+    assert.ok(input(root).disabled, 'no Preview-as actor, so nothing can be added');
+    await choosePreviewActor(root, 'sera');
+    const caption = field(root).querySelector('.manager-checks-simulator-extra-title');
+    assert.equal(caption.textContent.trim(), 'Additional dice', 'a visible caption names it');
+    assert.equal(input(root).getAttribute('aria-label'), 'Additional dice');
+    assert.equal(input(root).getAttribute('aria-describedby'), note(root).id);
+    assert.deepEqual(
+      [input(root).value, input(root).getAttribute('max'), note(root).dataset.checksPreviewAdditionalDiceNote],
+      ['0', '2', 'path']
+    );
+    assert.equal(note(root).textContent.trim(), 'Up to 2 for Sera Vane (Momentum 2, at most 3 per roll).');
+    const roll = root.querySelector('[data-checks-simulator-roll]');
+    assert.ok(field(root).compareDocumentPosition(roll) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('rolls the stepped dice as bought tiles, the odds, the inset and the balance unchanged', async () => {
+    const root = await mountPaid();
+    await choosePreviewActor(root, 'sera');
+    const readings = () => [
+      root.querySelector('[data-checks-odds-state]').textContent,
+      root.querySelector('[data-check-count-composed]')?.textContent ?? '',
+    ];
+    const before = readings();
+    await step(root, 1);
+    assert.equal(input(root).value, '1');
+    assert.deepEqual(readings(), before, 'the odds and the inset read the base pool alone');
+    await rollFaces(root, [9, 3, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', '', 'qualified bought']);
+    assert.match(root.querySelector('[data-checks-simulator-legend]').textContent, /dashed\u{A0}=\u{A0}bought/u);
+    assert.deepEqual([calls.updates, calls.macros], [[], []], 'the preview reads and spends nothing');
+  });
+
+  it('clamps a count left above a lowered bound, so it is never rolled', async () => {
+    const root = await mountPaid();
+    await choosePreviewActor(root, 'sera');
+    await step(root, 2);
+    assert.equal(input(root).value, '2');
+    await choosePreviewActor(root, 'bare');
+    assert.equal(input(root).value, '0');
+    assert.equal(
+      note(root).textContent.trim(),
+      `Bare Hands has no stored number at ${PATH}, so no dice can be added.`
+    );
+    await rollFaces(root, [9, 3, 8, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', ''], 'the base pool alone rolls');
+  });
+
+  it('bounds a macro source by its most per roll, running neither macro', async () => {
+    const root = await mountPaid({ ...MACROS, max: 2 });
+    await settle();
+    assert.equal(
+      note(root).textContent.trim(),
+      'The preview never runs the read macro, so up to 2 can be added here.'
+    );
+    await step(root, 3);
+    assert.equal(input(root).value, '2');
+    await rollFaces(root, [9, 3, 8, 2]);
+    assert.deepEqual(tileMarks(root), ['qualified', '', 'qualified bought', 'bought']);
+    assert.deepEqual([calls.updates, calls.macros], [[], []]);
+  });
+
+  it('offers no stepper while the check allows no additional dice', async () => {
+    const root = await mountPaid({ enabled: false });
+    await choosePreviewActor(root, 'sera');
+    assert.ok(!field(root), 'no stepper');
+    await rollFaces(root, [9, 3, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', '']);
+  });
+});
+
 describe('the source contract these hooks are pinned by', () => {
   it('keeps the panels on the shared primitives the spec names', () => {
     const odds = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte'),
       'utf8'
     );
-    assert.match(odds, /FillBar from '\.\.\/\.\.\/\.\.\/components\/FillBar\.svelte'/);
+    assert.match(odds, /BandedBar from '\.\.\/\.\.\/\.\.\/components\/BandedBar\.svelte'/);
     const preview = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte'),
       'utf8'

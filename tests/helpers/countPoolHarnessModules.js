@@ -1,0 +1,53 @@
+import { LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
+
+/** The counting pool's closure (issue 2006), for a suite mounting the Formula card on its own. */
+export const COUNT_POOL_RAW_MODULES = Object.freeze([
+  ...LOCALIZE_OR_RAW_MODULES,
+  'src/ui/svelte/components/stepperLabels.js',
+  'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/overlayHost.js',
+  'src/ui/svelte/util/overlayBounds.js',
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/systems/checkEvaluation.js',
+  'src/systems/checkTarget.js',
+  'src/systems/countEvaluation.js',
+  'src/utils/localizeWithFallback.js',
+  'src/utils/scalars.js',
+  'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
+  'src/ui/svelte/apps/manager/checks/countInsetModel.js',
+  'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  // The pool's additional-dice group and its macro wells (issue 2008).
+  'src/ui/svelte/actions/dragDrop.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/model/macroReference.js',
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
+]);
+
+export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Well.svelte',
+]);

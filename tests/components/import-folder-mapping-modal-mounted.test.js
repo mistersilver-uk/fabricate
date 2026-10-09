@@ -56,10 +56,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     // The shared modal chrome (issue 877): portal, centring, title/subtitle.
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/Modal.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
   ],
@@ -224,7 +224,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(commitButton().disabled, true);
   });
 
-  // The close control now belongs to the shared ManagerModal chrome (issue 877).
+  // The close control now belongs to the shared Modal chrome (issue 877).
   it('calls onClose from the shared modal close button', async () => {
     let closed = 0;
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose: () => (closed += 1) });
@@ -233,13 +233,13 @@ describe('ImportFolderMappingModal (mounted)', () => {
   });
 
   // The smoke harness pins `[data-import-mapping]` on the dialog ROOT; the root is now
-  // rendered by ManagerModal, so the hook survives only via its `rootAttributes` prop.
+  // rendered by Modal, so the hook survives only via its `dialogProps` prop.
   it('keeps the mapping automation hook on the shared modal root', async () => {
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
     const root = dialog();
     assert.ok(root, 'expected the dialog root');
     assert.ok(root.hasAttribute('data-manager-modal'), 'renders through the shared chrome');
-    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    // Maintainer rulings 2026-09-28: Modal draws one frame, the library's banded Modal.
     assert.ok(root.querySelector('.manager-modal-body > [data-import-mapping-match]'), 'in a padded body');
     const close = document.querySelector('[data-manager-modal-close]');
     assert.ok(close.classList.contains('is-size-26'), 'with the banded frame’s 26px close');

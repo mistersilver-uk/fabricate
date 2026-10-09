@@ -4,7 +4,7 @@
   create — a category and tags per folder, or skip one. Match-by-name is ON by default and pre-fills
   each row; the primary `Import N items` commits, and its count updates live as folders are skipped.
 
-  The dialog chrome comes from the shared `ManagerModal` primitive (issue 877), so this modal and
+  The dialog chrome comes from the shared `Modal` primitive (issue 877), so this modal and
   the post-import reference report are ONE implementation of "manager modal dialog"; this file owns
   only the mapping body, and each row mirrors the compact `RecipeRoutingAssignment` +
   `SearchablePopover` "assign X per Y" pattern.
@@ -15,8 +15,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../model/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from './ManagerModal.svelte';
+  import Button from '../../components/Button.svelte';
+  import Modal from '../../components/Modal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import Select from '../../components/Select.svelte';
@@ -230,7 +230,7 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={text('FABRICATE.Admin.Items.ImportMapping.Title', 'Categorize imported folders')}
   subtitle={text(
@@ -238,7 +238,7 @@
     'Assign a category and tags to each detected folder, or skip it.'
   )}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-  rootAttributes={{ 'data-import-mapping': '' }}
+  dialogProps={{ 'data-import-mapping': '' }}
   {onClose}
 >
   {#snippet body()}
@@ -246,7 +246,7 @@
          Foundry's default control chrome. -->
     <label class="manager-import-mapping-match" data-import-mapping-match>
       <SelectionCheckbox
-        size="sm"
+        density="compact"
         wrapper="contents"
         bind:input={matchToggle}
         checked={matchByName}
@@ -284,7 +284,7 @@
             >
               {itemCountLabel(row.group.itemCount)}
             </Chip>
-            <ManagerButton
+            <Button
               class={`is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
               data-import-mapping-skip
               aria-pressed={row.state.skipped}
@@ -297,7 +297,7 @@
                   ? text('FABRICATE.Admin.Items.ImportMapping.Unskip', 'Include')
                   : text('FABRICATE.Admin.Items.ImportMapping.Skip', 'Skip')}
               </span>
-            </ManagerButton>
+            </Button>
           </div>
 
           {#if !row.state.skipped}
@@ -315,11 +315,11 @@
                   options={categorySelectOptions}
                   showTick={false}
                   ariaLabelledBy={categoryCaptionId(row.index)}
-                  triggerData={{ 'data-import-mapping-category': '' }}
+                  triggerProps={{ 'data-import-mapping-category': '' }}
                   onChange={(next) => setCategory(row.index, next)}
                 />
               </Field>
-              <ManagerButton
+              <Button
                 class="is-subtle manager-import-mapping-new-category"
                 data-import-mapping-new-category
                 onclick={() =>
@@ -327,7 +327,7 @@
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
-              </ManagerButton>
+              </Button>
 
               <RecipeRoutingAssignment
                 options={tagOptionsFor(row.state)}
@@ -385,55 +385,50 @@
   {/snippet}
 
   {#snippet footer()}
-    <ManagerButton data-import-mapping-cancel onclick={() => onClose()}>
+    <Button data-import-mapping-cancel onclick={() => onClose()}>
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-    </ManagerButton>
-    <ManagerButton
-      role="primary"
-      data-import-mapping-commit
-      disabled={importDisabled}
-      onclick={commit}
-    >
+    </Button>
+    <Button role="primary" data-import-mapping-commit disabled={importDisabled} onclick={commit}>
       <i class="fas fa-file-import" aria-hidden="true"></i>
       <span>
         {commitLabel(importCount)}
       </span>
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   /* One control scale for the whole dialog (issue 772): it is dense, and it sits between surfaces
-     that read at `--fab-recipe-control-font`, so the manager's default body size made it both the
-     largest type on screen and the one with the least room for it. */
+     that read at `--fab-manager-recipe-control-font`, so the manager's default body size made it
+     both the largest type on screen and the one with the least room for it. */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     color: var(--fab-text-secondary);
   }
 
   /* The row's inline actions are secondary to the dialog's Cancel and Import, which keep the
      default 34px so the commit action stays the heaviest thing in the footer.
-
      RE-CHAINED, and split in two, at the conversion (issue 1118). `:global()` is load-bearing: the
      row carries this component's hash and the buttons inside it do not. At (0,3,0) this rule TIED
      the primitive's own compound and kept its 28px only on injection order, so naming that class
      takes it to (0,4,0). The SECOND selector is the half a plain re-chain would have broken: the
      "Add tag" control is a `SearchablePopover` trigger from a `triggerClass` STRING and will never
      carry `fab-manager-button`, so it is named by its own trigger class instead. */
-  .manager-import-mapping-row :global(.manager-button.fab-manager-button),
-  .manager-import-mapping-row :global(.manager-button.manager-recipe-routing-add-trigger) {
+  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button),
+  .manager-import-mapping-row :global(.fabricate-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
+    border-radius: 7px;
     padding: 0 var(--fab-space-2);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
      (0,4,0) and is settled by injection order, so the row's compact padding is restated one class
      higher. Only `padding`: the other two are uncontested. */
-  .manager-import-mapping-row :global(.manager-button.fab-manager-button.is-primary) {
+  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button.is-primary) {
     padding: 0 var(--fab-space-2);
   }
 
@@ -452,7 +447,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -473,12 +468,12 @@
     min-width: 0;
     flex: 1;
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* The field labels read as the bulk rail's micro-labels rather than as body text: the two
      surfaces caption the same vocabulary and sat at two different scales. */
-  .manager-import-mapping-controls :global(.manager-field > span) {
+  .manager-import-mapping-controls :global(.fabricate-field > span) {
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -502,7 +497,7 @@
   /* ONE RULE, ON THE TRIGGER (issue 1510), where this was two blocks with the identical selector,
      both element-typed against a `<select>` this row no longer renders — an element-typed leg in a
      scoped block dies SILENTLY on conversion and no gate sees it. `:global(...)` chained with
-     `.manager-field`, because a scoped rule cannot reach a class handed to a child, and the
+     `.fabricate-field`, because a scoped rule cannot reach a class handed to a child, and the
      compound restores the (0,2,0) the scoped form had.
 
      THE FLOOR IS WHAT KEEPS THE ROW STILL: the controls row is `flex-wrap` with
@@ -514,9 +509,9 @@
      cannot help while the trigger is the floor and the categories are world-authored. No View Lab
      case can photograph it — the modal opens only on a drop — so
      `tests/components/manager-select-conversion-rendered.test.js` measures it. */
-  :global(.manager-field.manager-import-mapping-category .fabricate-select-trigger) {
+  :global(.fabricate-field.manager-import-mapping-category .fabricate-select-trigger) {
     min-width: 140px;
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* The real control is 1px and transparent, so the ring is drawn on the visible box.

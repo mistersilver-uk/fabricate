@@ -8,6 +8,7 @@
  */
 
 import { playerStageOrder, storedOrderFor } from '../../../utils/progressiveResultOrder.js';
+import { notifyBulkAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 import { yieldKeyOf, yieldRowsFor } from '../util/salvageYieldRows.js';
 
 // The bulk-selection bound (issue 859), applied here at SELECTION level so both
@@ -554,9 +555,8 @@ export function createBulkActions({
    * consumed row from the listing, and the report must survive that drop.
    * Iteration/report order is the snapshot's own name-sorted order.
    *
-   * @returns {Promise<object>} The facade's own result shape, or `{cancelled:
-   *   true}` on a pre-flight abort (already running, nothing queued, or a
-   *   rejected order flush).
+   * @returns {Promise<object>} The facade's own result shape, or `{cancelled: true}` on a
+   *   pre-flight abort (already running, nothing queued, or a rejected order flush).
    */
   async function bulkSalvage() {
     if (busy) return { cancelled: true };
@@ -576,6 +576,7 @@ export function createBulkActions({
       invoke: (options) => services?.salvageComponents?.({ ...options, interactive: true }),
     });
     if (outcome.failed) return { cancelled: false, items: [], error: outcome.message };
+    notifyBulkAdditionalDice(outcome.result, services, snapshot[0]?.actorName);
     return outcome.result ?? { cancelled: true, items: [] };
   }
 

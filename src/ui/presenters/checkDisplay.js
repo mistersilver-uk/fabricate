@@ -1,10 +1,13 @@
 /**
- * The one display projection of a summed check (issue 2005): immutable plain data rebuilt from an
- * allowlist, which the prompt, the descriptor, the result box and the chat cards read. It carries
- * no evaluation record, path or policy; executed evidence alone names the recorded typed formula,
- * character and tier labels. Actor reads and target resolution stay with their adapters.
+ * The one display projection of a check (issues 2005 and 2006): immutable plain data rebuilt from
+ * an allowlist, which the prompt, the descriptor, the result box and the chat cards read. It
+ * carries no evaluation record, path or policy; executed evidence alone names the recorded typed
+ * formula, character and tier labels. Actor reads and target resolution stay with their adapters.
  */
+import { preRollBenefit } from '../../systems/checkModifierRouter.js';
 import { numberOrNull } from '../../utils/scalars.js';
+
+import { tileModel } from './countDiceTiles.js';
 
 const TERM_KINDS = Object.freeze(['anchor', 'adjustment', 'multiplier', 'benefit']);
 const TERM_SOURCES = Object.freeze(['tool', 'library', 'situational', 'advantage']);
@@ -54,7 +57,7 @@ export function foldTargetTerms(terms, preRolls = []) {
     if (kind === 'benefit') target += value;
   }
   for (const entry of Array.isArray(preRolls) ? preRolls : []) {
-    if (entry?.destination === 'target') target += numberOrNull(entry.total) ?? 0;
+    if (entry?.destination === 'target') target += numberOrNull(preRollBenefit(entry)) ?? 0;
   }
   return target;
 }
@@ -68,6 +71,7 @@ function preRollRow(entry) {
     expression: typeof entry.expression === 'string' ? entry.expression : '',
     total,
     destination: typeof entry.destination === 'string' ? entry.destination : null,
+    ...(entry.negate === true && { negate: true }),
   };
 }
 
@@ -101,7 +105,8 @@ function attributeFacts(data) {
 export function executedCheckEvidence(data) {
   if (!data || typeof data !== 'object' || data.targetRefusal) return null;
   const total = numberOrNull(data.total);
-  if (total === null) return null;
+  // A count pool reduced to zero rolled nothing, yet its pre-rolls and failure are evidence.
+  if (total === null && !(data.product === 'count' && data.zeroPool === true)) return null;
   const evidence = {
     total,
     target: numberOrNull(data.target),
@@ -127,6 +132,88 @@ export function executedCheckEvidence(data) {
   return evidence;
 }
 
+/** One executed die of a count projection, as `tileModel` reads it: numbers and flags only. */
+function countResult(entry) {
+  return {
+    index: numberOrNull(entry?.index),
+    face: numberOrNull(entry?.face),
+    active: entry?.active !== false,
+    explodedFrom: Number.isInteger(entry?.explodedFrom) ? entry.explodedFrom : null,
+    qualified: entry?.qualified === true,
+    cancelled: entry?.cancelled === true,
+    exploded: entry?.exploded === true,
+  };
+}
+
+/** A pool's or threshold's settled `{ source, value }` terms, rebuilt from the allowlist. */
+function countTerms(terms) {
+  return (Array.isArray(terms) ? terms : [])
+    .map((term) => ({
+      source: oneOf(TERM_SOURCES, term?.source),
+      value: numberOrNull(term?.value),
+    }))
+    .filter((term) => term.source && term.value !== null);
+}
+
+/** A label in which no `[[`, `&Name[` or `@` survives for an enricher to match (issue 2005). */
+function inertLabel(value) {
+  return text(value)
+    .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll(/&(?=\w+\[)/g, '&\u{2060}')
+    .replaceAll('@', '@\u{2060}');
+}
+
+/**
+ * The dice a count bought (issue 2008): the persisted `count`, the `marked` dice the roll added
+ * (`countDisplay.bought`) and the inert Resource name; never a path, macro or source. Null for
+ * none.
+ */
+function boughtProjection(boughtDice, display) {
+  const count = boughtDice?.count;
+  if (!Number.isInteger(count) || count < 1) return null;
+  const marked = Number.isInteger(display.bought)
+    ? Math.min(Math.max(display.bought, 0), count)
+    : 0;
+  return { count, marked, resourceLabel: inertLabel(display.resourceLabel) };
+}
+
+/**
+ * The executed dice of a count check (issue 2006), folded from the engine's unpersisted
+ * `countDisplay`: tiles, totals, the required count and margin, and the pool and threshold with
+ * their settled terms. Literal numbers and enumerated words only, never an expression, path or
+ * policy, and no label but the Resource name of the dice `boughtDice` bought; null without one.
+ */
+function countProjection(display, boughtDice) {
+  if (!display || typeof display !== 'object') return null;
+  const results = Array.isArray(display.results) ? display.results.map(countResult) : [];
+  const pool = display.pool ?? {};
+  const threshold = display.threshold ?? {};
+  const bought = boughtProjection(boughtDice, display);
+  const shown = results.filter((entry) => entry.face !== null);
+  return {
+    die: numberOrNull(display.die),
+    tiles: tileModel({ results: shown, bought: bought?.marked ?? 0 }),
+    qualified: numberOrNull(display.qualified),
+    cancelled: numberOrNull(display.cancelled),
+    net: numberOrNull(display.net),
+    required: numberOrNull(display.required),
+    margin: numberOrNull(display.margin),
+    zeroPool: display.zeroPool === true,
+    pool: {
+      base: numberOrNull(pool.base),
+      terms: countTerms(pool.terms),
+      rolled: numberOrNull(pool.rolled),
+    },
+    threshold: {
+      anchor: numberOrNull(threshold.anchor),
+      source: oneOf(['fixed', 'character'], threshold.source),
+      terms: countTerms(threshold.terms),
+      effective: numberOrNull(threshold.effective),
+    },
+    ...(bought && { boughtDice: bought }),
+  };
+}
+
 /** The executed visibility a card gates on, or null when it is unknown. */
 function executedVisibility(visibility) {
   if (!visibility || typeof visibility !== 'object') return null;
@@ -135,7 +222,9 @@ function executedVisibility(visibility) {
 
 /**
  * The projection itself. `evaluation` contributes only its product and direction; `terms` are the
- * permitted source terms, and `destination` is where a modifier lands for that evaluation.
+ * permitted source terms, and `destination` is where a modifier lands for that evaluation. A count
+ * projection also carries `count`, its executed dice, from the engine's `countDisplay`, and the
+ * dice `boughtDice` records only for a public check.
  */
 export function buildCheckDisplay({
   evaluation = null,
@@ -144,8 +233,12 @@ export function buildCheckDisplay({
   terms = [],
   evidence = null,
   visibility = null,
+  countDisplay = null,
+  boughtDice = null,
 } = {}) {
   const product = oneOf(['sum', 'count'], evaluation?.product) ?? 'sum';
+  const executed = executedVisibility(visibility);
+  const bought = isPublicCheckDisplay({ visibility: executed }) ? boughtDice : null;
   const direction = oneOf(['over', 'under'], evaluation?.direction) ?? 'over';
   let destination = null;
   if (product === 'sum') destination = direction === 'under' ? 'target' : 'append';
@@ -156,7 +249,8 @@ export function buildCheckDisplay({
     terms: sanitizeTargetTerms(terms),
     destination,
     evidence: evidence ? structuredClone(evidence) : null,
-    visibility: executedVisibility(visibility),
+    visibility: executed,
+    ...(product === 'count' && { count: countProjection(countDisplay, bought) }),
   });
 }
 
@@ -178,5 +272,7 @@ export function executedCheckDisplay(checkResult) {
     comparison: evidence?.comparison ?? null,
     evidence,
     visibility: checkResult?.visibility,
+    countDisplay: checkResult?.countDisplay,
+    boughtDice: data?.boughtDice,
   });
 }

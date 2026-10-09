@@ -48,7 +48,7 @@
   ariaLabelKey="FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label"
   ariaLabel="Environment editor sections"
   idStem="environment"
-  hookAttribute="data-environment-tab-button"
+  tabDataAttr="data-environment-tab-button"
   containerClass="manager-environment-tabs"
   buttonClass="manager-environment-tab-button"
   badgeClass="manager-environment-tab-badge"

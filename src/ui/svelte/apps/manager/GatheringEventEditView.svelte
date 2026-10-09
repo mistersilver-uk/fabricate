@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ArtPicker from '../../components/ArtPicker.svelte';
   import Field from '../../components/Field.svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
@@ -307,19 +308,15 @@
       </div>
       <div class="manager-task-core-grid">
         <div class="manager-task-media-column">
-          <button
-            type="button"
-            class="manager-task-image-picker"
-            aria-label={text(
+          <ArtPicker
+            art={eventImage()}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Events.ChooseImage',
               'Choose event image'
             )}
-            onclick={chooseEventImage}
+            onPick={chooseEventImage}
             disabled={typeof onPickImagePath !== 'function'}
-          >
-            <img src={eventImage()} alt="" />
-            <i class="fas fa-pen" aria-hidden="true"></i>
-          </button>
+          />
 
           <div class="manager-task-core-status">
             <StatusToggle
@@ -415,11 +412,11 @@
               showSearch={false}
               triggerHasPopup="listbox"
               triggerClass="manager-condition-menu-button"
-              triggerData={{ 'data-chip-remove-fallback': '' }}
+              triggerProps={{ 'data-chip-remove-fallback': '' }}
               triggerLabel={availabilityMenuLabel(kind)}
-              dialogAriaLabel={availabilityFieldLabel(kind)}
+              panelLabel={availabilityFieldLabel(kind)}
               emptyHint={availabilityMenuLabel(kind)}
-              onChoose={(id) => addAvailability(kind, id)}
+              onSelect={(id) => addAvailability(kind, id)}
             />
             <div class="manager-chip-row" data-gathering-event-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}

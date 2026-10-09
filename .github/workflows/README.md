@@ -175,8 +175,10 @@ The workflow now completes the merge itself from a resolution you supply.
 
 **Is it a conflict, or a failure?**
 `scripts/forward-port-complete-merge.sh` runs only when the merge fails, and says which it was.
-A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.
-Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
+A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` and names each path that could not be combined.
+When `resolution_ref` is supplied these are `::notice::` annotations: the initial conflict is expected, and only the following content gate may accept the resolution.
+Without a resolution they are `::error::` annotations, followed by an actionable refusal; an invalid or unverifiable supplied resolution also produces a real error at its failure point.
+Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
 
 **Produce the resolution.**
 In a local clone, `git fetch origin main release`, `git checkout -B resolve origin/main`, `git merge --no-ff origin/release`, resolve the paths the job named, and `git commit`.
@@ -247,6 +249,7 @@ Prefer prose that cites nothing, or cite only paths you have confirmed exist on 
 File: `.github/workflows/promote-to-early-access.yml`
 
 Trigger: `workflow_dispatch(beta_tag)`.
+The tag's `v` is optional when typed: `1.4.0-beta.3` and `v1.4.0-beta.3` both name the tag `v1.4.0-beta.3`, and every step after validation reads that canonical tag rather than the raw input.
 
 This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta commit onto `release`, which then triggers `release.yml` to mint the stable version and publish early access.
 It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
@@ -318,6 +321,7 @@ That separation is what makes the bucket policy safe — denying the derivable s
 
 **Tester path secret (rotation freezes a cohort, not a lockout).**
 The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from a per-group repository **secret** (`S3_TESTER_PATH_SECRET` for beta, and `S3_APPRENTICE_PATH_SECRET` and `S3_GUILD_ARTISAN_PATH_SECRET` for the two early-access groups, referred to abstractly here — never paste the value) — never the committed config.
+A segment written by the local rotation utility (see [Release Utilities](../../CONTRIBUTING.md#release-utilities)) starts with a label, `<label>-<32 hex characters>` (by default the UTC month, for example `oct2026-…`), so the month a feed was rotated for reads straight off its URL; the publisher takes the value verbatim either way.
 Generate each once and set it before publishing; the publish **refuses to run**, before building, when any tester group a channel declares has its secret unset, so the feed can never fall back to a guessable URL.
 Treat rotation as a **cohort migration, not hygiene**: it starts a new segment for future publishes, and the superseded segment keeps serving its last pre-rotation manifest, because the publisher only ever writes the current segment and nothing in the release path deletes, prunes, or expires an old one.
 No update is ever offered to that superseded cohort and no error is surfaced — it silently stops receiving updates rather than failing.

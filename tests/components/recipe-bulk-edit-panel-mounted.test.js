@@ -1,20 +1,22 @@
 /** The recipe browser's BULK EDIT panel (issue 1010). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import {
-  createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES
-} from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/ui/model/recipeBulkEditModel.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   openSelectPanel,
   selectOptionLabels,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -24,6 +26,7 @@ const panel = createMountedComponentHarness({
   rawModules: [
     // The book axis is a `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',
@@ -37,6 +40,9 @@ const panel = createMountedComponentHarness({
     // The tier labels the single-recipe editor shares, which name a DC, a Target or an adjustment.
     'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
     'src/utils/checkAdjustmentFormat.js',
+    // …and a count tier by its successes needed, the default's from the pool (issue 2006).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/utils/fillPlaceholders.js',
     'src/utils/scalars.js'
   ],
   compiledModules: [
@@ -46,6 +52,7 @@ const panel = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     // The shared set-delete card and the armed control inside it (issue 1132). Both are
@@ -822,6 +829,35 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     }
   });
 
+  it('names a count tier by its successes needed, and stages it when chosen (issue 2006)', async () => {
+    const HINT_JOIN = / (?:Every|Clears) .*$/;
+    const checkEvaluation = { product: 'count', direction: 'under', pool: { required: 2 } };
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 8, successes: 1 },
+      { id: 'tier-hard', name: 'Hard', dc: 18, successes: null },
+    ];
+    const { root, state } = await mountPanel({ checkEvaluation, checkTierOptions: tiers });
+    const rows = selectOptionLabels(root, TIER_HOOK);
+    assert.deepEqual(rows.slice(1).map((text) => text.replace(HINT_JOIN, '')), [
+      'Default · 2 successes',
+      'Easy · 1 success',
+      'Hard · — successes',
+    ]);
+    assert.match(rows[1], /default successes needed\.$/, 'the Default row clears to the count');
+    assert.ok(rows.every((text) => !/\bDC\b/.test(text)), 'no row says DC');
+    const hints = [...root.querySelectorAll('.fab-bulk-edit-subhint')].map((node) => node.textContent);
+    assert.ok(hints.some((text) => text.startsWith('The successes needed these recipes')));
+    chooseOption(root, TIER_HOOK, 'tier-easy');
+    assert.equal(state.draft.checkTierId, 'tier-easy');
+    assert.equal(tierLabel(root), 'Easy · 1 success');
+    panel.remount();
+    const unavailable = await mountPanel({ checkEvaluation, checkTierAxis: { available: false, reason: 'dynamic' } });
+    assert.match(
+      unavailable.root.querySelector('[data-recipe-bulk-check-tier-unavailable]').textContent,
+      /takes its successes needed from a macro/
+    );
+  });
+
   it('groups the two instructions above the authored tiers, and hints each of them', async () => {
     // THE ONE LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY (issue 1504). `Leave unchanged`
     // and `Default DC` are INSTRUCTIONS and the rest are the system's authored tiers, so the
@@ -949,7 +985,7 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
  * three sentences the impact prop turns into, and which ids the confirm hands back.
  */
 const deleteCard = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
-const deleteButton = (root) => deleteCard(root).querySelector('.manager-button.is-danger');
+const deleteButton = (root) => deleteCard(root).querySelector('.fabricate-button.is-danger');
 const impactRow = (root, key) => root.querySelector(`[data-recipe-bulk-impact-row="${key}"]`);
 
 const FULL_IMPACT = {

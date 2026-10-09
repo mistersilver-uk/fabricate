@@ -3,12 +3,22 @@
  * M12b), held as a contract over the sheet and over the one primitive that emits the opt-in.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { INSPECTOR_VERB_SITES } from '../helpers/inspectorVerbRoles.js';
+import { importedModules, literalStrings, walkNodes } from '../helpers/moduleAst.js';
+import { componentAstOf, sourceAstEntriesUnder } from '../helpers/parsedSource.js';
+import { renderedNodes } from '../helpers/structureShapes.js';
 import { stripCssComments } from '../helpers/styleBlockScan.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  attributeValue,
+  declaresAttribute,
+  rendersComponent,
+  styleRules
+} from '../helpers/svelteStructureContract.js';
 import { LADDER_RUNGS } from './control-height-known-literals.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -57,7 +67,7 @@ function bodiesOf(selector) {
 }
 
 describe('M12a — a manager button takes the corner its height is on', () => {
-  const PRIMITIVE = '.fabricate-button.manager-button.fab-manager-button';
+  const PRIMITIVE = '.fabricate-button.fabricate-button.fab-manager-button';
 
   it('publishes both ladders, so the numbers below are read and not restated', () => {
     // Non-vacuity for the whole file.
@@ -86,7 +96,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
     // The negative control. If the base rule had been edited instead.
     const base = rules().find(
       (rule) =>
-        rule.selector === '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button'
+        rule.selector === '.fabricate-button.fabricate-button, .fabricate-icon-button.fabricate-icon-button'
     );
     assert.ok(base, 'the shared base control rule is still spelled as one selector list');
     assert.equal(pixels(valueOf(base.body, 'border-radius')), 6, 'the base control is still on 6px');
@@ -141,8 +151,8 @@ describe('M12a — a manager button takes the corner its height is on', () => {
       convertedButtonsBelowTheBand().map((entry) => [entry.selector, entry])
     );
     for (const selector of [
-      '.fabricate-button.manager-button.fab-manager-button.manager-clear-filters',
-      '.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button'
+      '.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters',
+      '.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button'
     ]) {
       const entry = bySelector.get(selector);
       assert.ok(entry, `\`${selector}\` is still a converted button below the band`);
@@ -163,11 +173,11 @@ describe('M12a — a manager button takes the corner its height is on', () => {
 });
 
 describe('M12b — the 38px rung is reachable on the toolbar controls the reference draws at 38', () => {
-  const FIELD = 'src/ui/svelte/components/ManagerSearchField.svelte';
+  const FIELD = 'src/ui/svelte/components/SearchField.svelte';
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-search-field-rung-',
-    compiledModules: [FIELD],
+    compiledModules: ['src/ui/svelte/components/Field.svelte', FIELD],
     componentPath: FIELD
   });
 
@@ -176,12 +186,10 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
   after(() => harness.teardown());
 
-  const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
-  // The converted select triggers' opt-in: the scoped catalogue's lead row and the component
-  // toolbar's two filters, one member per host bar.
-  const triggerRule =
-    '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger, ' +
-    '.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger';
+  // THE FIELD IS 38 BY DEFAULT (issue 1782, maintainer ruling 2), and a select sharing its row
+  // takes `Select`'s own `form` rung, the same box, so neither needs an opt-in.
+  const fieldRule = '.fabricate-search.fabricate-search:not(.is-compact)';
+  const triggerRule = '.fabricate-select .fabricate-select-trigger-form';
 
   it('is on the published height ladder, which is why it needs no deviation', () => {
     assert.ok(LADDER_RUNGS.includes(38), '38 is a rung, so drawing it is compliance and not drift');
@@ -190,28 +198,19 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('states 38px and the band’s 9px corner for the field and for a toolbar select', () => {
     for (const [label, selector, heightProperty] of [
       ['field', fieldRule, 'height'],
-      ['converted select trigger', triggerRule, 'min-height']
+      ['form-rung select trigger', triggerRule, 'min-height']
     ]) {
       const [body] = bodiesOf(selector);
-      assert.equal(
-        pixels(valueOf(body, heightProperty)),
-        38,
-        `the ${label} opts into the 38px rung`
-      );
+      assert.equal(pixels(valueOf(body, heightProperty)), 38, `the ${label} stands at the 38px rung`);
       assert.equal(
         pixels(valueOf(body, 'border-radius')),
         9,
-        `and the ${label} takes the 34-38px band’s corner with it, rather than keeping the 34px control’s`
+        `and the ${label} takes the 34-38px band’s corner with it`
       );
     }
   });
 
-  it('and the shipped controls it overrides are still 34px, so the opt-in is a real change', () => {
-    // Non-vacuity again, and a specificity claim.
-    assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.manager-search input')[0], 'height')), 34);
-    // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
-    // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
-    // route still rendering a native select there, and this row's controls are triggers now.
+  it('keeps the `toolbar` rung at 34px and lifts no select to 38 with a site rule', () => {
     assert.equal(
       pixels(
         valueOf(
@@ -221,60 +220,56 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       ),
       34
     );
-    for (const selector of [fieldRule, ...triggerRule.split(', ')]) {
-      const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
-      assert.ok(classes >= 3, `\`${selector}\` carries a third class, so it wins on specificity`);
-    }
+    assert.ok(
+      rules().every(({ selector }) => !/is-size-38 \.fabricate-select-trigger/.test(selector)),
+      'a select on the search’s row takes the `form` rung, not a height-only `is-size-38` lift'
+    );
   });
 
-  it('emits NO size class by default, so every shipped field is unchanged', async () => {
+  it('keeps no field rung in the sheet, because the field takes none', () => {
+    assert.ok(
+      rules().every(({ selector }) => !/fabricate-search[^,]*is-size-/.test(selector)),
+      'a `.fabricate-search … is-size-*` rule paints a rung the field no longer emits'
+    );
+  });
+
+  it('emits NO size class by default, so the root is the family alone', async () => {
     const root = await harness.mount({ ariaLabel: 'Search' });
     // THIS EQUALITY IS ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM (issue 1508).
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'fabricate-search manager-search',
-      'a field that does not ask for a rung is the family root plus the hook class and nothing else'
+      'fabricate-search',
+      'a field that passes no class is the family root and nothing else'
     );
     harness.remount();
   });
 
-  it('emits is-size-38 when asked, and keeps the documented class order', async () => {
-    const root = await harness.mount({
-      size: '38',
-      compact: true,
-      class: 'manager-access-roster-search'
-    });
-    assert.equal(
-      root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'fabricate-search manager-search is-compact is-size-38 manager-access-roster-search',
-      'the family root leads, then the hook class, then the rung between the density and the caller class, which is where every hand-rolled site already writes its own extra'
-    );
-    harness.remount();
-  });
-
-  it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
-    for (const size of ['37', 40, 'tall', '']) {
-      const root = await harness.mount({ size });
-      assert.ok(
-        !root.querySelector('label').className.includes('is-size-'),
-        `\`${size}\` is not a rung this field offers, so it renders the shipped control`
+  it('retired `size`: no rung class for any value, and the documented class order', async () => {
+    for (const size of ['38', '30', 40, '']) {
+      const root = await harness.mount({
+        size,
+        density: 'compact',
+        ariaLabel: 'Search',
+        class: 'manager-access-roster-search'
+      });
+      assert.equal(
+        root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
+        'fabricate-search is-compact manager-access-roster-search',
+        `\`size=${JSON.stringify(size)}\` emits nothing: the family root, the density, then the caller class`
       );
       harness.remount();
     }
   });
 
-  it('names the class as a LITERAL, so the dead-rule gate can see a customer for the sheet rule', () => {
-    // `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`/`has-` class through a
-    // positional wildcard, so a class this component only ever BUILT from a template would leave
-    // `.manager-search.is-size-38 input` looking like a rule with no caller.
+  it('names no rung in its script, so the dead-rule gate sees no customer for one', () => {
     const source = readFileSync(resolve(repoRoot, FIELD), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
-    assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
+    assert.ok(!/is-size-/.test(script), 'the field writes no `is-size-*` class');
   });
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
-  const BUTTON = 'src/ui/svelte/components/ManagerButton.svelte';
-  const buttonRule = '.fabricate-button.manager-button.fab-manager-button.is-size-38';
+  const BUTTON = 'src/ui/svelte/components/Button.svelte';
+  const buttonRule = '.fabricate-button.fabricate-button.fab-manager-button.is-size-38';
 
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
     const [body] = bodiesOf(buttonRule);
@@ -287,88 +282,110 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       null,
       'the rung restates a corner the primitive already declares for this whole band'
     );
-    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
     assert.equal(
       pixels(valueOf(primitive, 'border-radius')),
       9,
       'and that corner is 9 — the band’s, which is why the rung needs none of its own'
     );
-    assert.ok(
-      BAND_9.includes(38) === false ? false : 38 >= BAND_9[0] && 38 <= BAND_9[1],
-      '38 is inside the band whose corner the primitive states'
-    );
+    assert.ok(38 >= BAND_9[0] && 38 <= BAND_9[1], '38 is inside the band whose corner the primitive states');
   });
 
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
-    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
     assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
     // A specificity claim, not a source-order one.
     assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
   });
 
-  it('emits the same token the field does, as a LITERAL, for the dead-rule gate', async () => {
+  it('emits the token the select triggers are opted in by, as a LITERAL, for the dead-rule gate', () => {
     const source = readFileSync(resolve(repoRoot, BUTTON), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
-    // ONE RUNG, ONE TOKEN. Two primitives spelling the same rung differently is the drift the
-    // shared name exists to prevent, and nothing else in the tree can see it.
-    const fieldScript = readFileSync(resolve(repoRoot, FIELD), 'utf8');
-    assert.equal(
-      (script.match(/'is-size-\d+'/g) ?? []).join(' '),
-      (fieldScript.match(/'is-size-\d+'/g) ?? []).join(' '),
-      'the button and the field name different rungs, so one ladder is spelled two ways'
-    );
   });
 });
 
-describe('M12a — the inspector rail’s action button takes the corner its height is on', () => {
-  const ACTION = 'src/ui/svelte/apps/manager/InspectorActionButton.svelte';
+describe('M12a — an inspector rail’s verbs take the manager button’s rung (issue 1521)', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  const FILES = [...new Set(INSPECTOR_VERB_SITES.map(({ file }) => file))];
+  const GEOMETRY = new Set(['min-height', 'height', 'border-radius', 'font-size', 'padding']);
+  const BUTTON_CLASSES = new Set(['fabricate-button', 'fab-manager-button', 'is-full-width']);
 
-  /** One rule body from a component's own scoped block, comments stripped. */
-  function scopedRule(componentPath, selector) {
-    const source = readFileSync(resolve(repoRoot, componentPath), 'utf8');
-    const block = stripCssComments(source.slice(source.search(/^<style>$/m) + '<style>'.length));
-    const found = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
-      ([, head]) => head.trim().replaceAll(/\s+/g, ' ') === selector
-    );
-    assert.equal(found.length, 1, `${componentPath} still declares exactly one \`${selector}\` rule`);
-    return found[0][2];
+  /** The value a bare attribute (`true`) or a static one gives, for matching a site's hook. */
+  function hookValue(node, name) {
+    const attribute = (node.attributes ?? []).find((candidate) => candidate.name === name);
+    if (!attribute) return undefined;
+    return attribute.value === true ? true : (attributeValue(node, name) ?? '');
   }
 
-  it('states the 34px control AND the band’s 9px corner on one rule', () => {
-    const body = scopedRule(ACTION, '.fab-inspector-action');
-    assert.equal(pixels(valueOf(body, 'min-height')), 34, 'this is still the rule that sizes the control');
-    assert.equal(
-      pixels(valueOf(body, 'border-radius')),
-      9,
-      'a 34px control is painting the chip rung the ladder gives to something at or below 24px'
-    );
+  it('renders each of the eight verbs as a full-width Button in the role its verb names', () => {
+    for (const { file, hook, value, role } of INSPECTOR_VERB_SITES) {
+      const hooked = renderedNodes(componentAstOf(file), 'Button').filter(
+        (node) => hookValue(node, hook) !== undefined
+      );
+      const sites = INSPECTOR_VERB_SITES.filter((site) => site.file === file && site.hook === hook);
+      assert.equal(hooked.length, sites.length, `${file} renders no ${hook} Button the table omits`);
+      const matches = hooked.filter((node) => hookValue(node, hook) === value);
+      assert.equal(matches.length, 1, `${file} renders one Button carrying ${hook}`);
+      assert.equal(attributeValue(matches[0], 'role'), role, `${file} ${hook}=${value} is ${role}`);
+      assert.ok(declaresAttribute(matches[0], 'fullWidth'), `${file} ${hook} spans its rail`);
+    }
   });
 
-  it('is unreachable from the sheet, which is why the fix is in the component', () => {
-    // The measurement, not an opinion.
-    const declarations = css
-      .split('}')
-      .filter((block) => /\.fab-inspector-action[^{]*\{/.test(block));
-    assert.deepEqual(
-      declarations,
-      [],
-      'a rule in the global sheet targets this primitive’s own element, where it cannot win'
-    );
+  it('states no rung or corner of its own on the primary', () => {
+    // The retired 36px primary is gone; `control-height-ladder.test.js` reports it as shrunk.
+    for (const body of bodiesOf('.fabricate-button.fabricate-button.fab-manager-button.is-primary')) {
+      assert.equal(valueOf(body, 'min-height'), null, 'the primary states no height of its own');
+      assert.equal(valueOf(body, 'border-radius'), null, 'and no corner of its own');
+    }
   });
 
-  it('leaves the primary’s retired 36px rung exactly as it stands, which is booked debt', () => {
-    // 36 is NOT on the ladder — `control-height-known-literals.js` already books it.
-    const body = scopedRule(ACTION, '.fab-inspector-action.is-primary');
-    assert.equal(pixels(valueOf(body, 'min-height')), 36, 'the primary’s height is unchanged by this edit');
-    assert.ok(!LADDER_RUNGS.includes(36), '36 is still a retired rung, so this stays booked debt');
-    assert.equal(valueOf(body, 'border-radius'), null, 'and it states no corner, so it takes the 9 above');
+  it('lets no rail restate a verb’s geometry in its own scoped block', () => {
+    const offenders = [];
+    for (const file of FILES) {
+      for (const rule of styleRules(componentAstOf(file))) {
+        const names = [...walkNodes(rule.prelude)]
+          .filter((node) => node.type === 'ClassSelector')
+          .map((node) => node.name);
+        if (names.every((name) => !BUTTON_CLASSES.has(name))) continue;
+        const restated = (rule.block?.children ?? []).filter(
+          (node) => node.type === 'Declaration' && GEOMETRY.has(node.property)
+        );
+        for (const node of restated) offenders.push(`${file}: ${node.property} ${node.value}`);
+      }
+    }
+    assert.deepEqual(offenders, [], 'a scoped rule moves a verb off the primitive’s rung');
+  });
+
+  it('retires the rail button: no file, import or render of it remains', () => {
+    const retired = 'InspectorActionButton';
+    assert.equal(existsSync(resolve(repoRoot, `${MANAGER}/${retired}.svelte`)), false);
+    const users = [...sourceAstEntriesUnder('src'), ...sourceAstEntriesUnder('scripts')]
+      .filter(
+        ([, ast]) =>
+          importedModules(ast).some((specifier) => specifier.endsWith(`/${retired}.svelte`)) ||
+          (ast.fragment !== undefined && rendersComponent(ast, retired))
+      )
+      .map(([path]) => path);
+    assert.deepEqual(users, []);
+  });
+
+  it('leaves the two removal verbs on ArmedDangerButton', () => {
+    for (const [file, key] of [
+      [`${MANAGER}/scoped/MembershipActions.svelte`, 'FABRICATE.Admin.Manager.Scoped.Membership.Remove'],
+      [`${MANAGER}/tools/ToolBreakageTab.svelte`, 'FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystem']
+    ]) {
+      const armed = renderedNodes(componentAstOf(file), 'ArmedDangerButton').filter((node) =>
+        literalStrings(node.attributes).includes(key)
+      );
+      assert.equal(armed.length, 1, `${file} arms ${key} through ArmedDangerButton`);
+    }
   });
 });
 
 describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
   it('pins the rung rule the close takes: IconButton’s 26px square in the module sheet', () => {
-    const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
+    const [box] = bodiesOf('.fabricate-icon-button.fabricate-icon-button.is-size-26');
     for (const property of ['width', 'height', 'min-width', 'min-height']) {
       assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
     }

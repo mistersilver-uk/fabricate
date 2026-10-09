@@ -135,11 +135,12 @@ const JOURNAL_STORE_SHAPE = {
     'selectedRunId', 'selectedRunKey', 'viewedStage', 'viewedStageIndex', 'worldTime',
   ],
   methods: [
-    'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
+    'advance', 'awardChoiceSettled', 'beginStep', 'cancel', 'chooseAward', 'dismiss', 'execute',
+    'load', 'pause', 'resume',
     'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
     'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
-    'setHistoryPageSize', 'setHistorySort', 'setKindFilter', 'setSearch', 'setSelection',
-    'tickWorldTime', 'viewStage',
+    'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
+    'toggleKind', 'viewStage',
   ],
 };
 
@@ -156,12 +157,45 @@ describe('journalStore', () => {
     compiler.cleanup();
   });
 
-  it('returns exactly the 57 public members the journal view reads, each still a getter', () => {
+  it('returns exactly the 59 public members the journal view reads, each still a getter', () => {
     const store = createJournalStore({ services: makeServices().services });
     const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
 
     assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
     assert.deepEqual(storeMemberKinds(store), shape);
+  });
+
+  it('1773: chooseAward sends the picks as one chooseAward command and remembers the settled run', async () => {
+    const owed = run({ id: 'owed', lifecycleContract: 'current', actions: { chooseAward: true } });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [owed], history: [] }) });
+    const store = await loadedStore(setup);
+    assert.equal(store.awardChoiceSettled('owed'), false);
+    const settled = await store.chooseAward(owed, { choiceId: 'pick', picks: ['coin'] });
+    assert.equal(settled.success, true, 'the reply answers the caller');
+    assert.deepEqual(
+      setup.calls.command.map(({ action, payload, requestId }) => ({ action, payload, requestId })),
+      [{ action: 'chooseAward', payload: { choiceId: 'pick', picks: ['coin'] }, requestId: undefined }]
+    );
+    assert.equal(store.awardChoiceSettled('owed'), true, 'the crafting outcome stops naming it');
+  });
+
+  it('1773: a run owing a reward is counted and filtered under Ready, whatever its own status', async () => {
+    const activeRuns = [
+      run({ id: 'owed-closed', derivedStatus: 'succeeded', awardChoicePending: true }),
+      run({ id: 'owed-live', derivedStatus: 'inProgress', awardChoicePending: true }),
+      run({ id: 'owed-paused', derivedStatus: 'paused', awardChoicePending: true }),
+      run({ id: 'craft-wait', derivedStatus: 'waiting', awardChoicePending: false }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
+    flushSync();
+    assert.deepEqual(store.activeCounts, { all: 4, ready: 2, inProgress: 1, paused: 1 });
+    store.setActiveStatusFilter('ready');
+    flushSync();
+    assert.deepEqual(
+      store.activeRuns.map((entry) => entry.id).sort((a, b) => a.localeCompare(b)),
+      ['owed-closed', 'owed-live'],
+      'the owed runs are reachable from Ready; a paused one stays under Paused'
+    );
   });
 
   it('correlates a trusted completed command notice and clears it on reselect', async () => {
@@ -297,7 +331,7 @@ describe('journalStore', () => {
     ];
     const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
 
-    store.setKindFilter('crafting');
+    for (const kind of ['gathering', 'salvage', 'alchemy']) store.toggleKind(kind);
     store.setSearch('silver');
     store.setActiveStatusFilter('paused');
     flushSync();
@@ -307,6 +341,35 @@ describe('journalStore', () => {
     store.setActiveStatusFilter('ready');
     flushSync();
     assert.deepEqual(store.activeRuns, [], 'search is applied after the pre-filter counts');
+  });
+
+  it('returns both lists to their first page when a kind is toggled', async () => {
+    const crafting = (prefix, index, extra = {}) =>
+      run({ id: `${prefix}-craft-${index}`, startedAt: index, ...extra });
+    const salvage = (prefix, extra = {}) =>
+      run({ id: `${prefix}-salvage`, runType: 'salvage', activityKind: 'salvage', ...extra });
+    const finished = { derivedStatus: 'succeeded', actions: { dismiss: true } };
+    const activeRuns = [
+      ...Array.from({ length: 6 }, (_unused, index) => crafting('a', index)),
+      salvage('a'),
+    ];
+    const hist = [
+      ...Array.from({ length: 6 }, (_unused, index) =>
+        crafting('h', index, { ...finished, finishedAt: 100 - index })
+      ),
+      salvage('h', { ...finished, finishedAt: 10 }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: hist }) }));
+    store.setActivePage(1);
+    store.setHistoryPage(1);
+    flushSync();
+    assert.deepEqual([store.activePage, store.historyPage], [1, 1], 'both lists on page 2');
+
+    store.toggleKind('crafting');
+    flushSync();
+    assert.deepEqual([store.activePage, store.historyPage], [0, 0], 'both back on page 1');
+    assert.deepEqual(store.activePageItems.map((entry) => entry.id), ['a-salvage']);
+    assert.deepEqual(store.historyPageItems.map((entry) => entry.id), ['h-salvage']);
   });
 
   // `Waiting` and `In progress` wear one badge, so the filter vocabulary must match it.
@@ -390,7 +453,7 @@ describe('journalStore', () => {
     const setup = makeServices({ listing: baseListing({ activeRuns, history: [] }) });
     const store = await loadedStore(setup);
     store.select(activeRuns[6]);
-    store.setKindFilter('crafting');
+    store.toggleKind('alchemy');
     store.setSearch('no-match');
     flushSync();
 
@@ -732,6 +795,60 @@ describe('journalStore', () => {
       assert.notEqual(setup.calls.notify[0].trim(), '', `never blank for ${label}`);
       assert.equal(store.commandError.message, setup.calls.notify[0], `notice matches for ${label}`);
     }
+  });
+
+  // Issue 2008: the authority refused the bought dice, so nothing was spent or rolled.
+  it('words an additional-dice refusal by its reason, never the generic error', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: {
+        success: false,
+        reason: 'additional-dice-refused',
+        additionalDiceRefusal: 'spendRefused',
+        additionalDiceNotice: { dice: 1, limit: 3, available: 3, label: 'Focus', source: 'path', actorName: 'Hero' },
+      },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.execute(current);
+    flushSync();
+
+    const expected = 'Fabricate could not spend Hero\'s Focus, so the check was not rolled.';
+    assert.deepEqual(setup.calls.notify, [expected], 'one warning, worded by its reason');
+    assert.equal(store.commandError.message, expected);
+  });
+
+  // Issue 2008: dice spent before the stage refused are never refunded, so the player is told.
+  it('warns of bought dice a roll spent before its stage could not complete', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: {
+        success: false,
+        reason: null,
+        message: 'The crafting stage inputs are stale',
+        boughtDice: 2,
+        additionalDiceNotice: { dice: 2, label: 'Focus', source: 'path', actorName: 'Hero' },
+      },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.execute(current);
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, [
+      'The crafting stage inputs are stale',
+      '2 Focus spent; the roll could not be completed.',
+    ]);
+    const unlabelled = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, reason: 'operation-failed', secret: true, boughtDice: 1 },
+    });
+    await (await loadedStore(unlabelled)).execute(current);
+    assert.equal(unlabelled.calls.notify.at(-1), '1 spent; the roll could not be completed.');
   });
 
   // A failed check is an outcome the run's own history records, not a command error.

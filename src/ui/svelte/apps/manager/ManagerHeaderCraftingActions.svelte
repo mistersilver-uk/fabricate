@@ -18,7 +18,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
 
   let {
@@ -38,7 +38,6 @@
     recipeItemDraft = null,
     recipeItemEditDirty = false,
     recipeItemEditSaving = false,
-    recipeItemSaveFailed = false,
     canSaveRecipeItemEdit = false,
     backToBooksScrolls = () => {},
     deleteRecipeItemFromEdit = () => {},
@@ -61,10 +60,10 @@
 </script>
 
 {#if currentView === 'recipes'}
-  <ManagerButton role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
+  <Button role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'recipe-edit'}
   {#if recipeEditDirty}
     <Chip
@@ -75,11 +74,11 @@
       >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
+  <Button role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
     onclick={deleteRecipeFromEdit}
     disabled={!selectedRecipeId || recipeEditSaving}
@@ -87,11 +86,11 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-  </ManagerButton>
-  <ManagerButton role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
+  </Button>
+  <Button role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
     <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
     <span>{recipeEditSaveLabel()}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'recipe-item-edit'}
   {#if recipeItemEditDirty}
     <Chip
@@ -103,7 +102,7 @@
       >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton
+  <Button
     role="ghost"
     data-recipe-item-back
     onclick={backToBooksScrolls}
@@ -112,8 +111,8 @@
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.RecipeItem.BackToBrowse', 'Back to Books & Scrolls')}</span
     >
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
     data-recipe-item-delete
     onclick={deleteRecipeItemFromEdit}
@@ -122,8 +121,8 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
     data-recipe-item-save
     onclick={saveRecipeItemDraft}
@@ -132,14 +131,7 @@
     <i class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
     ></i>
     <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
-  </ManagerButton>
-  <!-- An attempted-and-failed save is announced beside the control the GM just clicked
-       (issue 919). -->
-  {#if recipeItemSaveFailed}
-    <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
-      {text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}
-    </p>
-  {/if}
+  </Button>
 {:else if currentView === 'components'}
   <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The control opens a picker and
        navigates nowhere — `proto:1046` binds `onAddFrom`, which at `proto:5545` sets
@@ -147,7 +139,7 @@
        absent from this file, comments included, which is what
        `component-world-scope-screens.test.js` asserts. `size="38"` is the rung the reference
        draws (`proto:1046`), taken as the shared opt-in rather than a local height. -->
-  <ManagerButton
+  <Button
     role="primary"
     size="38"
     data-component-add-from-catalogue
@@ -156,7 +148,7 @@
   >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Component.AddFromCatalogue', 'Add from catalogue')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'knowledge'}
   <!-- The Knowledge surface's only actions are per-character, in the detail-pane header. -->
 {:else if currentView === 'component-edit'}
@@ -178,7 +170,7 @@
       >{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton
+  <Button
     role="primary"
     data-checks-save
     onclick={saveChecks}
@@ -186,7 +178,7 @@
   >
     <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'essences'}
   <!-- No header action: the reference's Essence Rules header carries nothing on the right
        (`tmp/proto/essence-rules.png`, markup `proto:1523`-`1540`), because an essence is a

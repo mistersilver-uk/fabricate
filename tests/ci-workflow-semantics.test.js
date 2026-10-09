@@ -66,7 +66,7 @@ function contextFor(action, draft = false) {
 function jobsFor(workflow, action, draft = false) {
   const context = contextFor(action, draft);
   return Object.entries(workflow.jobs)
-    .filter(([, job]) => !job.if || evaluate(job.if, context))
+    .filter(([, job]) => !job.if || gateValue(job.if, context))
     .map(([name]) => name)
     .sort();
 }
@@ -84,7 +84,7 @@ test('CI runs full gates for source events in either draft state and isolates me
     'check-screenshots',
     'lint',
     'lint-commits',
-    'lint-debt',
+    'unit-test-shards',
     'unit-tests',
     'validate-bindings',
   ];
@@ -115,7 +115,7 @@ test('a red unit-tests job re-prints its failing tests at the END of the job log
   // bounded tail the log APIs serve (issue 1654).
   assert.match(
     workflow,
-    /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
+    /npm run test:shard 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
     'the unit-tests run must tee its output, or the failure re-print below has nothing to read'
   );
   assert.match(
@@ -141,6 +141,36 @@ test('a red unit-tests job re-prints its failing tests at the END of the job log
     true,
     'the TAP must be written outside the checkout'
   );
+});
+
+test('the required unit-tests check is green only when every shard of the suite passed', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const jobs = parseJobs(ci);
+  const shards = jobs['unit-test-shards'];
+  const gate = jobs['unit-tests'];
+
+  // Each shard runs its quarter: `test:shard` reads the shard from the job's env.
+  assert.equal(jobEnv(ci, 'unit-test-shards').UNIT_TEST_SHARD, '${{ matrix.shard }}/4');
+  assert.match(ci, /\n {8}shard: \[1, 2, 3, 4\]\n/, 'the matrix must run all four shards');
+  assert.match(ci, /\n {6}fail-fast: false\n/, 'one red shard must not cancel the others');
+  assert.ok(Number(shards['timeout-minutes']) <= 10, 'a shard is a quarter of the suite');
+
+  // The gate is the check the ruleset requires. It runs after a failed or cancelled shard (always),
+  // and passes only on the shards' success, so neither can read as green.
+  assert.deepEqual(needsOf(gate), ['unit-test-shards']);
+  assert.match(unwrap(gate.if), /^always\(\) && /);
+  const check = gate.steps.find((step) => step.env.SHARDS);
+  assert.equal(check?.env.SHARDS, '${{ needs.unit-test-shards.result }}');
+  for (const [result, status] of [['success', 0], ['failure', 1], ['cancelled', 1], ['skipped', 1]]) {
+    const run = spawnSync('bash', ['-e'], { input: check.run, env: { PATH: process.env.PATH, SHARDS: result } });
+    assert.equal(run.status, status, `the gate exits ${run.status} when the shards ended ${result}`);
+  }
+
+  // The gate is skipped exactly when the shards are, on a metadata edit.
+  for (const action of ['edited', 'synchronize']) {
+    const context = contextFor(action);
+    assert.equal(gateValue(gate.if, context), gateValue(shards.if, context), action);
+  }
 });
 
 // The screenshot gate's sequencing contract (issue 1133).
@@ -231,12 +261,21 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.match(gateStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 
-  // The capture deadline is READ from the producer, never restated.
+  // The capture deadline is READ from the producer, never restated. The producer is a chain of
+  // stages — select, the Foundry cache warm-up, the render shards beside the chrome verification,
+  // then capture — so its budget is the sum over stages of each stage's longest job.
   const declaredCaptureMinutes = Number(flagValue(gateStep.run, '--capture-timeout-minutes'));
+  const producerJobs = parseJobs(captureSource);
+  const stages = [['select'], ['warm-foundry'], ['render', 'verify-chrome'], ['capture']];
+  const minutesOf = (name) => {
+    const minutes = Number(producerJobs[name]?.['timeout-minutes']);
+    assert.ok(minutes > 0, `pr-screenshots.yml's ${name} job declares no timeout-minutes`);
+    return minutes;
+  };
   assert.equal(
     declaredCaptureMinutes,
-    Number(capture['timeout-minutes']),
-    "the gate's --capture-timeout-minutes must equal capture's real timeout-minutes"
+    stages.reduce((sum, stage) => sum + Math.max(...stage.map(minutesOf)), 0),
+    "the gate's --capture-timeout-minutes must equal the producer's summed stage timeouts"
   );
   assert.equal(flagValue(gateStep.run, '--capture-workflow'), 'pr-screenshots.yml');
 
@@ -279,6 +318,105 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.ok(publishStep, 'capture no longer publishes screenshot evidence');
   assert.match(publishStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(publishStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+});
+
+/** A job's `needs:` as a list, whether written as a scalar or as a flow sequence. */
+const needsOf = (job) =>
+  job.needs
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+test('the capture workflow publishes only after every shard and the chrome verification pass', () => {
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const jobs = parseJobs(source);
+
+  assert.deepEqual(needsOf(jobs.capture).sort(), ['render', 'select', 'verify-chrome']);
+  // A status function would let capture publish past a failed or skipped dependency.
+  assert.doesNotMatch(unwrap(jobs.capture.if), /\b(?:always|failure|cancelled)\(/);
+  // capture only runs after render ran, so a step-level render test there is always true.
+  for (const step of jobs.capture.steps) {
+    assert.doesNotMatch(step.if, /render/, `capture's "${step.name || step.uses}" re-tests render`);
+  }
+  // No shard starts for a selection that is not rendered (issue 2153: not keyed to the gate).
+  assert.match(unwrap(jobs.render.if), /needs\.select\.outputs\.render == 'true'/);
+  assert.doesNotMatch(source, /has_ui/, 'the capture keys rendering on `render`, not on the gate');
+  // The harvest is warmed and verified for any selection, rendered or not.
+  for (const name of ['warm-foundry', 'verify-chrome']) {
+    assert.equal(unwrap(jobs[name].if), "needs.select.outputs.ids != ''", `${name} must key on ids`);
+  }
+
+  // Only the PNGs and the manifest leave a shard: exactly these two lines, nothing wider.
+  const renderStart = source.indexOf('\n  render:\n');
+  const renderSource = source.slice(renderStart, source.indexOf('\n  verify-chrome:\n'));
+  const upload = /\n( +)path: \|\n((?:\1 {2}.*\n)+)/.exec(renderSource);
+  assert.ok(upload, 'the render job no longer uploads a block-scalar path');
+  assert.deepEqual(
+    upload[2].trim().split('\n').map((line) => line.trim()),
+    ['ui-screenshot-artifact/apps/*.png', 'ui-screenshot-artifact/apps/manifest.json']
+  );
+});
+
+test('a cold Foundry cache is filled once, and select never holds the Foundry credentials', () => {
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const jobs = parseJobs(source);
+
+  // select only learns whether the credentials exist.
+  const selectSource = source.slice(
+    source.indexOf('\n  select:\n'),
+    source.indexOf('\n  warm-foundry:\n')
+  );
+  assert.doesNotMatch(selectSource, /FOUNDRY_(?:USERNAME|PASSWORD|LICENSE_KEY):/);
+  assert.match(
+    selectSource,
+    /HAS_FOUNDRY_CREDENTIALS: \$\{\{ secrets\.FOUNDRY_USERNAME != '' && secrets\.FOUNDRY_PASSWORD != '' }}/
+  );
+  assert.match(selectSource, /\[ "\$HAS_FOUNDRY_CREDENTIALS" != "true" ]/);
+
+  // It probes the very key the jobs after it restore, without restoring it.
+  const probe = jobs.select.steps.find((step) => step.uses.startsWith('actions/cache/restore@'));
+  assert.ok(probe, 'select no longer probes the Foundry archive cache');
+  assert.equal(probe.with['lookup-only'], 'true');
+  const action = readFileSync('.github/actions/prepare-view-lab/action.yml', 'utf8');
+  const cached = parseActionSteps(action).find((step) => step.with.path === '.foundry-e2e/cache');
+  assert.ok(cached, 'prepare-view-lab no longer caches the Foundry archive');
+  assert.equal(probe.with.key, cached.with.key);
+  assert.equal(probe.with.path, cached.with.path);
+
+  // One warm-up, and both kinds of runner wait for it.
+  assert.deepEqual(needsOf(jobs['warm-foundry']), ['select']);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.ok(needsOf(jobs[name]).includes('warm-foundry'), `${name} must wait for warm-foundry`);
+  }
+  // Skipped at STEP level on a hit, so the jobs after it keep a plain success() chain.
+  const warmSteps = jobs['warm-foundry'].steps;
+  assert.ok(warmSteps.length > 0);
+  for (const step of warmSteps) {
+    assert.equal(unwrap(step.if), "needs.select.outputs.foundry_cache_hit != 'true'");
+  }
+  assert.match(selectSource, /foundry_cache_hit: \$\{\{ steps\.foundry-cache\.outputs\.cache-hit }}/);
+});
+
+test('the capture workflow grants each write only on the one job that needs it', () => {
+  // SonarCloud: a workflow-level write reaches every job, render shards included, and those run
+  // the PR's own code with Foundry credentials in scope.
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const topLevel = /^permissions:\n((?: {2}.*\n)+)/m.exec(source);
+  assert.ok(topLevel, 'pr-screenshots.yml declares no workflow-level permissions');
+  assert.doesNotMatch(topLevel[1], /:\s*write/, 'workflow-level permissions must be read-only');
+
+  const jobs = parseJobs(source);
+  for (const [name, job] of Object.entries(jobs)) {
+    assert.ok(job.permissions, `${name} inherits permissions instead of declaring its own`);
+  }
+  const writers = Object.entries(jobs)
+    .filter(([, job]) => Object.values(job.permissions).some((grant) => /\bwrite\b/.test(grant)))
+    .map(([name]) => name);
+  assert.deepEqual(writers, ['capture'], 'only the publishing job may hold a write permission');
+  for (const name of ['render', 'verify-chrome']) {
+    assert.deepEqual(jobs[name].permissions, { contents: 'read' }, `${name} must be read-only`);
+  }
 });
 
 // The release config and the workflows that carry its secrets (issue #1761).
@@ -461,6 +599,12 @@ function gateValue(raw, context) {
 function jobOutputs(source, jobName) {
   const jobEntries = section(entries(source), 'jobs');
   return scalars(nestedEntries(nestedEntries(jobEntries, jobName), 'outputs'));
+}
+
+/** The job's own `env:` mapping, which `parseJobs` folds to an empty scalar. */
+function jobEnv(source, jobName) {
+  const jobEntries = section(entries(source), 'jobs');
+  return scalars(nestedEntries(nestedEntries(jobEntries, jobName), 'env'));
 }
 
 /** A `needs` context for a semantic-release publisher, given what the run minted. */
@@ -834,6 +978,22 @@ test('promote-to-early-access runs its scripts from the workflow ref and moves t
   }
 });
 
+test('promote-to-early-access reads its typed tag once and uses the validated tag everywhere else', () => {
+  // The input's v is optional, so only the validate step may read it: a later step reading the raw
+  // input would look up or merge a tag name that does not exist.
+  const source = readFileSync(path.join(WORKFLOWS, 'promote-to-early-access.yml'), 'utf8');
+  const { steps } = parseJobs(source).promote;
+
+  const validate = steps.findIndex((step) => /validate-release-tag\.mjs .*--optional-prefix/.test(step.run));
+  assert.ok(validate !== -1, 'no step validates the tag with its prefix optional');
+  assert.match(steps[validate].run, /echo "tag=v\$VERSION" >> "\$GITHUB_OUTPUT"/);
+
+  assert.equal(source.split('inputs.beta_tag').length - 1, 1, 'the raw input is read more than once');
+  const users = steps.filter((step) => /\$\{?BETA_TAG\b/.test(step.run));
+  assert.ok(users.length >= 3, `only ${users.length} step(s) use the tag`);
+  assert.equal(source.split('BETA_TAG: ${{ steps.validate.outputs.tag }}').length - 1, users.length - 1);
+});
+
 test('every inline tester-segment resolution words its refusal through describeMissingTesterSecrets', () => {
   let resolutions = 0;
   for (const { file, source } of workflowSources()) {
@@ -850,4 +1010,47 @@ test('every inline tester-segment resolution words its refusal through describeM
     }
   }
   assert.ok(resolutions >= 2, `only ${resolutions} inline tester-segment resolution(s) were found`);
+});
+
+test('the ratchet jobs check out and name their base, and a release test run opts out', () => {
+  const ci = readFileSync(path.join(WORKFLOWS, 'ci.yml'), 'utf8');
+  const jobs = parseJobs(ci);
+  const before = 'b'.repeat(40);
+  for (const name of ['unit-test-shards', 'lint']) {
+    const { steps } = jobs[name];
+    const checkout = steps.find((step) => step.uses.startsWith('actions/checkout@'));
+    assert.equal(checkout?.with['fetch-depth'], '2', `${name} must check out the merge ref's parents`);
+    assert.equal(checkout.with.ref, undefined, `${name} must check out the merge ref, whose HEAD^1 is the base tip`);
+    const base = unwrap(jobEnv(ci, name).RATCHET_BASE ?? '');
+    const resolved = (github) => evaluate(base, { github });
+    assert.equal(resolved({ event_name: 'pull_request', event: { before } }), 'HEAD^1', name);
+    assert.equal(resolved({ event_name: 'push', event: { before } }), before, name);
+    assert.equal(
+      resolved({ event_name: 'push', event: { before: '0'.repeat(40) } }),
+      'HEAD^1',
+      `${name}: a push that created the branch has no previous tip`
+    );
+    const fetchIndex = steps.findIndex((step) => /git fetch .*"\$RATCHET_BASE"/.test(step.run));
+    const firstNpm = steps.findIndex((step) => /\bnpm\b/.test(step.run));
+    assert.ok(fetchIndex !== -1 && fetchIndex < firstNpm, `${name} fetches its base before running`);
+    const fetchIf = unwrap(steps[fetchIndex].if);
+    assert.equal(evaluate(fetchIf, { github: { event_name: 'push' } }), true, name);
+    assert.equal(evaluate(fetchIf, { github: { event_name: 'pull_request' } }), false, name);
+  }
+
+  for (const file of ['beta.yml', 'release.yml']) {
+    const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
+    const testing = Object.entries(parseJobs(source)).filter(([, job]) =>
+      job.steps.some((step) => /\bnpm (?:test|run test:shard)\b/.test(step.run))
+    );
+    assert.ok(testing.length > 0, `${file} runs npm test in some job`);
+    for (const [name, job] of testing) {
+      assert.equal(jobEnv(source, name).RATCHET_BASE, 'none', `${file} job "${name}" runs npm test`);
+      // Sharded as in ci.yml: run whole, the suite meets a 15-minute bound.
+      assert.equal(jobEnv(source, name).UNIT_TEST_SHARD, '${{ matrix.shard }}/4', `${file} job "${name}"`);
+      assert.ok(Number(job['timeout-minutes']) <= 10, `${file} job "${name}" runs a quarter of the suite`);
+      assert.ok(job.steps.every((step) => !/\bnpm test\b/.test(step.run)), `${file} runs the whole suite`);
+    }
+    assert.match(source, /\n {8}shard: \[1, 2, 3, 4\]\n/, `${file} must run all four shards`);
+  }
 });

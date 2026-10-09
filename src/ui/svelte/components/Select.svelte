@@ -15,25 +15,25 @@
   | `size` | `'form'` \| `'inline'` \| `'toolbar'` | `'form'` | 38px/radius 9/12.5px/`--fab-surface-soft`, 30px/radius 7/11.5px/`--fab-bg-2`, 34px/radius 9/`0.72rem`/`--fab-bg-1`. It names a height, a corner, a type size AND a fill, because the fill is its own axis. There is deliberately no trigger-box prop: the trigger's width and fill are per-site skin, stated in a descendant rule of the caller's own wrapper class. |
   | `showTick` / `placeholder` | boolean / string | `true` / `''` | The selected column, a property of the LIST rather than of an option and with callers on both polarities; and the trigger's text while `value` is null. |
   | `minWidth` / `maxWidth` | px | `0` | The PANEL's width band; `0` takes the rung's own. Either DECIDES a measured panel's box, because `anchoredPopover` resolves the band into one width and writes it as both bounds; `SIZES` is the single source of the numbers. |
-  | `triggerData` / `triggerTitle` | `{ 'data-x': 'value' }` / string | `{}` / `''` | Hooks stamped verbatim on the trigger button, and the only route to a native `title` on it. `triggerData` CANNOT carry a NAME or a TOOLTIP: `SearchablePopover` spreads it FIRST and then writes `title`, `aria-label` and `aria-labelledby` from its own props. |
+  | `triggerProps` / `triggerTitle` | `{ 'data-x': 'value' }` / string | `{}` / `''` | Hooks stamped verbatim on the trigger button, and the only route to a native `title` on it. `triggerProps` cannot carry a name or a tooltip: `SearchablePopover` spreads it first and then writes `title`, `aria-label` and `aria-labelledby` from its own props. |
   | `label` / `hint` / `error` | strings | `''` | Any renders the whole control inside `<Field as="div">`, with a caption span before the trigger and the note span after it. |
   | `ariaLabel` / `ariaLabelledBy` | string / id list | `''` | The accessible name when there is no `label`. ONE OF THE THREE IS REQUIRED, and `ariaLabel` IS NEVER PASSED BESIDE `ariaLabelledBy`, which wins and would leave the string dead text free to drift. All three name the OPEN PANEL as well as the trigger, so a control given only a `hint` or an `error` would open an unnamed dialog wrapping an unnamed list. |
-  | `ariaDescribedBy` / `id` / `name` | id list / strings | `''` | The trigger's description, overriding this component's own note span and never routed through `triggerData`; and two attributes forwarded to the trigger button, neither required, because the labelled form names its trigger with `aria-labelledby`. |
+  | `ariaDescribedBy` / `id` / `name` | id list / strings | `''` | The trigger's description, overriding this component's own note span and never routed through `triggerProps`; and two attributes forwarded to the trigger button, neither required, because the labelled form names its trigger with `aria-labelledby`. |
   | `readonly` | boolean | `false` | Takes focus and REFUSES to open. Mapped to `triggerAriaDisabled`, not to `disabled`: a disabled button does not take focus, so "takes focus and refuses" could not be built on it. |
   | `disabled` / `invalid` / `mono` / `icon` / `class` | booleans / Font Awesome classes / class string | `false` / `false` / `false` / `''` / `''` | The whole control off; `aria-invalid` and the danger border; the value in the mono face with tabular figures; a leading glyph on the trigger; and an extra class on the picker ROOT, so a call site can reach the trigger's own box with a descendant rule. |
 
   Rest spread:
   - `{...rest}` lands on the `<Field>` root in the LABELLED form only. The bare form's root is the
     picker root, which `SearchablePopover` writes and which takes no spread, so a rest attribute
-    there is refused loudly rather than dropped silently; `triggerData` is the route.
+    there is refused loudly rather than dropped silently; `triggerProps` is the route.
 
   Invariants:
   - THIS COMPONENT HAS NO `<style>` AT ALL, and the `.fabricate-select*` family lives in
     `styles/fabricate.css`, for the two reasons `openspec/specs/design-system/spec.md` states; a
     CALL SITE stating its own per-site skin is the licensed exception.
-  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of `--fab-recipe-control-font`,
-    which is declared only inside `.fabricate-manager` — the area-scoped-property rule in the same
-    requirement; `tests/token-generation-gate.test.js` ratchets that read out of scoped styles.
+  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of
+    `--fab-manager-recipe-control-font`, which is declared only inside `.fabricate-manager` — the
+    area-scoped-property rule; `tests/token-generation-gate.test.js` ratchets that read out.
   - THE LABELLED FORM'S HOST IS A `<div>`, NEVER A `<label>`. A `<label>` forwards a caption click
     into the control it wraps, and this control toggles a portaled panel dismissed on `mousedown` in
     the capture phase — so from open, the caption's mousedown dismissed the list and the forwarded
@@ -67,7 +67,7 @@
     placeholder = '',
     minWidth = 0,
     maxWidth = 0,
-    triggerData = {},
+    triggerProps = {},
     triggerTitle = '',
     label = '',
     hint = '',
@@ -148,7 +148,7 @@
       `Fabricate | Select: ${Object.keys(rest).join(', ')} cannot be forwarded without a ` +
         "`label`, `hint` or `error`, because the bare form's root element belongs to " +
         'SearchablePopover and takes no attribute spread. Pass a `data-*` hook through ' +
-        '`triggerData`, which stamps it on the trigger button itself.'
+        '`triggerProps`, which stamps it on the trigger button itself.'
     );
   });
 
@@ -162,14 +162,14 @@
     if (!label && !ariaLabel && !ariaLabelledBy) {
       console.warn(
         'Fabricate | Select: the panel it opens, and the option list inside it, have no ' +
-          'accessible name: neither `dialogAriaLabel` nor `dialogAriaLabelledBy` resolves to ' +
+          'accessible name: neither `panelLabel` nor `panelLabelledBy` resolves to ' +
           'anything. Pass a `label`, an `ariaLabel` or an `ariaLabelledBy`.'
       );
     }
   });
 
   const triggerAttributeData = $derived({
-    ...triggerData,
+    ...triggerProps,
     'data-select-size': rung,
     'aria-invalid': invalid ? 'true' : undefined,
     id: id || undefined,
@@ -234,19 +234,19 @@
     optionClass="fabricate-select-option"
     triggerLabel={triggerText}
     triggerIcon={icon}
-    triggerData={triggerAttributeData}
+    triggerProps={triggerAttributeData}
     {triggerTitle}
-    triggerAriaLabel={labelTarget}
-    triggerAriaLabelledBy={labelledByTarget}
-    triggerAriaDescribedBy={describedByTarget}
+    ariaLabel={labelTarget}
+    ariaLabelledBy={labelledByTarget}
+    ariaDescribedBy={describedByTarget}
     triggerAriaDisabled={readonly}
-    dialogAriaLabel={label || ariaLabel}
-    dialogAriaLabelledBy={ariaLabelledBy}
+    panelLabel={label || ariaLabel}
+    panelLabelledBy={ariaLabelledBy}
     minWidth={minWidth || band.minWidth}
     maxWidth={maxWidth || band.maxWidth}
     {disabled}
     option={optionRow}
-    onChoose={choose}
+    onSelect={choose}
   />
 {/snippet}
 

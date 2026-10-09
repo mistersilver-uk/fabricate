@@ -2,6 +2,7 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
+import { PREMIUM_ICONS_AD_PATTERN, WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -194,8 +195,12 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: '' },
     ],
     expectView: 'world-components',
-    // The page's own hook, so a route that fell back to the systems library fails rather than publishing the wrong screen.
-    expectSelector: '[data-scoped-page="world-components"]',
+    // The page's own hook, so a route that fell back to the systems library fails rather than publishing the wrong screen,
+    // and the Premium advert alone in the header group, since the lab world opts into experimental features (issue 2220).
+    expectSelector:
+      '.fabricate-manager:has([data-scoped-page="world-components"]) .manager-header-actions > [data-premium-icons-ad]:only-child',
+    // Compact at 1280: the advert's full face waits for the 1320 rung.
+    expectVisible: '[data-premium-icons-ad]',
     // The four leaves in the prototype's authored order, each proved to hold its own icon rather than merely to exist.
     expectContained: [
       {
@@ -217,6 +222,16 @@ export const CASES = Object.freeze([
         target: '[data-pagination-page]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-component-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone (issue 1371): `manager-scoped-prop-contract` pairs the claim with the page's own import.
@@ -226,6 +241,8 @@ export const CASES = Object.freeze([
       // Issue 1371 r8-cat: the frame is this screen too.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
+      PREMIUM_ICONS_AD_PATTERN,
     ],
   }),
   managerCase({
@@ -329,6 +346,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -504,7 +522,7 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/model\/componentScopeValidation\.js$/],
   }),
   managerCase({
-    // The shared entry frame stacks its rail below `max-width: 1000px`, and nothing in the registry reached that state.
+    // The shared entry frame stacks its rail below `max-width: 960px`, and nothing in the registry reached that state.
     id: 'world-component-entry-stacked',
     label: 'Manager — World Component entry stacked',
     reaches: 'beyond',
@@ -533,10 +551,36 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    // 980 rather than 1024, measured: the lab's manager container resolves to the window width minus two.
-    position: { width: 980, height: 860 },
+    // 960, measured: the lab's manager container resolves to the window width minus two.
+    position: { width: 960, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
     // The frame is the sheet's and the two pages that wear it, so a change to either selects this frame and its wide twin.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // Inside the 960-1000 band: the frame stacks on the ladder's 960 rung, so here its rail stays beside it.
+    id: 'world-component-entry-980',
+    label: 'Manager — World Component entry at 980px',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-component-entry-page',
+      expectedTracks: 2,
+    },
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'world', 'scoped', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
@@ -555,15 +599,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-recipe-category-id] .manager-icon-button',
+        target: '[data-recipe-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-component-tag-id] .manager-icon-button',
+        target: '[data-component-tag-id] .fabricate-icon-button',
       },
     ],
     // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).
@@ -577,6 +621,7 @@ export const CASES = Object.freeze([
       // Categories screens, so this frame is claimed beside the three system ones.
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
@@ -630,6 +675,21 @@ export const CASES = Object.freeze([
         target: '[data-scoped-list-inspector-foot]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-essence-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+        // A world-default card is the fact row's `rule` density, its subtitle muted (issue 1521).
+        {
+          selector: '[data-scoped-list-inherit-note="effectSource"]',
+          styles: 'color: var(--fab-text-muted)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
@@ -638,10 +698,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
       // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
-      // The inspector's foot action, which this case draws and did not claim (issue 1446).
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/ui\/model\/scopedEntityListModel\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -678,6 +737,7 @@ export const CASES = Object.freeze([
       // The buffered-save seam (issue 1372): the header's Back and Save pair, and the draft leaf behind it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({

@@ -23,7 +23,7 @@
     SYSTEM_MEMBERSHIP_FILTERS,
     WORLD_MEMBERSHIP_FILTERS,
   } from '../../../../model/scopedEntityListModel.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Select from '../../../components/Select.svelte';
@@ -35,8 +35,8 @@
   import Callout from '../../../components/Callout.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconButton from '../../../components/IconButton.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
+  import FilterBar from '../../../components/FilterBar.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { createScopedListBrowserState } from '../../../../model/managerBrowserViewState.js';
 
@@ -94,15 +94,9 @@
     // ── THE TOOLBAR AS TWO ROWS (issue 1371 r8-cat) ──────────────────────────────────────────
     // `false` keeps the one row every caller renders today.
     splitToolbar = false,
-    // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
-    // The control HEIGHT the search field and the lead row's lane-filter selects take, named after
-    // the rung rather than after an adjective, exactly as `ManagerSearchField`'s own `size` is:
-    // `''` is the shipped 34px control and `'38'` is the ladder's next rung up
-    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
-    toolbarLeadSize = '',
     // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ─────────────────────────── A
-    // `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for the
-    // tile at the head of every list row.
+    // `Medallion` descriptor — `{variant, glyph}`, the primitive's OWN prop names — for the tile
+    // at the head of every list row, which is the art ladder's 38 whatever the caller.
     rowMedallion = null,
     // ── THE SELECTION BAND'S SELECT-ALL, AND WHAT IT REACHES (issue 1371 r9-cat, gap-list 37) ──
     // `'results'` (the shipped band: a tri-state master box for the page, and `Select all {n}
@@ -211,19 +205,9 @@
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
 
-  /**
-   * The class a LEAD-ROW select carries when the caller asked for the 38px rung, and `undefined`
-   * otherwise.
-   */
-  function leadSelectSizeClass(filter) {
-    const onLeadRow = (filter?.toolbarRow ?? 'lead') === 'lead';
-    return toolbarLeadSize === '38' && onLeadRow ? 'is-size-38' : undefined;
-  }
-
   /** The row medallion's three arguments, merged over the shipped tile. */
   const rowMedallionSpec = $derived({
     variant: '',
-    size: 40,
     glyph: 0,
     ...(rowMedallion && typeof rowMedallion === 'object' ? rowMedallion : {}),
   });
@@ -554,12 +538,11 @@
               'FABRICATE.Admin.Manager.Scoped.List.Unavailable',
               'This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable.'
             )}
-            dataAttr="data-scoped-list-state"
-            dataValue="unavailable"
+            data-scoped-list-state="unavailable"
           />
         </div>
       {:else}
-        <ManagerToolbar
+        <FilterBar
           class="manager-scoped-list-toolbar"
           data-scoped-list-toolbar=""
           ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
@@ -591,7 +574,7 @@
                   'FABRICATE.Admin.Manager.Scoped.List.MembershipLabel',
                   'Membership filter'
                 )}
-                dataAttr="data-scoped-list-membership"
+                data-scoped-list-membership
                 optionDataAttr="data-scoped-list-membership-option"
                 onChange={(next) => changeMembership(next)}
               />
@@ -608,12 +591,13 @@
             <span class="manager-scoped-list-sort-label" id="scoped-list-sort-label">
               {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
             </span>
+            <!-- The search's row is one 38px shell (issue 1782), so a one-row toolbar's sort takes `form`. -->
             <Select
-              size="toolbar"
+              size={splitToolbar ? 'toolbar' : 'form'}
               value={sortKey}
               options={sortSelectOptions}
               ariaLabelledBy="scoped-list-sort-label"
-              triggerData={{ 'data-scoped-list-sort': '' }}
+              triggerProps={{ 'data-scoped-list-sort': '' }}
               onChange={(next) => changeSortKey(next)}
             />
 
@@ -672,7 +656,7 @@
               onClear={clearSelection}
             />
           {/if}
-        </ManagerToolbar>
+        </FilterBar>
 
         {#if bulk && !inspectorBody && selection.count > 0}
           <!-- With no inspector column there is nowhere else for a bulk body to go, so it sits
@@ -695,21 +679,14 @@
                 'FABRICATE.Admin.Manager.Scoped.List.FilteredEmpty',
                 'Nothing here matches the current search and filters.'
               )}
-              dataAttr="data-scoped-list-state"
-              dataValue="filtered"
+              data-scoped-list-state="filtered"
             >
-              <ManagerButton data-scoped-list-clear-filters onclick={clearFilters}>
+              <Button data-scoped-list-clear-filters onclick={clearFilters}>
                 {text('FABRICATE.Admin.Manager.Scoped.List.ClearFilters', 'Clear filters')}
-              </ManagerButton>
+              </Button>
             </EmptyState>
           {:else if page.rows.length === 0}
-            <EmptyState
-              {icon}
-              title={emptyTitle}
-              hint={emptyHint}
-              dataAttr="data-scoped-list-state"
-              dataValue="empty"
-            />
+            <EmptyState {icon} title={emptyTitle} hint={emptyHint} data-scoped-list-state="empty" />
           {:else}
             <ul class="manager-scoped-list" role="list" aria-label={title}>
               {#each page.rows as entry (entry.id)}
@@ -727,7 +704,7 @@
                 >
                   <!-- THE SELECTION BOX LEADS THE ROW. -->
                   <SelectionCheckbox
-                    size="lg"
+                    density="comfortable"
                     wrapper="label"
                     checked={bulkSelected}
                     ariaLabel={format(
@@ -751,7 +728,7 @@
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
                       variant={rowMedallionSpec.variant}
-                      size={rowMedallionSpec.size}
+                      size={38}
                       glyph={rowMedallionSpec.glyph}
                     />
                     <span class="manager-system-copy">
@@ -898,14 +875,14 @@
             {#if inspectorKicker}
               <p class="manager-kicker" data-scoped-list-inspector-kicker>{inspectorKicker}</p>
             {/if}
-            <div class="manager-inspector-title-row">
-              <span class="manager-inspector-icon">
+            <div class="manager-inspector-title-row is-art">
+              <span class="manager-inspector-icon is-art">
                 <Medallion
                   art={thumbnail.src}
                   alt=""
                   icon={thumbnail.icon}
                   tint={thumbnail.tint}
-                  size={42}
+                  size={38}
                 />
               </span>
               <span class="manager-inspector-copy">
@@ -945,8 +922,7 @@
               title={restingTitle ||
                 text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
               hint={restingHint || subtitle}
-              dataAttr="data-scoped-list-inspector-state"
-              dataValue="resting"
+              data-scoped-list-inspector-state="resting"
             />
           </div>
         {/if}
@@ -957,14 +933,13 @@
 
 <!-- THE TWO TOOLBAR CONTROLS THAT MOVE ROW, WRITTEN ONCE (issue 1371 r8-cat). -->
 {#snippet searchField()}
-  <ManagerSearchField
+  <SearchField
     value={query}
-    size={toolbarLeadSize}
-    onInput={(next) => changeQuery(next)}
+    onChange={(next) => changeQuery(next)}
     placeholder={searchPlaceholder ||
       text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
     ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
-    inputAttrs={{ 'data-scoped-list-search': '' }}
+    inputProps={{ 'data-scoped-list-search': '' }}
   />
 {/snippet}
 
@@ -985,16 +960,16 @@
         </span>
       {/if}
       <!--
-        THE APP'S OWN LIST, AT THIS ROW'S OWN RUNG (issue 1504).
+        THE APP'S OWN LIST, AT THIS ROW'S OWN RUNG (issue 1504): `form` on the search's row, so the
+        row is one 38px shell (issue 1782), and `toolbar` on the second.
       -->
       <Select
-        size="toolbar"
-        class={leadSelectSizeClass(filter)}
+        size={row === 'filters' ? 'toolbar' : 'form'}
         value={filterValues[filter.id] ?? 'all'}
         options={laneFilterOptions(filter)}
         ariaLabel={filter.microLabel ? undefined : filter.label}
         ariaLabelledBy={filter.microLabel ? `scoped-list-filter-label-${filter.id}` : undefined}
-        triggerData={{ 'data-scoped-list-filter': filter.id }}
+        triggerProps={{ 'data-scoped-list-filter': filter.id }}
         onChange={(next) => changeFilter(filter.id, next)}
       />
     {/if}
@@ -1006,7 +981,7 @@
      released full-width classification `<main>` is the list column plus the freed 300px — so the
      budget this frame lays out against is the main column's inline size, not the window's. */
   .manager-scoped-list-frame {
-    container-type: inline-size;
+    container: fabricate-scoped-list / inline-size;
     display: grid;
     grid-template-rows: minmax(0, 1fr);
     min-width: 0;
@@ -1046,7 +1021,7 @@
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
      its height to whichever child grows, and the browse archetype's rule — the pagination bar sits
      OUTSIDE the scroll area so it never moves — is the opposite of that. */
-  :global(.manager-toolbar.manager-scoped-list-toolbar) {
+  :global(.fabricate-filter-bar.manager-scoped-list-toolbar) {
     flex: 0 0 auto;
   }
 
@@ -1062,10 +1037,10 @@
     flex: 0 0 auto;
   }
 
-  /* `Pagination` renders its own `<section>` carrying two classes since issue 1502 — the family
-     root `fabricate-pagination` and `manager-pagination` — so a scoped rule cannot reach it and
-     the sizing has to be stated from this side of the boundary. */
-  .manager-scoped-list-column > :global(.manager-pagination) {
+  /* `Pagination` renders its own `<section>` carrying the family root `fabricate-pagination`, so
+     a scoped rule cannot reach it and the sizing has to be stated from this side of the
+     boundary. */
+  .manager-scoped-list-column > :global(.fabricate-pagination) {
     flex: 0 0 auto;
   }
 
@@ -1176,7 +1151,7 @@
        selects beside it sit on (issue 1372). */
     background: var(--fab-bg-1);
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
@@ -1380,7 +1355,7 @@
 
   /* BELOW THE THRESHOLD THE INSPECTOR STACKS UNDER THE LIST rather than compressing to a column
      too narrow to read a name in. */
-  @container (max-width: 760px) {
+  @container fabricate-scoped-list (max-width: 760px) {
     .manager-scoped-list-layout.has-inspector {
       grid-template-columns: minmax(0, 1fr);
     }

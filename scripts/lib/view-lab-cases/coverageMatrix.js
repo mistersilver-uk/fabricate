@@ -25,7 +25,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -43,7 +43,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -191,7 +191,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
       // The list collapses (issue 1096), so the tier-step row is not in the document until its trigger is opened.
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       // Anchored on a named trigger's tier-step row: which control is last depends on the mode.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
@@ -218,7 +218,7 @@ export const CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -255,7 +255,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkReadoutModel\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckSimulatorFaces\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
@@ -273,7 +272,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // The bars themselves, not the panel: a panel that abstained would still render.
-    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    expectSelector: '.fabricate-manager [data-banded-bar-track]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
@@ -320,13 +319,14 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // A bucket that must exist, not merely a bar.
-    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    expectSelector: '.fabricate-manager [data-banded-bar-row="award-0"]',
     kinds: ['manager', 'checks'],
-    // No entry for `src/systems/progressiveCheckSandbox.js`: `isUiFile` admits no such path, so a pattern would be dead.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
+      // The preview sandbox the award-count histogram is bucketed from.
+      /^src\/systems\/progressiveCheckSandbox\.js$/,
     ],
   }),
   managerCase({
@@ -531,7 +531,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-overview' },
     ],
     expectView: 'recipe-edit',
@@ -589,7 +589,7 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
-    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 84px column.
+    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 72px column.
     expectNoHorizontalOverflow: [
       '.fabricate-app-content',
       '.fabricate-app-nav',
@@ -614,5 +614,37 @@ export const CASES = Object.freeze([
     expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
     kinds: ['player', 'extension'],
     sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  // Issue 2008: the Preview stepper adds one bought die to the simulated roll only, marked on the
+  // last original tile, while the odds and the inset reading stay at the base pool.
+  managerCase({
+    id: 'manager-checks-count-simulator-bought',
+    label: 'Manager — Checks count preview, a simulated roll with one bought die (frame 07 rail)',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-faults' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      {
+        selector:
+          '[data-checks-preview-additional-dice-field] .fab-stepper [data-stepper-increment]',
+      },
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-panel]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager:has([data-check-count-expected="1.30"])' +
+      ':has([data-checks-odds-expected="1.30"])' +
+      ' [data-checks-simulator-readout][data-checks-simulator-product="count"]' +
+      ':has([data-checks-simulator-legend]:has-text("dashed = bought"))' +
+      ':not(:has([data-checks-simulator-face-marks~="bought"] ~ li))' +
+      ' [data-checks-simulator-face-marks~="bought"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(?:CheckOutcomePreview\.svelte|checkPreview\.js|checkReadoutModel\.js)$/,
+    ],
   }),
 ]);

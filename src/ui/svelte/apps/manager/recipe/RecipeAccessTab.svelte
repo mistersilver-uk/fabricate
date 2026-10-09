@@ -17,7 +17,7 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -69,7 +69,7 @@
   data-recipe-tab="access"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Access', 'Access')}
 >
-  <div class="manager-recipe-tab-intro">
+  <div class="manager-recipe-tab-intro" data-tab-heading>
     <h2 class="manager-recipe-tab-title">
       {text('FABRICATE.Admin.Manager.Recipe.AccessTab.Title', 'Who can craft this')}
     </h2>
@@ -158,11 +158,11 @@
           'No player or character has been granted this recipe yet.'
         )}
         contextClass="manager-recipe-tab-empty"
-        dataAttr="data-recipe-access-empty"
+        data-recipe-access-empty
       />
     {/if}
 
-    <ManagerButton
+    <Button
       class="manager-recipe-tab-action"
       data-recipe-open-access
       onclick={() => onOpenAccess()}
@@ -170,7 +170,7 @@
       <i class="fas fa-user-shield" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AccessTab.ManageAccess', 'Manage access')}</span>
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </ManagerButton>
+    </Button>
   </div>
 </section>
 
@@ -214,7 +214,7 @@
     height: 26px;
     overflow: hidden;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-bg-3);
     font-size: 0.66rem;

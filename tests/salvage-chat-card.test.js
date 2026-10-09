@@ -10,6 +10,7 @@ import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js
 import {
   NOT_PUBLIC,
   OVER_FIXED_DATA,
+  PUBLIC_BARE,
   UNDER_DATA,
   UNDER_ROWS,
   executedCheck,
@@ -99,11 +100,16 @@ test('uses the item-bag fallback image when a recovered entry has no img', () =>
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
-test('renders the roll total row when a finite check value is present', () => {
-  const content = buildSalvageChatContent(successModel({ rollValue: 15 }));
+test('renders the roll total row when a public check has a finite value', () => {
+  const content = buildSalvageChatContent(successModel({ rollValue: 15, check: PUBLIC_BARE }));
   assert.ok(content.includes('fabricate-craft-chat__roll'), 'shared roll row element');
   assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
   assert.ok(content.includes('fabricate-craft-chat__roll-value">15<'), 'roll value rendered');
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck({}, visibility);
+    const html = buildSalvageChatContent(successModel({ rollValue: 15, check }));
+    assert.ok(!html.includes('__roll'), `no total for ${JSON.stringify(visibility)} (issue 2054)`);
+  }
 });
 
 test('omits the roll row for a guaranteed no-check salvage (null / absent value)', () => {

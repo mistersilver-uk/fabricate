@@ -6,7 +6,9 @@
 import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
+import { cardRollsKey, settleCardRolls } from './checkCardRolls.js';
 import { refusalData } from './checkTarget.js';
+import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
 import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftCardFields.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
@@ -54,6 +56,19 @@ function selectedQuantityItems(items, quantity) {
     remaining -= readStackQuantity(item);
   }
   return selected;
+}
+
+/** `ctx.refusal`, having first completed a resumed run (`options.runId`) `failed` with its message,
+ * as a short stock does, so a run refused before it resumes is never left in progress. */
+export async function refuseSalvage(engine, ctx) {
+  const { actor, options, refusal } = ctx;
+  const salvageRunManager = actor && options?.runId ? engine._getSalvageRunManager() : null;
+  const salvageRun = salvageRunManager?.getActiveRun(actor, options.runId);
+  if (!salvageRun) return refusal;
+  const failed = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+    failureReason: refusal.message,
+  });
+  return { ...refusal, salvageRun: failed };
 }
 
 /** The run this salvage runs against, the stock it will spend, and the two refusals reachable
@@ -191,9 +206,15 @@ export async function openSalvageRun(engine, ctx) {
 /** The salvage check, the failure policy, and the two zero-mutation aborts the result can carry. */
 export async function runSalvageCheck(engine, ctx) {
   const { actor, component, options, salvageRunManager, system, toolValidation } = ctx;
+  // The salvage card carries a public roll only when this call posts one: a bulk run posts an
+  // aggregate card instead, and its rolls keep their own messages. The key is on `ctx` before the
+  // check runs, so `settleSalvageRoll` closes an offer the check opened and then threw past.
+  const carries = options?.suppressChat !== true && system?.features?.chatOutput === true;
+  if (carries) ctx.cardRolls = cardRollsKey();
+  const cardRolls = ctx.cardRolls ?? false;
   const checkResult = await engine._runSalvageCraftingCheck(component, system, actor, {
-    interactive: options?.interactive === true,
-    toolItems: toolValidation.tools,
+    interactive: checkRequest({ ...options, cardRolls }, { craftingSystem: system, component }),
+    toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     rollDecision: options?.rollDecision ?? null,
   });
   ctx.checkResult = checkResult;
@@ -208,7 +229,7 @@ export async function runSalvageCheck(engine, ctx) {
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse(checkResult.message, {
+    const { result: misconfigured } = refuse(checkResult.message, {
       // Additive discriminator (issue 859): a GM-side config gap, NOT a rolled
       // failure. `success` is unchanged, so no existing consumer regresses; a caller
       // that cares can now say "not configured — tell your GM" instead of reporting a
@@ -217,6 +238,7 @@ export async function runSalvageCheck(engine, ctx) {
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
       ...(refusal && { data: refusal }),
     });
+    return { result: carryAdditionalDice(misconfigured, checkResult) };
   }
 
   // The player dismissed the interactive roll dialog: a user choice, not a failure. Abort with
@@ -226,10 +248,11 @@ export async function runSalvageCheck(engine, ctx) {
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse('Salvage cancelled', {
+    const { result: cancelled } = refuse('Salvage cancelled', {
       cancelled: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
     });
+    return { result: carryAdditionalDice(cancelled, checkResult) };
   }
   return null;
 }
@@ -251,6 +274,14 @@ export async function beginSalvageSettlement(engine, ctx) {
     await salvageRunManager.updateRun(actor, salvageRun);
   }
   return null;
+}
+
+/**
+ * Closes the offer a public salvage roll rode to its card under: a roll no card carried posts its
+ * own message. `salvage()` calls it on every way out once the check has begun.
+ */
+export function settleSalvageRoll(ctx) {
+  return settleCardRolls(ctx.cardRolls);
 }
 
 /**
@@ -277,6 +308,7 @@ export async function resolveSalvageFailure(engine, ctx) {
       // Salvage parity (issue 419): the FAILURE path breaks required tools only
       // when `breakToolsOnFail === true` (this gate), matching crafting.
       const salvageFailBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+      // ratchet-exempt(world-scope): not-a-system
       usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
         forceBreak: salvageFailBreak.forceBreak,
         authority: salvageFailBreak.authority,
@@ -307,7 +339,7 @@ export async function resolveSalvageFailure(engine, ctx) {
           actor,
           resultGroups: failureResultGroups,
           consumedItems: consumedOnFail,
-          tools: toolValidation.tools,
+          tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
           salvageRecipeView: failureSalvageRecipeView,
           checkResult,
         })
@@ -414,6 +446,7 @@ export async function commitSalvage(engine, ctx) {
   // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
   // `breakToolsOnFail` gate exists here), via the shared seam.
   const salvageSuccessBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+  // ratchet-exempt(world-scope): not-a-system
   const usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
     forceBreak: salvageSuccessBreak.forceBreak,
     authority: salvageSuccessBreak.authority,
@@ -427,7 +460,7 @@ export async function commitSalvage(engine, ctx) {
     actor,
     resultGroups,
     consumedItems,
-    tools: toolValidation.tools,
+    tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     salvageRecipeView,
     checkResult,
   });

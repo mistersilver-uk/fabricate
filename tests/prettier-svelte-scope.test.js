@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 // `standalone.mjs` — a bundle with no filesystem access, so no `getFileInfo`/`resolveConfig`.
 import * as prettier from 'prettier/index.mjs';
 // The same walker `scripts/compare-svelte-render.mjs` uses, so "every component" means one thing.
+import { PRETTIER_GATE_ARGS } from '../scripts/lib/newViolations.js';
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
 import { assertGateArgv, runPrettierCheck } from './helpers/gateScope.js';
 
@@ -32,10 +33,12 @@ const ignorePath = [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.pre
 const components = listSvelteComponents(path.join(repoRoot, 'src'));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 
-// The file scope `format` and `format:check` share (issue 1660).
+// `format` and `format:check` run the base-comparing gate, which hands Prettier's CLI
+// `PRETTIER_GATE_ARGS`: the file scope both share (issue 1660).
+const GATE_SCRIPT = 'scripts/format-check.mjs';
 const GATE_TARGETS = ['.'];
-const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
-const FORMAT_CHECK_ARGV = ['prettier', '--check', ...GATE_TARGETS];
+const FORMAT_ARGV = ['node', GATE_SCRIPT, '--write'];
+const FORMAT_CHECK_ARGV = ['node', GATE_SCRIPT];
 
 /** A throwaway directory holding one `Component.svelte`, and a disposer. */
 function withFixtureComponent(source, run) {
@@ -76,10 +79,10 @@ function formatCheckReport(result, before, after) {
   const operational = result.status === PRETTIER_OPERATIONAL_ERROR;
   const report = [
     operational
-      ? 'expected the current repository to already satisfy format:check, got exit 2 — an' +
+      ? "expected the format gate's Prettier listing to reach a verdict, got exit 2 — an" +
         ' OPERATIONAL ERROR rather than a formatting verdict, so any "All matched files use' +
         ' Prettier code style!" line in the output below is meaningless:'
-      : `expected the current repository to already satisfy format:check, got exit ${result.status}:`,
+      : `expected the format gate's Prettier listing to reach a verdict, got exit ${result.status}:`,
   ];
 
   if (operational) {
@@ -94,7 +97,7 @@ function formatCheckReport(result, before, after) {
         ' deleted or renamed long ago and never taken out of the format:check argv — and this' +
         ' gate pins every one of those targets by equality, so a stale entry produces this' +
         ' message on every run, forever. Re-running tells you which: if it passes, it was the' +
-        ' tree; if it names the same path again, drop it from GATE_TARGETS and from the script' +
+        ' tree; if it names the same path again, drop it from GATE_TARGETS and from PRETTIER_GATE_ARGS' +
         ' together. Exit 2 also outranks exit 1, so this run may ALSO have found genuinely' +
         ' unformatted files; the output below is worth reading in full.'
     );
@@ -139,7 +142,7 @@ describe('Prettier covers Svelte components', () => {
   });
 
   it('resolves a Svelte parser for a real component', async () => {
-    const sample = path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte');
+    const sample = path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte');
     const info = await prettier.getFileInfo(sample, { ignorePath, resolveConfig: true });
     assert.deepEqual(
       info,
@@ -152,7 +155,7 @@ describe('Prettier covers Svelte components', () => {
   // reported even with no plugin loaded, so it does NOT prove a parser exists.
   it('registers prettier-plugin-svelte in the resolved config', async () => {
     const config = await prettier.resolveConfig(
-      path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
+      path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte')
     );
     assert.ok(
       config?.plugins?.includes('prettier-plugin-svelte'),
@@ -164,7 +167,7 @@ describe('Prettier covers Svelte components', () => {
   // than inherited.
   it('pins the plugin options that decide component formatting', async () => {
     const config = await prettier.resolveConfig(
-      path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
+      path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte')
     );
     assert.equal(config?.svelteAllowShorthand, true, 'svelteAllowShorthand must be pinned');
     assert.equal(
@@ -185,6 +188,7 @@ describe('Prettier covers Svelte components', () => {
   it('pins the format and format:check scripts by argv equality', () => {
     assertGateArgv(packageJson, 'format', FORMAT_ARGV);
     assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
+    assert.deepEqual([...PRETTIER_GATE_ARGS], ['--list-different', ...GATE_TARGETS]);
   });
 });
 
@@ -200,11 +204,11 @@ describe('the argv pin actually fails on the reported hole', () => {
       },
     };
     assert.ok(
-      withDecoyIgnorePath.scripts['format:check'].includes('--check .'),
+      withDecoyIgnorePath.scripts['format:check'].includes(GATE_SCRIPT),
       'the decoy command must still contain the substring a naive check would look for — that is' +
         ' exactly what the old substring-only assertion could not see past. (It used to look for' +
         ' the component glob; the scope is the repository root since issue #1660, so the' +
-        ' stand-in for "the command still looks right" is the check flag and its target.)'
+        ' stand-in for "the command still looks right" is the gate script.)'
     );
     assert.throws(
       () => assertGateArgv(withDecoyIgnorePath, 'format:check', FORMAT_CHECK_ARGV),
@@ -214,11 +218,11 @@ describe('the argv pin actually fails on the reported hole', () => {
   });
 
   it('fails when the corpus target is removed from the script', () => {
-    // `prettier --check` with nothing to check exits 0 having looked at no file at all, which is
-    // the same silent success issue 946 reported by a different route.
+    // A gate with nothing to run exits 0 having looked at no file at all, which is the same silent
+    // success issue 946 reported by a different route.
     const withoutTarget = {
       scripts: {
-        'format:check': packageJson.scripts['format:check'].replace(' .', ''),
+        'format:check': packageJson.scripts['format:check'].replace(` ${GATE_SCRIPT}`, ''),
       },
     };
     assert.notEqual(
@@ -235,17 +239,16 @@ describe('the argv pin actually fails on the reported hole', () => {
 });
 
 describe('format:check actually reaches the component corpus when executed', () => {
-  // The execution half of the fix: run the REAL, pinned `format:check` argv through Prettier's real
+  // The execution half of the fix: run the REAL, pinned arguments the gate hands Prettier's real
   // CLI entry point (PATH-free — see `runPrettierCheck`), not a reconstruction through the Node API
-  // (issue 946).
+  // (issue 946). Exit 1 lists format debt, which the gate compares with base; exit 2 is no verdict.
   it('inspects the real component corpus, not a reconstruction of it', () => {
-    const argv = assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
     // Listed immediately either side of the invocation, deliberately rather than reusing the
     // module-level `components`: that binding is computed at load and separated from this run by
     // five async tests which each call `getFileInfo` over all 267 components, so comparing against
     // it would widen the window being described by seconds for no gain.
     const before = listSvelteComponents(path.join(repoRoot, 'src'));
-    const result = runPrettierCheck([...argv.slice(1), '--log-level', 'debug']);
+    const result = runPrettierCheck([...PRETTIER_GATE_ARGS, '--log-level', 'debug']);
     const after = listSvelteComponents(path.join(repoRoot, 'src'));
     const report = formatCheckReport(result, before, after);
     // The bracketing is asserted, not just taken: `before`/`after` are what the listing diff is
@@ -256,7 +259,7 @@ describe('format:check actually reaches the component corpus when executed', () 
       `the bracketing listings must be the real component corpus — got ${before.length} before` +
         ` and ${after.length} after; an empty bracket makes the moved-file diff a no-op`
     );
-    assert.equal(result.status, 0, report);
+    assert.notEqual(result.status, PRETTIER_OPERATIONAL_ERROR, report);
     // And the report this test would have failed with must be the report, not a stand-in: a green
     // run never reads its own failure message, so nothing else here notices if the call is
     // replaced by a literal or stops carrying Prettier's own output.
@@ -276,7 +279,7 @@ describe('format:check actually reaches the component corpus when executed', () 
         ' to zero while format:check still exits 0'
     );
     assert.ok(
-      inspected.some((file) => file.endsWith('ExplainerCard.svelte')),
+      inspected.some((file) => file.endsWith('IconFactRow.svelte')),
       'expected a known real component to appear among the files Prettier actually inspected'
     );
   });
@@ -328,11 +331,11 @@ describe('the report a failing format:check would actually print', () => {
     status: 1,
     stdout: 'Checking formatting...\n',
     stderr:
-      '[warn] src/ui/svelte/apps/manager/ExplainerCard.svelte\n' +
+      '[warn] src/ui/svelte/apps/manager/IconFactRow.svelte\n' +
       '[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n',
   };
   const componentPath = (name) => path.join(repoRoot, 'src/ui/svelte/apps/manager', name);
-  const steady = [componentPath('ExplainerCard.svelte')];
+  const steady = [componentPath('IconFactRow.svelte')];
 
   it("reports exit 1 as Prettier's own verdict, with nothing added to it", () => {
     const report = formatCheckReport(UNFORMATTED, steady, steady);
@@ -419,7 +422,7 @@ describe('the report a failing format:check would actually print', () => {
   it('names the components that appeared and vanished across the invocation', () => {
     const vanished = componentPath('Vanished.svelte');
     const appeared = componentPath('Appeared.svelte');
-    const kept = componentPath('ExplainerCard.svelte');
+    const kept = componentPath('IconFactRow.svelte');
     // Exit 0 on purpose: the listing diff is enrichment reported at ANY exit code, because a tree
     // moving under the run is worth knowing about whatever Prettier concluded.
     const report = formatCheckReport(
@@ -437,7 +440,7 @@ describe('the report a failing format:check would actually print', () => {
       `the report must name what vanished, not just count it:\n${report}`
     );
     assert.ok(
-      !report.includes('ExplainerCard'),
+      !report.includes('IconFactRow'),
       `a component present either side of the run did not move and is not news:\n${report}`
     );
   });

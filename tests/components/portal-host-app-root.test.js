@@ -21,6 +21,8 @@ const ANCHORED_POPOVER = 'src/ui/svelte/actions/anchoredPopover.js';
 const PORTAL_ACTION = 'actions/portal.js';
 /** The THIRD portal route (issue 1500). Six overlays no longer name `portal.js` at all. */
 const ANCHORED_POPOVER_ACTION = 'actions/anchoredPopover.js';
+/** The fourth route (issue 2157): a typeahead combobox's suggestion list, over the same action. */
+const TYPEAHEAD_PANEL_ACTION = 'actions/typeaheadPanel.js';
 /** The module that now HOLDS the clipping selectors (issue 1500), and the reason it is scanned. */
 const OVERLAY_BOUNDS = 'src/ui/svelte/util/overlayBounds.js';
 const OVERLAY_BOUNDS_MODULE = 'util/overlayBounds.js';
@@ -73,6 +75,7 @@ function portalingFiles(sources) {
         file === OVERLAY_BOUNDS ||
         text.includes(PORTAL_ACTION) ||
         text.includes(ANCHORED_POPOVER_ACTION) ||
+        text.includes(TYPEAHEAD_PANEL_ACTION) ||
         text.includes(OVERLAY_BOUNDS_MODULE)
     )
     .map(([file]) => file)
@@ -195,10 +198,12 @@ test('the portal population is the set of components that actually portal', () =
 
   for (const anchor of [
     'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/Modal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+    // A typeahead combobox, which names neither earlier route.
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
     // The selectors themselves, which is the shape the clipping boundary took when it left the
     // components. Without this file the offence clause reads no boundary selector at all.
     'src/ui/svelte/util/overlayBounds.js',
@@ -214,7 +219,7 @@ test('the portal population is the set of components that actually portal', () =
     files.length >= 9,
     `only ${files.length} files were detected as portaling. Nine do since issue 1500 re-keyed ` +
       'six of them onto the anchored-popover action, moved the clipping selectors into their own ' +
-      'module and left `ManagerColorPopover` a plain panel its caller positions; a lower number ' +
+      'module and left `TintPicker` a plain panel its caller positions; a lower number ' +
       'means the membership test has narrowed and this gate is guarding a subset.'
   );
 });
@@ -391,7 +396,8 @@ test('every portal target is resolved through the shared resolver or handed in b
     if (file === RESOLVER || file === ANCHORED_POPOVER) continue;
     const source = stripComments(text);
     // The anchored-popover action resolves the host through `resolveOverlayHost` itself.
-    for (const use of source.matchAll(/use:anchoredPopover=|anchoredPopover\(\w/g)) {
+    const adoptions = /use:anchoredPopover=|use:typeaheadPanel=|anchoredPopover\(\w/g;
+    for (const use of source.matchAll(adoptions)) {
       targets.push(`${file}: ${use[0]}`);
     }
     for (const use of source.matchAll(/use:portal=\{([^}]*)\}/g)) {

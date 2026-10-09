@@ -94,7 +94,7 @@ describe('1286 EmptyState — variant contract', () => {
   it('keeps the data hook and the context class a host container needs', async () => {
     const target = await harness.mount({
       contextClass: 'manager-task-required-tools-empty',
-      dataAttr: 'data-complications-empty',
+      'data-complications-empty': true,
     });
     const panel = panelOf(target);
     assert.ok(

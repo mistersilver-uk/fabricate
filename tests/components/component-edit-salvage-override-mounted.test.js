@@ -8,6 +8,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import {
   chooseSelectOption,
@@ -23,6 +24,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-salvage-override-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -120,6 +122,12 @@ async function typeCommit(input, raw) {
   input.value = raw;
   input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
   key(input, 'Enter');
+  await flush();
+}
+
+async function clearInput(input) {
+  input.value = '';
+  input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
   await flush();
 }
 
@@ -456,11 +464,129 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.ok(!target.querySelector('[data-override-player-sees]'), 'no line, no picker');
   });
 
-  it('a count check reads its successes override, so it shows no DC line', async () => {
+});
+
+describe('ComponentEditView — the successes needed override of a count check (issue 2006)', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+  afterEach(() => harness.remount());
+
+  const COUNT_TIERS = [
+    { id: 'o', name: 'One', dc: 10, adjustment: 2, successes: 1 },
+    { id: 't', name: 'Two', dc: 15, adjustment: 0, successes: 2 },
+    { id: 'n', name: 'Unset', dc: 20, adjustment: -2, successes: null },
+  ];
+  // The retained character-value target is dormant under a count: only `successesOverride` is read.
+  const countConfig = (pool = {}, rest = {}) => ({
+    ...rest,
+    evaluation: {
+      ...evaluation(),
+      product: 'count',
+      direction: 'over',
+      pool: { die: 10, base: '4', threshold: '8', required: 3, ...pool },
+    },
+  });
+  const mountCount = ({ salvage = {}, pool, config } = {}) =>
+    mountOverride({
+      salvage,
+      salvageCheckTiers: COUNT_TIERS,
+      config: config ?? countConfig(pool),
+    });
+  const keptNotices = (target) =>
+    [...target.querySelectorAll('[data-salvage-override-kept]')].map((node) => node.textContent.trim());
+  const customInput = (target) => target.querySelector('[data-salvage-successes-custom]');
+
+  it('edits the successes override from the tiers\' successes, naming both dormant overrides', async () => {
+    const { target, drafts, dirty } = await mountCount({
+      salvage: { dcOverride: 15, adjustmentOverride: -2 },
+    });
+    assert.equal(card(target).dataset.salvageOverrideField, 'successesOverride');
+    assert.equal(title(target), 'Successes needed override');
+    assert.equal(
+      hint(target),
+      'Replaces the successes needed for this component. The pool and threshold still come from the check.'
+    );
+    assert.deepEqual(presetLabels(target), [
+      'System default — 3 successes needed',
+      'One — 1 success needed',
+      'Two — 2 successes needed',
+      'Custom…',
+    ]);
+    assert.equal(selectTriggerText(target, PRESET), 'System default — 3 successes needed');
+    assert.deepEqual(keptNotices(target), [
+      'A DC override of 15 is kept on this component. This system does not read it, so it is not shown for editing.',
+      'A difficulty adjustment override of −2 is kept on this component. This system does not read it, so it is not shown for editing.',
+    ]);
+    assert.equal(playerSees(target), 'Salvage check · 3 successes needed · d10s, success on ≥ 8');
+    assert.ok(!target.querySelector('[data-override-preview-actor]'), 'the line reads no character');
+    assert.ok(!dirty.includes(true), 'rendering the dormant overrides is not an edit');
+
+    await choose(target, 'req:2');
+    assert.equal(lastSalvage(drafts).successesOverride, 2, 'the preset writes the successes needed');
+    assert.equal(playerSees(target), 'Salvage check · 2 successes needed · d10s, success on ≥ 8');
+    assert.equal(dirty.at(-1), true, 'a successes override is an edit');
+
+    await choose(target, 'system');
+    assert.equal(lastSalvage(drafts).successesOverride, null, 'System default clears it');
+    assert.equal(dirty.at(-1), false, 'and the draft is clean again against its baseline');
+    assert.ok(
+      drafts.every(
+        ({ updates }) => updates.salvage.dcOverride === 15 && updates.salvage.adjustmentOverride === -2
+      ),
+      'neither dormant override is ever written or cleared'
+    );
+  });
+
+  it('types a custom count, and an off-list override shows under Custom… verbatim', async () => {
+    const { target, drafts } = await mountCount({ salvage: { successesOverride: 7 } });
+    assert.equal(selectTriggerText(target, PRESET), 'Custom…');
+    assert.equal(customInput(target).value, '7', 'never snapped to a tier');
+    assert.equal(customInput(target).getAttribute('aria-label'), 'Custom successes needed');
+    await typeCommit(customInput(target), '4');
+    assert.equal(lastSalvage(drafts).successesOverride, 4);
+    assert.equal(playerSees(target), 'Salvage check · 4 successes needed · d10s, success on ≥ 8');
+    await typeCommit(customInput(target), '25');
+    assert.equal(lastSalvage(drafts).successesOverride, 20, 'editing stops at 20');
+    await clearInput(customInput(target));
+    assert.equal(lastSalvage(drafts).successesOverride, null, 'a cleared field is the default');
+  });
+
+  it('names one success, a strict test and a threshold read from the character as authored', async () => {
+    const { target } = await mountCount({
+      salvage: { successesOverride: 1 },
+      config: {
+        thresholdMode: 'exceed',
+        evaluation: {
+          product: 'count',
+          direction: 'under',
+          pool: { die: 20, base: '2', threshold: '@skills.smith.level', required: 3 },
+        },
+      },
+    });
+    assert.equal(
+      playerSees(target),
+      'Salvage check · 1 success needed · d20s, success on < @skills.smith.level'
+    );
+  });
+
+  it('saves the successes override and reopens clean on its preset', async () => {
+    const first = await mountCount();
+    await choose(first.target, 'req:1');
+    const saved = lastSalvage(first.drafts);
+    assert.equal(saved.successesOverride, 1);
+    harness.remount();
+    const reopened = await mountCount({ salvage: saved });
+    assert.equal(selectTriggerText(reopened.target, PRESET), 'One — 1 success needed');
+    assert.ok(!reopened.dirty.includes(true), 'reopening the saved record is clean');
+  });
+
+  it('a fixed-range routed count is graded by its ranges, so it shows no line', async () => {
     const { target } = await mountOverride({
-      config: { evaluation: { product: 'count', direction: 'over', pool: { die: 10 } } },
+      salvageResolutionMode: 'routed',
+      salvageCheckTiers: COUNT_TIERS,
+      config: countConfig({}, { type: 'fixed' }),
     });
     assert.ok(Boolean(card(target)), 'the override itself still renders');
-    assert.ok(!target.querySelector('[data-override-player-sees]'), 'no DC line');
+    assert.ok(!target.querySelector('[data-override-player-sees]'), 'no line');
   });
 });

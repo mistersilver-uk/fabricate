@@ -10,6 +10,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { flushSync } from '../node_modules/svelte/src/index-client.js';
 import { createSvelteModuleCompiler } from './helpers/compile-svelte-module.js';
+import { convertCountingFormula } from '../src/ui/svelte/apps/manager/checks/countFormulaConversion.js';
 
 const MODULE_PATH = 'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js';
 
@@ -217,6 +218,29 @@ describe('checksRouteModel', () => {
     assert.deepEqual(model.checksDirtyActivities, []);
     assert.equal(model.checkSimpleDraft.rollFormula, '1d20');
     assert.equal(model.checkActivation.salvage.enabled, true);
+  });
+
+  // Convert (issue 2006, N21) is a draft write like any other: nothing is saved on the click.
+  it('stages a free-text Convert as a dirty draft, and Discard restores the summing check', () => {
+    const summing = {
+      rollFormula: '2d20cs<=@skills.survival.value',
+      dc: 12,
+      tiers: [{ id: 'plain', name: 'Plain', dc: 10, successes: null }],
+    };
+    const { model, calls } = openModel({
+      system: { ...SYSTEM, craftingCheck: { enabled: true, simple: summing } },
+    });
+    const before = JSON.parse(JSON.stringify(model.checkSimpleDraft));
+    model.onUpdateCraftingCheckSimple(convertCountingFormula(model.checkSimpleDraft));
+    flushSync();
+    assert.equal(model.checkSimpleDraft.evaluation.product, 'count');
+    assert.deepEqual(model.checksDirtyActivities, ['crafting'], 'the activity is dirty');
+    assert.deepEqual(calls, [], 'Convert persists nothing');
+    model.discardChecksDrafts();
+    flushSync();
+    assert.deepEqual(JSON.parse(JSON.stringify(model.checkSimpleDraft)), before, 'Discard restores it');
+    assert.equal(model.checkSimpleDraft.rollFormula, summing.rollFormula);
+    assert.equal(model.checksDirty, false);
   });
 
   it('stages the alchemy Active switch as a check mode of simple or none', async () => {

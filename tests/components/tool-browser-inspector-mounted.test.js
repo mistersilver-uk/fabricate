@@ -20,6 +20,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     // THE PANEL'S CARD IS THE SHARED PRIMITIVE (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
+    // Its two rule groups are rail sections (issue 1782).
+    'src/ui/svelte/components/Rail.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
   ],
 });
@@ -79,6 +81,29 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
     );
   });
 
+  it('draws an ADOPTED Tool as two named rail groups, rules then inheritance (issue 1782)', async () => {
+    const target = await harness.mount({
+      tool: MEMBER_TOOL,
+      managedItems: [{ id: 'c1', name: 'Iron Ore' }],
+      systemName: 'Mythwright Forge',
+    });
+    const sections = [...target.querySelectorAll('.fab-rail')];
+    assert.deepEqual(
+      sections.map((section) => section.dataset.toolInspectorSection),
+      ['rules', 'inheritance']
+    );
+    assert.deepEqual(
+      sections.map((section) => [
+        section.getAttribute('role'),
+        document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent,
+      ]),
+      [
+        ['group', 'Effective rules here'],
+        ['group', 'Inheritance'],
+      ]
+    );
+  });
+
   it('describes an UNADOPTED world Tool instead of going empty, and offers the adoption', async () => {
     const adds = [];
     const worldEdits = [];
@@ -130,6 +155,19 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
     assert.match(
       panel.querySelector('[data-tool-inspector-rule="breakage"]').textContent,
       /8% break/
+    );
+    // ONE rail section, named by that heading; a Tool with no rules record inherits nothing
+    // (issue 1782).
+    const sections = [...panel.querySelectorAll('.fab-rail')];
+    assert.deepEqual(
+      sections.map((section) => section.dataset.toolInspectorSection),
+      ['rules'],
+      'the rules group alone, with no Inheritance group'
+    );
+    assert.equal(sections[0].getAttribute('role'), 'group');
+    assert.equal(
+      document.querySelector(`[id="${sections[0].getAttribute('aria-labelledby')}"]`)?.textContent,
+      'What it would inherit here'
     );
   });
 

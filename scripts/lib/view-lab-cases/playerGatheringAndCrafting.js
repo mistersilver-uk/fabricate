@@ -4,16 +4,27 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  COUNT_ADVANTAGE_FOOTER,
   CRAFTING_PROGRESSIVE,
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
   CRAFTING_SHARED,
+  PLAYER_DETAIL_HEADER,
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { playerAdditionalDicePromptCases } from './playerAdditionalDicePromptCases.js';
+import { playerAdvantagePromptCases } from './playerAdvantagePromptCases.js';
+import { playerCountResultCases } from './playerCountResultCases.js';
 
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+/** The files a count prompt case is drawn from (issue 2006). */
+const COUNT_PROMPT_SOURCES = Object.freeze([
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+]);
 
 /** Issue 2005's player-rendering states: open the horseshoe and press Craft, prompting. */
 const CRAFT_HORSESHOE = Object.freeze([
@@ -41,7 +52,7 @@ const LAB_CHAT = (visibility) =>
   `[data-view-lab-chat-log] > .chat-message[data-view-lab-chat-visibility="${visibility}"]`;
 const PROMPT_SOURCES = [
   CRAFTING_SIMPLE,
-  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
 ];
 const RESULT_SOURCES = [
@@ -74,13 +85,14 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-footer button[data-action="roll"][type="submit"])' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
@@ -95,15 +107,18 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
+    // Frame 27: Disadvantage and Advantage each state the keep rule under their label.
     expectSelector:
-      `${SINGLE_PROMPT}:has(button[data-action="advantage"])` +
+      SINGLE_PROMPT +
+      ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("keep the worse"))' +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("1d20 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -129,7 +144,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -146,7 +161,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("1d20"))' +
+      ':has([data-check-formula] .fabricate-info-strip-value:text-is("1d20"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
@@ -229,6 +244,24 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
   }),
+  // The character-value prompt at the 1024x640 floor, its footer inside the window.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-compact',
+    label: 'Player app — roll-under crafting roll prompt at 1024x640',
+    smokeLabels: [],
+    reaches: 'beyond',
+    position: { width: 1024, height: 640 },
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-live[aria-live="polite"] .target-row` +
+      ' > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 11 · stay at or under")',
+    expectContained: [
+      { container: SINGLE_PROMPT, target: `${SINGLE_PROMPT} .manager-modal-footer` },
+    ],
+    kinds: ['player', 'crafting', 'responsive'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
   // The recipe's check card names the target and its source fact, or why the target cannot be read.
   playerCase({
     id: 'player-crafting-check-descriptor-under-resolved',
@@ -258,6 +291,43 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: DESCRIPTOR_SOURCES,
   }),
+  // Issue 1521: a formula the crafter cannot reduce to a number is a danger notice after the strip.
+  playerCase({
+    id: 'player-crafting-check-formula-unresolved',
+    label: 'Player app — crafting check whose roll formula cannot be read for this character',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'formula-unresolved' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]' +
+      ':has(.fabricate-info-strip [data-check-formula]:has-text("@skills.missing.level"))' +
+      ' > .fabricate-info-strip + .fab-notice.is-danger[data-check-formula-error]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
+  // The listing says the check cannot roll for this character instead of Ready to craft (issue 2139).
+  playerCase({
+    id: 'player-crafting-check-unrollable-status',
+    label: 'Player app — a recipe whose check cannot roll for this character',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under-unresolved' },
+    steps: [CRAFT_HORSESHOE[0]],
+    position: { width: 1100, height: 760 },
+    expectSelector:
+      '.fabricate-app' +
+      ':has(.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"][data-recipe-status="checkUnrollable"])' +
+      ' [data-recipe-blocking]:has-text("roll for this character")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingBrowseStatus|summaryProjection)\.js$/,
+      /^src\/ui\/svelte\/util\/craftingRecipeStatus\.js$/,
+      /^src\/systems\/craftingCheckRefusal\.js$/,
+    ],
+  }),
   // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
   playerCase({
     id: 'player-crafting-roll-result-under-pass',
@@ -268,7 +338,7 @@ export const CASES = Object.freeze([
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
     expectSelector:
       `${RESULT_BOX}[data-roll-success="true"]` +
-      ':has([data-roll-summary]:text-is("The result group is produced.")) ' +
+      ':has([data-roll-summary]:text-is("The result set is produced.")) ' +
       EVIDENCE_ROWS('target', 'preRolled', 'margin'),
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
@@ -289,7 +359,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
   }),
-  // The posted result card, docked in a lab chat log: public states its rows, private and blind none.
+  // The posted result card: public states its rows, private and blind neither a total nor rows.
   playerCase({
     id: 'player-crafting-chat-card-under-public',
     label: 'Player app — roll-under crafting result card, public roll, with its evidence rows',
@@ -306,13 +376,14 @@ export const CASES = Object.freeze([
   }),
   playerCase({
     id: 'player-crafting-chat-card-under-whispered',
-    label: 'Player app — roll-under crafting result card after a private GM roll, no evidence rows',
+    label:
+      'Player app — roll-under crafting result card after a private GM roll, no total or evidence rows',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('gmroll'), ROLL],
     expectSelector:
-      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):not(:has(.fabricate-craft-chat__roll))` +
       ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('whisper'),
     kinds: ['player', 'crafting'],
@@ -320,15 +391,99 @@ export const CASES = Object.freeze([
   }),
   playerCase({
     id: 'player-crafting-chat-card-under-blind',
-    label: 'Player app — roll-under crafting result card after a blind roll, no evidence rows',
+    label:
+      'Player app — roll-under crafting result card after a blind roll, no total or evidence rows',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('blindroll'), ROLL],
     expectSelector:
-      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):not(:has(.fabricate-craft-chat__roll))` +
       ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('blind'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  // Issue 2132: a failed card's reason line, inked into the chat's own ink as the pill is.
+  playerCase({
+    id: 'player-crafting-chat-card-under-fail',
+    label: 'Player app — failed roll-under crafting result card, with its failure reason',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'crafting',
+      dialog: 'open',
+      rollPromptState: 'under-evidence-fail',
+      chatLog: '1',
+    },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
+    allowedConsoleErrors: [/Your crafting check failed/],
+    expectSelector: `${CHAT_CARD}.fabricate-craft-chat--failure:has(.fabricate-craft-chat__result) .fabricate-craft-chat__notice`,
+    expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__notice`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  // Issue 2153: the GM-only card's needs-attention line, for a complication macro it cannot run.
+  playerCase({
+    id: 'player-crafting-chat-card-gm-complication-fault',
+    label: 'Player app — GM-only complication card, with a macro that needs attention',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The GM crafts, so the elected GM applies the delivery on its own client and whispers the card.
+    query: { tab: 'crafting', viewer: 'gm', rollPromptState: 'complication-fault', chatLog: '1' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    allowedConsoleErrors: [/names a macro that could not be resolved to a script macro/],
+    expectSelector: '.fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault',
+    expectVisible: `${LAB_CHAT('whisper')} .fabricate-craft-chat__complication-fault`,
+    kinds: ['player', 'crafting'],
+    // The runtime builds this card, the router delivers it to the elected GM, and the presenter
+    // escapes it beside the crafted card.
+    sourceMatches: [
+      /^src\/systems\/complicationRuntime\.js$/,
+      /^src\/bootstrap\/socketRouter\.js$/,
+      /^src\/ui\/presenters\/CraftingChatCard\.js$/,
+    ],
+  }),
+  // Issue 1773: a card's credit, with its label, roll and reason, and its learned and already-known
+  // grants, each a full-width row whose recipe name is never ellipsized away.
+  playerCase({
+    id: 'player-crafting-chat-card-rewards',
+    label: 'Player app — crafting result card with a credit and two knowledge grants',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'crafting',
+      rollPromptState: 'over-evidence',
+      resultRowState: 'reward-craft',
+      chatLog: '1',
+    },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${CHAT_CARD}:has([data-reward-kind="currency"] .fabricate-craft-chat__reward-reason)` +
+      ':has([data-reward-kind="knowledge"])',
+    expectVisible: `${LAB_CHAT('public')} [data-reward-kind="currency"]`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: [...CHAT_SOURCES, /^src\/systems\/(?:resultKindAward|craftChatEntries)\.js$/],
+  }),
+  // Issue 1773: a stage that left a reward to pick says on its public card where it is chosen.
+  playerCase({
+    id: 'player-crafting-chat-card-award-pending',
+    label: 'Player app — crafting result card naming a reward still to be chosen',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'crafting',
+      rollPromptState: 'over-evidence',
+      resultRowState: 'reward-group',
+      chatLog: '1',
+    },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector: `${CHAT_CARD}:has([data-reward-kind="awardChoice"])`,
+    expectVisible: `${LAB_CHAT('public')} [data-reward-kind="awardChoice"]`,
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
   }),
@@ -357,17 +512,18 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     expectSelector:
-      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
-      ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · best face explodes · worst face cancels"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each adds dice."))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -382,21 +538,74 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     expectSelector:
-      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
-      ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (@abilities.int.mod + 11)"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (character value 13), moved +1 by modifiers"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each moves the threshold."))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
-  // The recipe detail behind the count prompt: the pool line in place of a formula, and no DC chip.
+  // Issue 2006: the note names the faces actually authored, a from-face explosion and cancel.
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-explode',
+    label: 'Player app — success-counting crafting roll prompt naming its chosen faces',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-explode' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 7"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≥ 7 · explodes on 9 or above once · 2 or under cancels a success"))' +
+      ':not(:has([data-roll-prompt-zero-pool]))' +
+      ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-explode-narrow',
+    label: 'Player app — success-counting crafting roll prompt naming its chosen faces at 1024x640',
+    smokeLabels: [],
+    reaches: 'beyond',
+    position: { width: 1024, height: 640 },
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-explode' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 7"))' +
+      ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
+    kinds: ['player', 'crafting', 'responsive'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  // A pool reduced to zero warns that the roll fails, and the roll stays possible.
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-zero',
+    label: 'Player app — success-counting crafting roll prompt over a pool of no dice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-zero' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("0d10 · each ≥ 7"))' +
+      ':has(button[type="submit"]:not([disabled]):not([aria-disabled]))' +
+      ':not(:has([data-roll-prompt-additional-dice-group]))' +
+      ' .formula-content [data-roll-prompt-zero-pool]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  // The recipe detail behind the count prompt: the pool line in place of a formula, its successes
+  // needed (issue 2006) and no DC chip.
   playerCase({
     id: 'player-crafting-check-count',
     label: 'Player app — success-counting crafting check in the recipe detail',
@@ -409,7 +618,8 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("6d10 · each ≥ 8"))' +
+      ':has([data-check-formula] .fabricate-info-strip-value:text-is("5d10 · each ≥ 8"))' +
+      ':has([data-check-successes-needed="2"]:has-text("2 successes needed"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
@@ -431,13 +641,14 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-footer button[data-action="roll"][type="submit"])' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -453,6 +664,21 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-detail-tab="events"]' },
     ],
     kinds: ['player', 'gathering'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
+  }),
+  // Issue 1521: the stamina pool is an info strip under its kicker, the node legend a line after it.
+  playerCase({
+    id: 'player-gathering-economy-strip',
+    label: 'Player app — Gathering stamina pool strip',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', rollPromptState: 'gathering-stamina' },
+    steps: [{ selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' }],
+    expectSelector:
+      '.fabricate-info-strip[data-gathering-economy-strip][data-economy-mode="both"]' +
+      ':has([data-gathering-stamina-pool=""]:has-text("6/10"))' +
+      ' + [data-gathering-nodes-legend]',
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -466,8 +692,10 @@ export const CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
+    // Issue 1644: the find section states its one drop on the shared yield scale.
+    expectSelector: '[data-gathering-drops-state="ready"] [data-yield-scale] [data-yield-entry]',
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-after-success',
@@ -484,24 +712,44 @@ export const CASES = Object.freeze([
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
+  // Issue 2153: the posted result card's event section, re-inked for the chat's parchment.
+  playerCase({
+    id: 'player-gathering-chat-card-event',
+    label: 'Player app — gathering result card, with the event that fired',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', rollPromptState: 'gathering-event', chatLog: '1' },
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
+      { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
+      { selector: '.gathering-task-detail-attempt' },
+    ],
+    expectSelector:
+      '.fabricate-gather-chat .fabricate-gather-chat__section--event .fabricate-gather-chat__heading',
+    expectVisible: `${LAB_CHAT('public')} .fabricate-gather-chat__section--event`,
+    kinds: ['player', 'gathering'],
+    sourceMatches: [/^src\/ui\/presenters\/GatheringChatCard\.js$/],
+  }),
   playerCase({
     id: 'player-gathering-drop-open',
     label: 'Player app — Gathering drop modifiers open',
-    // The only state that draws the repaired drop disclosure (issue 1512), on the world's five-row
-    // drop table, so one open row's breakdown shows against four collapsed siblings.
+    // The only state that draws the opened breakdown (issue 1644): the world's five-row drop table,
+    // authored with coal last although its chance is second, so the scale shows authored order.
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'gathering' },
     steps: [
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', scroll: true },
+      { selector: '[data-gathering-drops-disclosure]', scroll: true },
       // A scroll step short-circuits before the driver's activation branch, so opening is its own.
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', press: 'Enter' },
+      { selector: '[data-gathering-drops-disclosure]', press: 'Enter' },
+      { selector: ':nth-match([data-gathering-drop-modifiers], 1)', scroll: true },
     ],
-    // The open row and the region it names, so a header that only flipped its attribute fails.
+    // The open disclosure and the breakdowns it names, so a toggle that only flipped its state fails.
     expectSelector:
-      '.gathering-task-drop:has(.gathering-task-drop-summary[aria-expanded="true"][aria-controls])' +
+      '[data-gathering-drops]' +
+      ':has([data-gathering-drops-disclosure][aria-expanded="true"][aria-controls])' +
       ' [data-gathering-drop-modifiers]',
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
@@ -555,10 +803,10 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-blind'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A blind-selection environment redacts its task list: one opaque attempt card, with the mask chip above it.
+    // A blind-selection environment redacts its task list; its one generic Attempt is the header's primary.
     steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-realm-locked',
@@ -592,7 +840,115 @@ export const CASES = Object.freeze([
     steps: [],
     position: { width: 1100, height: 760 },
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
+  }),
+  // Issue 1773: the Produces list previews a currency reward by its label and expression, and a
+  // knowledge reward by the recipe it teaches, each with its kind's glyph.
+  playerCase({
+    id: 'player-crafting-results-kinds',
+    label: 'Player app — Crafting outputs of every result kind',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-kinds' },
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-io-group="outputs"]:has([data-io-output="component"])' +
+      ':has([data-io-output="currency"]):has([data-io-output="knowledge"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/(?:resultOutputRows|CraftingListingBuilder)\.js$/,
+    ],
+  }),
+  // Issue 1773: a group the player chooses from previews who chooses and how many over its
+  // alternatives, one Well beneath the plain result.
+  playerCase({
+    id: 'player-crafting-results-choice-group',
+    label: 'Player app — Crafting outputs with a reward the player chooses',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-group' },
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-io-group="outputs"]:has([data-io-output="component"])' +
+      ':has([data-io-output="group"] .fab-well [data-io-output="currency"])' +
+      ':has([data-io-output="group"] [data-io-output="knowledge"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/resultOutputRows\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  }),
+  // Issue 1773: two groups drawn by roll preview who chooses and how many, each by roll.
+  playerCase({
+    id: 'player-crafting-results-rolled-group',
+    label: 'Player app — Crafting outputs with two rewards drawn by roll',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-group-rolled' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-io-output="group"] + [data-io-output="group"]', scroll: true },
+    ],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-io-group="outputs"]:has([data-io-output="group"] + [data-io-output="group"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/resultOutputRows\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  }),
+  // Issue 1773: a craft that left a reward to pick names it and offers the run in the Journal.
+  playerCase({
+    id: 'player-crafting-outcome-award-pending',
+    label: 'Player app — a craft outcome owing a reward the player picks in the Journal',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'over-evidence', resultRowState: 'reward-group' },
+    steps: [...CRAFT_HORSESHOE],
+    expectTab: 'crafting',
+    expectSelector: '[data-crafting-run-summary] [data-crafting-award-pending]',
+    expectCenterHit: '[data-crafting-award-pending] button',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RunSummaryPanel\.svelte$/,
+      /^src\/systems\/journalRunReply\.js$/,
+    ],
+  }),
+  // Issue 1773: a routed tier that pays a credit previews it as a reward, not as an Item.
+  playerCase({
+    id: 'player-crafting-routed-tier-reward',
+    label: 'Player app — Crafting routed tier awarding a currency credit',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-tiers' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+    ],
+    expectTab: 'crafting',
+    // One shared-ladder tier drawing both rows (issue 1644).
+    expectSelector:
+      '[data-recipe-section="outcome-tiers"]' +
+      ' [data-outcome-tier]:has([data-award-kind="component"]):has([data-award-kind="currency"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
@@ -639,10 +995,10 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     query: { tab: 'crafting' },
     steps: [{ selector: '[data-crafting-sources-add]' }],
-    // The portaled form, as of the phase that routed this control onto the shared picker.
+    // The portaled form, as of the phase that routed this control onto the set picker (issue 1782).
     expectSelector:
-      '.fabricate-picker-popover.crafting-sources-popover ' +
-      '.manager-travel-popover-options .crafting-source-option',
+      '.fabricate-picker-popover.fabricate-set-picker-popover ' +
+      '.manager-travel-popover-options .fabricate-set-picker-option',
     kinds: ['player', 'crafting'],
     // `apps/crafting/ComponentSourcesBar.svelte` named explicitly rather than left to `CRAFTING_SHARED`.
     sourceMatches: [
@@ -684,6 +1040,30 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
+  // Issue 1644: after a live craft of the Runeblade, the tier its roll routed through is marked.
+  playerCase({
+    id: 'player-crafting-routed-reached',
+    label: 'Player app — Crafting routed by check after its roll, the reached tier marked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+      { selector: '[data-recipe-section="outcome-tiers"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="outcome-tiers"]' +
+      ':has([data-outcome-tier="rw-masterwork"][data-outcome-rolled="true"] [data-outcome-reached])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_CHECK,
+      /^src\/systems\/(?:versionedCommandResults|journalRollFacts)\.js$/,
+      /^src\/systems\/CraftingEngine\.js$/,
+    ],
+  }),
   playerCase({
     id: 'player-crafting-run-summary',
     label: 'Player app — Crafting run summary',
@@ -697,7 +1077,12 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-result',
@@ -743,7 +1128,7 @@ export const CASES = Object.freeze([
       // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
@@ -771,7 +1156,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -796,7 +1181,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -823,7 +1208,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
@@ -832,7 +1217,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-alternative',
     label: 'Player app — Crafting essence alternative',
     smokeLabels: ['player-crafting-essence-alternative'],
-    // The counterpart wants an open alternatives radiogroup whose essence option draws the glyph face.
+    // The counterpart wants an open choice slot whose essence alternative draws the glyph face.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -905,6 +1290,51 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-chooser-open',
+    label: 'Player app — Crafting requirement chooser open on a choice slot',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // The chooser opened by pressing the choice tile, not by auto-advance, on a slot the player has
+    // picked from: the picked alternative is selected, and the other is short and still offered.
+    // No fixture group pairs a met alternative with a short one, so both read short.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="essence"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="choice"]' },
+      {
+        // The smoke walk's selector, so its shape is proven against the rendered chooser.
+        selector:
+          '[data-requirement-panel="sm-set-tidebound-g2"] ' +
+          '[data-requirement-alternative].crafting-alt-option[data-option-index="1"] button',
+      },
+    ],
+    expectSelector:
+      '[data-recipe-section="requirement-rail"]' +
+      ':has([data-requirement-slot][data-slot-kind="choice"][aria-expanded="true"])' +
+      ':has(.crafting-alt-option[data-option-index="1"] [aria-pressed="true"])' +
+      ':has(.crafting-alt-option.is-short[data-option-index="0"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  // Issue 1644: a tag slot matching two held stacks, one short, opens the held-stack picker.
+  playerCase({
+    id: 'player-crafting-stack-picker',
+    label: 'Player app — Crafting held-stack picker on a tag slot',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', tagStacks: '1' },
+    // Selecting the recipe opens its one choice slot, so pressing the tile would shut it.
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    expectSelector:
+      '[data-recipe-section="stacks"][data-alt-kind="stack"] [role="radiogroup"]' +
+      ':has([role="radio"][aria-checked="true"]:not(.is-short))' +
+      ':has([role="radio"].is-short[aria-describedby]:not(:disabled))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
     id: 'player-crafting-tag-unmatched',
     label: 'Player app — Crafting tag unmatched',
     smokeLabels: ['player-crafting-tag-unmatched'],
@@ -929,6 +1359,65 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-unmet-by-allocation',
+    label: 'Player app — Crafting recipe the player stepped below its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // A ready recipe whose pool the player stepped down: no Craft primary, no ready chip, and the
+    // header states the missing materials.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector: '[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        fill: '0',
+      },
+    ],
+    expectSelector:
+      '[data-recipe-header]' +
+      ':has([data-recipe-blocking][data-notice-tone="danger"])' +
+      ':has(.player-detail-header-tile [data-crafting-status="missingMaterials"])' +
+      ':not(:has([data-crafting-craft]))' +
+      ':not(:has(.player-detail-header-meta [data-crafting-status]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      PLAYER_DETAIL_HEADER,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-essence-overshoot',
+    label: 'Player app — Crafting essence pool funded past its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // Four Steel Ingots give 8 Earth of 6 and 8 Fire of 3: one surplus sentence per essence.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector: '[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        fill: '4',
+      },
+      { selector: '[data-essence-overshoot="fire"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="essence-pool"]' +
+      ':has([data-essence-overshoot="earth"])' +
+      ':has([data-essence-overshoot="fire"])',
+    expectContained: [
+      { container: '[data-crafting-detail-scroll]', target: '[data-essence-overshoot="fire"]' },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/essenceOvershoot\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-pick-for-me',
     label: 'Player app — Crafting pick for me',
     smokeLabels: ['player-crafting-pick-for-me'],
@@ -939,11 +1428,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
       {
-        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-coal"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-coal"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-ruby"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-ruby"] .fab-stepper-input',
         fill: '0',
       },
       { selector: '.requirement-rail-wand' },
@@ -961,18 +1450,15 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ingot"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-iron-ingot"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
         fill: '2',
       },
     ],
@@ -1138,6 +1624,13 @@ export const CASES = Object.freeze([
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
     expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
+  ...playerCountResultCases(),
+  ...playerAdvantagePromptCases(),
+  ...playerAdditionalDicePromptCases(),
 ]);

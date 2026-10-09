@@ -157,10 +157,10 @@
             art: option?.img ?? '',
             icon: option?.icon ?? 'fas fa-circle',
             tint: tintOf(option?.colorToken),
-            disabled: option?.available !== true,
+            unavailable: option?.available !== true,
             needed: Number(option?.need) || 1,
             claimed: 0,
-            held: option?.available === true ? Number(option?.need) || 1 : 0,
+            held: Math.max(0, Number(option?.held) || 0),
             optionIndex: Number(option?.index) || 0,
             heldItemId: null,
           },
@@ -172,7 +172,7 @@
         art: item?.img ?? option?.img ?? '',
         icon: option?.icon ?? 'fas fa-circle',
         tint: tintOf(option?.colorToken),
-        disabled: option?.available !== true || item?.available !== true,
+        unavailable: option?.available !== true || item?.available !== true,
         needed: Number(option?.need) || 1,
         claimed: Math.max(0, Number(item?.claimed) || 0),
         held: Math.max(0, Number(item?.held) || 0),
@@ -209,13 +209,13 @@
     requirements.map((requirement, requirementIndex) => {
       const groupId = String(requirement?.groupId ?? `requirement-${requirementIndex}`);
       const options = choiceOptions(groupId, requirement?.option);
+      // ChoiceOptionList locks stock held in full yet claimed elsewhere; a pending command, all.
       const candidates = candidateRows(groupId, options).map((candidate) => ({
         ...candidate,
-        unavailable: candidate.disabled,
-        reason: candidate.disabled
+        reason: candidate.unavailable
           ? localize('FABRICATE.App.Journal.Stage.CandidateUnavailable')
           : '',
-        disabled: busy || candidate.disabled,
+        disabled: busy,
       }));
       const selected = selectedCandidate(requirement, candidates);
       const needed = Math.max(1, Number(requirement?.option?.need) || 1);
@@ -232,11 +232,11 @@
         selected,
         candidates,
         disabled: !editable || busy,
-        // Only an UNSTARTED stage reaches the requirement rail at all, and only an unstarted
-        // stage has a selection left to repair.
+        // Only an unstarted stage reaches this rail, and only it has a selection left to repair.
         stale: !selected && (requirement?.selectedItemId != null || !requirement?.option),
         poolsRequired: essenceRequirements.length,
         poolsMet: essenceRequirements.filter((entry) => entry?.satisfied === true).length,
+        poolsStarted: essenceRequirements.filter((entry) => Number(entry?.delivered) > 0).length,
       };
     })
   );
@@ -349,7 +349,7 @@
       groupName={`journal-route-${step?.stepId}`}
       disabled={!editable || busy}
       onChange={chooseRoute}
-      dataAttr="data-journal-route"
+      data-journal-route
     >
       {#snippet optionBody(route)}
         <div class="fab-stack" data-gap="1">
@@ -418,10 +418,8 @@
         />
       {/if}
     </section>
-    <!-- Carriers, not the seeded envelope. Every stage with a resolution snapshot persists an
-         `essenceSpend: {labels:{}, carriers:[]}`, which `presentEssenceSpend` answers truthy, so a
-         recipe needing no essence drew an empty band. Same filter the terminal screen applies
-         (issue 1648, M20 then UX2-4). -->
+    <!-- Carriers, not the envelope: a resolved stage persists a truthy empty `essenceSpend`, so a
+         recipe needing no essence would draw an empty band; the terminal screen filters alike. -->
     {#if consumedEssence?.carriers?.length > 0}
       <EssencePool
         history={consumedEssence}
@@ -506,6 +504,8 @@
         })}
       overshootLabel={(essence, amount) =>
         localize('FABRICATE.App.Journal.Stage.Overshoot', { essence, amount })}
+      meterValueLabel={(delivered, need) =>
+        localize('FABRICATE.App.Crafting.Pool.MeterValue', { delivered, need })}
       allocationLabel={(source) =>
         localize('FABRICATE.App.Journal.Stage.Allocate', { name: source.label })}
       decrementLabel={(source) =>

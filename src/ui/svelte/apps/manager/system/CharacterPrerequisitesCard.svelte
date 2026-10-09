@@ -19,7 +19,7 @@
   import { tick } from 'svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
@@ -140,11 +140,11 @@
       </p>
     </div>
     <div class="manager-character-modifier-card-header-actions">
-      <ManagerButton role="primary" data-add-prerequisite onclick={handleAdd}>
+      <Button role="primary" data-add-prerequisite onclick={handleAdd}>
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Add', 'Add prerequisite')}
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         data-seed-prerequisite-presets
         disabled={!presetsSupported}
         data-tooltip={!presetsSupported
@@ -157,7 +157,7 @@
       >
         <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.SeedPresets', 'Seed presets')}
-      </ManagerButton>
+      </Button>
     </div>
   </header>
 
@@ -260,7 +260,7 @@
                     >
                     <IconPicker
                       value={entry.icon || DEFAULT_PREREQUISITE_ICON}
-                      buttonTitle={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.CharacterPrerequisites.ChangeIcon',
                         'Change icon'
                       )}
@@ -318,7 +318,7 @@
                       value={entry.op}
                       options={operatorOptions}
                       ariaLabelledBy={operatorCaptionId(entry.id)}
-                      triggerData={{ 'data-prerequisite-operator': '' }}
+                      triggerProps={{ 'data-prerequisite-operator': '' }}
                       minWidth={160}
                       onChange={(next) => onUpdate(entry.id, { op: next })}
                     />
@@ -356,7 +356,7 @@
 
 <style>
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
-     `.fabricate-field.manager-field select { width: 100% }` painted this control until it became
+     `.fabricate-field.fabricate-field select { width: 100% }` painted this control until it became
      a `<button>`, and `.fabricate-select-trigger` declares no width at all by design — a
      trigger's box belongs to the row it sits in. Without this rule the button hugs its value, so
      the operator control measured 72.91px on "is false", 92.28px on "≥ · at least" and 109.66px

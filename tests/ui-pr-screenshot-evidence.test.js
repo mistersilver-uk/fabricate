@@ -16,7 +16,7 @@ import { deflateSync } from 'node:zlib';
 
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   SMOKE_SOURCE,
   SMOKE_SOURCE_SEGMENTS,
@@ -815,7 +815,6 @@ describe('UI PR screenshot evidence', () => {
     // chooser is open all route to the whole set.
     for (const file of [
       'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-      'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
       'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
       'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
       'src/ui/svelte/util/requirementSlots.js',
@@ -920,13 +919,13 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
     assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
-    // The alternatives picker is now the chooser ONE slot opens, so the walk must open
-    // that slot before waiting on the section. Bounded to one module (issue 1692): a lazy
+    // The alternatives are the panel ONE slot opens, so the walk must open that slot before
+    // waiting on its panel. Bounded to one module (issue 1692): a lazy
     // `[^]*?` scan over the whole concatenated harness could otherwise be satisfied by text
     // spanning two unrelated modules.
     assert.ok(
       withinOneModule(
-        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/
+        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-requirement-panel\]/
       ),
       'the alternatives capture must open its slot before waiting on the chooser, in one module'
     );
@@ -993,8 +992,12 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/ui/svelte/apps/manager/CraftingSettingsView.svelte'), ['manager-alchemy-settings']);
     // #727 pills — RollResultBox lives under the crafting detail sources.
     assert.ok(idsFor('src/ui/svelte/apps/crafting/detail/RollResultBox.svelte').includes('player-crafting-roll-result'));
-    // #727 roll total — the chat card markup is built in CraftingChatCard.js.
-    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js'), ['chat-craft-card']);
+    // #727 roll total — the chat card markup is built in CraftingChatCard.js, which also
+    // renders issue 2005's roll-under evidence, so it maps to both recipes.
+    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js').sort(byCodePoint), [
+      'chat-craft-card',
+      'chat-craft-card-under',
+    ]);
     assert.deepEqual(idsFor('src/ui/presenters/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
@@ -1078,6 +1081,25 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
   });
 
+  // Issue 1522: the editor's cards keep the recipes the editor's body selected before they moved.
+  it('maps each extracted component-editor card to the recipes that photograph it', () => {
+    const viewsOf = (name) =>
+      mapChangedFilesToViews([`src/ui/svelte/apps/manager/component/${name}.svelte`]).map(v => v.id);
+    for (const [card, expected] of [
+      ['ComponentCategoryTagsCards', ['manager-component-edit']],
+      ['ComponentEssencesCard', ['manager-component-edit']],
+      ['ComponentRulesValidationTab', ['manager-component-edit']],
+      ['ComponentDifficultyCard', ['manager-component-edit', 'manager-component-edit-difficulty']],
+      ['ComponentSalvageStages', ['manager-component-edit', 'manager-component-edit-salvage']],
+      [
+        'ComponentSalvageCard',
+        ['manager-component-edit', 'manager-component-edit-salvage', 'manager-component-edit-salvage-simple'],
+      ],
+    ]) {
+      assert.deepEqual(viewsOf(card), expected, `${card} maps to its recipes`);
+    }
+  });
+
   // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so `collect`
   // publishes it; appending its label to `player-salvage` would never publish it.
   it('maps the issue-777 required-tools frame to its changed source', () => {
@@ -1145,7 +1167,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/Modal.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
       assert.ok(
@@ -1159,9 +1181,9 @@ describe('UI PR screenshot evidence', () => {
 
   // The shared modal chrome (issue 877) is rendered by BOTH import-flow modals, so a
   // change to it must republish both frames, not just the report's.
-  it('maps the shared ManagerModal chrome to both import-flow frames', () => {
+  it('maps the shared Modal chrome to both import-flow frames', () => {
     const ids = mapChangedFilesToViews([
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/Modal.svelte',
     ]).map(view => view.id);
     assert.ok(ids.includes('manager-import-report'));
     assert.ok(ids.includes('manager-import-folder-mapping'));
@@ -2039,9 +2061,9 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     // Issue 855: the interactive crafting-check roll prompt routes through
-    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot() as a
+    // answerRollPrompt(ctx, '<label>'), which forwards `label` to screenshot() as a
     // variable — so the literal lives in the helper CALL, not in a screenshot() call.
-    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*ctx\s*,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/answerRollPrompt\(\s*ctx\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     }

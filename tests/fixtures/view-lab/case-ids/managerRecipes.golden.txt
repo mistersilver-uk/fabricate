@@ -1,9 +1,13 @@
 manager-recipes-normal
 manager-recipes-blocked-enable-flash
 manager-recipes-inspector-empty-step
+manager-recipes-inspector-reward-group
+manager-recipes-inspector-reward-group-rolled
+manager-recipes-inspector-reward-rows
 manager-recipes-inspector-route-list
 manager-recipes-narrow
 manager-recipes-no-check
+manager-recipes-inspector-check-off
 manager-recipes-grouped-continuation
 manager-recipes-bulk-edit
 manager-recipes-bulk-edit-unstaged
@@ -14,7 +18,9 @@ manager-recipes-bulk-edit-check-tier
 manager-recipes-check-pill-under
 manager-recipes-check-pill-under-attribute
 manager-recipes-check-pill-under-dynamic
+manager-recipes-check-pill-count
 manager-recipes-bulk-edit-check-tier-under
+manager-recipes-bulk-edit-check-tier-count
 manager-recipes-bulk-delete-idle
 manager-recipes-bulk-delete-armed
 manager-crafting-group-expanded
@@ -23,8 +29,13 @@ manager-books-scrolls-item
 manager-books-scrolls-cap-filter-list
 manager-crafting-settings
 manager-recipe-item-overview
+manager-recipe-item-save-failed
 manager-recipe-item-contents
 manager-recipe-item-contents-picker
+manager-recipe-item-contents-picker-staged
+manager-recipe-item-contents-overflow
+manager-recipe-item-limits
+manager-recipe-item-limits-suggestions
 manager-recipe-item-validation
 manager-recipe-item-validation-blocked
 manager-recipe-item-preview-recipe-pager

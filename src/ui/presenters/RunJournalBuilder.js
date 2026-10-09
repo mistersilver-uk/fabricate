@@ -1,5 +1,5 @@
+import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
-import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
   actorToOption,
@@ -18,11 +18,13 @@ import {
 } from '../../systems/historyItemEvidence.js';
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
-import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
+import { historyEvidenceFields, splitHistoryReceipts } from '../../systems/runHistoryEvidence.js';
 import {
   craftingOutcomeBand,
   ladderRule,
   routedOutcomeBand,
+  taskCountRequired,
+  withCountBotch,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
 import { resolveRunRecipe } from '../../systems/runTerms.js';
@@ -43,7 +45,33 @@ import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.j
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { comparisonText } from './checkDescriptor.js';
+import {
+  activeModeLabelKey,
+  executedTargetFields,
+  historicalModeLabelKey,
+  journalActiveCheck,
+  journalCheckAnchor,
+  journalCheckLabel,
+  journalCountNeeded,
+  journalModeLabelKey,
+  recordedNumber,
+  taskCountNeed,
+} from './journalCheckText.js';
+import { taughtNameReader } from './resultOutputRows.js';
+import {
+  awardChoiceFields,
+  awardHeldAvailability,
+  inFlightAwardJournal,
+  stepAwardEvidence,
+} from './runAwardChoiceProjection.js';
+import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
+import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
+import {
+  ingredientNeed,
+  ingredientOptionName,
+  ingredientOverrideIndex,
+  selectedIngredientIndex,
+} from './runJournalIngredientOptions.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -51,19 +79,6 @@ const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
-
-function recordedNumber(value) {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
-}
-
-/** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
-function executedTargetFields(data) {
-  // A count's `target` is a per-die face, so its line keeps its wording until issue 2006.
-  if (data.product === 'count') return null;
-  if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
-  return { target: recordedNumber(data.target), margin: recordedNumber(data.margin) };
-}
 
 /** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
  *  recorded roll BESIDE the real quantity it produced, an authored expression INSTEAD of a number no
@@ -118,40 +133,9 @@ function historicalStepAttempted(step, run, index) {
   );
 }
 
-// Localized player-facing resolution-mode label keys. The crafting
-// `resolutionMode` token is system-internal, so the projection maps it to a
-// localized enum (never emitting the raw token). There is no canonical
-// "Standard" mode — `simple` (a DC pass/fail check) renders as "Standard (DC)".
-const MODE_LABEL_KEYS = Object.freeze({
-  simple: 'FABRICATE.App.Journal.Mode.Standard',
-  routedByIngredients: 'FABRICATE.App.Journal.Mode.RoutedByIngredients',
-  routedByCheck: 'FABRICATE.App.Journal.Mode.RoutedByCheck',
-  progressive: 'FABRICATE.App.Journal.Mode.Progressive',
-  alchemy: 'FABRICATE.App.Journal.Mode.Alchemy',
-});
-
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
-const SAFE_EXECUTION_EFFECT_KINDS = new Set([
-  'executeCraftingStage',
-  'consumeItems',
-  'awardItems',
-  'consumeIngredients',
-  'consumeAlchemyExtras',
-  'spendCurrency',
-  'applyToolUsage',
-  'awardResults',
-  'finalizeCraftingStage',
-  'recordRecipeUse',
-  'learnAlchemyRecipe',
-  'fireComplications',
-  'postCraftChat',
-  'recordAlchemyDeadEnd',
-  'consumeAlchemyItems',
-  'createGatheredResults',
-  'refundStageConsumption',
-]);
 
 /**
  * Defensively drop models that repeat a native run identity, keeping the first
@@ -186,9 +170,6 @@ function dedupeRunModelsById(models, phase) {
  * into a non-negative second count. Mirrors `CraftingRunManager._durationToSeconds`
  * (months = 30 days, years = 365 days) so the projection's required-time read
  * matches the gate the engine arms.
- *
- * @param {object|null} timeRequirement
- * @returns {number}
  */
 function durationToSeconds(timeRequirement = null) {
   if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
@@ -221,7 +202,7 @@ function durationToSeconds(timeRequirement = null) {
  * Native actor/type/id keys retain identity while `activityKind` distinguishes alchemy.
  * Lifecycle actions, paused-first readiness, current-stage selection intent and allowlisted
  * recovery evidence supplement the legacy `manualAdvance` compatibility flag.
- * The completion-preference action describes visibility, not automatic material-spending eligibility.
+ * Completion preference states visibility; `completesAsTimePasses` states scan eligibility.
  * Authored requirements and possible yields remain distinct from actual spending and awards.
  *
  * Like {@link GatheringListingBuilder} it never returns raw Foundry documents:
@@ -300,6 +281,7 @@ export class RunJournalBuilder {
     resolveItemEssences = null,
     affordCurrency = null,
     affordCurrencySpends = null,
+    getAwardChoiceClaimability = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -334,6 +316,7 @@ export class RunJournalBuilder {
     this._affordCurrency = typeof affordCurrency === 'function' ? affordCurrency : undefined;
     this._affordCurrencySpends =
       typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
+    this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
   }
 
   /**
@@ -397,7 +380,7 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     });
-    const history = this._buildRunModels({
+    const closed = this._buildRunModels({
       actor,
       viewer: resolvedViewer,
       worldTime,
@@ -407,6 +390,9 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     }).filter((run) => !dismissedRunKeys.has(run.key));
+    // A closed run still owing a pick is listed, and counted, under Active until it is settled.
+    activeRuns.push(...closed.filter((run) => run.awardChoicePending));
+    const history = closed.filter((run) => !run.awardChoicePending);
     return {
       selectedActorId: idOf(actor),
       selectedActorUuid: this._actorUuid(actor),
@@ -482,7 +468,7 @@ export class RunJournalBuilder {
       ? runs.filter((run) => accessByRun.get(run)?.visible === true && !run.isFizzle)
       : [];
     const crafting = runs.map((run, runIndex) =>
-      this._craftingRunModel({
+      this._withAwardChoices({
         run,
         actor,
         viewer,
@@ -653,7 +639,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
-      selectionAvailability: currentStep?.selectionAvailability ?? null,
+      selectionAvailability: this._awardHeld(run, actor, currentStep?.selectionAvailability),
       stageStart: this._stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
@@ -745,6 +731,39 @@ export class RunJournalBuilder {
     };
   }
 
+  /** `_craftingRunModel` with the run's award choices for this viewer (issue 1773). */
+  _withAwardChoices(args) {
+    const { run, actor, viewer, authority, recipe, access } = args;
+    const model = this._craftingRunModel(args);
+    if (!model || run.isFizzle === true) return model;
+    const { _recipeManager: recipeManager, _recipeVisibility: recipeVisibility, localize } = this;
+    const taughtName = taughtNameReader(
+      { recipeManager, recipeVisibility },
+      { isGM: viewer?.isGM === true, viewer, craftingActor: actor, knowledgeSources: [actor] }
+    );
+    const currencyUnits = () => recipeManager?._resolveNormalizedCurrencyUnits?.(recipe) ?? [];
+    const system = this._getSystem(stringOrNull(run.craftingSystemId));
+    const claimability = () => this._awardChoiceClaimability({ run, actor });
+    const fields = awardChoiceFields({
+      run,
+      actions: model.actions,
+      owner: actor?.isOwner === true,
+      entitled: viewer?.isGM === true || access?.visible === true,
+      authority,
+      describe: { system, currencyUnits, taughtName, localize },
+      claimability,
+    });
+    const bolt = completesAsTimePasses({ run, recipe, getSystem: this._getSystem, claimability });
+    return { ...model, ...fields, completesAsTimePasses: bolt };
+  }
+
+  /** The current stage's readiness, held while an earlier stage owes a claimable pick. */
+  _awardHeld(run, actor, availability) {
+    return awardHeldAvailability(availability, run, () =>
+      this._awardChoiceClaimability({ run, actor })
+    );
+  }
+
   /**
    * Project a no-signature alchemy fizzle history entry. It references no recipe,
    * so it carries a generic localized title and NO recipe/signature/step data — an
@@ -806,7 +825,7 @@ export class RunJournalBuilder {
       updatedAt: numberOrNull(run.updatedAt),
       finishedAt: numberOrNull(run.finishedAt),
       structureLabel: '',
-      resolutionModeLabel: this.localize(MODE_LABEL_KEYS.alchemy),
+      resolutionModeLabel: this.localize(journalModeLabelKey('alchemy')),
       recipeId: null,
       taskId: null,
       flavor: '',
@@ -911,7 +930,7 @@ export class RunJournalBuilder {
       completedAt: historyEntitled ? recordedNumber(runStep?.completedAt) : null,
       presentationSnapshot: evidence.presentationSnapshot ?? null,
       resolutionSnapshot: evidence.resolutionSnapshot ?? null,
-      ...(historyEntitled && historyEvidenceFields(runStep)),
+      ...(historyEntitled && stepAwardEvidence(runStep)),
       essenceSpend: evidence.essenceSpend ?? null,
       currencySpends:
         evidence.currencySpends ??
@@ -929,7 +948,7 @@ export class RunJournalBuilder {
         historyEntitled,
         toolStates,
       }),
-      lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
+      lastCheckResult: this._stepCheckResult(runStep, system, recipe),
       // Requirements retain their authored identity; consumption retains physical receipts.
       // Only entitled consumption receives the separate historical metadata enrichment.
       requirements: normalizeList(runStep?.requirements).map((entry) =>
@@ -1238,9 +1257,10 @@ export class RunJournalBuilder {
         : normalizeList(routed.relativeOutcomes);
     const permitsFailure = activityPermitsFailureResults(system, 'crafting');
     const systemId = stringOrNull(recipe.craftingSystemId);
-    const dc = this._resolveCheckDc({ config: routed, recipe, mode });
+    const dc = journalCheckAnchor({ config: routed, recipe, mode });
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
     try {
-      return outcomes.map((outcome, index) => {
+      const tiers = outcomes.map((outcome, index) => {
         const fail = outcome?.success !== true;
         const resolved =
           fail && !permitsFailure
@@ -1263,6 +1283,7 @@ export class RunJournalBuilder {
           ),
         };
       });
+      return withCountBotch(tiers, routed, botch, dc);
     } catch {
       return null;
     }
@@ -1581,55 +1602,32 @@ export class RunJournalBuilder {
     system,
     selection,
   }) {
-    const groupId = stringOrNull(group?.id);
-    const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
-    const options = normalizeList(group?.options).map((option, index) => {
-      const candidate = this._resolveIngredientSelection({
-        ingredientSet,
-        recipe,
-        actor,
-        items,
-        optionOverrides: {
-          ...optionOverrides,
-          [groupId]: { optionIndex: index },
-        },
-        essenceAllocation,
-        editFeasibility: true,
-      });
-      const presentation = this._ingredientOptionPresentation({
-        group,
-        option,
-        index,
-        available: candidate?.success === true,
-        recipe,
-        items,
-        system,
-      });
-      presentation.candidates = presentation.candidates.map((item) => {
-        const resolved = this._resolveIngredientSelection({
-          ingredientSet,
+    return choiceAvailability({
+      group,
+      ingredientSet,
+      optionOverrides,
+      selection,
+      resolve: (set, overrides) =>
+        this._resolveIngredientSelection({
+          ingredientSet: set,
           recipe,
           actor,
           items,
+          optionOverrides: overrides,
           essenceAllocation,
           editFeasibility: true,
-          optionOverrides: {
-            ...optionOverrides,
-            [groupId]: { optionIndex: index, heldItemId: item.itemId },
-          },
-        });
-        const claimed = normalizeList(resolved?.plan)
-          .filter(
-            (entry) =>
-              entry.ingredient !== option &&
-              (stringOrNull(entry.item?.uuid) || stringOrNull(idOf(entry.item))) === item.itemId
-          )
-          .reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
-        return { ...item, claimed, available: resolved?.success === true };
-      });
-      return presentation;
+        }),
+      present: (option, index, available) =>
+        this._ingredientOptionPresentation({
+          group,
+          option,
+          index,
+          available,
+          recipe,
+          items,
+          system,
+        }),
     });
-    return { groupId, selectedOptionIndex, options };
   }
 
   _requirementPresentation({ group, recipe, items, optionOverrides, selection, system, choice }) {
@@ -1800,14 +1798,19 @@ export class RunJournalBuilder {
     };
   }
 
-  _checkResultModel(lastCheckResult) {
+  _stepCheckResult(runStep, system, recipe) {
+    const need = system && journalCountNeeded(this._activeCheck(system, recipe));
+    return this._checkResultModel(runStep?.lastCheckResult, need);
+  }
+
+  _checkResultModel(lastCheckResult, need = null) {
     if (!lastCheckResult || typeof lastCheckResult !== 'object') return null;
     // The roll detail lives on `data` (dc, resolved formula, raw total) — surface it
     // so the run journal can show the ACTUAL roll (e.g. "1d20 + 3 = 11 vs DC 16"),
     // not just the authored requirement.
     const data =
       lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
-    const executed = executedTargetFields(data);
+    const executed = executedTargetFields(data, need);
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
@@ -1824,6 +1827,7 @@ export class RunJournalBuilder {
   _bandLabels() {
     return {
       otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      needed: this.localize('FABRICATE.App.Journal.StepDetails.BandNeeded'),
       named: (tier, adjustment) =>
         this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
     };
@@ -1834,39 +1838,13 @@ export class RunJournalBuilder {
     return rule ? { ladderRule: rule } : null;
   }
 
-  /**
-   * Compose the step's crafting-check label as `rollFormula` + resolved DC ONLY
-   * (no skill name — none is stored). The active mode selects the check config
-   * (`simple`/`progressive`/`routed`); the DC resolves from the recipe's selected
-   * tier, else the config's static DC. A dynamic-DC macro and progressive
-   * (value-budget) checks have no statically resolvable DC, so the formula is
-   * surfaced without a number rather than a hardcoded default. Outside sum/over/fixed
-   * a fixed target is named a Target, and a character value names no number.
-   * @private
-   */
+  /** The step's check label through {@link journalCheckLabel}, for the recipe's active check. */
   _checkLabel({ system, recipe }) {
-    if (!system) return null;
-    const mode = this._resolveMode(recipe, system);
-    const { config, rollFormula } = resolveActiveCraftingCheckFormula({
-      ...system,
-      resolutionMode: mode,
-    });
-    const formula = stringOrNull(rollFormula);
-    if (!formula) return null;
-    const dc = this._resolveCheckDc({ config, recipe, mode });
-    if (dc === null) return formula;
-    const evaluation = activeCheckEvaluation(config);
-    // A count keeps its DC wording until issue 2006.
-    if (isFixedSumOver(evaluation) || evaluation.product === 'count') {
-      return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
-    }
-    // A character value states no number, and a fixed range grades the raw roll against no target.
-    if (evaluation.target.source === 'attribute' || config?.type === 'fixed') return formula;
-    return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithTarget', {
-      formula,
-      target: dc,
-      comparison: comparisonText(evaluation, config, this.localize),
-    });
+    return system ? journalCheckLabel(this._activeCheck(system, recipe), this.localize) : null;
+  }
+
+  _activeCheck(system, recipe) {
+    return journalActiveCheck({ system, recipe, mode: this._resolveMode(recipe, system) });
   }
 
   _activeCheckKind({ system, recipe }) {
@@ -1877,19 +1855,6 @@ export class RunJournalBuilder {
     });
     if (check.checkUsable) return 'check';
     return check.requiresCheck ? 'unknown' : 'none';
-  }
-
-  _resolveCheckDc({ config, recipe, mode }) {
-    if (mode === 'progressive') return null;
-    if (config?.dcMode === 'dynamic') return null;
-    const tierId = stringOrNull(recipe?.checkTierId);
-    if (tierId) {
-      const tier = normalizeList(config?.tiers).find((entry) => entry?.id === tierId);
-      const tierDc = Number(tier?.dc);
-      if (Number.isFinite(tierDc)) return Math.trunc(tierDc);
-    }
-    const dc = Number(config?.dc);
-    return Number.isFinite(dc) ? Math.trunc(dc) : null;
   }
 
   _craftingFailureReason(runSteps) {
@@ -1990,14 +1955,12 @@ export class RunJournalBuilder {
   }
 
   _resolutionModeLabel(recipe, system) {
-    const mode = this._resolveMode(recipe, system);
-    return this.localize(MODE_LABEL_KEYS[mode] || MODE_LABEL_KEYS.simple);
+    return this.localize(activeModeLabelKey(this._activeCheck(system, recipe)));
   }
 
   _historicalModeLabel(steps) {
-    const mode = steps.find((step) => step.attempted && step.resolutionSnapshot)?.resolutionSnapshot
-      .mode;
-    return MODE_LABEL_KEYS[mode] ? this.localize(MODE_LABEL_KEYS[mode]) : '';
+    const key = historicalModeLabelKey(steps.find((s) => s.attempted && s.resolutionSnapshot));
+    return key ? this.localize(key) : '';
   }
 
   /**
@@ -2302,7 +2265,12 @@ export class RunJournalBuilder {
       roll: evidence.roll,
       rollModel: evidence.rollModel,
       unattributedAwardIndexes: evidence.unattributedAwardIndexes,
-      check: ['routed', 'progressive'].includes(mode) ? this._checkResultModel(result) : null,
+      check: ['routed', 'progressive'].includes(mode)
+        ? this._checkResultModel(
+            result,
+            taskCountNeed(system?.gatheringCraftingCheck?.routed, task)
+          )
+        : null,
       tiers: [],
     };
   }
@@ -2391,7 +2359,7 @@ export class RunJournalBuilder {
       groupsByName.set(name, [...(groupsByName.get(name) ?? []), group]);
     }
     const permitFailure = activityPermitsFailureResults(system, 'gathering');
-    return outcomes.map((outcome, index) => {
+    const tiers = outcomes.map((outcome, index) => {
       const fail = outcome?.success !== true;
       const groups = groupsByName.get(normalizeName(outcome?.name)) ?? [];
       const results =
@@ -2406,6 +2374,8 @@ export class RunJournalBuilder {
         ),
       };
     });
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
+    return withCountBotch(tiers, routed, botch, taskCountRequired(routed, task));
   }
 
   _tierYield(result, systemId, index) {
@@ -2534,7 +2504,7 @@ export class RunJournalBuilder {
     const lifecycleContract = getRunLifecycleContract(run);
     const recoveryEvidence =
       this._recoveryEvidence(
-        run?.executionJournal,
+        inFlightAwardJournal(run) ?? run?.executionJournal,
         evidenceEntitled,
         stringOrNull(run?.craftingSystemId)
       ) ?? this._nativeRecoveryEvidence(run, evidenceEntitled);
@@ -2765,14 +2735,15 @@ export class RunJournalBuilder {
         }[settlement[key]],
         hasReceipt: true,
         receipt: entitled
-          ? {
-              items: normalizeList(
-                key === 'consumption'
-                  ? (owner.consumedIngredients ?? owner.consumedComponents)
-                  : owner.createdResults
-              ).map((entry) => this._mapResult(entry, run.craftingSystemId, false)),
-              currencies: [],
-            }
+          ? this._receiptProjection(
+              key === 'consumption'
+                ? normalizeList(owner.consumedIngredients ?? owner.consumedComponents)
+                : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(
+                    normalizeList
+                  ),
+              run.craftingSystemId,
+              { resolveMetadata: false }
+            )
           : null,
       }));
     return {
@@ -2815,16 +2786,31 @@ export class RunJournalBuilder {
       entries = normalizeList(receipt.results);
     } else if (effect.kind === 'createGatheredResults') {
       entries = normalizeList(receipt);
+    } else if (['awardRewards', 'awardChoice'].includes(effect.kind)) {
+      entries = [receipt.createdResults, receipt.currencyCredits, receipt.knowledgeGrants].flatMap(
+        normalizeList
+      );
     }
+    const spends = effect.kind === 'spendCurrency' ? normalizeList(receipt.settledSpends) : [];
+    return this._receiptProjection(entries, systemId, { spends });
+  }
+
+  /** A receipt's rows by shape (issue 1773): Item receipts as items, a spend or a credit as a
+   *  currency row and a grant as a grant row, so a reconciling GM sees what a reward step paid. */
+  _receiptProjection(entries, systemId, { spends = [], resolveMetadata = true } = {}) {
+    const { items, currencyCredits, knowledgeGrants } = splitHistoryReceipts(entries);
+    const grants = knowledgeGrants.map(({ recipeId, recipeName, outcome }) => ({
+      recipeId,
+      recipeName: recipeName ?? null,
+      outcome,
+    }));
     return {
-      items: entries.map((entry) => this._mapResult(entry, systemId)),
-      currencies:
-        effect.kind === 'spendCurrency'
-          ? normalizeList(receipt.settledSpends).map((spend) => ({
-              unit: stringOrEmpty(spend?.unit),
-              amount: numberOrNull(spend?.amount),
-            }))
-          : [],
+      items: items.map((entry) => this._mapResult(entry, systemId, resolveMetadata)),
+      currencies: [...spends, ...currencyCredits].map((entry) => ({
+        unit: stringOrEmpty(entry?.unit),
+        amount: numberOrNull(entry?.amount),
+      })),
+      ...(grants.length > 0 && { grants }),
     };
   }
 }
@@ -2858,57 +2844,6 @@ function normalizeName(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase();
-}
-
-function ingredientOverrideIndex(group, optionOverrides) {
-  const groupId = stringOrNull(group?.id);
-  if (!Object.hasOwn(optionOverrides, groupId)) return;
-  const raw = optionOverrides[groupId]?.optionIndex;
-  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
-  if (typeof raw === 'string' && !raw.trim()) {
-    return null;
-  }
-  const index = Number(raw);
-  return Number.isSafeInteger(index) && index >= 0 && index < normalizeList(group?.options).length
-    ? index
-    : null;
-}
-
-function selectedIngredientIndex(group, optionOverrides, selection) {
-  const options = normalizeList(group?.options);
-  const override = ingredientOverrideIndex(group, optionOverrides);
-  if (override !== undefined) return override;
-  const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
-    options.includes(ingredient)
-  );
-  const selectedIndex = options.indexOf(selected);
-  return Math.max(selectedIndex, 0);
-}
-
-function ingredientNeed(option) {
-  const match = plainObjectOrNull(option?.match);
-  if (match?.type === 'essence' || match?.type === 'currency') {
-    return Math.max(0, numberOrNull(match.amount) ?? 0);
-  }
-  return Math.max(0, numberOrNull(option?.quantity) ?? 1);
-}
-
-function ingredientOptionName({ group, option, kind, match, definition, component }) {
-  if (kind === 'component') {
-    return stringOrEmpty(component?.name) || stringOrEmpty(match?.componentId);
-  }
-  if (kind === 'essence') {
-    const essenceName = stringOrEmpty(definition?.name) || stringOrEmpty(match?.essenceId);
-    return essenceName ? `${essenceName} essence` : '';
-  }
-  if (kind === 'currency') {
-    return `${ingredientNeed(option)} ${stringOrEmpty(match?.unit)}`.trim();
-  }
-  if (kind === 'tag') {
-    const tags = normalizeList(match?.tags).map(stringOrEmpty).filter(Boolean);
-    return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
-  }
-  return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
 }
 
 /**
@@ -2991,8 +2926,4 @@ function safeMissingGroup(group) {
     need: numberOrNull(group?.need),
     have: numberOrNull(group?.have),
   };
-}
-
-function missingGroupId(group) {
-  return stringOrNull(group?.group?.id ?? group?.groupId ?? group?.id);
 }

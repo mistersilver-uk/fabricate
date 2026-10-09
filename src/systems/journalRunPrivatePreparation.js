@@ -1,3 +1,5 @@
+import { preparedDecisionPolicy } from './preparedDecisionPolicy.js';
+
 function safePrepareRecord(record, invalidateLegacy = true) {
   const binding = record?.binding ?? {};
   const safeBinding = Object.fromEntries(
@@ -5,10 +7,7 @@ function safePrepareRecord(record, invalidateLegacy = true) {
       .filter((key) => Object.hasOwn(binding, key))
       .map((key) => [key, binding[key]])
   );
-  safeBinding.decisionPolicy = {
-    allowsSituationalModifier: binding.decisionPolicy?.allowsSituationalModifier === true,
-    allowAdvantage: binding.decisionPolicy?.allowAdvantage === true,
-  };
+  safeBinding.decisionPolicy = preparedDecisionPolicy(binding.decisionPolicy);
   const legacyPrivate = invalidateLegacy && Object.hasOwn(binding, 'privateEvaluation');
   return {
     status: legacyPrivate && record?.status === 'active' ? 'released' : record?.status,
@@ -90,7 +89,17 @@ function createPreparedTokenStore({
     }
   }
 
+  /** Releases every active record past its expiry, so the ledger never keeps an expired token active. */
+  function expire(state) {
+    for (const record of Object.values(state.prepareTokens)) {
+      if (record?.status !== 'active' || !(record.expiresAt <= now())) continue;
+      record.status = 'released';
+      record.releasedAt = now();
+    }
+  }
+
   function issue(state, request, binding, expiresAt) {
+    expire(state);
     const token = nextRandomId();
     if (!token) throw new Error('Secure random ID API unavailable');
     const issuerInstanceId = localInstanceId();
@@ -116,13 +125,13 @@ function createPreparedTokenStore({
   }
 
   function consume(state, request, token, binding) {
+    expire(state);
     const record = state.prepareTokens[token];
     const snapshot = snapshots.get(token);
     prune();
     pruneReplies();
     if (
       record?.status !== 'active' ||
-      record.expiresAt <= now() ||
       !snapshot ||
       record.issuerGMId !== currentUser?.()?.id ||
       record.issuerInstanceId !== localInstanceId() ||

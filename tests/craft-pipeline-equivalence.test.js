@@ -873,7 +873,15 @@ const SCENARIOS = [
       const key = await versionedExecutionKey(world.engine);
       assert.equal(typeof key, 'symbol', 'the versioned-execution key must be reachable');
       await world.craft(null, {
-        [key]: { resolvedCheckResult: { success: true, outcome: null, value: 7, data: {} } },
+        [key]: {
+          resolvedCheckResult: {
+            success: true,
+            outcome: null,
+            value: 7,
+            data: {},
+            visibility: { rollMode: 'publicroll', secret: false },
+          },
+        },
       });
       return world.journal.entries;
     },

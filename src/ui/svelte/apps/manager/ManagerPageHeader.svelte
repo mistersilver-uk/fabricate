@@ -1,32 +1,32 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's page header: the breadcrumb trail, the eyebrow, one of eight identity headings and
-  the trailing action group, plus the Tool Studio's own second header (issue 1720, extracted from
-  the root).
+  The manager's page header, drawn by `PageHeader`: the breadcrumb trail `headerBreadcrumbs.js`
+  derives, the eyebrow, one of eight identity headings and the trailing action group, plus the
+  Tool library's own second header (issues 1720 and 1777).
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `header` | the `headerModel` instance | — | `headingVariant` selects the identity heading; passed WHOLE to both children |
+  | `header` | the `headerModel` instance | — | `headingVariant` selects the identity heading; passed WHOLE to the trail and the actions |
   | `isToolStudioRoute` | `boolean` | `false` | the two headers are exclusive, and the Tool Studio draws the second |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
   Rest spread:
-  - `{...rest}` lands on both children; every prop this unit does not read itself belongs to the
-    trail or to the action group, and each declares its own.
+  - `{...rest}` reaches the trail model and the action group; every prop this unit does not read
+    itself belongs to one of them, and each declares its own.
 
   Invariants:
   - Two `<header>` elements under no wrapper, so the shell's own children are unchanged — pinned
-    by the 38-state DOM census in `tests/components/manager-header-mounted.js`.
+    by the DOM census in `tests/components/manager-header-mounted.js`.
   - The identity heading is keyed on `header.headingVariant` alone; the order the eight variants
     are tested in is stated once, in `headerModel.svelte.js`.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import Kicker from '../../components/Kicker.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ManagerHeaderActions from './ManagerHeaderActions.svelte';
-  import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
+  import PageHeader from '../../components/PageHeader.svelte';
+  import { headerBreadcrumbs } from './headerBreadcrumbs.js';
 
   let {
     header,
@@ -57,35 +57,43 @@
     environmentDraftForDisplay = null,
     ...rest
   } = $props();
+
+  const crumbs = $derived(
+    headerBreadcrumbs({
+      ...rest,
+      header,
+      currentView,
+      text,
+      selectedSystem,
+      selectSystemAndShowBrowser,
+      editSystem,
+      recipeDraft,
+      componentForEdit,
+      essenceEditName,
+    })
+  );
+
+  // The Tool library's trail, from its root (issue 1328) and with no `Crafting` crumb, because the
+  // rail holds Tool Rules outside that group (issue 1373).
+  const toolLibraryCrumbs = $derived([
+    {
+      label: text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems'),
+      onSelect: () => selectSystemAndShowBrowser(),
+    },
+    { label: selectedSystem?.name, onSelect: () => editSystem(selectedSystem.id) },
+    { label: text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules') },
+  ]);
 </script>
 
 {#if !isToolStudioRoute}
   <!-- Two children, always: the heading block and the trailing actions. -->
-  <header class="manager-header">
-    <div class="manager-heading">
-      <ManagerHeaderBreadcrumbs
-        {header}
-        {currentView}
-        {text}
-        {selectedSystem}
-        {selectSystemAndShowBrowser}
-        {editSystem}
-        {recipeDraft}
-        {componentForEdit}
-        {essenceEditName}
-        {...rest}
-      />
-      <!-- The eyebrow sits between the trail and the title. -->
-      {#if header.kicker}
-        <div class="manager-page-kicker">
-          <Kicker dataAttr="data-page-kicker">{header.kicker}</Kicker>
-        </div>
-      {/if}
+  <PageHeader class="manager-header" breadcrumbs={crumbs} kicker={header.kicker}>
+    {#snippet identity()}
       {#if header.headingVariant === 'recipe-edit'}
         <!-- The recipe editor's identity header: the recipe's own image, its name and the
              "<category> · <resolution mode>" subline. -->
         <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-          <Medallion art={resolveRecipeImage(recipeDraft)} alt="" icon="fas fa-scroll" size={44} />
+          <Medallion art={resolveRecipeImage(recipeDraft)} alt="" icon="fas fa-scroll" size={38} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={recipeDraft.name || ''}>
               {recipeDraft.name || header.title}
@@ -97,7 +105,7 @@
         <!-- The component editor's identity header, which must match the recipe editor's
              exactly, so it reuses that block's classes wholesale (issue 676). -->
         <div class="manager-recipe-edit-heading" data-component-edit-heading>
-          <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
+          <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={38} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={componentForEdit.name || ''}>
               {componentForEdit.name || header.title}
@@ -114,7 +122,7 @@
             art={downtimeHeaderArtwork.image ?? ''}
             alt=""
             icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
-            size={44}
+            size={38}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={header.title}>{header.title}</h1>
@@ -124,14 +132,13 @@
       {:else if header.headingVariant === 'world-essence-entry'}
         <!-- The essence's own identity header, from the recipe editor's block. `tint` recolours
              the glyph alone since issue 1506 and resolves to the accent when unset; `glyph` is
-             passed because the primitive's default is sized for the 40px row tiles, not for this
-             44px one (`essEntry.png`). -->
+             the art ladder's 15 at the 38 rung. -->
         <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
           <Medallion
             icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
             tint={worldEssenceEntryTint}
-            size={44}
-            glyph={22}
+            size={38}
+            glyph={15}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={worldEssenceEntryName}>
@@ -146,7 +153,7 @@
         <!-- The same identity header on the system rules route, from the same block rather
              than a fifth implementation of one meaning. -->
         <div class="manager-recipe-edit-heading" data-essence-edit-heading>
-          <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
+          <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={38} glyph={15} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={essenceEditName}>
               {essenceEditName || header.title}
@@ -158,15 +165,14 @@
         <!-- The component's own identity header, the twin of the two above (issue 1371). The
              medallion falls back to the glyph when the entry links no Item. -->
         <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-          <!-- 42px rather than the siblings' 44 because `proto:814` draws this chip at 42 and an
-               art size is its own ladder; the `glyph-chip` variant is the borderless face
-               `proto:5375` draws, which no other prop can ask for (issue 1371). -->
+          <!-- The `glyph-chip` variant is the borderless face `proto:5375` draws, which no other
+               prop can ask for (issue 1371). -->
           <Medallion
             art={worldComponentEntryImage}
             alt=""
             icon="fas fa-cube"
-            size={42}
-            glyph={22}
+            size={38}
+            glyph={15}
             variant="glyph-chip"
           />
           <div class="manager-recipe-edit-heading-copy">
@@ -186,8 +192,8 @@
             art={worldToolEntryRecord.entity?.img ?? ''}
             alt=""
             icon="fas fa-screwdriver-wrench"
-            size={44}
-            glyph={22}
+            size={38}
+            glyph={15}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={worldToolEntryName}>
@@ -227,41 +233,22 @@
           </Chip>
         </div>
       {/if}
-    </div>
-    <ManagerHeaderActions {header} {text} {currentView} {...rest} />
-  </header>
+    {/snippet}
+    {#snippet actions()}
+      <ManagerHeaderActions {header} {text} {currentView} {...rest} />
+    {/snippet}
+  </PageHeader>
 {/if}
 
 {#if currentView === 'tools' && selectedSystem}
-  <header class="manager-header manager-tools-context-header" data-tool-library-context>
-    <div class="manager-heading">
-      <nav
-        class="manager-breadcrumbs"
-        aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-      >
-        <!-- The root this trail alone was missing: the Tool library has its own header and
-             began at the system name, so the two Tool screens disagreed (issue 1328). -->
-        <button type="button" onclick={() => selectSystemAndShowBrowser()}
-          >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-        >
-        <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        <button type="button" onclick={() => editSystem(selectedSystem.id)}
-          >{selectedSystem.name}</button
-        >
-        <!-- No `Crafting` crumb: the rail holds Tool Rules outside that group, and the Tool
-             editor's own trail never carried one either (issue 1373). -->
-        <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
-      </nav>
-      <h1 class="manager-title">
-        {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
-      </h1>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
-          'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
-        )}
-      </p>
-    </div>
-  </header>
+  <PageHeader
+    class="manager-header manager-tools-context-header"
+    data-tool-library-context=""
+    breadcrumbs={toolLibraryCrumbs}
+    title={text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
+    subtitle={text(
+      'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
+      'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
+    )}
+  />
 {/if}

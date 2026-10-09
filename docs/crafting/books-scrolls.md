@@ -27,11 +27,15 @@ You manage which recipes a book contains on the book's own page in [Books & Scro
 You link recipes to a book from the book's own page in [Books & Scrolls](#books--scrolls), not from the recipe editor.
 Open a recipe item, then use its **Contents** tab to build the list of recipes the book teaches.
 
-- Use **Link recipe** to open a searchable list of the crafting system's recipes not already in this book.
-  Type to find one by name, then choose it to link it.
-  The list stays open, so you can link several recipes in a row.
-- Use **Remove recipe** on a listed recipe to take it out of the book.
-- A book with no recipes yet says so until you link the first one.
+- The recipes already in the book appear as read-only chips.
+  When there are too many to show, the overflow reads **+N more** and opens the picker.
+- Use **Edit recipes** to open a searchable panel of the crafting system's recipes.
+  Type to find one by name, then tick a recipe to add it or untick a linked one to remove it.
+- The panel footer states the pending change, for example "1 to add · 1 to remove".
+  **Clear all** resets your choices.
+- **Apply** links each addition and unlinks each removal in a single change.
+  Pressing Escape, clicking outside the panel, or pressing **Edit recipes** again discards your staged choices.
+- A book with no recipes yet says so until you add the first one.
 
 Because membership works this way, the same recipe can be linked from more than one book, and a single book can teach many recipes.
 The book is backed by a game-world item that sets its name, image, and description.
@@ -153,12 +157,9 @@ These chips only appear while the book's **Limited learning** is on; an unmet re
 A learn-only book never shows a use limit, and an item-only book never shows a learn limit.
 A book that both grants access by being held and can be learned from can show both.
 
-Below the limits, a single call-to-action button reveals the recipes.
-Its label depends on the book.
-A book you learn from reads **Read & learn** (for example "Read & learn up to 2 of 5" when a learn cap restricts you, or "Read & learn 5 recipes" when it does not).
-A book that grants crafting access by being held reads **Craft** (for example "Craft 3 recipes").
-A book that only lists its recipes reads **View recipes**.
-Selecting the button expands the recipe list, and selecting it again hides it.
+The book's recipes are listed below its limits.
+On a book you learn from, the header holds a **Read & learn** button (for example "Read & learn all 5 recipes") that learns every recipe you have not yet learned in one press.
+It appears only when you can learn the whole book: no learn cap stops you short, the cap's budget is not spent, and at least one recipe is still unlearned.
 
 A book with a single recipe shows that recipe's name, description, and its action button.
 A book with several recipes lists them in an accordion: each row has the recipe's icon, name, and its action button, and expands to reveal the description.

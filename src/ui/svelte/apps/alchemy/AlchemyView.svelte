@@ -3,12 +3,13 @@
   AlchemyView — the player Alchemy tab content. It reads the shared services.alchemy
   store and renders one of: loading, error, no-actor, the discipline chooser (>1
   discipline, none chosen), or the three-column workbench (known . workbench .
-  inventory). The 84px nav rail is the shell's (FabricateAppRoot), NOT this grid, so
+  inventory). The nav rail is the shell's (FabricateAppRoot), not this grid, so
   the content grid is three columns with compressible sides and a floored center,
   mirroring CraftingView / GatheringView.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import KnownRecipesColumn from './KnownRecipesColumn.svelte';
   import Workbench from './Workbench.svelte';
   import ComponentInventoryColumn from './ComponentInventoryColumn.svelte';
@@ -79,7 +80,7 @@
   });
 
   function onDragStart(event, componentId) {
-    event.dataTransfer?.setData('text/plain', componentId);
+    event.dataTransfer?.setData('text/plain', JSON.stringify({ componentId }));
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
   }
 </script>
@@ -126,7 +127,7 @@
             onAdd={(id) => store?.add(id)}
             onRemoveOne={(id) => store?.removeOne(id)}
             onRemoveAll={(id) => store?.removeAll(id)}
-            onBrew={() => store?.brew()}
+            onBrew={(event) => withRollPromptOrigin(event, () => store?.brew())}
             onDrop={(id) => store?.add(id)}
           />
         </section>

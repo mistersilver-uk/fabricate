@@ -11,6 +11,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -49,11 +50,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -102,11 +112,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -157,11 +176,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -220,11 +248,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -274,11 +311,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -292,6 +338,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -330,11 +377,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -351,6 +407,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -389,11 +446,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -438,11 +504,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -469,6 +544,7 @@
         "failureResultPolicy": "always",
         "progressive": {
           "awardMode": "partial",
+          "thresholdMode": "meet",
           "rollFormula": "2d6 + 1d20",
           "evaluation": {
             "product": "sum",
@@ -507,11 +583,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -615,11 +700,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -801,11 +895,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 17,
           "thresholdMode": "exceed",
           "dcMode": "dynamic",
@@ -965,11 +1068,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 17,
           "thresholdMode": "exceed",
           "dcMode": "dynamic",
@@ -1116,11 +1228,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -1265,6 +1386,7 @@
         },
         "progressive": {
           "awardMode": "partial",
+          "thresholdMode": "meet",
           "rollFormula": "2d6 + 1d20",
           "evaluation": {
             "product": "sum",
@@ -1303,11 +1425,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -1383,6 +1514,7 @@
         "failureResultPolicy": "always",
         "progressive": {
           "awardMode": "partial",
+          "thresholdMode": "meet",
           "rollFormula": "2d6 + 1d20",
           "evaluation": {
             "product": "sum",
@@ -1421,11 +1553,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -1525,11 +1666,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -1691,6 +1841,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -1729,11 +1880,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -1782,11 +1942,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -1968,11 +2137,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2031,11 +2209,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2085,11 +2272,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2234,6 +2430,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -2272,11 +2469,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2293,6 +2499,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -2331,11 +2538,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2380,11 +2596,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2542,6 +2767,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -2580,11 +2806,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2635,11 +2870,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2690,11 +2934,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2753,11 +3006,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2807,11 +3069,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2825,6 +3096,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -2863,11 +3135,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2886,6 +3167,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -2924,11 +3206,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2973,11 +3264,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3004,6 +3304,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
           "evaluation": {
             "product": "sum",
@@ -3042,11 +3343,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -3147,11 +3457,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3254,11 +3573,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3369,11 +3697,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3475,11 +3812,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3545,6 +3891,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
           "evaluation": {
             "product": "sum",
@@ -3583,11 +3930,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -3656,6 +4012,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
           "evaluation": {
             "product": "sum",
@@ -3694,11 +4051,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -3795,11 +4161,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3878,6 +4253,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -3916,11 +4292,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3969,11 +4354,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4059,11 +4453,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4122,11 +4525,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4176,11 +4588,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4229,6 +4650,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4267,11 +4689,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4288,6 +4719,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4326,11 +4758,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4375,11 +4816,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4441,6 +4891,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4479,11 +4930,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4532,11 +4992,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4587,11 +5056,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4650,11 +5128,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4704,11 +5191,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4722,6 +5218,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4760,11 +5257,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4781,6 +5287,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4819,11 +5326,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4868,11 +5384,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4899,6 +5424,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -4937,11 +5463,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4990,11 +5525,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5045,11 +5589,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5108,11 +5661,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5162,11 +5724,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5180,6 +5751,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5218,11 +5790,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5239,6 +5820,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5277,11 +5859,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5326,11 +5917,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5357,6 +5957,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5395,11 +5996,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5448,11 +6058,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 14,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5503,11 +6122,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5566,11 +6194,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5620,11 +6257,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 14,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5638,6 +6284,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5676,11 +6323,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5697,6 +6353,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5735,11 +6392,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5784,11 +6450,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 14,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5815,6 +6490,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -5853,11 +6529,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5906,11 +6591,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5961,11 +6655,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6024,11 +6727,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6078,11 +6790,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6096,6 +6817,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -6134,11 +6856,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -6155,6 +6886,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -6193,11 +6925,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -6242,11 +6983,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6273,6 +7023,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -6311,11 +7062,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -6364,11 +7124,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6419,11 +7188,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6482,11 +7260,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6536,11 +7323,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6554,6 +7350,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -6592,11 +7389,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -6613,6 +7419,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -6651,11 +7458,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -6700,11 +7516,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -6731,6 +7556,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20",
           "evaluation": {
             "product": "sum",
@@ -6769,11 +7595,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -6920,11 +7755,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -7073,11 +7917,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -7234,11 +8087,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -7386,11 +8248,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -7502,6 +8373,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20",
           "evaluation": {
             "product": "sum",
@@ -7540,11 +8412,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -7659,6 +8540,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "1d20",
           "evaluation": {
             "product": "sum",
@@ -7697,11 +8579,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": [
               {
@@ -7844,11 +8735,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -7973,6 +8873,7 @@
         "failureResultPolicy": "never",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8011,11 +8912,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8064,11 +8974,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8119,11 +9038,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8182,11 +9110,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8236,11 +9173,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8254,6 +9200,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8292,11 +9239,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8313,6 +9269,7 @@
         "failureResultPolicy": "never",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8351,11 +9308,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8400,11 +9366,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8431,6 +9406,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8469,11 +9445,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8522,11 +9507,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8577,11 +9571,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8640,11 +9643,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8694,11 +9706,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8712,6 +9733,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8750,11 +9772,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8771,6 +9802,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8809,11 +9841,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8858,11 +9899,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -8889,6 +9939,7 @@
         "failureResultPolicy": "always",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -8927,11 +9978,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -8980,11 +10040,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9035,11 +10104,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9098,11 +10176,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9152,11 +10239,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9170,6 +10266,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9208,11 +10305,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9229,6 +10335,7 @@
         "failureResultPolicy": "always",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9267,11 +10374,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9316,11 +10432,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9347,6 +10472,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9385,11 +10511,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9438,11 +10573,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9493,11 +10637,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9556,11 +10709,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9610,11 +10772,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9628,6 +10799,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9666,11 +10838,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9687,6 +10868,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9725,11 +10907,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9774,11 +10965,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9805,6 +11005,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -9843,11 +11044,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -9896,11 +11106,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -9951,11 +11170,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10017,11 +11245,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10071,11 +11308,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10089,6 +11335,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10127,11 +11374,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10151,6 +11407,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10189,11 +11446,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10238,11 +11504,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10272,6 +11547,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10310,11 +11586,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10363,11 +11648,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10418,11 +11712,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10481,11 +11784,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10535,11 +11847,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10553,6 +11874,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10591,11 +11913,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10612,6 +11943,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10650,11 +11982,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10699,11 +12040,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10730,6 +12080,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -10768,11 +12119,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -10821,11 +12181,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10876,11 +12245,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10942,11 +12320,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -10996,11 +12383,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11014,6 +12410,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11052,11 +12449,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11076,6 +12482,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11114,11 +12521,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11163,11 +12579,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11197,6 +12622,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11235,11 +12661,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11288,11 +12723,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11343,11 +12787,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11409,11 +12862,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11463,11 +12925,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11481,6 +12952,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11519,11 +12991,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11543,6 +13024,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11581,11 +13063,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11630,11 +13121,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11664,6 +13164,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11702,11 +13203,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -11755,11 +13265,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11810,11 +13329,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11873,11 +13401,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11927,11 +13464,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -11945,6 +13491,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -11983,11 +13530,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12004,6 +13560,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12042,11 +13599,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12091,11 +13657,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12122,6 +13697,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12160,11 +13736,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12213,11 +13798,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12268,11 +13862,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12331,11 +13934,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12385,11 +13997,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12403,6 +14024,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12441,11 +14063,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12462,6 +14093,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12500,11 +14132,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12549,11 +14190,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12580,6 +14230,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12618,11 +14269,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12671,11 +14331,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12726,11 +14395,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12789,11 +14467,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12843,11 +14530,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -12861,6 +14557,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12899,11 +14596,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -12920,6 +14626,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -12958,11 +14665,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13007,11 +14723,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13038,6 +14763,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13076,11 +14802,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13129,11 +14864,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13184,11 +14928,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13248,11 +15001,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13302,11 +15064,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13320,6 +15091,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13358,11 +15130,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13380,6 +15161,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13418,11 +15200,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13467,11 +15258,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13499,6 +15299,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13537,11 +15338,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13590,11 +15400,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13645,11 +15464,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13709,11 +15537,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13763,11 +15600,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13781,6 +15627,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13819,11 +15666,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13841,6 +15697,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "",
           "evaluation": {
             "product": "sum",
@@ -13879,11 +15736,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -13928,11 +15794,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -13960,6 +15835,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -13998,11 +15874,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           },
@@ -14057,11 +15942,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14112,11 +16006,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14175,11 +16078,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14229,11 +16141,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14247,6 +16168,7 @@
         },
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -14285,11 +16207,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           },
@@ -14312,6 +16243,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "equal",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -14350,11 +16282,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           },
@@ -14405,11 +16346,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14436,6 +16386,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "exceed",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -14474,11 +16425,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -14527,11 +16487,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14582,11 +16551,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14645,11 +16623,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14699,11 +16686,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -14717,6 +16713,7 @@
         },
         "progressive": {
           "awardMode": "exceed",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -14755,11 +16752,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -14776,6 +16782,7 @@
         "failureResultPolicy": "perRecord",
         "progressive": {
           "awardMode": "exceed",
+          "thresholdMode": "meet",
           "rollFormula": "3d6",
           "evaluation": {
             "product": "sum",
@@ -14814,11 +16821,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -14863,11 +16879,20 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",

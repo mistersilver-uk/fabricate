@@ -13,7 +13,10 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -22,14 +25,13 @@ let Component;
 let mounted;
 let target;
 
-
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
     filename: sourcePath,
     generate: 'client',
     dev: true,
-    css: 'injected'
+    css: 'injected',
   });
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
@@ -63,8 +65,8 @@ async function renderComposition(props = {}) {
       onExclude: () => {},
       onRestore: () => {},
       onOpenSource: () => {},
-      ...props
-    }
+      ...props,
+    },
   });
   flushSync();
   await tick();
@@ -78,7 +80,7 @@ function sampleRecords() {
     record('candidate', 'Candidate', 'candidate', { matches: true }),
     record('excluded-nonmatching', 'Excluded Nonmatching', 'excluded', { matches: false }),
     record('excluded-matching', 'Excluded Matching', 'excluded', { matches: true }),
-    record('nonmatching', 'Nonmatching', 'notMatching', { matches: false })
+    record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
   ];
 }
 
@@ -92,35 +94,242 @@ function record(id, name, compositionState, overrides = {}) {
     record: {
       name,
       img: `icons/${id}.webp`,
-      description: `${name} description`
+      description: `${name} description`,
     },
-    ...overrides
+    ...overrides,
   };
 }
 
 function sectionNames() {
-  return Array.from(target.querySelectorAll('[data-section]'))
-    .map(section => section.getAttribute('data-section'));
+  return Array.from(target.querySelectorAll('[data-section]')).map((section) =>
+    section.getAttribute('data-section')
+  );
 }
 
 function rowIds(sectionName) {
-  return Array.from(target.querySelectorAll(`[data-section="${sectionName}"] [data-record-id]`))
-    .map(row => row.getAttribute('data-record-id'));
+  return Array.from(
+    target.querySelectorAll(`[data-section="${sectionName}"] [data-record-id]`)
+  ).map((row) => row.getAttribute('data-record-id'));
 }
 
 function quickAction(recordId, action) {
-  return target.querySelector(`[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`);
+  return target.querySelector(
+    `[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`
+  );
 }
 
 /** Open one row's overflow menu and return the PORTALED panel. */
 async function openRowMenu(recordId) {
-  target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
+  target
+    .querySelector(`[data-record-id="${recordId}"] .fabricate-icon-button[aria-haspopup="menu"]`)
+    .click();
   await tick();
   flushSync();
   const panels = target.querySelectorAll('[role="menu"]');
   assert.equal(panels.length, 1, 'exactly one row menu is open at a time');
   return panels[0];
 }
+
+// ── Issue 1522: a row's overrides open in place in that row, whatever its section ──────────────
+
+/** Open one row through its own disclosure and return that row's override body. */
+function openRow(recordId) {
+  const row = target.querySelector(`[data-record-id="${recordId}"]`);
+  const chevron = row.querySelector('.fab-row-disclosure');
+  assert.ok(Boolean(chevron), `${recordId} draws a disclosure`);
+  chevron.click();
+  flushSync();
+  const body = target.querySelector(`[id="${chevron.getAttribute('aria-controls')}"]`);
+  assert.ok(Boolean(body) && !body.hidden, `${recordId} opens its body`);
+  assert.ok(row.contains(body), `${recordId} opens its body in its own row`);
+  return body.querySelector('[data-composition-override-body]');
+}
+
+// Sibling entries in every map, so a writer that drops or rebuilds the map is caught.
+const SIBLINGS = Object.freeze({
+  nodeRuntime: { other: { max: 2, current: 1 } },
+  taskDropRateAdjustments: { other: { x: 5 } },
+  taskDropRateAdjustmentsEnabled: { other: false },
+  eventDropRateAdjustments: { other: 7 },
+  eventDropRateAdjustmentsEnabled: { other: false },
+});
+
+function overrideRecord(kind, id, compositionState, enabled) {
+  const shared = { runtimeState: 'available', dropRateAdjustmentsEnabled: enabled };
+  if (kind === 'event') {
+    return record(id, id, compositionState, {
+      ...shared,
+      dropRateAdjustment: 4,
+      record: { name: id, dropRate: 10 },
+    });
+  }
+  return record(id, id, compositionState, {
+    ...shared,
+    record: { name: id, nodes: { enabled: true, max: 5, current: 4 } },
+    dropRateAdjustmentRows: [
+      { id: 'drop-a', baseDropRate: 40, adjustment: 10, effectiveDropRate: 50 },
+      { id: 'drop-b', baseDropRate: 30, adjustment: 6, effectiveDropRate: 36 },
+    ],
+  });
+}
+
+const STORED = Object.freeze({ 'drop-a': 10, 'drop-b': 6 });
+
+function environmentFor(kind, id, enabled, stored) {
+  const own = `${kind}DropRateAdjustmentsEnabled`;
+  return {
+    ...SIBLINGS,
+    taskDropRateAdjustments: { ...SIBLINGS.taskDropRateAdjustments, [id]: stored },
+    eventDropRateAdjustments: { ...SIBLINGS.eventDropRateAdjustments, [id]: 4 },
+    [own]: enabled ? SIBLINGS[own] : { ...SIBLINGS[own], [id]: false },
+  };
+}
+
+const adjustment = (row) =>
+  `[data-drop-rate-adjustment="${row}"] [data-drop-rate-adjustment-input]`;
+const clearButton = (row) =>
+  `[data-drop-rate-adjustment="${row}"] .manager-environment-drop-adjustment-clear`;
+const EVENT_INPUT = '[data-drop-rate-adjustment-input]';
+const BODIES = '.manager-environment-comp-body, .fabricate-sortable-list-body';
+const EVENT_CLEAR = '.manager-environment-drop-adjustment-clear';
+
+/** A writer step: type into, blur, key or click the control `selector` names inside the body. */
+const typed =
+  (selector, value, type = 'input') =>
+  (body, id) => {
+    const element = body.querySelector(typeof selector === 'function' ? selector(id) : selector);
+    element.value = value;
+    element.dispatchEvent(new Event(type, { bubbles: true }));
+  };
+/** Returns the key event, so a row can assert the input took it from Foundry's keybindings. */
+const keyed = (selector, key) => (body) => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  body.querySelector(selector).dispatchEvent(event);
+  return event;
+};
+const clicked = (selector) => (body) => body.querySelector(selector).click();
+
+const taskAdjusted = (id, own) => ({
+  taskDropRateAdjustments: { ...SIBLINGS.taskDropRateAdjustments, ...(own && { [id]: own }) },
+});
+
+// [name, kind, act, expected patch for the row id, whether the switch starts on, stored drop map]
+const WRITERS = [
+  [
+    'nodeRuntime, seeded from the config',
+    'task',
+    typed((id) => `[data-node-count-input="${id}"]`, '2'),
+    (id) => ({
+      nodeRuntime: { ...SIBLINGS.nodeRuntime, [id]: { enabled: true, max: 5, current: 2 } },
+    }),
+  ],
+  [
+    'nodeRuntime, a typed fraction kept whole',
+    'task',
+    typed((id) => `[data-node-count-input="${id}"]`, '2.5'),
+    (id) => ({
+      nodeRuntime: { ...SIBLINGS.nodeRuntime, [id]: { enabled: true, max: 5, current: 2 } },
+    }),
+  ],
+  [
+    'a drop adjustment set',
+    'task',
+    typed(adjustment('drop-b'), '+5'),
+    (id) => taskAdjusted(id, { 'drop-a': 10, 'drop-b': 5 }),
+  ],
+  [
+    'a drop adjustment cleared to 0 deletes its key',
+    'task',
+    typed(adjustment('drop-b'), '0'),
+    (id) => taskAdjusted(id, { 'drop-a': 10 }),
+  ],
+  [
+    'the last drop row cleared deletes the task key',
+    'task',
+    clicked(clearButton('drop-a')),
+    (id) => taskAdjusted(id, null),
+    true,
+    { 'drop-a': 10 },
+  ],
+  [
+    'the blur clamp at +100',
+    'task',
+    typed(adjustment('drop-a'), '250', 'blur'),
+    (id) => taskAdjusted(id, { ...STORED, 'drop-a': 100 }),
+  ],
+  [
+    'the blur clamp at -100',
+    'task',
+    typed(adjustment('drop-a'), '-400', 'blur'),
+    (id) => taskAdjusted(id, { ...STORED, 'drop-a': -100 }),
+  ],
+  [
+    'ArrowUp',
+    'task',
+    keyed(adjustment('drop-a'), 'ArrowUp'),
+    (id) => taskAdjusted(id, { ...STORED, 'drop-a': 11 }),
+  ],
+  [
+    'ArrowDown',
+    'task',
+    keyed(adjustment('drop-a'), 'ArrowDown'),
+    (id) => taskAdjusted(id, { ...STORED, 'drop-a': 9 }),
+  ],
+  [
+    'the switch off writes false',
+    'task',
+    clicked('[data-task-drop-rate-adjustments-toggle]'),
+    (id) => ({
+      taskDropRateAdjustmentsEnabled: { ...SIBLINGS.taskDropRateAdjustmentsEnabled, [id]: false },
+    }),
+  ],
+  [
+    'the switch on deletes the key',
+    'task',
+    clicked('[data-task-drop-rate-adjustments-toggle]'),
+    () => ({ taskDropRateAdjustmentsEnabled: { ...SIBLINGS.taskDropRateAdjustmentsEnabled } }),
+    false,
+  ],
+  [
+    'the adjustment set',
+    'event',
+    typed(EVENT_INPUT, '+12'),
+    (id) => ({ eventDropRateAdjustments: { ...SIBLINGS.eventDropRateAdjustments, [id]: 12 } }),
+  ],
+  [
+    'the adjustment cleared deletes its key',
+    'event',
+    clicked(EVENT_CLEAR),
+    () => ({ eventDropRateAdjustments: { ...SIBLINGS.eventDropRateAdjustments } }),
+  ],
+  [
+    'the blur clamp at +100',
+    'event',
+    typed(EVENT_INPUT, '101', 'blur'),
+    (id) => ({ eventDropRateAdjustments: { ...SIBLINGS.eventDropRateAdjustments, [id]: 100 } }),
+  ],
+  [
+    'ArrowDown',
+    'event',
+    keyed(EVENT_INPUT, 'ArrowDown'),
+    (id) => ({ eventDropRateAdjustments: { ...SIBLINGS.eventDropRateAdjustments, [id]: 3 } }),
+  ],
+  [
+    'the switch off writes false',
+    'event',
+    clicked('[data-event-drop-rate-adjustments-toggle]'),
+    (id) => ({
+      eventDropRateAdjustmentsEnabled: { ...SIBLINGS.eventDropRateAdjustmentsEnabled, [id]: false },
+    }),
+  ],
+  [
+    'the switch on deletes the key',
+    'event',
+    clicked('[data-event-drop-rate-adjustments-toggle]'),
+    () => ({ eventDropRateAdjustmentsEnabled: { ...SIBLINGS.eventDropRateAdjustmentsEnabled } }),
+    false,
+  ],
+];
 
 describe('CompositionList mounted layout', () => {
   before(async () => {
@@ -131,7 +340,8 @@ describe('CompositionList mounted layout', () => {
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/IconButton.svelte',
-      // THE shared overflow action menu (issue 1477).
+      // THE shared overflow action menu (issue 1477), and the eyebrow its heading renders.
+      'src/ui/svelte/components/Kicker.svelte',
       'src/ui/svelte/components/ActionMenu.svelte',
       // The product's one ordered list and the disclosure it renders (issue 1512). This loop has no
       // dependency validator, so omitting either reports the file as `# cancelled`.
@@ -143,7 +353,10 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/apps/manager/environment/OverrideIndicator.svelte',
       'src/ui/svelte/components/Pagination.svelte',
       // The shared numeric stepper (issue 1050): the blind-weight cell renders it.
-      'src/ui/svelte/components/Stepper.svelte'
+      'src/ui/svelte/components/Stepper.svelte',
+      // A row's overrides body (issue 1522), and the switch it draws.
+      'src/ui/svelte/components/StatusToggle.svelte',
+      'src/ui/svelte/apps/manager/environment/CompositionOverrideBody.svelte',
     ]) {
       writeCompiledSvelte(component);
     }
@@ -171,6 +384,7 @@ describe('CompositionList mounted layout', () => {
       'src/utils/scalars.js',
       'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
       ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
       'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -181,7 +395,8 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/actions/anchoredPopover.js',
       'src/ui/svelte/util/overlayHost.js',
       'src/ui/svelte/util/actionMenuLayout.js',
-      'src/gatheringImageDefaults.js'
+      'src/gatheringImageDefaults.js',
+      'src/ui/svelte/apps/manager/environment/recordNodePool.js',
     ]) {
       copyModule(modulePath);
     }
@@ -191,10 +406,13 @@ describe('CompositionList mounted layout', () => {
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) {
       copyModule(modulePath);
     }
-    Component = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/apps/manager/environment/CompositionList.svelte.js'
-    )).href)).default;
+    Component = (
+      await import(
+        pathToFileURL(
+          join(tempRoot, 'src/ui/svelte/apps/manager/environment/CompositionList.svelte.js')
+        ).href
+      )
+    ).default;
   });
 
   afterEach(() => {
@@ -217,19 +435,18 @@ describe('CompositionList mounted layout', () => {
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
       onExclude: (kind, id) => calls.push(['exclude', kind, id]),
-      onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
+      onOpenSource: (kind, id) => calls.push(['openSource', kind, id]),
     });
 
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
-    assert.deepEqual(rowIds('available-to-add'), [
-      'candidate',
-      'nonmatching',
-      'disabled'
-    ]);
+    assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.ok(!target.textContent.includes('Excluded'), 'manual task mode does not present excluded task rows');
+    assert.ok(
+      !target.textContent.includes('Excluded'),
+      'manual task mode does not present excluded task rows'
+    );
 
     const excludeQuick = quickAction('included', 'exclude');
     assert.ok(excludeQuick, 'included manual task rows render a quick remove action');
@@ -256,7 +473,10 @@ describe('CompositionList mounted layout', () => {
 
     // A non-matching row in MANUAL mode is plainly added (issue #1315).
     const nonMatchingQuick = quickAction('nonmatching', 'include');
-    assert.ok(nonMatchingQuick, 'non-matching available task rows render the same quick add action');
+    assert.ok(
+      nonMatchingQuick,
+      'non-matching available task rows render the same quick add action'
+    );
     assert.equal(nonMatchingQuick.getAttribute('title'), 'Add');
     assert.equal(nonMatchingQuick.getAttribute('aria-label'), 'Add');
     nonMatchingQuick.click();
@@ -285,8 +505,14 @@ describe('CompositionList mounted layout', () => {
 
     menu = await openRowMenu('disabled');
     assert.ok(menu.textContent.includes('Enable in library first'));
-    assert.ok(!menu.querySelector('[data-action="include"]'), 'the library gate precedes both modes, so a disabled record cannot be added');
-    assert.ok(!menu.querySelector('[data-action="force-include"]'), 'and no force can reach past it either');
+    assert.ok(
+      !menu.querySelector('[data-action="include"]'),
+      'the library gate precedes both modes, so a disabled record cannot be added'
+    );
+    assert.ok(
+      !menu.querySelector('[data-action="force-include"]'),
+      'and no force can reach past it either'
+    );
     menu.querySelectorAll('button').item(1).click();
     assert.deepEqual(calls.at(-1), ['openSource', 'task', 'disabled']);
   });
@@ -336,14 +562,20 @@ describe('CompositionList mounted layout', () => {
       kind: 'task',
       mode: 'automatic',
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
-      onRestore: (kind, id) => calls.push(['restore', kind, id])
+      onRestore: (kind, id) => calls.push(['restore', kind, id]),
     });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
+    assert.ok(
+      !target.querySelector('[data-section="available-to-add"]'),
+      'automatic mode has no Available to add list'
+    );
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.ok(!target.querySelector('.manager-environment-comp-quick-action'), 'automatic rows carry no icon-only quick actions');
+    assert.ok(
+      !target.querySelector('.manager-environment-comp-quick-action'),
+      'automatic rows carry no icon-only quick actions'
+    );
 
     // The revived control (issue #1315). Its guard demanded `mode === 'manual'` inside a section
     // gated `mode !== 'manual'`, so it rendered in NO state at all; rendering it is half the fix,
@@ -378,21 +610,24 @@ describe('CompositionList mounted layout', () => {
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
       onExclude: (kind, id) => calls.push(['exclude', kind, id]),
-      onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
+      onOpenSource: (kind, id) => calls.push(['openSource', kind, id]),
     });
 
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
-    assert.deepEqual(rowIds('available-to-add'), [
-      'candidate',
-      'nonmatching',
-      'disabled'
-    ]);
+    assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.ok(!target.querySelector('[data-sortable-grip]'), 'all-drops event mode does not render rank handles');
-    assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops event rows are not draggable');
+    assert.ok(
+      !target.querySelector('[data-sortable-grip]'),
+      'all-drops event mode does not render rank handles'
+    );
+    assert.equal(
+      target.querySelector('[data-record-id="included"]').getAttribute('draggable'),
+      null,
+      'all-drops event rows are not draggable'
+    );
 
     const removeQuick = quickAction('included', 'exclude');
     assert.ok(removeQuick, 'included manual event rows render a quick remove action');
@@ -400,7 +635,9 @@ describe('CompositionList mounted layout', () => {
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
     assert.equal(
-      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source event"]'),
+      target.querySelector(
+        '[data-record-id="included"] .fabricate-icon-button[aria-label="Open source event"]'
+      ),
       null,
       'included manual event rows do not render a standalone edit-source action'
     );
@@ -411,7 +648,10 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['include', 'event', 'candidate']);
 
     const nonMatchingQuick = quickAction('nonmatching', 'include');
-    assert.ok(nonMatchingQuick, 'non-matching available event rows render the same quick add action');
+    assert.ok(
+      nonMatchingQuick,
+      'non-matching available event rows render the same quick add action'
+    );
     nonMatchingQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'event', 'nonmatching']);
 
@@ -444,13 +684,16 @@ describe('CompositionList mounted layout', () => {
       records: [
         record('first', 'First', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('second', 'Second', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
+        record('blocked', 'Blocked', 'explicitlyIncluded', {
+          runtimeState: 'unavailable',
+          conditionsMet: false,
+        }),
         record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
         record('candidate', 'Candidate', 'candidate', { matches: true }),
         record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
-        record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true })
+        record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true }),
       ],
-      onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
+      onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to]),
     });
 
     // The included rows are the shared list's as of issue 1512, so the grip, badge and rocker carry
@@ -458,13 +701,19 @@ describe('CompositionList mounted layout', () => {
     const dragSource = (row) => row.querySelector('[data-sortable-grip][draggable="true"]');
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
     assert.ok(Boolean(dragSource(includedRow)), 'included ranked event rows have a drag source');
-    assert.ok(includedRow.querySelector('[data-sortable-grip] .fa-grip-vertical'), 'included ranked event rows render the grip handle');
-    assert.ok(includedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('1'), 'included ranked event rows render the rank number');
+    assert.ok(
+      includedRow.querySelector('[data-sortable-grip] .fa-grip-vertical'),
+      'included ranked event rows render the grip handle'
+    );
+    assert.ok(
+      includedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('1'),
+      'included ranked event rows render the rank number'
+    );
     // Rendered rather than pinned in source (issue 1512), and the drag source is the list's GRIP —
     // not the whole row, whose expanded body is not something a GM drags.
     assert.ok(
-      [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every(
-        (row) => Boolean(dragSource(row))
+      [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every((row) =>
+        Boolean(dragSource(row))
       ),
       'reorder drag is enabled only when event rank controls are active, and then on every row'
     );
@@ -475,11 +724,23 @@ describe('CompositionList mounted layout', () => {
       'and the row itself is not a drag source'
     );
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.ok(Boolean(dragSource(forcedRow)), 'force-included ranked event rows have a drag source');
-    assert.ok(forcedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('4'), 'force-included rows receive their visible rank');
+    assert.ok(
+      Boolean(dragSource(forcedRow)),
+      'force-included ranked event rows have a drag source'
+    );
+    assert.ok(
+      forcedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('4'),
+      'force-included rows receive their visible rank'
+    );
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.ok(Boolean(dragSource(blockedRow)), 'condition-blocked included event rows have a drag source');
-    assert.ok(blockedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
+    assert.ok(
+      Boolean(dragSource(blockedRow)),
+      'condition-blocked included event rows have a drag source'
+    );
+    assert.ok(
+      blockedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('3'),
+      'condition-blocked included rows receive their visible rank'
+    );
 
     assert.ok(
       !target.querySelector('[data-section="available-to-add"] [data-sortable-grip]'),
@@ -488,7 +749,10 @@ describe('CompositionList mounted layout', () => {
 
     // The rocker replaces the menu's two hidden copies of the same act (issue 1512).
     const menu = await openRowMenu('first');
-    assert.ok(!menu.textContent.includes('Move up'), 'the ranked menu no longer duplicates the move');
+    assert.ok(
+      !menu.textContent.includes('Move up'),
+      'the ranked menu no longer duplicates the move'
+    );
     assert.ok(!menu.textContent.includes('Move down'), 'in either direction');
     includedRow.querySelector('[data-sortable-move="down"]').click();
     assert.deepEqual(calls.at(-1), ['reorder', 'event', 0, 1]);
@@ -500,12 +764,15 @@ describe('CompositionList mounted layout', () => {
       eventSelectionMode: 'allDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
-      ]
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
+      ],
     });
 
     assert.ok(!target.querySelector('.manager-environment-comp-head.has-rank-controls'));
-    assert.ok(!target.querySelector('[data-sortable-grip]'), 'no grip where the list does not order');
+    assert.ok(
+      !target.querySelector('[data-sortable-grip]'),
+      'no grip where the list does not order'
+    );
     assert.ok(!target.querySelector('[data-sortable-move]'), 'and no rocker either');
     assert.ok(!target.querySelector('[draggable="true"]'));
 
@@ -520,15 +787,21 @@ describe('CompositionList mounted layout', () => {
       eventSelectionMode: 'limitedDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
-        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
-      ]
+        record('blocked', 'Blocked', 'explicitlyIncluded', {
+          runtimeState: 'unavailable',
+          conditionsMet: false,
+        }),
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
+      ],
     });
 
     assert.deepEqual(rowIds('included'), ['included', 'blocked', 'forced']);
     assert.ok(!target.querySelector('[data-sortable-grip]'));
     assert.equal(target.querySelector('[data-record-id="forced"]').getAttribute('draggable'), null);
-    assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
+    assert.equal(
+      target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'),
+      null
+    );
   });
 
   it('event automatic mode retains Excluded and standalone Non-matching sections, and renders the labelled Force add', async () => {
@@ -536,24 +809,41 @@ describe('CompositionList mounted layout', () => {
     await renderComposition({
       kind: 'event',
       mode: 'automatic',
-      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
     });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
-    assert.ok(!target.querySelector('[data-section="candidates"]'), 'nor a separate candidates list');
+    assert.ok(
+      !target.querySelector('[data-section="available-to-add"]'),
+      'automatic mode has no Available to add list'
+    );
+    assert.ok(
+      !target.querySelector('[data-section="candidates"]'),
+      'nor a separate candidates list'
+    );
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.ok(!target.querySelector('[data-section="excluded"] [data-sortable-grip]'), 'excluded rows reserve no rank handle');
-    assert.ok(!target.querySelector('[data-section="non-matching"] [data-sortable-grip]'), 'non-matching rows reserve no rank handle');
+    assert.ok(
+      !target.querySelector('[data-section="excluded"] [data-sortable-grip]'),
+      'excluded rows reserve no rank handle'
+    );
+    assert.ok(
+      !target.querySelector('[data-section="non-matching"] [data-sortable-grip]'),
+      'non-matching rows reserve no rank handle'
+    );
 
     // THE `warning` role's first reachable call site (issues 1118 and #1315).
-    const forceAdd = target.querySelector('[data-record-id="nonmatching"] .manager-environment-force-include');
-    assert.ok(Boolean(forceAdd), 'the automatic-mode Non-matching list renders the labelled Force add');
+    const forceAdd = target.querySelector(
+      '[data-record-id="nonmatching"] .manager-environment-force-include'
+    );
+    assert.ok(
+      Boolean(forceAdd),
+      'the automatic-mode Non-matching list renders the labelled Force add'
+    );
     assert.ok(forceAdd.textContent.includes('Force add'));
     assert.ok(
       forceAdd.classList.contains('fab-manager-button'),
-      `the labelled Force add renders through the ManagerButton primitive, got ${forceAdd.className}`
+      `the labelled Force add renders through the Button primitive, got ${forceAdd.className}`
     );
     assert.ok(
       forceAdd.classList.contains('is-warning-action'),
@@ -565,14 +855,171 @@ describe('CompositionList mounted layout', () => {
     );
     forceAdd.click();
     assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
+    // The positive half of the manual-mode absence above: the same selector does find the
+    // standalone edit-source action where the list renders one.
+    assert.ok(
+      Boolean(
+        target.querySelector(
+          ':scope [data-record-id="nonmatching"] .fabricate-icon-button[aria-label="Open source event"]'
+        )
+      ),
+      'a non-matching event row renders the standalone edit-source action'
+    );
 
     assert.ok(
       !target.querySelector('[data-record-id="disabled"] .manager-environment-force-include'),
       'a library-disabled row gets the enable-in-library note instead, because no force can revive it'
     );
     assert.ok(
-      target.querySelector('[data-record-id="disabled"]').textContent.includes('Enable in library first'),
+      target
+        .querySelector('[data-record-id="disabled"]')
+        .textContent.includes('Enable in library first'),
       'and that note is what it renders'
     );
+  });
+
+  describe('CompositionList row overrides (issue 1522)', () => {
+    it('opens one row at a time in every section, and opening selects the row', async () => {
+      for (const [mode, ids] of [
+        ['manual', ['included', 'candidate', 'nonmatching', 'disabled']],
+        ['automatic', ['included', 'excluded-matching', 'nonmatching', 'disabled']],
+      ]) {
+        const selected = [];
+        await renderComposition({
+          mode,
+          onSelect: (_kind, id) => {
+            selected.push(id);
+          },
+        });
+        for (const id of ids) {
+          assert.ok(Boolean(openRow(id)), `${id} opens the overrides body`);
+          assert.equal(selected.at(-1), id, `opening ${id} selects it`);
+          assert.equal(
+            target.querySelectorAll('.fab-row-disclosure[aria-expanded="true"]').length,
+            1,
+            'one row is open at a time'
+          );
+          let shown = 0;
+          for (const body of target.querySelectorAll(BODIES)) {
+            if (!body.hidden) {
+              shown += 1;
+              continue;
+            }
+            assert.ok(body.inert, `${body.id} is closed, hidden and inert`);
+            assert.ok(
+              !body.querySelector('[data-composition-override-body]'),
+              `${body.id} mounts no editor while closed`
+            );
+          }
+          assert.equal(shown, 1, `${id}: one body shows`);
+        }
+        unmount(mounted);
+        mounted = null;
+        target.remove();
+      }
+    });
+
+    it('closes the open row when another row is selected, and keeps it when its own is', async () => {
+      const selected = [];
+      await renderComposition({
+        mode: 'automatic',
+        onSelect: (_kind, id) => {
+          selected.push(id);
+        },
+      });
+      const expanded = () => target.querySelectorAll('.fab-row-disclosure[aria-expanded="true"]');
+      const select = (id) => {
+        target.querySelector(`[data-record-id="${id}"] [data-action="select"]`).click();
+        flushSync();
+      };
+      for (const open of ['included', 'excluded-matching']) {
+        openRow(open);
+        select(open);
+        assert.equal(expanded().length, 1, `selecting ${open} keeps its own row open`);
+        select('nonmatching');
+        assert.equal(selected.at(-1), 'nonmatching');
+        assert.equal(expanded().length, 0, `selecting another row closes ${open}`);
+      }
+    });
+
+    it('clears a drop row back to its input, and names each row`s controls by the row', async () => {
+      await renderComposition({
+        mode: 'automatic',
+        records: [overrideRecord('task', 'kept', 'explicitlyIncluded', true)],
+        environment: environmentFor('task', 'kept', true, STORED),
+      });
+      const body = openRow('kept');
+      const input = body.querySelector(adjustment('drop-a'));
+      const clear = body.querySelector(clearButton('drop-a'));
+      assert.equal(
+        input.getAttribute('aria-label'),
+        'drop-a: Drop-rate adjustment (-100% to +100%)'
+      );
+      assert.equal(clear.getAttribute('aria-label'), 'Clear drop-a');
+      clear.focus();
+      clear.click();
+      flushSync();
+      assert.ok(document.activeElement === input, 'focus lands on the cleared row`s input');
+      const toggle = body.querySelector('[data-task-drop-rate-adjustments-toggle]');
+      assert.equal(toggle.getAttribute('aria-label'), 'Apply drop-rate adjustments');
+    });
+
+    it('holds ArrowUp at +100, inside the row', async () => {
+      const patches = [];
+      const capped = overrideRecord('task', 'kept', 'explicitlyIncluded', true);
+      capped.dropRateAdjustmentRows[0].adjustment = 100;
+      await renderComposition({
+        mode: 'automatic',
+        records: [capped],
+        environment: environmentFor('task', 'kept', true, { ...STORED, 'drop-a': 100 }),
+        onUpdateEnvironment: (patch) => {
+          patches.push(patch);
+        },
+      });
+      const body = openRow('kept');
+      let leaked = false;
+      const foundry = () => {
+        leaked = true;
+      };
+      document.addEventListener('keydown', foundry);
+      const event = keyed(adjustment('drop-a'), 'ArrowUp')(body);
+      document.removeEventListener('keydown', foundry);
+      flushSync();
+      assert.ok(event.defaultPrevented && !leaked, 'the key never reaches Foundry');
+      assert.deepEqual(patches, [taskAdjusted('kept', { ...STORED, 'drop-a': 100 })]);
+      assert.equal(body.querySelector(adjustment('drop-a')).value, '+100');
+    });
+
+    for (const [name, kind, act, expected, enabled = true, stored = STORED] of WRITERS) {
+      it(`${kind} row writer: ${name}, from an included row and an excluded row`, async () => {
+        for (const [id, state] of [
+          ['kept', 'explicitlyIncluded'],
+          ['dropped', 'excluded'],
+        ]) {
+          const patches = [];
+          await renderComposition({
+            kind,
+            mode: 'automatic',
+            records: [
+              overrideRecord(kind, 'kept', 'explicitlyIncluded', enabled),
+              overrideRecord(kind, 'dropped', 'excluded', enabled),
+            ],
+            environment: environmentFor(kind, id, enabled, stored),
+            onUpdateEnvironment: (patch) => {
+              patches.push(patch);
+            },
+          });
+          const event = act(openRow(id), id);
+          flushSync();
+          assert.deepEqual(patches, [expected(id)], `${state}: ${name}, in one patch`);
+          if (event instanceof KeyboardEvent) {
+            assert.ok(event.defaultPrevented, `${state}: ${name} keeps the key from Foundry`);
+          }
+          unmount(mounted);
+          mounted = null;
+          target.remove();
+        }
+      });
+    }
   });
 });

@@ -11,7 +11,7 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -20,6 +20,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-edit-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
@@ -88,22 +89,23 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Callout.svelte',
+    // The failed save's blocking notice (issue 1522).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). `ExplainerCard`'s docs link and
-    // `EditorValidationSurface`'s View action both render through the primitive, so it is a
-    // STATIC import of this tree; omitting it HANGS this suite as `# cancelled`.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    // THE manager's labelled push-button (issue 1118). `EditorValidationSurface`'s View action
+    // renders through the primitive, so it is a STATIC import of this tree; omitting it HANGS
+    // this suite as `# cancelled`.
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     // THE shared picker both of the two above now render (issue 1503). `IconPicker` and
     // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC
@@ -121,6 +123,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     // The REAL player essence/component tile the behaviour preview now mounts (issue 1036,
     // round 3). A `.svelte` in the declared closure but absent HANGS the suite (# cancelled).
+    // It is a ListRow card (issue 1778).
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/manager/EssenceEditView.svelte',
   ],
@@ -275,6 +279,27 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     harness.remount();
   });
 
+  it('draws the create draft primer as a callout note with three glyph-led points', async () => {
+    const root = await harness.mount(props());
+    openTab(root, 'oncraft');
+
+    const primer = root.querySelector('[data-essence-on-craft-explainer]');
+    assert.ok(Boolean(primer), 'the create draft keeps its primer');
+    assert.equal(primer.getAttribute('data-essence-on-craft-explainer'), 'true');
+    assert.ok(primer.matches('div.manager-callout[role="note"]'), 'and it is the callout note');
+    assert.equal(primer.dataset.calloutTone, 'neutral', 'a standing note takes the neutral tone');
+    assert.ok(primer.querySelector(':scope > i').classList.contains('fa-circle-question'));
+    assert.match(primer.querySelector('.manager-callout-title').textContent, /What an essence/);
+    const points = [...primer.querySelectorAll('.manager-callout-item')];
+    assert.equal(points.length, 3, 'one point per thing an essence carries');
+    for (const point of points) {
+      assert.ok(Boolean(point.querySelector(':scope > i')), 'each point leads with its glyph');
+      assert.ok(point.querySelector('.manager-callout-item-lead').textContent.trim().length > 0);
+      assert.ok(point.querySelector('.manager-callout-item-text').textContent.trim().length > 0);
+    }
+    harness.remount();
+  });
+
   it('explains the both-gates-off state instead of rendering an empty tab', async () => {
     const root = await harness.mount(
       props({ showSourceUi: false, showPropertyMacroUi: false })
@@ -323,7 +348,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     );
 
     // 2. one square clear button became the Tool Studio's grouped pair.
-    const actions = card.querySelectorAll('.manager-item-drop-zone-actions .manager-icon-button');
+    const actions = card.querySelectorAll('.manager-item-drop-zone-actions .fabricate-icon-button');
     assert.equal(actions.length, 2, 'copy source uuid and unlink, grouped and right-aligned');
     actions[0].click();
     flushSync();
@@ -706,6 +731,10 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     const callout = root.querySelector('[data-scoped-shared-definition]');
     assert.ok(callout, 'the callout is the first thing the rules tab says');
+    assert.ok(
+      !root.querySelector('[data-essence-on-craft-explainer]'),
+      'and the create primer is not, because each rules card explains itself'
+    );
     assert.ok(
       callout.textContent.includes('Aether'),
       'it names the essence rather than "the shared definition"'

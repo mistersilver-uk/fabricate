@@ -4,7 +4,7 @@
 
   Until issue 877 this was a DialogV2 built from an HTML string, so it inherited
   Foundry's own defaults: serif headings sized like page titles, raw `<ul>` bullets and
-  a full-width default footer button. It is now the same `ManagerModal` chrome the
+  a full-width default footer button. It is now the same `Modal` chrome the
   folder-mapping step uses, which is the other dialog in the very same import flow —
   one implementation of "manager modal dialog", not two technologies side by side.
 
@@ -21,8 +21,8 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from './ManagerModal.svelte';
+  import Button from '../../components/Button.svelte';
+  import Modal from '../../components/Modal.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -53,13 +53,13 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={content?.title || text('FABRICATE.Admin.ImportReport.Title', 'Import report')}
   subtitle={content?.headline || ''}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   width="620px"
-  rootAttributes={{ 'data-import-report': '' }}
+  dialogProps={{ 'data-import-report': '' }}
   {onClose}
 >
   {#snippet body()}
@@ -90,7 +90,7 @@
         icon="fas fa-circle-check"
         title={text('FABRICATE.Admin.ImportReport.EmptyStateTitle', 'Nothing needs attention')}
         hint={content?.emptyStateLabel || ''}
-        dataAttr="data-import-report-empty"
+        data-import-report-empty
       />
     {/if}
 
@@ -102,11 +102,11 @@
   {/snippet}
 
   {#snippet footer()}
-    <ManagerButton role="primary" data-import-report-close onclick={() => onClose()}>
+    <Button role="primary" data-import-report-close onclick={() => onClose()}>
       {text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   .manager-import-report-list {
@@ -124,7 +124,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
   }
 
@@ -169,7 +169,7 @@
     flex: 1;
     min-width: 0;
     color: var(--fab-text-secondary);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     overflow-wrap: anywhere;
   }
 

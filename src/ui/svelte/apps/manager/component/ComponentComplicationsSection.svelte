@@ -31,7 +31,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -515,7 +515,7 @@
           'FABRICATE.Admin.Manager.Component.Complications.Empty',
           'Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence.'
         )}
-        dataAttr="data-complications-empty"
+        data-complications-empty
       />
     {:else}
       <div class="fab-complications-list">
@@ -545,8 +545,7 @@
               'FABRICATE.Admin.Manager.Component.Complications.Remove',
               'Remove complication'
             )}
-            dataAttr="data-complication"
-            dataValue={complication.id}
+            data-complication={complication.id || true}
             onToggle={() => toggleOpen(complication.id)}
             onDelete={() => removeComplication(complication.id)}
           >
@@ -583,7 +582,7 @@
                     'FABRICATE.Admin.Manager.Component.Complications.SeverityLabel',
                     'Severity'
                   )}
-                  dataAttr="data-complication-severity"
+                  data-complication-severity
                   optionDataAttr="data-complication-severity-option"
                   density="field"
                   onChange={(value) => setField(complication.id, 'severity', value)}
@@ -601,7 +600,7 @@
                   'Tell the player'
                 )}
                 disabled={saving}
-                dataAttr="data-complication-visibility"
+                data-complication-visibility
                 onToggle={(next) =>
                   setField(complication.id, 'visibility', next ? 'visible' : 'gmOnly')}
               />
@@ -695,7 +694,7 @@
                     'FABRICATE.Admin.Manager.Component.Complications.MatchLabel',
                     'How the conditions combine'
                   )}
-                  dataAttr="data-complication-match"
+                  data-complication-match
                   optionDataAttr="data-complication-match-option"
                   density="compact"
                   onChange={(value) => setField(complication.id, 'match', value)}
@@ -711,8 +710,7 @@
                     title={text(...condition.title)}
                     detail={text(...condition.detail)}
                     disabled={saving}
-                    dataAttr="data-complication-condition"
-                    dataValue={condition.key}
+                    data-complication-condition={condition.key || true}
                     onToggle={(next) => setWhen(complication.id, condition.key, next)}
                   />
                 {/each}
@@ -754,8 +752,7 @@
                       'Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.'
                     )}
                     disabled={saving || triggerClauseUnavailable(complication)}
-                    dataAttr="data-complication-condition"
-                    dataValue="checkTrigger"
+                    data-complication-condition="checkTrigger"
                     onToggle={(next) =>
                       setWhen(
                         complication.id,
@@ -773,7 +770,7 @@
                         'Check trigger'
                       )}
                       disabled={saving}
-                      triggerData={{ 'data-complication-trigger': '' }}
+                      triggerProps={{ 'data-complication-trigger': '' }}
                       onChange={(next) => setWhen(complication.id, 'checkTrigger', next || null)}
                     />
                   </ComplicationEffectRow>
@@ -801,7 +798,7 @@
                     'Rolled against the character at the moment the result is decided.'
                   )}
                   disabled={saving}
-                  dataAttr="data-complication-roll-condition"
+                  data-complication-roll-condition
                   onToggle={(next) => setNested(complication.id, 'rollCondition', 'enabled', next)}
                 >
                   <!-- ONE LINE, and it needs a row of its own. The reveal strip is a WRAPPING flex
@@ -814,8 +811,8 @@
 
                        THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT. Driven from a
                        1280px manager down to 600px the strip narrows to 534px and stops, because
-                       the pane carries its own floor; the row's content floor is 260 + 156 + 104
-                       plus two 7px gaps — the same 534px — with `min-width: 0` on every child, so
+                       the pane carries its own floor; the row's content floor is 258 + 156 + 104
+                       plus two 8px gaps — the same 534px — with `min-width: 0` on every child, so
                        `scrollWidth - clientWidth === 0` throughout. A
                        `@container fabricate-manager (max-width: 680px)` rule was written and
                        removed: it fires where the row still has room and wrapped three fields onto
@@ -852,7 +849,7 @@
                         'Comparison'
                       )}
                       disabled={saving}
-                      triggerData={{ 'data-complication-roll-condition-cmp': '' }}
+                      triggerProps={{ 'data-complication-roll-condition-cmp': '' }}
                       onChange={(next) => setNested(complication.id, 'rollCondition', 'cmp', next)}
                     />
                     <!-- A SIGNED INTEGER STEPPER, not a bare field. `min`/`max` stay at the
@@ -924,7 +921,7 @@
                     'Rolled and posted to chat when the complication fires.'
                   )}
                   disabled={saving}
-                  dataAttr="data-complication-effect-roll"
+                  data-complication-effect-roll
                   onToggle={(next) => setNested(complication.id, 'effectRoll', 'enabled', next)}
                 >
                   <input
@@ -984,18 +981,18 @@
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
-                        triggerClass="fabricate-button manager-button"
+                        triggerClass="fabricate-button"
                         triggerIcon="fas fa-scroll"
                         triggerLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
-                        triggerData={{ 'data-complication-macro-browse': 'true' }}
-                        triggerAriaLabel={text(
+                        triggerProps={{ 'data-complication-macro-browse': 'true' }}
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
-                        dialogAriaLabel={text(
+                        panelLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
@@ -1003,7 +1000,7 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
                           'Search macros...'
                         )}
-                        searchAriaLabel={text(
+                        searchLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
                           'Search macros...'
                         )}
@@ -1011,7 +1008,7 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.None',
                           'No script macros in this world'
                         )}
-                        onChoose={(uuid) => setMacro(complication.id, uuid)}
+                        onSelect={(uuid) => setMacro(complication.id, uuid)}
                       />
                     {/snippet}
                     <div class="fab-complication-macro-controls">
@@ -1062,7 +1059,7 @@
     <!-- Dashed and fullWidth: the append-a-row verb, the same shape as `RecipeStepsCard`'s "Add a
          step". The bespoke scoped rule it replaced declared nothing the role and `fullWidth` do
          not already state, so it is retired rather than re-chained under `:global(...)`. -->
-    <ManagerButton
+    <Button
       role="dashed"
       fullWidth
       data-complications-add
@@ -1071,7 +1068,7 @@
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Component.Complications.Add', 'Add complication')}</span>
-    </ManagerButton>
+    </Button>
   </section>
 {/if}
 
@@ -1079,7 +1076,7 @@
   /* Theme-ROOT tokens only, per `Chip.svelte`'s note, so a reuse outside `.fabricate-manager`
      does not silently lose them. */
   .fab-complications-title-glyph {
-    margin-right: 7px;
+    margin-right: var(--fab-space-chip);
     color: var(--fab-warning);
     font-size: 11px;
   }
@@ -1088,7 +1085,7 @@
     display: flex;
     flex: 0 0 auto;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     justify-content: flex-end;
   }
 
@@ -1105,20 +1102,20 @@
   .fab-complications-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .fab-complication-fields {
     display: flex;
     flex-wrap: wrap;
-    gap: 11px;
+    gap: var(--fab-space-3);
     align-items: flex-end;
   }
 
   .fab-complication-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
@@ -1129,7 +1126,7 @@
   .fab-complication-activity-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
   }
 
   /* The NOT-PROGRESSIVE axis, applied over whichever tone chosen-ness gave the chip. `opacity`
@@ -1147,7 +1144,7 @@
   /* Its OWN run, not more of the chip's label: concatenated into the chip's text node it
      inherited that weight and size, so "· not progressive" read as part of the activity's NAME. */
   .fab-complication-activity-note {
-    margin-left: 2px;
+    margin-left: var(--fab-space-2xs);
     color: var(--fab-text-subtle);
     font-size: 9px;
     font-weight: 400;
@@ -1167,17 +1164,17 @@
      darker raw colour was ruled out for the studio as a whole (see the mapping note in
      `styles/fabricate.css`): it would force a value into all seven themes to correct one step. */
   .fab-complication-card {
-    padding: 12px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-bg-0);
   }
 
   .fab-complication-card-heading {
     display: flex;
-    gap: 9px;
+    gap: var(--fab-space-2);
     align-items: center;
-    margin-bottom: 9px;
+    margin-bottom: var(--fab-space-2);
   }
 
   .fab-complication-card-hint {
@@ -1194,7 +1191,7 @@
   .fab-complication-rows {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .fab-complication-expression {
@@ -1226,7 +1223,7 @@
     display: flex;
     flex: 1 1 100%;
     flex-wrap: nowrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
   }
@@ -1269,7 +1266,7 @@
   /* Indented to the reveal strip's own inset, so it hangs under the row's copy rather than its
      checkbox. Subtle rather than the macro card's warning tone: nothing has gone wrong. */
   .fab-complication-trigger-hint {
-    margin: 6px 0 0 24px;
+    margin: var(--fab-space-chip) 0 0 var(--fab-space-6);
     color: var(--fab-text-subtle);
     font-size: 9.5px;
     line-height: 1.45;
@@ -1288,17 +1285,17 @@
   .fab-complication-macro-controls {
     display: flex;
     flex: 1 1 100%;
-    gap: 9px;
+    gap: var(--fab-space-2);
     align-items: center;
   }
 
   /* The browse trigger, in the macro card's HEAD. Its type is copied from the manager's existing
      compact in-header control, `.manager-salvage-stage-edit`, rather than invented, so the two read
-     as one treatment: `manager-button`'s default is sized for a footer action and wrapped "Browse
+     as one treatment: `fabricate-button`'s default is sized for a footer action and wrapped "Browse
      macros" onto two lines. `white-space: nowrap` is what fixes the wrap; the rest keeps it from
      looking like a different button once it no longer does. */
   .fab-complication-macro :global([data-complication-macro-browse]) {
-    padding: 4px 9px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: normal;
@@ -1315,7 +1312,7 @@
   }
 
   .fab-complication-macro-warning {
-    margin: 7px 0 0;
+    margin: var(--fab-space-2) 0 0;
     color: var(--fab-warning-text);
     font-size: 10px;
   }

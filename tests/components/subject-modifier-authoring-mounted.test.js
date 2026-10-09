@@ -7,13 +7,21 @@ import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  GATHERING_TASK_EDITOR_COMPILED_MODULES,
+  GATHERING_TASK_EDITOR_RAW_MODULES,
+} from '../helpers/gatheringTaskEditorModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -28,6 +36,7 @@ const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -281,6 +290,7 @@ const GATHERING_PICKER = '[data-subject-modifier-picker="gathering-check-modifie
 const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -294,6 +304,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
@@ -313,6 +324,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // The gathering host's seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    ...GATHERING_TASK_EDITOR_RAW_MODULES,
     // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
@@ -325,11 +337,16 @@ const gatheringHarness = createMountedComponentHarness({
     'src/utils/localizeWithFallback.js',
     'src/ui/svelte/apps/manager/checks/previewActorId.js',
     'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+    // A count check's override and line (issue 2006): its copy, and the count description.
+    'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
+    'src/systems/countCheck.js',
+    'src/systems/countEvaluation.js',
+    ...RESULT_ROW_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
@@ -342,7 +359,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -354,6 +371,9 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+    // The task's identity and depleted-marker art (issue 1522).
+    'src/ui/svelte/components/ArtPicker.svelte',
+    ...GATHERING_TASK_EDITOR_COMPILED_MODULES,
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,
@@ -363,6 +383,8 @@ async function mountGathering(overrides = {}) {
   const updates = [];
   const target = await gatheringHarness.mount({
     task: { id: 'task-1', name: 'Forage', dropRows: [] },
+    // The pick is a Requirements card (issue 1522).
+    activeTab: 'requirements',
     resolutionMode: 'routed',
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',

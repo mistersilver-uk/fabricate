@@ -12,6 +12,7 @@ import {
   ACCESS_ROSTER_SEARCH_MISS_TERM,
   getCaseById
 } from '../../scripts/lib/viewLabCases.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +22,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1513: the shared `<Pagination>` imports `<Select>`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -35,7 +37,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Pagination.svelte',
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/RosterRow.svelte',
     'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
@@ -124,7 +126,7 @@ describe('GrantAccessInspector (mounted)', () => {
     });
 
     // Toggle the first character on; the existing player grant must be preserved.
-    const charToggle = root.querySelector('[data-access-character-row] .manager-status-toggle');
+    const charToggle = root.querySelector('[data-access-character-row] .fabricate-toggle');
     charToggle.click();
     flushSync();
 
@@ -142,7 +144,7 @@ describe('GrantAccessInspector (mounted)', () => {
       onSaveAccess: (recipeId, access) => calls.push({ recipeId, access })
     });
 
-    const playerToggle = root.querySelector('[data-access-player-row] .manager-status-toggle');
+    const playerToggle = root.querySelector('[data-access-player-row] .fabricate-toggle');
     playerToggle.click();
     flushSync();
 
@@ -198,7 +200,7 @@ describe('GrantAccessInspector (mounted)', () => {
     // Page 2 shows the remaining 2 characters.
     assert.equal(root.querySelectorAll('[data-access-character-row]').length, 2);
     // c7 (granted) is on page 2 and its toggle reflects the granted state.
-    const toggles = root.querySelectorAll('[data-access-character-row] .manager-status-toggle');
+    const toggles = root.querySelectorAll('[data-access-character-row] .fabricate-toggle');
     const grantedToggle = Array.from(toggles).find((t) => t.getAttribute('aria-pressed') === 'true');
     assert.ok(grantedToggle, 'the granted character on page 2 keeps its on state');
 

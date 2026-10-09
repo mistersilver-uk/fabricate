@@ -11,6 +11,7 @@
  * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment. */
 
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
+import { readStoredResource } from '../../../../../systems/additionalDiceReach.js';
 import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import { planModifierPlacement } from '../../../../../systems/checkModifierRouter.js';
 import {
@@ -95,6 +96,22 @@ export function cloneRollData(actor) {
   const live = actor?.getRollData?.() ?? actor?.system ?? {};
   const clone = globalThis.foundry?.utils?.deepClone;
   return typeof clone === 'function' ? clone(live) : structuredClone(live);
+}
+
+/** The Preview-as actor as the Studio reads it: its name, a roll-data copy, and its stored value
+ *  at a document path through the engine's own `readStoredResource`; null for "No actor". */
+export function previewCharacter(actor) {
+  if (!actor) return null;
+  return {
+    name: actor.name,
+    rollData: cloneRollData(actor),
+    readStored: (path) => readStoredResource(actor, path),
+  };
+}
+
+/** {@link previewCharacter} for an actor id, through {@link resolvePreviewActor}. */
+export function resolvePreviewCharacter(id, options) {
+  return previewCharacter(resolvePreviewActor(id, options));
 }
 
 /**
@@ -204,9 +221,12 @@ export function buildPreviewCheckArgs({
   };
   const plan = { kind, formula, dc, dynamicDc, actor, evaluation, target };
 
-  if (kind === 'progressive') return { ...plan, args: shared };
-
   const thresholdMode = draft?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  // A summed progressive check has no comparison; a counting one tests each die by it.
+  if (kind === 'progressive') {
+    return { ...plan, args: count ? { ...shared, thresholdMode } : shared };
+  }
+
   if (kind === 'routed') {
     return {
       ...plan,
@@ -269,14 +289,28 @@ function toolContributions(toolTerms) {
 
 /** Roll the preview through the engine's own runner.
  *  @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
+ *  @param {number} [additionalDice] The simulator's stepped dice, for a check that allows them.
  *  @returns {Promise<object|null>} The runner's result verbatim, or null when nothing rolls. */
-export async function runCheckPreview(plan) {
+export async function runCheckPreview(plan, additionalDice = 0) {
   if (!plan?.kind) return null;
   const rollsPool = plan.evaluation?.product === 'count';
   if (!rollsPool && String(plan.formula ?? '').trim() === '') return null;
-  if (plan.kind === 'routed') return runFormulaRouted(plan.args);
-  if (plan.kind === 'progressive') return runFormulaProgressive(plan.args);
-  return runFormulaPassFail(plan.args);
+  const args = simulatedArgs(plan, additionalDice);
+  if (plan.kind === 'routed') return runFormulaRouted(args);
+  if (plan.kind === 'progressive') return runFormulaProgressive(args);
+  return runFormulaPassFail(args);
+}
+
+/**
+ * The runner's arguments with the stepped dice placed through the engine's preview seam, which
+ * reads and spends nothing (issue 2008); unchanged at zero and for a check that allows none.
+ */
+function simulatedArgs(plan, additionalDice) {
+  const allowed = plan.evaluation?.pool?.additionalDice?.enabled === true;
+  const stepped = Number.isInteger(additionalDice) && additionalDice > 0;
+  if (plan.evaluation?.product !== 'count' || !allowed || !stepped) return plan.args;
+  const rollOptions = { ...plan.args.rollOptions, simulatedAdditionalDice: additionalDice };
+  return { ...plan.args, rollOptions: { ...rollOptions, reportVisibility: true } };
 }
 
 /** Whether the plan grades against a character value the target resolution reads. */

@@ -66,20 +66,25 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
     // One row shape, rendered twice: Core's preview state (gold) and the companion-installed
     // state (muted). Writing the markup once is what makes the two frames comparable — and
     // keeps a second near-identical block out of the SonarCloud duplication gate.
-    const downtimeRow = (rowId, chipId, chipModifier) =>
-      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
-      ` data-world-nav-item="downtime" id="${rowId}">` +
-      `<i class="fas fa-hourglass-half"></i>` +
-      `<span class="manager-nav-label">Downtime</span>` +
-      `<span class="manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
-      `</button>`;
+    const downtimeRows = [
+      ['row', 'chip', ''],
+      ['row-installed', 'chip-installed', ' is-installed'],
+    ];
     await page.setContent(
       `<style>${css}</style>` +
         `<div class="fabricate-manager">` +
         `<span class="manager-titlebar-badge" id="titlebar">PREMIUM</span>` +
-        `<nav class="manager-rail"><div class="manager-world-nav">` +
-        downtimeRow('row', 'chip', '') +
-        downtimeRow('row-installed', 'chip-installed', ' is-installed') +
+        `<nav class="manager-rail fabricate-nav"><div class="manager-world-nav">${downtimeRows
+          .map(
+            ([rowId, chipId, chipModifier]) =>
+              `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
+              ` data-world-nav-item="downtime" id="${rowId}">` +
+              `<i class="fas fa-hourglass-half"></i>` +
+              `<span class="manager-nav-label">Downtime</span>` +
+              `<span class="manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
+              `</button>`
+          )
+          .join('')}` +
         `<button class="manager-nav-button manager-nav-parent is-active" id="plain-active">` +
         `<i class="fas fa-users"></i>` +
         `<span class="manager-nav-label">Parties</span>` +
@@ -143,9 +148,10 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
       read.count.color,
       'the chip must beat the later nav-count rules that re-tone every trailing marker'
     );
-    assert.equal(read.chip.radius, '4px', 'at the rail scale the design draws a 4px chip');
-    // 5px, one pixel tighter each side than the design's own `2px 6px`.
-    assert.equal(read.chip.padding, '5px', 'the rail chip keeps its filled-chip padding');
+    assert.equal(read.chip.radius, '6px', 'the design draws a 4px chip; the chip rung is 6');
+    // 4px (`--fab-space-1`), a rung tighter each side than the design's own `2px 6px`: the 5px
+    // it was snapped down to the scale (issue 1523).
+    assert.equal(read.chip.padding, '4px', 'the rail chip keeps its filled-chip padding');
     assert.ok(
       read.labelLines === 1,
       `the chip must not squeeze the label into a second line (got ${read.labelLines})`
@@ -217,22 +223,25 @@ test('the Downtime rail children sit on the same indent and gap as every other r
   });
   const page = await context.newPage();
   try {
-    const subitem = (id, extraClass) =>
-      `<button class="manager-nav-subitem${extraClass}" id="${id}">` +
-      `<i class="fas fa-flask"></i>` +
-      `<span class="manager-nav-label">Recipes</span>` +
-      `<span class="manager-nav-count">7</span>` +
-      `</button>`;
+    const groups = [
+      ['crafting-submenu', 'crafting-child', ''],
+      ['downtime-submenu', 'downtime-child', ' manager-downtime-subitem'],
+    ];
     await page.setContent(
       `<style>${css}</style>` +
         `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
-        `<nav class="manager-nav">` +
-        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="crafting-submenu">` +
-        subitem('crafting-child', '') +
-        `</div></div>` +
-        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="downtime-submenu">` +
-        subitem('downtime-child', ' manager-downtime-subitem') +
-        `</div></div>` +
+        `<nav class="fabricate-nav manager-nav">${groups
+          .map(
+            ([submenuId, id, extraClass]) =>
+              `<div class="manager-nav-group is-expanded">` +
+              `<div class="manager-nav-submenu" id="${submenuId}">` +
+              `<button class="manager-nav-subitem${extraClass}" id="${id}">` +
+              `<i class="fas fa-flask"></i>` +
+              `<span class="manager-nav-label">Recipes</span>` +
+              `<span class="manager-nav-count">7</span>` +
+              `</button></div></div>`
+          )
+          .join('')}` +
         `</nav></aside><main class="manager-main"></main></div></div>`
     );
     const read = await page.evaluate(() => {
@@ -281,20 +290,25 @@ test('a rail label wraps at a space and ellipsises, and never splits a word', as
   });
   const page = await context.newPage();
   try {
-    const row = (id, label) =>
-      `<div class="manager-nav-group" style="position:relative">` +
-      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
-      `<i class="fas fa-hourglass-half"></i>` +
-      `<span class="manager-nav-label">${label}</span>` +
-      `<span class="manager-nav-premium">PREMIUM</span>` +
-      `</button></div>`;
+    const rows = [
+      ['short', 'Downtime'],
+      ['oneword', 'Handelsverwaltungsuebersicht'],
+      ['twowords', 'Trade Administration'],
+    ];
     await page.setContent(
       `<style>${css}</style>` +
         `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
-        `<nav class="manager-nav"><section class="manager-world-nav">` +
-        row('short', 'Downtime') +
-        row('oneword', 'Handelsverwaltungsuebersicht') +
-        row('twowords', 'Trade Administration') +
+        `<nav class="fabricate-nav manager-nav"><section class="manager-world-nav">${rows
+          .map(
+            ([id, label]) =>
+              `<div class="manager-nav-group" style="position:relative">` +
+              `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
+              `<i class="fas fa-hourglass-half"></i>` +
+              `<span class="manager-nav-label">${label}</span>` +
+              `<span class="manager-nav-premium">PREMIUM</span>` +
+              `</button></div>`
+          )
+          .join('')}` +
         `</section></nav></aside><main class="manager-main"></main></div></div>`
     );
     const read = await page.evaluate(() => {
@@ -350,22 +364,27 @@ test('a four-digit companion badge takes width from the LABEL, which never split
   });
   const page = await context.newPage();
   try {
-    const subitem = (id, label, count) =>
-      `<button class="manager-nav-subitem manager-downtime-subitem" id="${id}">` +
-      `<i class="fas fa-scroll"></i>` +
-      `<span class="manager-nav-label">${label}</span>` +
-      `<span class="manager-nav-issue-badge" data-world-downtime-badge="${id}" role="img" ` +
-      `aria-label="${count} waiting">${count}</span>` +
-      `</button>`;
+    const subitems = [
+      ['wide', 'Trade Administration Overview', '1200'],
+      ['control', 'Trade Administration Overview', '7'],
+      ['oneword', 'Handelsverwaltungsuebersicht', '1200'],
+      ['short', 'Ledger', '1200'],
+    ];
     await page.setContent(
       railPage(
-        `<div class="manager-nav-group is-expanded">` +
-          `<div class="manager-nav-submenu" id="downtime-submenu">` +
-          subitem('wide', 'Trade Administration Overview', '1200') +
-          subitem('control', 'Trade Administration Overview', '7') +
-          subitem('oneword', 'Handelsverwaltungsuebersicht', '1200') +
-          subitem('short', 'Ledger', '1200') +
-          `</div></div>`
+        `<nav class="fabricate-nav manager-nav"><div class="manager-nav-group is-expanded">` +
+          `<div class="manager-nav-submenu" id="downtime-submenu">${subitems
+            .map(
+              ([id, label, count]) =>
+                `<button class="manager-nav-subitem manager-downtime-subitem" id="${id}">` +
+                `<i class="fas fa-scroll"></i>` +
+                `<span class="manager-nav-label">${label}</span>` +
+                `<span class="manager-nav-issue-badge" data-world-downtime-badge="${id}" ` +
+                `role="img" aria-label="${count} waiting">${count}</span>` +
+                `</button>`
+            )
+            .join('')}` +
+          `</div></div></nav>`
       )
     );
     // Counting LINE BOXES by distinct top edge, not by rect count.
@@ -472,24 +491,26 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     // The parent's single trailing track carries EITHER the rollup or the muted chip. Both
     // rows are rendered so the trade is measured rather than asserted: the chip is ≈47.5px
     // and the rollup ≈18-26px, so while the rollup shows the label track GROWS.
-    const parentRow = (id, trailing) =>
-      `<div class="manager-nav-group" style="position:relative">` +
-      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
-      `<i class="fas fa-hourglass-half"></i>` +
-      `<span class="manager-nav-label">Downtime</span>` +
-      trailing +
-      `</button>` +
-      `<button class="manager-nav-toggle" id="${id}-toggle">` +
-      `<i class="fas fa-chevron-down"></i></button></div>`;
-    const rollup =
-      `<span class="manager-nav-issue-badge" data-world-downtime-badge-total role="img" ` +
-      `aria-label="5 updates">5</span>`;
-    const chip = `<span class="manager-nav-premium is-installed">PREMIUM</span>`;
-    const nav =
-      `<section class="manager-world-nav">` +
-      parentRow('rollup', rollup) +
-      parentRow('chip', chip) +
-      `</section>`;
+    const nav = `<nav class="fabricate-nav manager-nav"><section class="manager-world-nav">${[
+      [
+        'rollup',
+        `<span class="manager-nav-issue-badge" data-world-downtime-badge-total role="img" ` +
+          `aria-label="5 updates">5</span>`,
+      ],
+      ['chip', `<span class="manager-nav-premium is-installed">PREMIUM</span>`],
+    ]
+      .map(
+        ([id, trailing]) =>
+          `<div class="manager-nav-group" style="position:relative">` +
+          `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
+          `<i class="fas fa-hourglass-half"></i>` +
+          `<span class="manager-nav-label">Downtime</span>` +
+          trailing +
+          `</button>` +
+          `<button class="manager-nav-toggle" id="${id}-toggle">` +
+          `<i class="fas fa-chevron-down"></i></button></div>`
+      )
+      .join('')}</section></nav>`;
 
 
     await page.setContent(railPage(nav));
@@ -599,7 +620,7 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     );
     assert.ok(
       collapsed.rollup.markInsideRow,
-      'and stays inside the parent button, which grows from its 36px floor to hold it'
+      'and stays inside the parent button, which grows from its 34px floor to hold it'
     );
   } finally {
     await context.close();

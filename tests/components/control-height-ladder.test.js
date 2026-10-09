@@ -9,20 +9,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { assertRatchet, byCodePoint, tallyByKey } from '../helpers/ratchetBaseline.js';
-import { repoRoot } from '../helpers/sourceScan.js';
 import {
-  MAX_VAR_CHAIN_DEPTH,
-  collectStyleCorpus,
-  scanPixelValues,
-} from '../helpers/styleBlockScan.js';
+  STYLE_CORPUS,
+  assertGateCases,
+  checkGate,
+  emptyMarkerFailure,
+  exemptAt,
+  gateOver,
+  styleCorpusOf,
+  workingTree,
+} from '../helpers/designSystemRatchet.js';
+import { repoRoot } from '../helpers/sourceScan.js';
+import { MAX_VAR_CHAIN_DEPTH, pixelValuesIn, scanPixelValues } from '../helpers/styleBlockScan.js';
 
 import {
   FLOOR_REFERENCE_STYLESHEET_DECLARATIONS,
   FLOOR_REFERENCE_SVELTE_DECLARATIONS,
-  INDIRECT_HEIGHT_NOTES,
-  KNOWN_RETIRED_HEIGHTS,
-  KNOWN_RETIRED_HEIGHT_TOTAL,
   LADDER_RUNGS,
   RETIRED_CONTROL_HEIGHTS,
   SCANNED_HEIGHT_PROPERTIES,
@@ -33,23 +35,34 @@ import {
 const STYLESHEET_DECLARATION_FLOOR = 435;
 const SVELTE_DECLARATION_FLOOR = 380;
 
-/** The corpus is walked once. Lazily, so a walk failure is reported as a test rather than as an
- * unattributed module-load throw that escapes the `# fail` count entirely. */
+/** Every declaration of one side's style corpus that can reach a retired height. */
+const retiredHeights = (corpus) =>
+  scanPixelValues({
+    corpus,
+    properties: SCANNED_HEIGHT_PROPERTIES,
+    values: RETIRED_CONTROL_HEIGHTS,
+  });
+
+/** The corpus is walked once, lazily, so a walk failure is reported as a test. */
 let cached = null;
 function scan() {
   if (cached === null) {
-    const corpus = collectStyleCorpus();
-    cached = {
-      corpus,
-      retired: scanPixelValues({
-        corpus,
-        properties: SCANNED_HEIGHT_PROPERTIES,
-        values: RETIRED_CONTROL_HEIGHTS,
-      }),
-    };
+    const { readFile, listFiles } = workingTree(STYLE_CORPUS);
+    const { styles: corpus, sources } = styleCorpusOf(readFile, listFiles());
+    cached = { corpus, sources, retired: retiredHeights(corpus) };
   }
   return cached;
 }
+
+/** One side's retired heights, one site per occurrence, netting a move within a file. */
+const RETIRED_HEIGHT_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
+  retiredHeights(styleCorpusOf(readFile, files).styles).occurrences.map((record) => ({
+    file: record.file,
+    line: record.line,
+    id: `${record.property} ${record.value}px`,
+    value: `${record.value}px`,
+  }))
+);
 
 /** `styles/**` on one side, Svelte scoped blocks on the other. */
 const isStylesheet = (record) => record.file.startsWith('styles/');
@@ -119,8 +132,7 @@ test('both stylesheet corpora are still being scanned', () => {
     `only ${svelte} height declarations found in Svelte <style> blocks, against roughly ` +
       `${FLOOR_REFERENCE_SVELTE_DECLARATIONS} when the floor of ${SVELTE_DECLARATION_FLOOR} was ` +
       'set. This is the corpus stylelint cannot reach, so nothing else in the repository would ' +
-      'notice: the likely cause is the line-anchored `<style>` extractor, not 50 deleted ' +
-      'components.'
+      'notice: the likely cause is the `<style>` extractor, not 50 deleted components.'
   );
   assert.ok(
     Object.keys(corpus).length > 150,
@@ -162,7 +174,8 @@ test('every live rung is still in use in BOTH corpora', () => {
     missing,
     [],
     'the scan can no longer see values it certainly still reads, which means it is answering ' +
-      'about a smaller corpus than it claims:\n  ' + missing.join('\n  ')
+      'about a smaller corpus than it claims:\n  ' +
+      missing.join('\n  ')
   );
 });
 
@@ -186,7 +199,8 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
     retired.capReached,
     [],
     'these declarations hit the resolution depth cap, so their candidate sets are INCOMPLETE and ' +
-      'a retired value beyond the cap reads as absent:\n  ' + retired.capReached.join('\n  ')
+      'a retired value beyond the cap reads as absent:\n  ' +
+      retired.capReached.join('\n  ')
   );
 });
 
@@ -196,91 +210,151 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
  * RESTATED because its subject changed: every one of those declarations sizes a THUMBNAIL — a
  * record's art tile, an actor's portrait, or the inventory header's shell around one — and the
  * geometry requirement exempts art and portraits from the control ladder outright, now naming
- * their own published size ladder rather than promising one. That is the same clause that lets
- * `BooksScrollsView.svelte:706` stay in the baseline at 40px. Closing the gap would also mean
+ * their own published size ladder rather than promising one. That is the same clause that puts
+ * `BooksScrollsView.svelte`'s thumbnail on the art ladder's 38. Closing the gap would also mean
  * reading a `style` attribute built by an interpolation, which is a different scanner from this
  * one. So "no new retired control height has been introduced" is a claim about what the two
  * stylesheet corpora DECLARE, not about what the product renders.
  */
-test('no new retired control height has been introduced', () => {
-  const { retired } = scan();
-  const observed = tallyByKey(
-    retired.occurrences,
-    (record) => `${record.file} ${record.property} ${record.value}`
-  );
-
-  assertRatchet({
-    label: 'retired control heights',
-    baseline: KNOWN_RETIRED_HEIGHTS,
-    pinnedTotal: KNOWN_RETIRED_HEIGHT_TOTAL,
-    observed,
-    scanned: retired.declarations.length,
-    floor: STYLESHEET_DECLARATION_FLOOR + SVELTE_DECLARATION_FLOOR,
-    guidance:
-      'Control height MUST be one of 26, 28, 30, 34, 38 or 44 — see the "Geometry comes from the ' +
+test('no new retired control height has been introduced', (t) => {
+  checkGate(
+    t,
+    RETIRED_HEIGHT_GATE,
+    'Control height MUST be one of 26, 28, 30, 34, 38 or 44 — see the "Geometry comes from the ' +
       'published ladders" requirement in `openspec/specs/design-system/spec.md`. 32, 36 and 40 ' +
-      'are retired and this baseline is the debt already owed, not a permission to add to it. ' +
-      'The nearest rung is almost always right; if the declaration genuinely is not a control — ' +
-      'a thumbnail, a slider track, a text-area minimum — say so in a note beside its row.',
-  });
+      'are retired, and the ones the base commit already carries are debt owed, not a permission ' +
+      'to add to it. The nearest rung is almost always right. Three things this scan counts are ' +
+      'not a control, and each takes a ratchet-exempt(design-system) reason at the declaration ' +
+      'rather than a snapped value: an art tile or portrait, which the requirement puts on its ' +
+      'own size ladder; a slider track or text-area minimum; and a retired value inside a `calc()` ' +
+      'that is a CONTENT contribution to a padded well, where snapping 40 to 38 would only shrink ' +
+      'the content box. A retired value as a `var()` fallback is reachable only when no ancestor ' +
+      'sets the token, so paying it down means choosing a rung for the unparented case, not ' +
+      'deleting the fallback.'
+  );
 });
 
-test('every baselined row still carries the raw and resolved text it was measured with', () => {
-  const { retired } = scan();
-  const texts = new Map();
-  for (const record of retired.occurrences) {
-    const key = `${record.file} ${record.property} ${record.value}`;
-    const pairs = texts.get(key) ?? new Set();
-    pairs.add(`${record.raw} => ${record.resolved}`);
-    texts.set(key, pairs);
-  }
+/** The player keys issue 1523's PR12 still owes; PR12 deletes each one as it snaps the site. */
+const PR12_PLAYER_KEYS = Object.freeze([
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: height 40px',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: min-height 40px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: height 32px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: min-height 32px',
+  'src/ui/svelte/apps/crafting/ShoppingList.svelte: min-height 36px',
+  'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte: min-height 40px',
+]);
 
-  const drifted = [];
-  for (const row of KNOWN_RETIRED_HEIGHTS) {
-    const found = [...(texts.get(row.key) ?? new Set())].sort(byCodePoint);
-    const pinned = [...row.texts].sort(byCodePoint);
-    if (found.join(' ; ') !== pinned.join(' ; ')) {
-      drifted.push(`${row.key}\n      pinned: ${pinned.join(' ; ')}\n      found:  ${found.join(' ; ') || '(none)'}`);
-    }
-  }
+// ABSOLUTE, not against the base: a site the base already carried passes the ratchet above.
+test('every retired height outside the PR12 player keys carries a reasoned marker', () => {
+  const { sources, retired } = scan();
+  const unmarked = retired.occurrences
+    .filter((record) => !exemptAt(record.file, sources[record.file], record.line))
+    .map((record) => ({
+      key: `${record.file}: ${record.property} ${record.value}px`,
+      line: record.line,
+    }))
+    .filter(({ key }) => !PR12_PLAYER_KEYS.includes(key))
+    .map(({ key, line }) => `${key} (line ${line})`);
+
+  assert.deepEqual(
+    unmarked,
+    [],
+    'these retired heights carry no ratchet-exempt(design-system) reason. Snap each to its rung ' +
+      'by kind, or mark the art tile, portrait or named exception it is:\n  ' +
+      unmarked.join('\n  ')
+  );
+});
+
+test('no retired control height has been laundered into a private token', () => {
+  const { retired } = scan();
 
   // This is what closes the ratchet's cheapest escape. Rewrite `height: 36px` as `--x: 36px;
   // height: var(--x)` and the file, property, value and COUNT are all unchanged — only the text
-  // moves. Without this the gate would report the tree as unchanged while the debt had been
-  // laundered into a token, which is the move the resolution exists to catch.
+  // moves. Resolution keeps the occurrence findable; this keeps it from reading as unchanged.
+  const laundered = retired.occurrences
+    .filter((record) => !pixelValuesIn(record.raw).includes(record.value))
+    .map(
+      (record) =>
+        `${record.file}:${record.line} ${record.property} ${record.value}px\n      raw:      ` +
+        `${record.raw}\n      resolved: ${record.resolved}`
+    );
+
   assert.deepEqual(
-    drifted,
+    laundered,
     [],
-    'a baselined declaration is no longer written the way it was measured. If you moved the ' +
-      'literal into a custom property the debt has NOT been paid — the control is still that ' +
-      'many pixels tall. Update the row only when the text genuinely changed for another ' +
-      'reason:\n  ' + drifted.join('\n  ')
+    'a retired control height has been moved into a custom property and read back. The debt has ' +
+      'NOT been paid — the control is still that many pixels tall — and the gate above did not ' +
+      'move because the scan resolves `var()`. Use a rung of the published ladder:\n  ' +
+      laundered.join('\n  ')
   );
 });
 
-test('exactly the rows whose raw and resolved texts differ carry a note', () => {
-  // The predicate is `raw !== resolved`.
-  // explain the value". The two readings ALREADY diverge, on a row in the baseline rather than
-  // on an invented one: `styles/fabricate.css min-height 40` writes its 40 literally on the
-  // line — `calc(40px + (2 * var(--fab-space-3)) + 2px)` — so the value is right there to read,
-  // and it qualifies only because a DIFFERENT token in the same calc resolves elsewhere. Its
-  // own note says exactly that. A row could equally be unreadable while its two texts agree.
-  const indirect = KNOWN_RETIRED_HEIGHTS.filter((row) =>
-    row.texts.some((pair) => {
-      const [raw, resolved] = pair.split(' => ');
-      return raw !== resolved;
-    })
-  ).map((row) => row.key);
+/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
 
-  assert.deepEqual(
-    indirect.sort(byCodePoint),
-    Object.keys(INDIRECT_HEIGHT_NOTES).sort(byCodePoint),
-    'a row whose resolved text differs from the text on the line it cites is unadjudicable ' +
-      'without a note, and a note for a row that has become direct is a stale explanation ' +
-      'nobody will re-read. These two sets must be the same set.'
-  );
+const SHEET = 'styles/fabricate.css';
+const PROBE = 'src/ui/svelte/Probe.svelte';
+const REASON = 'ratchet-exempt(design-system): the probe needs it';
 
-  for (const [key, note] of Object.entries(INDIRECT_HEIGHT_NOTES)) {
-    assert.ok(note.length > 80, `the note for "${key}" is too short to explain anything`);
-  }
+const sheetWith = (...lines) =>
+  [':root { --probe-rung: 30px; }', '.fabricate .a { height: 36px; }', ...lines, ''].join('\n');
+
+const probeWith = (...rules) =>
+  [
+    '<div class="probe"></div>',
+    '<style>',
+    '  .probe { min-height: 32px; }',
+    ...rules,
+    '</style>',
+    '',
+  ].join('\n');
+
+const WIRING_BASE = Object.freeze({
+  [SHEET]: sheetWith(),
+  [PROBE]: probeWith(),
+  'README.md': 'unrelated\n',
+});
+
+const height = (file, id) => `${file}: ${id}`;
+
+test('the height gate fails a new retired height and a grown one, and nothing on the ladder', (t) => {
+  assertGateCases(t, RETIRED_HEIGHT_GATE, WIRING_BASE, [
+    {
+      head: { [SHEET]: sheetWith('.fabricate .b { min-height: 40px; }') },
+      failures: [`${height(SHEET, 'min-height 40px')} is new (1)`],
+    },
+    {
+      head: { [PROBE]: probeWith('  .probe-b { min-height: 32px; }') },
+      failures: [`${height(PROBE, 'min-height 32px')} rose from 1 to 2`],
+    },
+    {
+      head: {
+        [SHEET]: sheetWith('.fabricate .c { height: 34px; min-height: var(--probe-rung); }'),
+      },
+      failures: [],
+    },
+    {
+      head: {
+        [SHEET]: sheetWith(
+          ':root { --probe-rung: 40px; }',
+          '.fabricate .d { height: var(--probe-rung); }'
+        ),
+      },
+      failures: [`${height(SHEET, 'height 40px')} is new (1)`],
+    },
+    { head: { 'README.md': 'changed\n' }, skipped: 'corpus-unchanged' },
+  ]);
+});
+
+test('a reasoned marker at the declaration exempts a retired height, and an empty one fails', (t) => {
+  const offender = '.fabricate .b { height: 32px; }';
+  assertGateCases(t, RETIRED_HEIGHT_GATE, WIRING_BASE, [
+    { head: { [SHEET]: sheetWith(`/* ${REASON} */`, offender) }, failures: [] },
+    {
+      head: { [SHEET]: sheetWith('/* ratchet-exempt(design-system): */', offender) },
+      failures: [
+        `${height(SHEET, 'height 32px')} is new (1); its ratchet-exempt marker gives no reason`,
+        emptyMarkerFailure(SHEET, 3),
+      ],
+    },
+  ]);
 });

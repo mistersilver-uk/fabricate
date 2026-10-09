@@ -181,7 +181,7 @@ export function registerBulkCases() {
 
   // The remove leg sits in the shell's dock since issue 1371 r16-list (M23).
   function componentDeleteButton() {
-    return target.querySelector('[data-component-bulk-remove] .manager-button.is-danger');
+    return target.querySelector('[data-component-bulk-remove] .fabricate-button.is-danger');
   }
 
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
@@ -647,7 +647,7 @@ export function registerBulkCases() {
     assert.ok(Boolean(remove), 'the inspector renders its Delete');
     assert.ok(
       remove.classList.contains('fab-manager-button'),
-      'Delete renders through the ManagerButton primitive, not a hand-written class'
+      'Delete renders through the Button primitive, not a hand-written class'
     );
     assert.ok(
       remove.classList.contains('is-danger'),
@@ -674,7 +674,7 @@ export function registerBulkCases() {
   });
 
   function recipeDeleteButton() {
-    return target.querySelector('[data-recipe-bulk-delete-card] .manager-button.is-danger');
+    return target.querySelector('[data-recipe-bulk-delete-card] .fabricate-button.is-danger');
   }
 
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
@@ -1089,7 +1089,7 @@ export function registerBulkCases() {
     );
 
     const deleteButton = target.querySelector(
-      '[data-essence-bulk-delete-card] .manager-button.is-danger'
+      '[data-essence-bulk-delete-card] .fabricate-button.is-danger'
     );
     assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
     deleteButton.click();
@@ -1100,7 +1100,7 @@ export function registerBulkCases() {
       false,
       'the FIRST click only arms — nothing is written'
     );
-    target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger').click();
+    target.querySelector('[data-essence-bulk-delete-card] .fabricate-button.is-danger').click();
     await tick();
     await tick();
     flushSync();
@@ -1136,7 +1136,7 @@ export function registerBulkCases() {
         flushSync();
       }
       const button = () =>
-        target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+        target.querySelector('[data-essence-bulk-delete-card] .fabricate-button.is-danger');
       button().click();
       await tick();
       flushSync();
@@ -1410,7 +1410,7 @@ export function registerBulkCases() {
       globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
       try {
         const button = () =>
-          target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
+          target.querySelector(`[${studio.deleteCard}] .fabricate-button.is-danger`);
         button().click();
         await settle();
         button().click();

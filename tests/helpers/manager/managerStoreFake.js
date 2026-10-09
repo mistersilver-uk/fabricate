@@ -21,6 +21,20 @@ function withHydrateSpy(card, requests) {
   return copy;
 }
 
+const VALID_TASK = { valid: true, errors: [], nameErrors: [], resultErrors: [] };
+
+/**
+ * A task validation fixture held to the store's contract (issue 1522): `valid` is "no errors", and
+ * `nameErrors` is a part of `errors`. A fixture breaking it could block Save with no blocking row.
+ */
+function taskValidation(result) {
+  const { valid, errors = [], nameErrors = [], resultErrors = [] } = result ?? VALID_TASK;
+  if (valid !== (errors.length === 0) || nameErrors.some((error) => !errors.includes(error))) {
+    throw new Error(`gathering task validation fixture breaks the store contract: ${valid}`);
+  }
+  return { valid, errors, nameErrors, resultErrors };
+}
+
 // The provider declares its OWN tab set, so `ids` is a parameter rather than a copy of Core's four.
 function downtimeProvider({
   prefix = 'Companion',
@@ -968,6 +982,12 @@ function createStore(calls = [], options = {}) {
       blocksSystem: false,
     },
   });
+  // The real store publishes the unfiltered roster beside the searched rows (issue 1773).
+  viewState.update((state) => ({
+    ...state,
+    recipeRoster:
+      options.recipeRoster ?? state.recipes.map(({ id, name, img }) => ({ id, name, img })),
+  }));
 
   function applySelectedSystem(id) {
     const nextSelected = systemDetails[id] || null;
@@ -1636,8 +1656,7 @@ function createStore(calls = [], options = {}) {
       calls.push(['addGatheringLibraryTask', systemId]);
       return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
     },
-    validateGatheringLibraryTask: (task) =>
-      options.gatheringTaskValidation?.(task) || { valid: true, errors: [], resultErrors: [] },
+    validateGatheringLibraryTask: (task) => taskValidation(options.gatheringTaskValidation?.(task)),
     updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
       calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
       // The two failure branches the root's save path can take. Without these the fixture

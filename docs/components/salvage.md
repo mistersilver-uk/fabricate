@@ -19,15 +19,15 @@ See [Salvaging From the Inventory Tab](#salvaging-from-the-inventory-tab).
 
 ## Salvage Resolution Mode
 
-The salvage resolution mode controls how result groups are awarded when a component is salvaged.
+The salvage resolution mode controls how result sets are awarded when a component is salvaged.
 It is set at the system level.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Mode        | Description                                                                                                                          |
 |:------------|:-------------------------------------------------------------------------------------------------------------------------------------|
-| Simple      | Always awards exactly one result group. No check required. This is the default.                                                      |
-| Routed      | Awards a result group based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result group on the component. |
+| Simple      | Always awards exactly one result set. No check required. This is the default.                                                        |
+| Routed      | Awards a result set based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result set on the component. |
 | Progressive | Awards results sequentially as the check value exceeds each result's difficulty threshold.                                           |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -37,8 +37,8 @@ The card offers Simple, Progressive, and Routed by check, with Simple selected b
 A salvaged component has a single ingredient, so it cannot route by ingredient set, which is why ingredient-set routing (and Alchemy) is not offered here.
 Changing the mode is not destructive to recipes or runs, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
 
-Simple mode awards a single result group.
-When you switch a system into Simple mode, any component that has more than one result group is trimmed back to its first.
+Simple mode awards a single result set.
+When you switch a system into Simple mode, any component that has more than one result set is trimmed back to its first.
 Fabricate warns you by name when this happens, listing every component it trimmed, so you always know which setups changed.
 
 You can also set the salvage resolution mode through the API.
@@ -69,47 +69,70 @@ See [Salvage Resolution Mode](#salvage-resolution-mode).
 A component is not salvageable until you turn it on with the **Salvage this component** toggle.
 Setting one up is two steps, in this order:
 
-1. Add at least one result group under **Result groups**, describing what the component yields when it is broken down.
+1. Add at least one result set under **Result sets**, describing what the component yields when it is broken down.
 2. Turn on **Salvage this component**.
 
-The toggle stays unavailable until the component has a result group, because there is nothing to enable yet.
+The toggle stays unavailable until the component has a result set, because there is nothing to enable yet.
 The panel tells you which of the two states you are in, so you are never left guessing why the toggle will not move.
 
 {% include screenshot.html case="manager-component-edit-salvage" caption="The salvage section of the component editor." %}
 
-Removing a component's last result group turns salvage back off for that component.
+Removing a component's last result set turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
 
-When the system's salvage resolution mode is Simple, a component uses a single result group.
-In Simple mode the panel shows the hint **Simple mode uses a single result group**, so it is clear why only one is allowed; once you have added the one group, the **Add group** control is hidden.
-Routed and Progressive modes keep the full list, where each result group maps to an outcome or a stage.
+When the system's salvage resolution mode is Simple, a component uses a single result set.
+In Simple mode the panel shows the hint **Simple mode uses a single result set**, so it is clear why only one is allowed; once you have added the one set, the **Add result set** control is hidden.
+Routed and Progressive modes keep the full list, where each result set maps to an outcome or a stage.
 
 {: .note }
 > **Existing components show this toggle turned off, and that is correct.**
 > Before this toggle existed, per-component salvage was already stored and already enforced, but nothing in the interface could turn it on.
-> Components you set up with result groups therefore render with **Salvage this component** off.
+> Components you set up with result sets therefore render with **Salvage this component** off.
 > This is the true stored state being shown for the first time rather than a setting that has been lost, and nothing has been reset or migrated.
 > Turn the toggle on for each component you want salvageable.
 
-### The Salvage DC
+### Salvage Result Rows
 
-When the salvage check applies, a component can override the DC that check uses.
+Each result a component yields is one row in the **Salvage** panel.
+A row names the component it recovers and the amount.
 
-The **DC** control offers:
+A flat result row has a **Fixed | Rolled** amount.
+**Fixed** recovers the same number every time.
+**Rolled** takes a dice expression such as `1d4+1`, and the roll decides how many the player recovers.
+A progressive stage has no amount, because a progressive salvage always recovers one of the stage's component.
 
-- **System default**, which uses the system's own salvage check DC and stores no override on the component
-- one option per salvage check outcome tier you have authored, each naming the tier and its DC
-- **Custom**, which reveals a number field for any DC you like
+**Add result** opens a component picker, so you choose the component you are adding.
+A flat row cannot clear its component, so to change one, remove the row and add another.
+Adding a component that the result set already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
+A progressive stage can swap its component in place.
 
-The preset options are your system's real authored tiers, not a fixed list of suggested numbers, so they always reflect the DCs your world actually uses.
+Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
+While salvage is enabled, saving the component with such a row is refused until you fix it.
+A component with salvage disabled still saves.
+The editor wraps a row onto two lines where the column is narrow.
+
+### The Salvage Override
+
+When the salvage check applies, a component can override the difficulty that check uses for it alone.
+
+The override control offers:
+
+- **System default**, which uses the system's own salvage check difficulty and stores no override on the component
+- one option per salvage check outcome tier you have authored, each naming the tier and its number
+- **Custom**, which reveals a field for a value of your own
+
+The preset options are your system's real authored tiers, not a fixed list of suggested numbers, so they always reflect what your world actually uses.
 If you have not authored any tiers yet, the control offers **System default** and **Custom** only.
 Either way, the **Manage presets** link takes you to the Checks screen where the tiers are authored.
 
-A DC you set that does not match any tier is kept exactly as you typed it.
+A value you set that does not match any tier is kept exactly as you typed it.
 It shows under **Custom** with its own value, and it is never rounded to the nearest tier.
 
-When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
+What the control reads and edits, and what it is called, follows how the salvage check measures its roll: a DC or a Target under a fixed difficulty, a difficulty adjustment under a character value, and a number of successes needed under a counting check.
+See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage-and-gathering-task-overrides) and [Successes-needed overrides]({% link checks/crafting.md %}#successes-needed-overrides) for the full guide, including what is kept when you switch between them.
+
+When the system's salvage difficulty is set by a macro rather than a fixed number, **System default** says so instead of showing a number, because there is no single one to show.
 
 When the resolution mode is Progressive, each stage row also shows a read-only strip for any complications authored on that stage's own component.
 See [Complications]({% link components/complications.md %}) to author them.
@@ -158,20 +181,21 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Setup | What the player sees |
 |:------|:---------------------|
 | Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
-| Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
+| Simple, with a salvage check roll formula | **On a success**, the materials, the DC, Target, or successes needed to clear, and a note that a failed roll can cost the component. |
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**, plus a strip for any complications you told the player about. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
-| Simple, with a component left holding more than one result group | **Salvage isn't ready**, with a line saying the component has more than one result group and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single group and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
+| Simple, with a component left holding more than one result set | **Salvage isn't ready**, with a line saying the component has more than one result set and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single set and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra sets and clears the cue. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-A component's DC override shifts the DC shown for a simple check, and it shifts the thresholds shown for relative outcome tiers.
-Fixed tiers own absolute segments of the roll range and have no DC, so they are shown exactly as you authored them and no DC appears.
+A component's override shifts the number shown for a simple check, whether that number is a DC, a Target, or a difficulty adjustment.
+It shifts the thresholds shown for relative outcome tiers the same way.
+Fixed tiers own absolute segments of the roll range and have no such number, so they are shown exactly as you authored them.
 Progressive salvage is different again.
-The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than a pass-or-fail against a target.
+The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than measured against a target.
 Each component still carries its own progressive DC, and that DC is shown on its stage beside the reach value.
-See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers).
+See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers) and [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks).
 
 ### Required Tools
 
@@ -186,7 +210,7 @@ A tool the salvaging character holds but which is broken also reads **Unavailabl
 {% include screenshot.html case="player-salvage-tools" %}
 
 While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
-The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
+A note directly beneath the Info | Salvage tabs then explains that a required tool is missing, and it replaces the one-shot reminder at the foot of the tab.
 Bringing the tool onto the salvaging character clears the block and makes the button usable.
 
 This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).
@@ -234,11 +258,17 @@ This cannot be undone.
 
 ### Making the Attempt
 
-The footer holds a single button that rolls and commits in one press.
+With the **Salvage** tab open, the item's header holds a single button that rolls and commits in one press.
 It reads **Salvage** when the mode needs no roll, and **Salvage roll** when it has a usable check.
+A note at the foot of the tab states what pressing it costs.
+When a required tool is missing, the button is disabled and a note directly beneath the tabs says why.
 Pressing it opens the standard roll prompt, where the player picks Advantage, Normal or Disadvantage when the formula allows it, adds a situational bonus, and chooses a roll mode.
 The roll is posted to chat, so Dice So Nice animates it.
 There is no reroll and no separate confirmation step.
+
+A salvage result that cannot be rolled for the salvaging character refuses the salvage, and nothing is consumed.
+It reports the same "Invalid salvage configuration" message as any other unfinished salvage setup.
+A timed salvage that resumes after the character's data changed, so that a result can no longer be rolled, is failed with that reason rather than left running.
 
 Dismissing the prompt cancels the attempt.
 Nothing is consumed, no tool breaks, and no message is shown.

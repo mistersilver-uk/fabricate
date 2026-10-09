@@ -171,7 +171,7 @@ async function assertToolLibraryPagination(
   const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
   const slot = browser.locator('[data-tool-browser-pagination]');
-  const footer = slot.locator('.manager-pagination');
+  const footer = slot.locator('.fabricate-pagination');
   // The selection invariant is an identity, NOT A row position.
   if (expectedPage === 1 && !selectedToolId) {
     throw new Error('Tool pagination page-1 checks need the Tool ID the walk selected');
@@ -747,7 +747,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
-  const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
+  const enabledInSystem = editor.locator('[data-tool-enabled] .fabricate-toggle');
   await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
   // The per-system display label is a `ToolInheritCard` like every other overridable fact on this
   // tab (issue 1373): blank is the inheriting state, which renders the world name read-only on a
@@ -1168,7 +1168,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
     page,
     'patchToolDraft',
     'Tool invalid prerequisite fixture',
-    () => selectedPrerequisite.click(),
+    () => selectedPrerequisite.locator('.. >> .fab-selection-check').click(),
     async () => {
       if (
         (await editor
@@ -1201,7 +1201,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
     page,
     'patchToolDraft',
     'Tool prerequisite fixture restore',
-    () => prerequisiteToRestore.click(),
+    () => prerequisiteToRestore.locator('.. >> .fab-selection-check').click(),
     async () => {
       if (!(await prerequisiteToRestore.isChecked())) {
         throw new Error('Tool prerequisite fixture did not restore its selected prerequisite');
@@ -1387,7 +1387,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   if (!(await checksSave.isEnabled())) {
     throw new Error('Authoring a tier-step trigger left the Checks draft undirtied');
   }
-  await triggerCard.locator('[data-trigger] [data-remove-trigger]').first().click();
+  await triggerCard.locator('[data-trigger] [data-rule-row-remove]').first().click();
   await triggerCard.locator('[data-triggers-empty]').waitFor({ state: 'visible', timeout: 5000 });
   if (await checksSave.isEnabled())
     throw new Error('Tier-step trigger round trip left the Checks draft dirty');

@@ -51,6 +51,7 @@
   import Callout from '../../../../components/Callout.svelte';
   import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
+  import Button from '../../../../components/Button.svelte';
 
   let {
     stages = [],
@@ -164,7 +165,7 @@
     tone="neutral"
     icon="fas fa-arrow-down-long"
     text={localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}
-    dataAttr="data-inventory-salvage-flow"
+    data-inventory-salvage-flow
   />
 
   <!-- The eyebrow's right slot tracks the list's state rather than emptying out: before
@@ -217,18 +218,17 @@
         tone="neutral"
         icon="fas fa-hand-pointer"
         text={localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
-        dataAttr="data-inventory-salvage-reorder-note"
+        data-inventory-salvage-reorder-note
       >
         {#snippet actions()}
-          <button
-            type="button"
-            class="salvage-reorder-reset"
-            data-inventory-salvage-reorder-reset
+          <Button
+            role="ghost"
+            data-inventory-salvage-reorder-reset=""
             disabled={!canResetOrder}
             onclick={() => onResetOrder?.()}
           >
             {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
-          </button>
+          </Button>
         {/snippet}
       </Callout>
     {/if}
@@ -277,42 +277,5 @@ THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which 
   .salvage-state-chip {
     display: inline-flex;
     flex: 0 0 auto;
-  }
-
-  /* An inline text button, matching the panel ribbon's "Salvage again": a quiet way
-     back, not a second call to action. The Foundry `.app button` reset is required —
-     without it this inherits a fixed height and centred content and crops. */
-  .salvage-reorder-reset {
-    flex: 0 0 auto;
-    box-sizing: border-box;
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    width: auto;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--fab-accent);
-    font: inherit;
-    font-weight: 600;
-    line-height: 1;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  .salvage-reorder-reset:disabled {
-    color: var(--fab-text-subtle);
-    text-decoration: none;
-    cursor: default;
-  }
-
-  .salvage-reorder-reset:hover:not(:disabled) {
-    filter: brightness(1.1);
-  }
-
-  .salvage-reorder-reset:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
   }
 </style>

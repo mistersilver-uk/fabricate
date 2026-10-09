@@ -16,7 +16,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -48,6 +48,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-vocabulary-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
@@ -82,8 +83,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/VocabularyShell.svelte',
     'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte',
@@ -166,11 +167,11 @@ describe('the world Tags & Categories screen', () => {
       'a referenced row is never marked Unused'
     );
     assert.equal(
-      referenced.querySelector('.manager-icon-button').className.includes('is-danger'),
+      referenced.querySelector('.fabricate-icon-button').className.includes('is-danger'),
       false,
       'a referenced row does not wear the immediate-delete treatment'
     );
-    referenced.querySelector('.manager-icon-button').click();
+    referenced.querySelector('.fabricate-icon-button').click();
     flushSync();
     assert.ok(
       Boolean(root.querySelector('[data-vocabulary-confirm="reagent"]')),
@@ -186,7 +187,7 @@ describe('the world Tags & Categories screen', () => {
       'an entry nothing names and whose deletion rewrites nothing is marked Unused'
     );
     assert.ok(
-      unused.querySelector('.manager-icon-button').className.includes('is-danger'),
+      unused.querySelector('.fabricate-icon-button').className.includes('is-danger'),
       'and it wears the immediate-delete treatment'
     );
     const removed = [];
@@ -202,7 +203,7 @@ describe('the world Tags & Categories screen', () => {
         },
       })
     );
-    categoryCard(secondRoot, 'spare').querySelector('.manager-icon-button').click();
+    categoryCard(secondRoot, 'spare').querySelector('.fabricate-icon-button').click();
     flushSync();
     assert.deepEqual(removed, ['componentCategories:spare'], 'and it deletes in ONE click');
     assert.ok(
@@ -221,11 +222,11 @@ describe('the world Tags & Categories screen', () => {
       'it renders its honest reference count instead'
     );
     assert.equal(
-      gated.querySelector('.manager-icon-button').className.includes('is-danger'),
+      gated.querySelector('.fabricate-icon-button').className.includes('is-danger'),
       false,
       'and it does not wear the immediate-delete treatment'
     );
-    gated.querySelector('.manager-icon-button').click();
+    gated.querySelector('.fabricate-icon-button').click();
     flushSync();
     assert.ok(
       Boolean(secondRoot.querySelector('[data-vocabulary-confirm="curios"]')),
@@ -243,7 +244,7 @@ describe('the world Tags & Categories screen', () => {
       ['recipeCategories', 'data-recipe-category-id', 'potions'],
     ]) {
       const card = root.querySelector(`${panelSelector(kind)} [${attribute}="${id}"]`);
-      card.querySelector('.manager-icon-button').click();
+      card.querySelector('.fabricate-icon-button').click();
       flushSync();
       const copy = root.querySelector(`[data-vocabulary-confirm="${id}"] .manager-vocabulary-confirm-copy`);
       assert.ok(Boolean(copy), `${kind} opens a confirm strip carrying its sentence`);
@@ -341,7 +342,7 @@ describe('the world Tags & Categories screen', () => {
       'a deletion the GM asked for and did not get is an interruption, not a progress note'
     );
 
-    categoryCard(root, 'spare').querySelector('.manager-icon-button').click();
+    categoryCard(root, 'spare').querySelector('.fabricate-icon-button').click();
     await Promise.resolve();
     await Promise.resolve();
     flushSync();
@@ -353,7 +354,7 @@ describe('the world Tags & Categories screen', () => {
   it('states the reference count ALONE when a deletion rewrites nothing', async () => {
     // The common case for both component vocabularies is that nothing cascades.
     const root = await harness.mount(mountProps());
-    categoryCard(root, 'reagent').querySelector('.manager-icon-button').click();
+    categoryCard(root, 'reagent').querySelector('.fabricate-icon-button').click();
     flushSync();
     const copy = root
       .querySelector('[data-vocabulary-confirm="reagent"] .manager-vocabulary-confirm-copy')
@@ -448,7 +449,7 @@ describe('the world Tags & Categories screen', () => {
   it('states a search MISS with the query the GM typed', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const search = panel.querySelector('.manager-search input');
+    const search = panel.querySelector('.fabricate-search input');
     search.value = 'zzz';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     flushSync();

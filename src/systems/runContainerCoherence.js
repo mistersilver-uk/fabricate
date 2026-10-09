@@ -6,14 +6,17 @@
  * the CURRENT document, removing only what this writer intentionally dropped since its baseline.
  */
 
+import { trimRunHistory } from './choiceGroupAward.js';
+
 function isRunMap(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
- * Newest-first union of two histories by run `id`, capped at `historyLimit` (`<= 0` uncaps). The
- * writer's entries win shared ids and document-only ones are kept; the sort is stable, so an
- * already-ordered single writer's history is unchanged.
+ * Newest-first union of two histories by run `id`, capped at `historyLimit` (`<= 0` uncaps) save a
+ * run still owing an award choice (issue 1773). The writer's entries win shared ids and
+ * document-only ones are kept; the sort is stable, so an already-ordered single writer's history
+ * is unchanged.
  */
 export function unionRunHistory(currentHistory, nextHistory, compareHistory, historyLimit = 0) {
   const merged = [];
@@ -29,7 +32,7 @@ export function unionRunHistory(currentHistory, nextHistory, compareHistory, his
   for (const entry of Array.isArray(nextHistory) ? nextHistory : []) push(entry);
   for (const entry of Array.isArray(currentHistory) ? currentHistory : []) push(entry);
   if (typeof compareHistory === 'function') merged.sort(compareHistory);
-  return historyLimit > 0 ? merged.slice(0, historyLimit) : merged;
+  return historyLimit > 0 ? trimRunHistory(merged, historyLimit) : merged;
 }
 
 /**

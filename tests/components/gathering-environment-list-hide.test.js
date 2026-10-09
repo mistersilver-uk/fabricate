@@ -8,7 +8,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -20,8 +20,10 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/sceneImages.js',
+    'src/ui/svelte/apps/gathering/linkedSceneImage.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/gatheringImageDefaults.js'
   ],
@@ -30,6 +32,11 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    // The list row each card draws through, and the mark it imports (issue 1778).
+    'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],

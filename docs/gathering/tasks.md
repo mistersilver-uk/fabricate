@@ -11,9 +11,10 @@ nav_order: 2
 
 The selected crafting system's Gathering Tasks are managed from the Gathering **Tasks** tab.
 The task browser supports search, status/biome/availability filters, paging, row selection, enable toggles, duplicate and delete actions, and a right-side inspector with availability, a matching-environment count, and drop summaries.
-The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, and per-drop modifier tuning.
+The row **Edit** action opens the Gathering Task editor, which splits identity, availability, drop rules, and per-drop modifier tuning across four tabs.
+See [Editor tabs](#editor-tabs).
 
-{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser." %}
+{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser, on its Overview tab." %}
 
 Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only.
 Geography (the realm) is not a composition axis.
@@ -46,6 +47,67 @@ Disabled Gathering Tasks never match for player gathering.
 Reusable events are authored separately.
 See [Events]({% link gathering/events.md %}).
 
+## Editor tabs
+
+The Gathering Task editor has four tabs: **Overview**, **Requirements**, **Results** and **Validation**.
+The tab bar stays fixed while the selected tab's panel scrolls.
+The editor opens on Overview, and returns to it when you open a different task.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Tab              | What lives there                                                                                                                                                  |
+| :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**     | Task identity, the **Gathering resolution** card, and the nodes card. A legacy Progressive task also shows a warning here.                                         |
+| **Requirements** | Availability, stamina, the check modifier, the check override and **Required tools**.                                                                              |
+| **Results**      | The result sets (or, for a d100 task, the component browser and the Drops table) and the notices about them. A d100 task's selected-drop rail appears only here.  |
+| **Validation**   | The readiness rows for the whole task, grouped by Overview and Results, with a verdict that says whether the task can be saved.                                    |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Overview, Requirements and Validation use the full width of the window.
+So does Results on a `straight` (**Direct**) or `routed` (**Check**) task.
+
+### The Validation tab
+
+The Validation tab lists a row for each check the task passes or fails, so you can see why **Save** is disabled.
+The rows are grouped under **Overview** (the task name) and **Results** (drop rules and result sets, plus the outcome-tier and reward-rule checks when they apply).
+A check that does not apply to the task's mode draws no row.
+Requirements has no checks, so it draws no group.
+
+A row that blocks saving carries the status word "Blocks save".
+The verdict at the top then reads "Cannot be saved", and **Save** stays disabled until every blocking row is cleared.
+These rows block saving:
+
+- A task with no name.
+- A drop rule that is incomplete.
+- Result sets that are incomplete.
+
+A row that only warns lets the task save.
+The verdict then reads "Saves with warnings".
+These rows warn:
+
+- A `routed` (**Check**) task whose gathering check defines no outcome tiers.
+- A d100 task with the same component on more than one drop row, when the system's reward rule may award only one of them.
+
+When every row passes, the verdict says that every check passes and the task is ready to save.
+
+Each failing row has a **View** action.
+It opens the tab that holds the problem and focuses the field that fixes it: the name input on Overview for a missing name, or the Results panel for a result problem.
+
+The Validation tab itself carries a red count of blocking rows and an amber count of warnings, so you can see from any tab whether the task can be saved.
+The Results tab no longer carries issue marks.
+Instead, when Results holds rows that block saving, a notice on the Results tab shows how many there are, with a **Review in Validation** action that opens the Validation tab.
+The Results tab still shows the notices for the two warnings above.
+
+A d100 task's Drop rules card is a table.
+Its caption carries the heading, a count of rules and a search field.
+The columns are the rank (ranked mode only), the drop component, the drop chance (a slider and a number), the count and the modifiers.
+The page scrolls rather than the card, and the pager appears only when there are more rules than the smallest page size.
+Click a row, or tab into any control in it, to select that drop rule for the inspector rail.
+
+A legacy Progressive task keeps its own results, so its Results tab shows an empty state titled "Results are not authored here".
+It points you to the **Gathering resolution** card on Overview, where you can choose another mode to author results.
+
 ## How Drops Are Rolled
 
 Each Gathering Task is resolved by rolling against its drop rows.
@@ -62,9 +124,10 @@ They only adjust an individual row's chance after the task already matches.
 Multiple rows can reference the same component with different quantities and chances.
 Each row rolls on its own before the system's Gathering Rules choose which rows are awarded.
 
-In the player Gathering window, each possible drop is shown as one row with its current chance.
-Selecting a drop's row opens a breakdown of what makes up that chance, such as its base rate and any weather, time of day, biome, or character modifier contributing to it.
-Selecting the row again closes the breakdown.
+In the player Gathering window, a task's possible drops are listed as rows in the order you authored them, each with its current chance.
+The order never changes with the chance, and a drop with no name of its own shows its component's name.
+Open the Chance breakdown beneath the list to see, for every drop, what makes up its chance, such as its base rate and any weather, time of day, biome, or character modifier contributing to it.
+Open it again to close it.
 
 Every drop row must point at a real reward, either a component from the system's component library or a resolvable world item.
 Fabricate rejects rows that point at a component or item that no longer exists, and rows with no target, before saving the task.
@@ -87,7 +150,7 @@ The task editor lets you set:
 | Visibility gate    | Turn task visibility on or off, then set its formula and required threshold                                                                                                                                                                |
 | Time requirement   | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years                                                                                                                                             |
 | Failure outcome    | Leave clear for Fabricate's default failure feedback, or set custom text or a macro                                                                                                                                                        |
-| Result groups      | Add, rename, delete, and reorder groups                                                                                                                                                                                                    |
+| Result sets        | Add, rename, delete, and reorder sets                                                                                                                                                                                                      |
 | Results            | Add, edit, delete, and reorder component results, each with a component and a quantity                                                                                                                                                     |
 | Required tools     | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
@@ -96,10 +159,14 @@ The task editor lets you set:
 Progressive task result difficulty comes from the chosen component's own difficulty.
 Result rows do not store their own difficulty.
 
+Each task result row has the same **Fixed** and **Rolled** amount choice as a recipe result.
+See [Result Amounts]({% link crafting/recipes/index.md %}#result-amounts-fixed-or-rolled) for how a rolled amount is written, checked and refused.
+A task's results have no amount when the task is resolved progressively.
+
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.
-For a task resolved progressively that means one result group carrying at least one result.
+For a task resolved progressively that means one result set carrying at least one result.
 
 Task images can be typed directly or chosen with Foundry's image file picker when it is available.
 Cancelling the picker leaves the current path unchanged.
@@ -128,14 +195,19 @@ Clearing visibility removes the gate only when the task already had one saved.
 Routed gathering tasks do not carry their own result-selection setting.
 They are resolved by the system's gathering check, which you configure once for the whole system.
 When a routed task is attempted, the gathering check rolls and produces a named outcome.
-That outcome name is matched to a result group by name, and the matching group is awarded.
+That outcome name is matched to a result set by name, and the matching set is awarded.
 
-A few outcome names are reserved and take the failure path instead of awarding a group.
-Because the match is by name, give each result group a name that lines up with one of your gathering check's outcomes.
-Names are matched ignoring upper and lower case and surrounding spaces, so each result group needs a name that is unique once case is ignored.
+A few outcome names are reserved and take the failure path instead of awarding a result set.
+Because the match is by name, give each result set a name that lines up with one of your gathering check's outcomes.
+Names are matched ignoring upper and lower case and surrounding spaces, so each result set needs a name that is unique once case is ignored.
 
-If the outcome is a success but matches none of your result groups, the attempt fails and no group is awarded.
+If the outcome is a success but matches none of your result sets, the attempt fails and no result set is awarded.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
+
+A routed task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.
+The field is labelled **DC** when the check rolls over a fixed difficulty, **Target** when it rolls under one, or **Adjustment** when it is measured against a character value instead.
+There are no presets to pick from here, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets.
+See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage-and-gathering-task-overrides) and [Successes-needed overrides]({% link checks/crafting.md %}#successes-needed-overrides) for the full guide, including what a switch between them keeps.
 
 ## Progressive Checks
 

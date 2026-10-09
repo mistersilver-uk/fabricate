@@ -18,7 +18,7 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     dirty = false,
@@ -43,14 +43,14 @@
 </script>
 
 {#if dirty}
-  <Chip tone="warning" {...dirtyHook}>{dirtyLabel}</Chip>
+  <Chip tone="warning" density="action" {...dirtyHook}>{dirtyLabel}</Chip>
 {/if}
 <!-- Ghost, matching the recipe editor's Back: it is not a peer of Save. -->
-<ManagerButton role="ghost" {...backHook} onclick={() => onBack()} disabled={saving}>
+<Button role="ghost" {...backHook} onclick={() => onBack()} disabled={saving}>
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
-</ManagerButton>
-<ManagerButton role="primary" type="submit" form={formId} {...saveHook} disabled={!canSave}>
+</Button>
+<Button role="primary" type="submit" form={formId} {...saveHook} disabled={!canSave}>
   <i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
   <span>{saveLabel}</span>
-</ManagerButton>
+</Button>

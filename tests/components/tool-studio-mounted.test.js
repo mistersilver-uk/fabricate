@@ -5,10 +5,15 @@ import { resolve } from 'node:path';
 import { tick } from 'svelte';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
   createMountedComponentHarness,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -16,11 +21,12 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
   selectOptionLabels,
+  selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
 
@@ -49,6 +55,7 @@ const harness = createMountedComponentHarness({
     // The add-new essence offer projection (issue 1036).
     'src/ui/model/essenceValidation.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/chanceColorScale.js',
@@ -65,7 +72,7 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // The ONE ingredient-kind table (issue 1373, round 8).
-    'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -76,10 +83,12 @@ const harness = createMountedComponentHarness({
     // would go on naming a module the real one had moved past.
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
+    ...CHOICE_GROUP_RAW_MODULES,
   ],
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
-    // The shared side-panel explainer card and icon fact row (issue 881).
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    // The shared side-panel icon fact row (issue 881).
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -105,8 +114,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    ...KIND_MENU_COMPILED_MODULES,
+    ...CHOICE_GROUP_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
@@ -135,6 +150,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
+    // The failed-save notice at the editor's notice position (issue 1522).
+    'src/ui/svelte/components/Notice.svelte',
+    // The editor's header (issue 1777).
+    'src/ui/svelte/components/PageHeader.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -304,32 +323,56 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
+  it('draws the dirty chip at the action density of the buttons beside it', async () => {
+    const root = await harness.mount(props({ dirty: true }));
+    const chip = root.querySelector('[data-tool-editor-status]');
+    assert.ok(Boolean(chip.closest('.manager-header-actions')), 'the chip is in the cluster');
+    assert.ok(chip.classList.contains('is-action'), 'the chip stands beside 34px buttons');
+  });
+
   it('renders header-only actions, three accessible tabs, and no Kind', async () => {
     const navigation = [];
     const root = await harness.mount(
       props({
         systemName: 'The Herbalist',
-        onOpenSystems: () => {
-          navigation.push('systems');
+        // The argument count is recorded: the shell's `selectSystemAndShowBrowser(systemId)`
+        // must not receive a click event as its system id (issue 1777).
+        onOpenSystems: (...args) => {
+          navigation.push(['systems', args.length]);
         },
-        onOpenSystem: () => {
-          navigation.push('system');
+        onOpenSystem: (...args) => {
+          navigation.push(['system', args.length]);
         },
-        onOpenTools: () => {
-          navigation.push('tools');
+        onOpenTools: (...args) => {
+          navigation.push(['tools', args.length]);
         },
       })
     );
 
     assert.equal(root.querySelectorAll('[data-tool-editor-header]').length, 1);
-    assert.match(
-      root.querySelector('[data-tool-editor-header] .manager-breadcrumbs').textContent,
-      /Crafting Systems.*The Herbalist.*Tool Rules.*Smith's Hammer/
+    const header = root.querySelector('[data-tool-editor-header]');
+    assert.ok(header.classList.contains('fabricate-page-header'), 'drawn by PageHeader');
+    assert.deepEqual(
+      [...header.querySelectorAll('.manager-breadcrumbs > :not(i)')].map((crumb) => [
+        crumb.tagName.toLowerCase(),
+        crumb.textContent,
+      ]),
+      [
+        ['button', 'Crafting Systems'],
+        ['button', 'The Herbalist'],
+        ['button', 'Tool Rules'],
+        ['span', "Smith's Hammer"],
+      ],
+      'the whole trail, root to leaf'
     );
     root.querySelector('[data-tool-editor-open-systems]').click();
     root.querySelector('[data-tool-editor-open-system]').click();
     root.querySelector('[data-tool-editor-open-tools]').click();
-    assert.deepEqual(navigation, ['systems', 'system', 'tools']);
+    assert.deepEqual(navigation, [
+      ['systems', 0],
+      ['system', 0],
+      ['tools', 0],
+    ]);
     assert.match(root.querySelector('[data-tool-editor-image]').getAttribute('src'), /hammer/);
     // THE SUBTITLE STATES SCOPE, NOT THE LINK (issue 1373). `Linked game-world Item` is the
     // WORLD editor's subtitle and describes the one thing this screen cannot change.
@@ -788,7 +831,7 @@ describe('Tool Studio editor (mounted)', () => {
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
-    root.querySelector('[data-tool-enabled] .manager-status-toggle').click();
+    root.querySelector('[data-tool-enabled] .fabricate-toggle').click();
 
     assert.deepEqual(patches, [{ label: 'Display-only name' }]);
     assert.deepEqual(enabled, [false]);
@@ -914,11 +957,11 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       chanceControl.getAttribute('style'),
-      /--fab-chance-slider-track-gradient: var\(--fab-tool-breakage-chance-track-gradient\)/
+      /--fab-chance-slider-track-gradient: var\(--fab-manager-tool-breakage-chance-track-gradient\)/
     );
     assert.match(
       fabricateCss,
-      /\.fabricate-manager \.manager-tool-breakage-chance-control\s*\{\s*--fab-tool-breakage-chance-track-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--fab-success\) 0%,\s*var\(--fab-warning\) 33%,\s*var\(--fab-badge-gold\) 66%,\s*var\(--fab-danger\) 100%\s*\);/
+      /\.fabricate-manager \.manager-tool-breakage-chance-control\s*\{\s*--fab-manager-tool-breakage-chance-track-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--fab-success\) 0%,\s*var\(--fab-warning\) 33%,\s*var\(--fab-badge-gold\) 66%,\s*var\(--fab-danger\) 100%\s*\);/
     );
     assert.ok(chanceControl.querySelector('.manager-drop-rate-fill'));
 
@@ -1116,7 +1159,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(
       root
         .querySelector('.manager-tool-replacement-component-trigger')
-        .classList.contains('manager-button'),
+        .classList.contains('fabricate-button'),
       true
     );
     assert.ok(
@@ -1174,6 +1217,35 @@ describe('Tool Studio editor (mounted)', () => {
       type: 'component',
       componentId: 'scrap',
     });
+  });
+
+  it('refuses a drag on the replacement zone of an immune Tool', async () => {
+    let patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'breakage',
+        authority: 'checkDriven',
+        tool: tool({
+          checkBreakable: false,
+          onBreak: { mode: 'replaceWith', replacementTarget: null },
+        }),
+        onPatch: (patch) => {
+          patches = [...patches, patch];
+        },
+      })
+    );
+    const zone = root.querySelector('[data-tool-replacement-drop]');
+    assert.ok(Boolean(zone), 'the zone still renders at rest');
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    zone.dispatchEvent(over);
+    await tick();
+    assert.equal(over.defaultPrevented, false, 'a disabled zone does not accept the drag');
+    assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    drop.dataTransfer = { getData: () => JSON.stringify({ componentId: 'scrap' }) };
+    zone.dispatchEvent(drop);
+    await tick();
+    assert.deepEqual(patches, [], 'and a drop writes nothing');
   });
 
   it('restores focus to the Component picker trigger after Escape and outside dismissal', async () => {
@@ -1275,6 +1347,76 @@ describe('Tool Studio editor (mounted)', () => {
     root.querySelector('.manager-recipe-or-trigger').click();
     assert.equal(document.querySelector('[data-recipe-add="alternative-essence"]'), null);
     assert.equal(document.querySelector('[data-recipe-add="alternative-currency"]'), null);
+    assert.deepEqual(
+      selectOptionValues(root, '.fabricate-select-trigger[data-recipe-option-kind]'),
+      ['component', 'tags'],
+      'and the row’s own kind select offers neither'
+    );
+  });
+
+  it('edits a repair row in place: names it, steps it and removes it', async () => {
+    const patches = [];
+    const unnamed = {
+      id: 'g1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: null } }],
+    };
+    const kept = {
+      id: 'g2',
+      options: [{ quantity: 2, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }],
+    };
+    const repairing = (repairRequirements) =>
+      tool({ onBreak: { mode: 'flagBroken' }, repairRequirements });
+    const root = await harness.mount(
+      props({
+        activeTab: 'breakage',
+        tool: repairing([unnamed, kept]),
+        onPatch: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    const row = () =>
+      root.querySelector('[data-recipe-group-id="g1"]').querySelector('[data-recipe-option]');
+    /** The one repair set the editor forwarded, applied back as the Tool it edits. */
+    async function forwarded() {
+      await new Promise((done) => setTimeout(done, 0));
+      assert.equal(patches.length, 1, 'one edit forwards one patch');
+      const { repairRequirements } = patches.pop();
+      await harness.setProps({ tool: repairing(repairRequirements) });
+      return repairRequirements;
+    }
+
+    const field = row().querySelector('[data-recipe-option-search]');
+    field.focus();
+    field.value = 'scrap';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    document.querySelector('[data-recipe-option-suggestion="scrap"]').click();
+    const named = {
+      id: 'g1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: 'scrap' } }],
+    };
+    assert.deepEqual(await forwarded(), [named, kept]);
+    assert.equal(
+      row().querySelector('.manager-recipe-option-chosen-name').textContent,
+      'Iron Scrap'
+    );
+
+    row().querySelector('[data-stepper-increment]').click();
+    assert.deepEqual(await forwarded(), [
+      { id: 'g1', options: [{ ...named.options[0], quantity: 2 }] },
+      kept,
+    ]);
+    assert.equal(row().querySelector('[data-recipe-option-quantity]').value, '2');
+
+    row().querySelector('[data-recipe-remove="alternative"]').click();
+    assert.deepEqual(await forwarded(), [kept]);
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-recipe-group]')].map((group) =>
+        group.getAttribute('data-recipe-group-id')
+      ),
+      ['g2']
+    );
   });
 
   // Whitespace between sibling elements is significant in Svelte markup: a newline in the
@@ -1290,8 +1432,7 @@ describe('Tool Studio editor (mounted)', () => {
   // single element's own text, and `manager-layout.test.js` exercises a hand-authored fixture
   // rather than these components. This pins the joins so the NEXT reflow cannot move them
   // unnoticed. Expectations are derived from the children rather than written out, so a copy
-  // change does not fail the test but a whitespace change does — the same shape as the
-  // `ExplainerCard` row assertion above.
+  // change does not fail the test but a whitespace change does.
   //
   // The `data-*-copy` hooks exist for this test. `.manager-kicker` is not usable as a selector
   // here: `ToolBreakageTab` renders four of them, and `:nth-of-type` scoping would silently
@@ -1497,20 +1638,20 @@ describe('Tool Studio editor (mounted)', () => {
       ]
     );
     assert.ok(
-      root.querySelector('[data-tool-prerequisites-enabled]').closest('.manager-status-toggle')
+      root.querySelector('[data-tool-prerequisites-enabled]').closest('.fabricate-toggle')
     );
-    assert.ok(root.querySelector('[data-tool-bonus-enabled]').closest('.manager-status-toggle'));
+    assert.ok(root.querySelector('[data-tool-bonus-enabled]').closest('.fabricate-toggle'));
     assert.equal(
       root
         .querySelector('[data-tool-prerequisites-enabled]')
-        .closest('.manager-status-toggle')
+        .closest('.fabricate-toggle')
         .textContent.trim(),
       ''
     );
     assert.equal(
       root
         .querySelector('[data-tool-bonus-enabled]')
-        .closest('.manager-status-toggle')
+        .closest('.fabricate-toggle')
         .textContent.trim(),
       ''
     );
@@ -2175,10 +2316,13 @@ describe('Tool Studio editor (mounted)', () => {
     assert.match(blockers, /Repair group 3 is incomplete/);
     assert.match(blockers, /Some Tool settings are incomplete/);
     assert.doesNotMatch(blockers, /componentId|repairRequirements|unexpected internal/);
-    assert.equal(
-      root.querySelector('[data-tool-save-error]').textContent,
-      'The Tool could not be saved. Try again.'
+    // The failed save is the editor's blocking notice at its notice position (issue 1522).
+    const saveFailed = root.querySelector(
+      ':scope [data-notice-position="page"] > [data-tool-save-error]'
     );
+    assert.equal(saveFailed?.getAttribute('role'), 'alert');
+    assert.equal(saveFailed.querySelector('.fab-notice-title').textContent, 'Save failed');
+    assert.doesNotMatch(saveFailed.textContent, /database adapter/);
     assert.equal(
       root.querySelector('[data-tool-editor-save]').getAttribute('title'),
       'Resolve validation issues before saving.'

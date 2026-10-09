@@ -25,26 +25,26 @@ const SUM_UNDER = Object.freeze({
 
 /**
  * Success counting (issue 2004), either direction and target source; the target is inert (a count
- * always grades against `pool.required`) and neither row is interactive until #2006.
+ * always grades against `pool.required`). Interactive through the shared roll prompt (issue 2006).
  */
 const COUNT_OVER = Object.freeze({
   product: 'count',
   direction: 'over',
   targetSources: Object.freeze(['fixed', 'attribute']),
-  interactive: false,
+  interactive: true,
 });
 
 const COUNT_UNDER = Object.freeze({
   product: 'count',
   direction: 'under',
   targetSources: Object.freeze(['fixed', 'attribute']),
-  interactive: false,
+  interactive: true,
 });
 
 export const CHECK_EVALUATION_CAPABILITIES = Object.freeze({
   version: 1,
   modes: Object.freeze([SUM_OVER_FIXED, SUM_OVER_ATTRIBUTE, SUM_UNDER, COUNT_OVER, COUNT_UNDER]),
-  additionalDice: false,
+  additionalDice: true,
 });
 
 const expression = (value) => typeof value === 'string' || Number.isFinite(value);
@@ -84,6 +84,7 @@ const poolSchema = {
     readMacroUuid: (value) => typeof value === 'string',
     spendMacroUuid: (value) => typeof value === 'string',
     max: (value) => integer(value, 1, 20),
+    label: (value) => typeof value === 'string',
   },
 };
 

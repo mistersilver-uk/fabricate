@@ -195,6 +195,18 @@ A group holding only a single essence option is a required essence, meaning the 
 
 {% include screenshot.html case="player-crafting-essence-alternative" caption="The player's side of that choice, picking between a component and an essence amount for one requirement." %}
 
+On the Crafting tab, a group with an essence alternative shows it alongside its other alternatives, with a card that reports how much of that essence the player's items carry against the amount the recipe needs.
+Choosing it opens the essence pool beneath the alternatives, where the player picks which items fund it.
+The player can switch back to another alternative at any time.
+
+The essence pool shows one meter for each essence the recipe needs, labelled with how much the selected carriers supply against how much is needed.
+When the selection overshoots, the meter adds a surplus sentence, such as "Earth: 2 more than required".
+Only items that contribute an essence the recipe needs are listed as carriers.
+Each listed carrier has a stepper that stops at the number of units the player owns, shown as "You own N".
+A **Your selection** recap beneath lists every carrier the player has allocated, with a chip for each essence it yields.
+Essences the recipe does not need appear muted in those chips.
+Fractional essence amounts are rounded to 12 significant digits.
+
 A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
 Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.
 

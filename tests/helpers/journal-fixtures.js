@@ -166,6 +166,8 @@ export async function createPersistedCraftingHistory({
   // `recipeModel` builds a real `Recipe` (so a run can snapshot its terms); `prepare` edits the
   // world after it is built and before the run starts.
   recipeModel = false, prepare = null,
+  // Sets the world up before the run starts, as `drive` acts on it after (issue 1773).
+  beforeStart = null,
   // The 99gp plan and the canned 2gp settlement below exist so a history-capture fixture has
   // currency EVIDENCE to project (issue 1648).
   stubCurrencySettlement = drive === null,
@@ -305,6 +307,7 @@ export async function createPersistedCraftingHistory({
         .buildListing({ actor, viewer: gm });
       return { record, model: listing.history[0] ?? listing.activeRuns[0], error, retryErrors, awardedCount: actor.items.length, sourceItemsRemaining: sources.map((source) => source.items.length) };
     }
+    await beforeStart?.({ engine, actor, steps });
     const started = await engine.startVersionedRun({ viewer, actor, sourceActors: sources,
       recipeId: recipe.id, selectionPlan: { selectedIngredientSetId: set.id,
         ingredientEssenceAllocation: { stepId: steps[0].id, ingredientSetId: set.id,

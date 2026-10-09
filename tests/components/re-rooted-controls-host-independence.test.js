@@ -41,8 +41,8 @@ function composedClasses(source, label) {
 }
 
 const MANAGER_BUTTON_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerButton.svelte'),
-  'ManagerButton'
+  read('src/ui/svelte/components/Button.svelte'),
+  'Button'
 ).join(' ');
 const ICON_BUTTON_CLASSES = composedClasses(
   read('src/ui/svelte/components/IconButton.svelte'),
@@ -59,16 +59,16 @@ const FIELD_CLASSES = composedClasses(
   'Field'
 ).join(' ');
 
-/** `ManagerSearchField`'s `is-compact` literal belongs to a conditional expression. */
+/** `SearchField`'s `is-compact` literal belongs to a conditional expression. */
 const SEARCH_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerSearchField.svelte'),
-  'ManagerSearchField'
+  read('src/ui/svelte/components/SearchField.svelte'),
+  'SearchField'
 ).join(' ');
 
-/** `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals. */
+/** `FilterBar` and `InspectorCard` each compose exactly two unconditional literals. */
 const TOOLBAR_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerToolbar.svelte'),
-  'ManagerToolbar'
+  read('src/ui/svelte/components/FilterBar.svelte'),
+  'FilterBar'
 ).join(' ');
 const CARD_CLASSES = composedClasses(
   read('src/ui/svelte/components/InspectorCard.svelte'),
@@ -158,9 +158,9 @@ const LINK_FIELD_CLASSES = (() => {
 /** The class list `ModifierPillSelect` hands `Field`, read out of its own markup (issue 1515). */
 const PILL_SELECT_OWN_CLASSES = (() => {
   const source = read('src/ui/svelte/components/ModifierPillSelect.svelte');
-  const match = source.match(/class="(fabricate-pill-select[^"]*)"/u);
+  const match = source.match(/class=\{`(fabricate-pill-select[^`$]*)\$\{/u);
   assert.ok(match, 'ModifierPillSelect must write its family root at the head of the class it hands `Field`');
-  return match[1];
+  return match[1].trim();
 })();
 
 const PILL_SELECT_CLASSES = `${FIELD_CLASSES} ${PILL_SELECT_OWN_CLASSES}`;
@@ -186,14 +186,14 @@ test('the class reader excludes conditional literals from default-control fixtur
 });
 
 test('the fifteen class strings under measurement are the ones the primitives emit', () => {
-  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
-  assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
-  assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
-  assert.equal(FIELD_CLASSES, 'fabricate-field manager-field');
-  assert.equal(SEARCH_CLASSES, 'fabricate-search manager-search');
-  assert.equal(TOOLBAR_CLASSES, 'fabricate-filter-bar manager-toolbar');
-  assert.equal(CARD_CLASSES, 'fabricate-card manager-inspector-card');
-  assert.equal(TOGGLE_CLASSES, 'fabricate-toggle manager-status-toggle');
+  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button fab-manager-button');
+  assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button');
+  assert.equal(PAGINATION_CLASSES, 'fabricate-pagination');
+  assert.equal(FIELD_CLASSES, 'fabricate-field');
+  assert.equal(SEARCH_CLASSES, 'fabricate-search');
+  assert.equal(TOOLBAR_CLASSES, 'fabricate-filter-bar');
+  assert.equal(CARD_CLASSES, 'fabricate-card');
+  assert.equal(TOGGLE_CLASSES, 'fabricate-toggle');
   assert.equal(SLIDER_CLASSES, 'fabricate-slider manager-chance-slider manager-drop-rate-value');
   assert.equal(TABS_CLASSES, 'fabricate-tabs manager-editor-tabs');
   assert.equal(
@@ -204,7 +204,7 @@ test('the fifteen class strings under measurement are the ones the primitives em
   );
   assert.equal(
     OPTION_CARDS_CLASSES,
-    'fabricate-field manager-field fabricate-option-cards is-wide ' +
+    'fabricate-field fabricate-option-cards is-wide ' +
       'manager-resolution-mode-card manager-radio-card-group is-config-cards',
     'the fieldset carries `Field`s pair, then this family`s root, then this family`s own classes'
   );
@@ -221,7 +221,7 @@ test('the fifteen class strings under measurement are the ones the primitives em
   );
   assert.equal(
     PILL_SELECT_CLASSES,
-    'fabricate-field manager-field fabricate-pill-select manager-availability-multi',
+    'fabricate-field fabricate-pill-select manager-availability-multi',
     'the pill select emits `Field`s pair, then its own namespace root, then its family root'
   );
   assert.equal(
@@ -249,8 +249,8 @@ test('the fifteen class strings under measurement are the ones the primitives em
   // reports as unemitted while every re-rooted rule in the sheet keeps matching.
   for (const [file, label, root] of [
     ['src/ui/svelte/components/Field.svelte', 'Field', 'fabricate-field'],
-    ['src/ui/svelte/components/ManagerSearchField.svelte', 'ManagerSearchField', 'fabricate-search'],
-    ['src/ui/svelte/components/ManagerToolbar.svelte', 'ManagerToolbar', 'fabricate-filter-bar'],
+    ['src/ui/svelte/components/SearchField.svelte', 'SearchField', 'fabricate-search'],
+    ['src/ui/svelte/components/FilterBar.svelte', 'FilterBar', 'fabricate-filter-bar'],
     ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
     ['src/ui/svelte/components/StatusToggle.svelte', 'StatusToggle', 'fabricate-toggle'],
     [
@@ -290,22 +290,22 @@ const HOSTS = Object.freeze([
 /** The controls, and the element inside each host that is measured. */
 const CONTROLS = Object.freeze([
   Object.freeze({
-    id: 'manager-button',
+    id: 'button',
     classes: MANAGER_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="fabricate-button manager-button fab-manager-button" data-probe="${host}-manager-button"><span>Save</span></button>`,
+      `<button type="button" class="fabricate-button fab-manager-button" data-probe="${host}-button"><span>Save</span></button>`,
   }),
   Object.freeze({
     id: 'icon-button',
     classes: ICON_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="fabricate-icon-button manager-icon-button" data-probe="${host}-icon-button" aria-label="Delete"><i class="fas fa-trash"></i></button>`,
+      `<button type="button" class="fabricate-icon-button" data-probe="${host}-icon-button" aria-label="Delete"><i class="fas fa-trash"></i></button>`,
   }),
   Object.freeze({
     id: 'pagination',
     classes: PAGINATION_CLASSES,
     markup: (host) =>
-      `<section class="fabricate-pagination manager-pagination" data-probe="${host}-pagination"><span class="manager-pagination-summary">Showing 1-4 of 8</span><nav class="manager-pagination-nav"><button type="button" class="fabricate-icon-button manager-icon-button" data-probe="${host}-pagination-arrow" aria-label="Previous"><i class="fas fa-chevron-left"></i></button><span class="manager-pagination-page">1 of 2</span></nav></section>`,
+      `<section class="fabricate-pagination" data-probe="${host}-pagination"><span class="manager-pagination-summary">Showing 1-4 of 8</span><nav class="manager-pagination-nav"><button type="button" class="fabricate-icon-button" data-probe="${host}-pagination-arrow" aria-label="Previous"><i class="fas fa-chevron-left"></i></button><span class="manager-pagination-page">1 of 2</span></nav></section>`,
   }),
   // THE PROBE IS THE CONTROL, NOT THE ROOT (issue 1508). `Field`'s root is a `<label>` and the
   // thing the family's chrome reaches is the `<input type="text">` inside it, so that is what
@@ -316,26 +316,26 @@ const CONTROLS = Object.freeze([
     classes: FIELD_CLASSES,
     comparesBox: false,
     markup: (host) =>
-      `<label class="fabricate-field manager-field" data-probe="${host}-field-root"><span>Name</span><input type="text" data-probe="${host}-field"></label>`,
+      `<label class="fabricate-field" data-probe="${host}-field-root"><span>Name</span><input type="text" data-probe="${host}-field"></label>`,
   }),
   Object.freeze({
     id: 'search',
     classes: SEARCH_CLASSES,
     markup: (host) =>
-      `<label class="fabricate-search manager-search" data-probe="${host}-search-root"><i class="fas fa-search"></i><input type="search" data-probe="${host}-search"></label>`,
+      `<label class="fabricate-search" data-probe="${host}-search-root"><i class="fas fa-search"></i><input type="search" data-probe="${host}-search"></label>`,
   }),
   // THE PROBE IS THE ROOT FOR BOTH OF THESE.
   Object.freeze({
     id: 'toolbar',
     classes: TOOLBAR_CLASSES,
     markup: (host) =>
-      `<section class="fabricate-filter-bar manager-toolbar" data-probe="${host}-toolbar" aria-label="Filter"><div></div></section>`,
+      `<section class="fabricate-filter-bar" data-probe="${host}-toolbar" aria-label="Filter"><div></div></section>`,
   }),
   Object.freeze({
     id: 'card',
     classes: CARD_CLASSES,
     markup: (host) =>
-      `<section class="fabricate-card manager-inspector-card" data-probe="${host}-card"><h3>Matching evidence</h3><p>Body</p></section>`,
+      `<section class="fabricate-card" data-probe="${host}-card"><h3>Matching evidence</h3><p>Body</p></section>`,
   }),
   // THE PROBE IS THE ROOT AGAIN FOR THE TOGGLE, and here that is not a shortcut either.
   Object.freeze({
@@ -344,7 +344,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON.
     comparesBox: false,
     markup: (host) =>
-      `<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="${host}-toggle" data-keyboard-focus="true"><span class="manager-status-toggle-track" data-probe="${host}-toggle-track"><span class="manager-status-toggle-knob" data-probe="${host}-toggle-knob"></span></span><span class="manager-status-toggle-label" data-probe="${host}-toggle-label">On</span></button>`,
+      `<button type="button" class="fabricate-toggle" data-probe="${host}-toggle" data-keyboard-focus="true"><span class="manager-status-toggle-track" data-probe="${host}-toggle-track"><span class="manager-status-toggle-knob" data-probe="${host}-toggle-knob"></span></span><span class="manager-status-toggle-label" data-probe="${host}-toggle-label">On</span></button>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE SLIDER. Its root `<span>` is neither of the two controls
   // it owns, so the root carries the class string the pinning test reads while the number input,
@@ -390,7 +390,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header.
     comparesBox: false,
     markup: (host) =>
-      `<fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
+      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE STATUS CARD EITHER (issue 1509 phase 4). This family
   // owns NO CONTROL: the switch inside it is `StatusToggle`'s, composed rather than written, and
@@ -403,7 +403,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the sub-line's reason above.
     comparesBox: false,
     markup: (host) =>
-      `<div class="fabricate-toggle-card manager-recipe-status-card is-enabled is-on" data-probe="${host}-toggle-card"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-icon"><i class="fas fa-circle-check"></i></span><div class="manager-recipe-status-copy" data-probe="${host}-toggle-card-copy"><p class="manager-recipe-status-title" data-probe="${host}-toggle-card-title">Enabled</p><p class="manager-recipe-status-sub manager-muted" data-probe="${host}-toggle-card-sub">Craftable by players</p></div><button type="button" class="fabricate-toggle manager-status-toggle is-on" aria-pressed="true" data-keyboard-focus="true"><span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span></button></div>`,
+      `<div class="fabricate-toggle-card manager-recipe-status-card is-enabled is-on" data-probe="${host}-toggle-card"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-icon"><i class="fas fa-circle-check"></i></span><div class="manager-recipe-status-copy" data-probe="${host}-toggle-card-copy"><p class="manager-recipe-status-title" data-probe="${host}-toggle-card-title">Enabled</p><p class="manager-recipe-status-sub manager-muted" data-probe="${host}-toggle-card-sub">Craftable by players</p></div><button type="button" class="fabricate-toggle is-on" aria-pressed="true" data-keyboard-focus="true"><span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span></button></div>`,
   }),
   Object.freeze({
     id: 'toggle-card-locked',
@@ -424,7 +424,7 @@ const CONTROLS = Object.freeze([
     id: 'link-field',
     classes: `${LINK_FIELD_CLASSES} is-linked`,
     markup: (host) =>
-      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-icon"><img src="icons/svg/item-bag.svg" alt="" data-probe="${host}-link-field-art"></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button manager-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button manager-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
+      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-icon"><img src="icons/svg/item-bag.svg" alt="" data-probe="${host}-link-field-art"></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
   }),
   Object.freeze({
     id: 'link-field-compact',
@@ -442,14 +442,14 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the bordered rails' cause rather than one of its own:
     comparesBox: false,
     markup: (host) =>
-      `<div class="fabricate-field manager-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select"><button type="button" class="manager-availability-menu-button" data-keyboard-focus="true" data-probe="${host}-pill-select-menu"><span>Add modifier</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button><div class="manager-availability-pill-row" data-probe="${host}-pill-select-row"><span class="manager-availability-pill is-modifier" data-probe="${host}-pill-select-pill"><i class="fas fa-dice-d20" aria-hidden="true" data-probe="${host}-pill-select-glyph"></i><span data-probe="${host}-pill-select-label">Medicine</span><button type="button" class="manager-availability-remove" data-keyboard-focus="true" aria-label="Remove Medicine" data-probe="${host}-pill-select-remove"><i class="fas fa-xmark" aria-hidden="true"></i></button></span></div></div>`,
+      `<div class="fabricate-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select"><button type="button" class="manager-availability-menu-button" data-keyboard-focus="true" data-probe="${host}-pill-select-menu"><span>Add modifier</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button><div class="manager-availability-pill-row" data-probe="${host}-pill-select-row"><span class="manager-availability-pill is-modifier" data-probe="${host}-pill-select-pill"><i class="fas fa-dice-d20" aria-hidden="true" data-probe="${host}-pill-select-glyph"></i><span data-probe="${host}-pill-select-label">Medicine</span><button type="button" class="manager-availability-remove" data-keyboard-focus="true" aria-label="Remove Medicine" data-probe="${host}-pill-select-remove"><i class="fas fa-xmark" aria-hidden="true"></i></button></span></div></div>`,
   }),
   Object.freeze({
     id: 'pill-select-empty',
     classes: PILL_SELECT_CLASSES,
     comparesBox: false,
     markup: (host) =>
-      `<div class="fabricate-field manager-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select-empty"><div class="manager-availability-pill-row" data-probe="${host}-pill-select-empty-row"><span class="manager-muted manager-availability-any" data-probe="${host}-pill-select-any">No modifiers selected.</span></div></div>`,
+      `<div class="fabricate-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select-empty"><div class="manager-availability-pill-row" data-probe="${host}-pill-select-empty-row"><span class="manager-muted manager-availability-any" data-probe="${host}-pill-select-any">No modifiers selected.</span></div></div>`,
   }),
 ]);
 
@@ -589,14 +589,14 @@ const GLYPH_ONLY_PROBES = Object.freeze([
 
 /** The family's shared base rule, as the browser serialises its prelude. */
 const BASE_RULE_SELECTOR =
-  '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button';
+  '.fabricate-button.fabricate-button, .fabricate-icon-button.fabricate-icon-button';
 
 /** The family's bare-element type baseline, as the browser serialises its prelude. */
 const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
 
 /** The issue-1508 families' font floor, as the browser serialises its prelude. */
 const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
-  '.fabricate-field :is(input, select, textarea)',
+  '.fabricate-field :is(input, textarea)',
   '.fabricate-search input',
   '.fabricate-slider input',
   // AND THE TAB STRIP'S (issue 1509). Its root is a `<div role="tablist">` and the control it
@@ -669,7 +669,7 @@ const FIELD_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/** And on `ManagerSearchField`'s own `<input type="search">`. */
+/** And on `SearchField`'s own `<input type="search">`. */
 const SEARCH_COMPARED = Object.freeze([
   'height',
   'border-radius',
@@ -1595,7 +1595,7 @@ test('the pager’s box-sizing keyword differs by host, and nothing in the sheet
         'the condition that turns its host-supplied `box-sizing` into a different rendered box. ' +
         'That is invisible in Foundry, where core`s `@layer reset` universal rule gives every ' +
         'host `border-box`, and visible in any host without it — including this harness. Give ' +
-        '`.fabricate-pagination.manager-pagination` its own `box-sizing: border-box` and add the ' +
+        '`.fabricate-pagination.fabricate-pagination` its own `box-sizing: border-box` and add the ' +
         'property back to `COMPARED_PAGINATION`.'
     );
   } finally {
@@ -1608,18 +1608,18 @@ test('the values the comparison holds over are the ones the family declares, not
   const bare = (control) => measured[control].bare;
 
   // The four properties acceptance 2 says DO resolve.
-  assert.equal(bare('manager-button')['box-sizing'], 'border-box');
+  assert.equal(bare('button')['box-sizing'], 'border-box');
   // 9px, not the shared base block's 6: the probe carries `fab-manager-button`.
-  assert.equal(bare('manager-button')['border-radius'], '9px');
-  assert.equal(bare('manager-button')['min-height'], '34px');
+  assert.equal(bare('button')['border-radius'], '9px');
+  assert.equal(bare('button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
-  assert.equal(bare('icon-button')['border-radius'], '6px');
+  assert.equal(bare('icon-button')['border-radius'], '9px');
 
   // `line-height: 1` — the declaration the `font: inherit` baseline would delete wherever it
   // outranked the block that declares it. Chromium reports a NUMERIC line-height as its used px
   // value, so "is it 1" is asked as "does it equal the font size", which is what `1` means and is
   // engine-independent.
-  for (const control of ['manager-button', 'icon-button']) {
+  for (const control of ['button', 'icon-button']) {
     const style = bare(control);
     assert.ok(
       Number.parseFloat(style['font-size']) > 0,
@@ -1638,7 +1638,7 @@ test('the values the comparison holds over are the ones the family declares, not
   // not carries the UA's default button font, which in Chromium is Arial. This is the single
   // computed observation that proves the family no longer depends on
   // `.fabricate-manager button, … { font: inherit }` (`fabricate.css:1088-1093`) to get there.
-  for (const control of ['manager-button', 'icon-button']) {
+  for (const control of ['button', 'icon-button']) {
     assert.match(
       bare(control)['font-family'],
       /Signika/,
@@ -1657,11 +1657,9 @@ test('the values the comparison holds over are the ones the family declares, not
 function readRules(tab) {
   return tab.evaluate(() => {
     const out = [];
-    // THE AT-CONTEXT IS CARRIED (issue 1508) because two rules in this sheet share the prelude
-    // `.fabricate-manager select` — the (0,1,1) select baseline at the top level, and the one
-    // inside `@supports (appearance: base-select)` that restates `line-height: 1`. The floor's
-    // position clause below is about the SECOND of those, and a filter on `selectorText` alone
-    // cannot tell them apart.
+    // THE AT-CONTEXT IS CARRIED (issue 1508), so a clause can name a TOP-LEVEL rule: a prelude
+    // repeated inside a conditional block is a different rule that a `selectorText` filter alone
+    // cannot tell apart from it.
     const walk = (rules, at) => {
       for (const rule of rules) {
         const nested = rule.conditionText ? [...at, rule.conditionText] : at;
@@ -1771,13 +1769,13 @@ const CALLER_SIZED = Object.freeze([
     id: 'recipe-lock',
     passThrough: 'manager-recipe-lock',
     markup:
-      '<button type="button" class="fabricate-icon-button manager-icon-button manager-recipe-lock" data-probe="caller-recipe-lock" aria-label="Lock"><i class="fas fa-lock"></i></button>',
+      '<button type="button" class="fabricate-icon-button manager-recipe-lock" data-probe="caller-recipe-lock" aria-label="Lock"><i class="fas fa-lock"></i></button>',
   }),
   Object.freeze({
     id: 'recipe-edit',
     passThrough: 'manager-recipe-edit',
     markup:
-      '<button type="button" class="fabricate-icon-button manager-icon-button manager-recipe-edit" data-probe="caller-recipe-edit" aria-label="Edit"><i class="fas fa-pen"></i></button>',
+      '<button type="button" class="fabricate-icon-button manager-recipe-edit" data-probe="caller-recipe-edit" aria-label="Edit"><i class="fas fa-pen"></i></button>',
   }),
 ]);
 
@@ -1799,7 +1797,7 @@ async function measureCallerSized(css) {
         'body { font-family: "Signika", sans-serif; font-size: 14px; }</style>' +
         `<style id="module-sheet">${css}</style></head><body>` +
         `<div class="fabricate fabricate-manager"><div>${CALLER_SIZED.map((one) => one.markup).join('')}</div></div>` +
-        '<div><div><button type="button" class="fabricate-icon-button manager-icon-button" data-probe="caller-bare-icon" aria-label="Delete"><i class="fas fa-trash"></i></button></div></div>' +
+        '<div><div><button type="button" class="fabricate-icon-button" data-probe="caller-bare-icon" aria-label="Delete"><i class="fas fa-trash"></i></button></div></div>' +
         '</body></html>'
     );
     return await tab.evaluate(() => {
@@ -1875,7 +1873,7 @@ test('a caller`s per-site font rule still beats the family`s baseline', async ()
 /* THE SECOND NEGATIVE CONTROL, ON THE FLOOR ITSELF. */
 const FLOOR_RULE_PRELUDE = '.fabricate-button,\n.fabricate-icon-button {\n  font: inherit;\n}';
 const RE_FAMILY_ROOTED_FLOOR =
-  '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button {\n  font: inherit;\n}';
+  '.fabricate-button.fabricate-button,\n.fabricate-icon-button.fabricate-icon-button {\n  font: inherit;\n}';
 
 test('the caller-override measurement reds when the baseline is written at the family`s own (0,2,0)', async () => {
   assert.equal(
@@ -1906,6 +1904,10 @@ test('the caller-override measurement reds when the baseline is written at the f
   }
 });
 
+// The compact search draws the ring; the default search shell lights its border instead, which
+// `search-field-geometry-gate.test.js` measures.
+const TEXT_FIELD_RINGS = new Set(['.fabricate-search:where(.is-compact) input:focus-visible']);
+
 test('each re-rooted family declares its own focus ring, and none of them reaches a select', async () => {
   const tab = await browser.newPage();
   try {
@@ -1923,14 +1925,14 @@ test('each re-rooted family declares its own focus ring, and none of them reache
         '.fabricate-field :is(input, textarea):focus',
         '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
       ],
-      ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
-      ['.fabricate-slider input:focus', '.fabricate-slider input:focus-visible'],
+      ['.fabricate-search input:focus', '.fabricate-search:where(.is-compact) input:focus-visible'],
+      ['.fabricate-slider input:focus', '.fabricate-slider input[type="range"]:focus-visible'],
       // THE TAB STRIP'S PAIR (issue 1509).
       ['.fabricate-tabs button:focus', '.fabricate-tabs button:focus-visible'],
       // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added.
       [
-        '.fabricate-toggle.manager-status-toggle:focus',
-        '.fabricate-toggle.manager-status-toggle:focus-visible',
+        '.fabricate-toggle.fabricate-toggle:focus',
+        '.fabricate-toggle.fabricate-toggle:focus-visible',
       ],
       [
         '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
@@ -1939,14 +1941,19 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     ]) {
       const ring = rules.filter((rule) => rule.selectorText === repaint);
       assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
+      // A text-field family copies the module's inset text-field ring, every other family its
+      // outset one.
+      const textField = TEXT_FIELD_RINGS.has(repaint);
       assert.match(
         ring[0].cssText,
-        /outline:\s*2px solid var\(--fab-accent\)/,
+        textField
+          ? /outline:\s*1px solid var\(--fab-accent\)/
+          : /outline:\s*2px solid var\(--fab-accent\)/,
         `${repaint} must carry the same outline the module ring declares`
       );
       assert.match(
         ring[0].cssText,
-        /outline-offset:\s*2px/,
+        textField ? /outline-offset:\s*-1px/ : /outline-offset:\s*2px/,
         `${repaint} must carry the module ring's outline offset`
       );
 
@@ -1975,6 +1982,31 @@ test('each re-rooted family declares its own focus ring, and none of them reache
           'repaint or source order deletes the accent ring it exists to supply'
       );
     }
+
+    // The field family copies the module's text-field variant too, with the module's exclusion,
+    // below its element ring so the variant wins the tie for a text field and no other input.
+    const variantOf = (root) =>
+      rules.findIndex(
+        (rule) =>
+          rule.selectorText.startsWith(`${root} :is(input, textarea):where(:not(`) &&
+          rule.selectorText.endsWith(':focus-visible')
+      );
+    const exclusionOf = (index) => /:where\(:not\((.*?)\)\)/.exec(rules[index].selectorText)[1];
+    const moduleVariant = variantOf('.fabricate');
+    const fieldVariant = variantOf('.fabricate-field');
+    assert.ok(moduleVariant >= 0 && fieldVariant >= 0, 'both text-field variants are declared');
+    assert.equal(exclusionOf(fieldVariant), exclusionOf(moduleVariant));
+    assert.match(exclusionOf(moduleVariant), /checkbox.*radio.*range.*color.*file.*button/);
+    assert.match(rules[fieldVariant].cssText, /outline:\s*1px solid var\(--fab-accent\)/);
+    assert.match(rules[fieldVariant].cssText, /outline-offset:\s*-1px/);
+    assert.ok(
+      fieldVariant >
+        rules.findIndex(
+          (rule) =>
+            rule.selectorText ===
+            '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible'
+        )
+    );
 
     // NO RE-ROOTED FAMILY REACHES A FOCUSED `select`, and this is now the whole of that claim.
     const roots = [
@@ -2029,14 +2061,14 @@ test('the issue-1508 families declare their own control chrome rather than inher
   }
 
   // FIELD. `min-height: 34px` and `appearance: none` come from the family's element-typed chrome
-  // rule — the one that restates the area baseline's predicate leg for leg — and `height: 36px`,
-  // the 6px corner, the border and the fill from the family's own re-rooted control block. All
+  // rule — the one that restates the area baseline's predicate leg for leg — and `height: 38px`,
+  // its 9px corner, the border and the fill from the family's own re-rooted control blocks. All
   // six are values the manager used to supply and the family now declares for itself.
   assert.equal(field['min-height'], '34px');
   assert.equal(field.appearance, 'none');
   assert.equal(field['-webkit-appearance'], 'none');
-  assert.equal(field.height, '36px');
-  assert.equal(field['border-radius'], '6px');
+  assert.equal(field.height, '38px');
+  assert.equal(field['border-radius'], '9px');
   assert.equal(field['border-top-width'], '1px');
   assert.equal(field['border-top-style'], 'solid');
   assert.match(
@@ -2046,12 +2078,13 @@ test('the issue-1508 families declare their own control chrome rather than inher
       'inherit` floor is not reaching it'
   );
 
-  // SEARCH. No `min-height` and no `appearance`.
-  assert.equal(search.height, '34px');
-  assert.equal(search['border-radius'], '6px');
-  assert.equal(search['padding-left'], '34px');
-  assert.equal(search['padding-right'], '34px');
-  assert.equal(search['border-top-width'], '1px');
+  // SEARCH (issue 1782). The shell draws the box, so the input inside it is borderless, unpadded and
+  // square, and stretches to the 38px shell's 36px content height.
+  assert.equal(search.height, '36px');
+  assert.equal(search['border-radius'], '0px');
+  assert.equal(search['padding-left'], '0px');
+  assert.equal(search['padding-right'], '0px');
+  assert.equal(search['border-top-width'], '0px');
   assert.match(search['font-family'], /Signika/);
 });
 
@@ -2090,7 +2123,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
     await tab.setContent(document_(sheet));
     const rules = await readRules(tab);
     const base = rules.filter(
-      (rule) => rule.selectorText === '.fabricate-toggle.manager-status-toggle'
+      (rule) => rule.selectorText === '.fabricate-toggle.fabricate-toggle'
     );
     assert.equal(base.length, 1, 'the switch`s base rule must be declared exactly once');
     assert.match(base[0].cssText, /width:\s*auto/, 'the switch sizes to its content, not its cell');
@@ -2128,10 +2161,10 @@ test('the toggle and the slider declare their own control chrome rather than inh
     await tab.close();
   }
 
-  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 6px corner.
+  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 7px corner.
   const number = bare('slider-number');
   assert.equal(number.height, '28px');
-  assert.equal(number['border-radius'], '6px');
+  assert.equal(number['border-radius'], '7px');
   assert.equal(number['border-top-width'], '1px');
   assert.equal(number['text-align'], 'center');
   assert.match(number['font-family'], /Signika/);
@@ -2250,7 +2283,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
 
 /*
  * ── THE TWO FAMILIES THAT OWN NO CONTROL (issue 1508, phase 2) ──────────────────────────────
- * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
+ * `FilterBar` and `InspectorCard` are the first re-rooted families whose root is not a
  * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
  * card renders its caller's children. So they declare no font floor and no focus pair, and the
  * two clauses below are the two halves of that decision.
@@ -2290,7 +2323,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
   );
 
   // AND THE BRANCH THAT PAINTS IT IS THE FLEX ONE. `display: grid` is what
-  // `.fabricate-filter-bar.manager-toolbar` states on its own; the `:not(:has(…))` branch
+  // `.fabricate-filter-bar.fabricate-filter-bar` states on its own; the `:not(:has(…))` branch
   // overrides it to `flex`, and no component under `src/` writes `manager-toolbar-primary`, so
   // that branch is ALWAYS taken. Measuring `flex` here is what says the branch re-rooted too —
   // leaving it behind would give a bare-host bar the grid form nothing ships.
@@ -2301,11 +2334,11 @@ test('the filter bar and the card declare their own box rather than inheriting i
       'or a bar outside the manager renders the grid form no screen in the product uses'
   );
 
-  // THE CARD. Padding, a hairline border on all four edges, the 8px corner.
+  // THE CARD. Padding, a hairline border on all four edges, the 11px corner.
   assert.equal(card['padding-top'], '12px');
   assert.equal(card['border-top-width'], '1px');
   assert.equal(card['border-top-style'], 'solid');
-  assert.equal(card['border-radius'], '8px');
+  assert.equal(card['border-radius'], '11px');
   assert.equal(card.display, 'flex');
   assert.equal(card['flex-direction'], 'column');
   assert.equal(card.gap, '8px');
@@ -2338,9 +2371,17 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
     const rules = await readRules(tab);
     assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
 
+    // ROOTED at a family, not merely naming it: since issue 1507 a caller's own rule keyed on its
+    // bar, card or search field spells the root further down its chain, and that rule is the
+    // caller's.
+    const rootedAt = (named) => (rule) =>
+      rule.selectorText
+        .split(',')
+        .some((selector) => named.test(selector.trim().split(/[\s>+~]+/u, 1)[0]));
+
     for (const root of ['.fabricate-filter-bar', '.fabricate-card']) {
       const named = new RegExp(`\\${root}(?![\\w-])`);
-      const family = rules.filter((rule) => named.test(rule.selectorText));
+      const family = rules.filter(rootedAt(named));
       assert.ok(
         family.length >= 3,
         `only ${family.length} rules are rooted at \`${root}\`, so the absences below hold over ` +
@@ -2393,9 +2434,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
       ['.fabricate-search', 2],
     ]) {
       const named = new RegExp(`\\${root}(?![\\w-])`);
-      const containerScoped = rules.filter(
-        (rule) => named.test(rule.selectorText) && rule.at !== ''
-      );
+      const containerScoped = rules.filter((rule) => rootedAt(named)(rule) && rule.at !== '');
       assert.equal(
         containerScoped.length,
         expected,
@@ -2415,7 +2454,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
     }
     assert.match(
       sheet,
-      /container-name: fabricate-manager;/,
+      /container-name: fabricate-manager fabricate-option-host;/,
       'the container NAME must still be established by `.fabricate-manager` itself, which is the ' +
         'whole reason those rules cannot travel to a bare host'
     );
@@ -2426,7 +2465,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
 
 /** The elements a widened floor would have reached. */
 const NEGATIVE_CONTROLS =
-  '<fieldset class="fabricate-field manager-field fabricate-option-cards" data-probe="neg-root">' +
+  '<fieldset class="fabricate-field fabricate-option-cards" data-probe="neg-root">' +
   '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
   '<label><input type="checkbox" data-probe="neg-checkbox"></label>' +
   '<span class="fabricate-slider manager-chance-slider"><span class="manager-drop-rate-control"><input type="range" data-probe="neg-range"></span></span>' +
@@ -2436,7 +2475,7 @@ const NEGATIVE_CONTROLS =
   '</fieldset>' +
   // OUTSIDE THE FIELDSET, because a switch is not a field's control and nesting it inside one
   // would make the comparison below answer a question about `Field` rather than about the toggle.
-  '<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="neg-toggle"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>' +
+  '<button type="button" class="fabricate-toggle" data-probe="neg-toggle"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>' +
   '<label class="fabricate-toggle manager-tool-setting-toggle" data-probe="neg-toggle-host"><input type="checkbox" class="manager-tool-setting-toggle-input" data-probe="neg-toggle-input"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></label>' +
   // AND A TAB STRIP (issue 1509), for the toggle's reason and the floor group's. Its
   // `.fabricate-tabs button` member is a (0,1,1) TIE with the area's own bare-element baseline,
@@ -2489,7 +2528,7 @@ async function measureNegativeControls(css) {
 
 /** The blocks issues 1508 and 1509 ADD that can move a resting measurement. */
 const ADDED_BLOCKS = Object.freeze([
-  '.fabricate-field :is(input, select, textarea),\n.fabricate-search input,\n' +
+  '.fabricate-field :is(input, textarea),\n.fabricate-search input,\n' +
     '.fabricate-slider input,\n.fabricate-tabs button {\n  font: inherit;\n}',
   '.fabricate-toggle {\n  font: inherit;\n}',
   '.fabricate-field input[type="text"],\n.fabricate-field input[type="url"],\n' +
@@ -2564,7 +2603,7 @@ test('the validation surface declares no font floor and no focus pair', async ()
       '`.fabricate-validation` declares a focus rule. This family owns no control of its own, so ' +
         'a strip or a repaint here would paint chrome for a control ANOTHER primitive owns — and ' +
         'it would WIN: `<root> <element>:focus-visible` is (0,2,1) and out-ranks the composed ' +
-        '`ManagerButton`s own `.fabricate-button:focus-visible` ring at (0,2,0), so the row`s ' +
+        '`Button`s own `.fabricate-button:focus-visible` ring at (0,2,0), so the row`s ' +
         'View action would lose its family ring to this one. That displacement is what the ' +
         'design-system requirement refuses, and it is why the pair is REFUSED here rather than ' +
         'merely absent.'
@@ -2639,7 +2678,7 @@ test('the option-card family declares no font floor of its own', async () => {
       [],
       '`.fabricate-option-cards` types a bare element, which is a font FLOOR. This family must ' +
         'not declare one: its root element is `Field`s fieldset and carries `fabricate-field` ' +
-        'too, so `.fabricate-field :is(input, select, textarea)` already floors every input in ' +
+        'too, so `.fabricate-field :is(input, textarea)` already floors every input in ' +
         'the group at the same (0,1,1) rank. A second floor restates a property rather than ' +
         'establishing one, and whichever of the two came later would win on source order alone.'
     );
@@ -2656,7 +2695,7 @@ test('the option-card family declares no font floor of its own', async () => {
     assert.ok(
       !named.test(floorGroup[0].selectorText),
       '`.fabricate-option-cards` has joined the shared font-floor group. It must not: the same '+
-        'group already carries `.fabricate-field :is(input, select, textarea)`, which reaches '+
+        'group already carries `.fabricate-field :is(input, textarea)`, which reaches '+
         'this family`s radios through the root the two families share.'
     );
   } finally {
@@ -2666,7 +2705,7 @@ test('the option-card family declares no font floor of its own', async () => {
 
 test('the option-card radio takes its type from the field floor it shares a root with', async () => {
   // THE NEGATIVE CONTROL FOR THE REFUSAL ABOVE, and it is a perturbation rather than an argument:
-  const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, select, textarea),\n';
+  const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, textarea),\n';
   assert.equal(
     sheet.split(FIELD_FLOOR_MEMBER).length - 1,
     1,
@@ -2801,7 +2840,7 @@ test('the status card family declares no font floor and no focus pair', async ()
 
     // AND NO FOCUS PAIR, AND THE RANK IS PUBLISHED RATHER THAN ASSERTED. A pair would be
     // `.fabricate-toggle-card button:focus-visible` at (0,2,1). The switch's own repaint is
-    // `.fabricate-toggle.manager-status-toggle:focus-visible` at (0,3,0) — measured below — so on
+    // `.fabricate-toggle.fabricate-toggle:focus-visible` at (0,3,0) — measured below — so on
     // THIS family the hypothetical pair would LOSE rather than replace, which is the opposite of
     // what happens one clause down at the link field. That difference is why the refusal is a rule
     // about OWNERSHIP and not a rank argument: `StatusToggle` happens to write its pair at three
@@ -2818,7 +2857,7 @@ test('the status card family declares no font floor and no focus pair', async ()
     );
 
     const switchRepaint = rules.find(
-      (rule) => rule.selectorText === '.fabricate-toggle.manager-status-toggle:focus-visible'
+      (rule) => rule.selectorText === '.fabricate-toggle.fabricate-toggle:focus-visible'
     );
     assert.ok(
       Boolean(switchRepaint),
@@ -2968,26 +3007,16 @@ test('the chrome these families declare reaches the control they own and nothing
   assert.notEqual(shipped['neg-checkbox'].height, '34px', 'a checkbox is never floored to 34');
   assert.equal(shipped['neg-textarea']['min-height'], '92px', 'the field textarea keeps its 92');
 
-  // THE TWO AREA RULES THE FLOOR TIES.
+  // THE AREA RULE THE FLOOR TIES. Its `@supports (appearance: base-select)` select twin went with
+  // the last native select (issue 1777); `neg-select` stays, as the floor's element-typed control.
   assert.equal(
     shipped['neg-textarea']['line-height'],
     `${Number.parseFloat(shipped['neg-textarea']['font-size']) * 1.4}px`,
     '`.fabricate-manager textarea { line-height: 1.4 }` must still beat the family font floor'
   );
-  assert.equal(
-    shipped['neg-select']['line-height'],
-    shipped['neg-select']['font-size'],
-    "`@supports (appearance: base-select)`'s `.fabricate-manager select { line-height: 1 }` must " +
-      'still beat the family font floor'
-  );
-  assert.equal(
-    shipped['neg-select'].appearance,
-    'base-select',
-    'a select in a field keeps the area`s own `appearance`; the family declares none for it'
-  );
 });
 
-test('the font floor is declared between the area baseline and the two rules that restate a font longhand', async () => {
+test('the font floor is declared between the area baseline and the rule that restates a font longhand', async () => {
   // N1's INTERVAL, STATED AS AN ASSERTION. The floor ties `.fabricate-manager button, … textarea`
   // at (0,1,1) and beats it on source order with that rule's own declaration, which is a no-op.
   const tab = await browser.newPage();
@@ -3005,7 +3034,7 @@ test('the font floor is declared between the area baseline and the two rules tha
     const baselineIndex = only(
       (rule) =>
         rule.selectorText ===
-        '.fabricate-manager button, .fabricate-manager input, .fabricate-manager select, .fabricate-manager textarea',
+        '.fabricate-manager button, .fabricate-manager input, .fabricate-manager textarea',
       'the area`s bare-element font baseline'
     );
     const floorIndex = only(
@@ -3016,11 +3045,6 @@ test('the font floor is declared between the area baseline and the two rules tha
       (rule) => rule.selectorText === '.fabricate-manager textarea' && rule.at === '',
       'the area`s own textarea block'
     );
-    const supportsSelectIndex = only(
-      (rule) =>
-        rule.selectorText === '.fabricate-manager select' && rule.at === '(appearance: base-select)',
-      'the `@supports (appearance: base-select)` select block'
-    );
 
     assert.ok(
       baselineIndex < floorIndex,
@@ -3028,9 +3052,9 @@ test('the font floor is declared between the area baseline and the two rules tha
         `with that baseline's own declaration; baseline=${baselineIndex} floor=${floorIndex}`
     );
     assert.ok(
-      floorIndex < textareaIndex && floorIndex < supportsSelectIndex,
-      'the floor must be declared BEFORE both rules that restate a `font` longhand at its own ' +
-        `rank; floor=${floorIndex}, textarea=${textareaIndex}, @supports select=${supportsSelectIndex}`
+      floorIndex < textareaIndex,
+      'the floor must be declared BEFORE the rule that restates a `font` longhand at its own ' +
+        `rank; floor=${floorIndex}, textarea=${textareaIndex}`
     );
 
     // AND ITS REACH IS READ AS THE DECLARATION, never as a resolved value.
@@ -3084,7 +3108,7 @@ test('the family base rule declares its background rather than inheriting one', 
   try {
     await tab.setContent(document_(sheet));
     const rules = await readRules(tab);
-    // `background: var(--fab-overlay-light-06)` resolves through a custom property.
+    // `background: var(--fab-surface-soft)` resolves through a custom property.
     const base = rules.filter((rule) => rule.selectorText === BASE_RULE_SELECTOR);
     assert.equal(
       base.length,
@@ -3093,7 +3117,7 @@ test('the family base rule declares its background rather than inheriting one', 
     );
     assert.match(
       base[0].cssText,
-      /background-color:\s*var\(--fab-overlay-light-06\)|background:\s*var\(--fab-overlay-light-06\)/,
+      /background-color:\s*var\(--fab-surface-soft\)|background:\s*var\(--fab-surface-soft\)/,
       'the family declares its own resting background on its lowest-specificity rule'
     );
   } finally {
@@ -3103,9 +3127,9 @@ test('the family base rule declares its background rather than inheriting one', 
 
 /* THE NEGATIVE CONTROL, PERMANENT AND IN-FILE. */
 const BASE_RULE_PRELUDE =
-  '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button {';
+  '.fabricate-button.fabricate-button,\n.fabricate-icon-button.fabricate-icon-button {';
 const RE_APP_ROOTED_PRELUDE =
-  '.fabricate-manager .manager-button,\n.fabricate-manager .manager-icon-button {';
+  '.fabricate-manager .fabricate-button,\n.fabricate-manager .fabricate-icon-button {';
 
 test('the comparison reds when the family base rule is app-rooted again', async () => {
   assert.equal(
@@ -3123,7 +3147,7 @@ test('the comparison reds when the family base rule is app-rooted again', async 
 
   const measured = await measure(perturbed);
   const divergent = [];
-  for (const control of ['manager-button', 'icon-button']) {
+  for (const control of ['button', 'icon-button']) {
     for (const property of COMPARED) {
       if (measured[control].bare[property] !== measured[control].manager[property]) {
         divergent.push(`${control}.${property}`);

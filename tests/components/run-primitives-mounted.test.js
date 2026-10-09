@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import { chromium } from 'playwright';
 import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -23,38 +24,49 @@ function createHarness(name, dependencies = [], rawModules = []) {
 const runActionHarness = createHarness(
   'RunActionBar',
   [
-    component('ManagerButton'),
+    component('Button'),
     component('IconButton'),
     'src/ui/svelte/components/SegmentedControl.svelte',
   ],
-  [...FOUNDRY_BRIDGE_RAW_MODULES]
+  [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES]
 );
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
 const listRowHarness = createHarness('ListRow', [component('Medallion')]);
 const chipHarness = createHarness('Chip');
-const slotRowHarness = createHarness('SlotRow', [
-  component('SlotTile'),
-  component('ChoiceOptionList'),
-  component('Medallion'),
-]);
+const FOCUS_WHEN_ENABLED = ['src/ui/svelte/util/focusWhenEnabled.js'];
+const slotRowHarness = createHarness(
+  'SlotRow',
+  [component('SlotTile'), component('ChoiceOptionList'), component('Medallion'), component('Kicker')],
+  FOCUS_WHEN_ENABLED
+);
+const choiceListHarness = createHarness('ChoiceOptionList', [component('Medallion'), component('Kicker')], FOCUS_WHEN_ENABLED);
 const essenceHarness = createHarness('EssencePool', [
   component('FillBar'),
+  component('Meter'),
   component('Medallion'),
   component('Stepper'),
 ]);
-const progressHarness = createHarness('RunProgress', [component('FillBar')]);
-const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('ManagerButton')]);
+const progressHarness = createHarness(
+  'RunProgress',
+  [component('FillBar'), component('StageBars')],
+  [...FOUNDRY_BRIDGE_RAW_MODULES]
+);
+const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
 const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
 const yieldHarness = createHarness('YieldScale', resultModules);
 const outcomeHarness = createHarness('OutcomeLadder', resultModules);
-const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], SEARCHABLE_POPOVER_RAW_MODULES);
+const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], [
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
+]);
 const harnesses = [
   runActionHarness,
   worldClockHarness,
   listRowHarness,
   chipHarness,
   slotRowHarness,
+  choiceListHarness,
   essenceHarness,
   progressHarness,
   stageNavHarness,
@@ -95,6 +107,16 @@ function expectGeometry(name, selector, declarations) {
   }
 }
 
+const ESSENCE_SLOT = {
+  id: 'essence',
+  kind: 'essence',
+  label: 'Essence pool',
+  icon: 'fas fa-atom',
+  poolsMet: 1,
+  poolsRequired: 1,
+  poolsStarted: 1,
+};
+
 describe('run primitives mounted behavior', () => {
   before(async () => {
     for (const harness of harnesses) await harness.setup();
@@ -128,11 +150,11 @@ describe('run primitives mounted behavior', () => {
 
   it('keeps the default pager face and opts into compact without changing its named controls', async () => {
     const props = { totalCount: 12, pageSize: 4, pageSizeOptions: [4, 6, 12], persistent: true,
-      label: 'Finished runs', navLabel: 'Finished pages' };
+      ariaLabel: 'Finished runs', navLabel: 'Finished pages' };
     const target = await pagerHarness.mount(props);
     assert.ok(!target.querySelector('[data-pagination-compact], .manager-pagination-hidden'));
     const page = target.querySelector('[data-pagination-page]').textContent;
-    await pagerHarness.setProps({ ...props, compact: true });
+    await pagerHarness.setProps({ ...props, density: 'compact' });
     assert.equal(target.querySelector('[data-pagination-page]').textContent, page);
     assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Finished runs');
     assert.equal(target.querySelector('nav').getAttribute('aria-label'), 'Finished pages');
@@ -453,10 +475,11 @@ describe('run primitives mounted behavior', () => {
         label: 'Any binder',
         needed: 1,
         openLabel: 'Choose a binder',
-        affordanceLabel: '1 of 2',
+        affordanceLabel: '1 of 3',
         candidates: [
           { id: 'resin', label: 'Pine Resin', icon: 'fas fa-leaf' },
           { id: 'glass', label: 'Duskglass', icon: 'fas fa-flask' },
+          { id: 'ash', label: 'Bone Ash', icon: 'fas fa-bone' },
         ],
       },
     ];
@@ -483,6 +506,12 @@ describe('run primitives mounted behavior', () => {
     assert.ok(target.querySelector('[data-choice-options="binder"]'), 'the chooser opens in flow');
     const unavailable = target.querySelector('[data-choice-id="glass"]');
     assert.equal(unavailable.disabled, true, 'stage claims, not held stock, disable a candidate');
+    const short = target.querySelector('[data-choice-id="ash"]');
+    assert.equal(short.disabled, false, 'a candidate held short of the need is still offered');
+    assert.equal(
+      target.querySelectorAll(':scope [data-choice-options="binder"] [role="radiogroup"] [role="radio"]').length,
+      3
+    );
     target.querySelector('[data-choice-id="resin"]').click();
     assert.deepEqual(choices, [['binder', 'resin']]);
     assert.equal(target.querySelectorAll('[data-choice-options]').length, 1, 'only one chooser is rendered');
@@ -492,14 +521,259 @@ describe('run primitives mounted behavior', () => {
     slotRowHarness.remount();
 
     const locked = await slotRowHarness.mount({
-      requirements,
+      requirements: [...requirements, ESSENCE_SLOT],
       held,
       claimed,
       locked: true,
       slotLabel: (slot) => slot.label,
     });
-    assert.equal(locked.querySelectorAll(':scope [data-slot-id] [role="img"]').length, 2);
+    assert.equal(locked.querySelectorAll(':scope [data-slot-id] [role="img"]').length, 3);
     assert.ok(!locked.querySelector('button'), 'rolled slots expose no controls');
+  });
+
+  it('paints a partly delivered essence with the partial face, never short', async () => {
+    const essence = (id, poolsMet, poolsRequired, poolsStarted) => ({
+      ...ESSENCE_SLOT,
+      id,
+      poolsMet,
+      poolsRequired,
+      poolsStarted,
+      available: poolsMet >= poolsRequired,
+    });
+    const target = await slotRowHarness.mount({
+      requirements: [
+        essence('met', 1, 1, 1),
+        essence('started', 0, 1, 1),
+        // A caller that counts only met pools still paints one of two partial.
+        essence('one-of-two', 1, 2, undefined),
+        essence('untouched', 0, 1, 0),
+      ],
+      slotLabel: (slot) => slot.label,
+    });
+    const shells = [...target.querySelectorAll(':scope [data-slot-id] .fab-slot-tile-shell')];
+    assert.deepEqual(
+      shells.map((shell) => shell.dataset.slotState),
+      ['met', 'partial', 'partial', 'short']
+    );
+    for (const shell of shells.slice(1, 3)) {
+      const tile = shell.querySelector('.fab-slot-tile');
+      assert.ok(tile.classList.contains('is-partial') && !tile.classList.contains('is-short'));
+      assert.ok(shell.querySelector('.fab-slot-pip').classList.contains('is-ratio'));
+    }
+  });
+
+  // The library's candidate list (library.html §SlotRow): held stylus, chalk; Duskglass held but
+  // claimed elsewhere by the stage; ash held short of the need.
+  const binderStock = { stylus: 2, chalk: 5, dusk: 2, ash: 0 };
+  function mountBinderChoices(chosen, selectedId = 'stylus') {
+    return choiceListHarness.mount({
+      slotId: 'binder',
+      options: ['stylus', 'chalk', 'dusk', 'ash'].map((id) => ({ id, label: `${id} stock` })),
+      needed: 1,
+      selectedId,
+      held: (id) => binderStock[id] ?? 0,
+      claimed: (id) => (id === 'dusk' ? 2 : 0),
+      onChoose: (slotId, id) => {
+        chosen.push([slotId, id]);
+      },
+      label: 'Choose a component',
+      candidateReading: ({ held, needed }) => `${held} held · needs ${needed}`,
+    });
+  }
+
+  it('is one single-select radiogroup that disables only a candidate claimed elsewhere', async () => {
+    const chosen = [];
+    const target = await mountBinderChoices(chosen);
+    const group = target.querySelector(':scope [data-choice-options="binder"] [role="radiogroup"]');
+    assert.equal(group.getAttribute('aria-label'), 'Choose a component');
+    const [stylus, chalk, dusk, ash] = group.querySelectorAll('[role="radio"]');
+    assert.deepEqual(
+      [stylus, chalk, dusk, ash].map((radio) => [
+        radio.getAttribute('aria-checked'),
+        radio.getAttribute('tabindex'),
+        radio.disabled,
+        radio.dataset.keyboardFocus,
+      ]),
+      [
+        ['true', '0', false, 'true'],
+        ['false', '-1', false, 'true'],
+        ['false', '-1', true, 'true'],
+        ['false', '-1', false, 'true'],
+      ],
+      'only the held candidate the stage claims elsewhere is disabled; the short one is offered'
+    );
+    assert.equal(target.querySelectorAll('[aria-pressed]').length, 0, 'a radio, not a toggle');
+    assert.ok(ash.classList.contains('is-short') && !chalk.classList.contains('is-short'));
+    const describedBy = ash.getAttribute('aria-describedby');
+    assert.ok(describedBy, 'the short candidate is described by its reading');
+    assert.equal(target.querySelector(`[id="${describedBy}"]`).textContent, '0 held · needs 1');
+    const labelledBy = ash.getAttribute('aria-labelledby');
+    assert.equal(target.querySelector(`[id="${labelledBy}"]`).textContent, 'ash stock');
+    assert.ok(!chalk.hasAttribute('aria-describedby'), 'a met candidate names its reading instead');
+    ash.click();
+    assert.deepEqual(chosen, [['binder', 'ash']], 'a short candidate is pressable');
+    choiceListHarness.remount();
+  });
+
+  it('moves selection and focus with the arrows, Home and End, skipping a disabled candidate', async () => {
+    const chosen = [];
+    const target = await mountBinderChoices(chosen);
+    const radios = [...target.querySelectorAll('[role="radio"]')];
+    const press = (index, key) =>
+      radios[index].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    const focusedId = () => globalThis.document.activeElement?.dataset?.choiceId;
+    press(0, 'ArrowRight');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['chalk', 'chalk']);
+    press(1, 'ArrowDown');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['ash', 'ash'], 'the claimed one is skipped');
+    press(3, 'ArrowRight');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['stylus', 'stylus'], 'it wraps');
+    press(0, 'ArrowLeft');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['ash', 'ash']);
+    press(3, 'Home');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['stylus', 'stylus']);
+    press(0, 'End');
+    assert.deepEqual([chosen.at(-1)[1], focusedId()], ['ash', 'ash']);
+    press(1, ' ');
+    assert.equal(chosen.at(-1)[1], 'chalk', 'Space checks the focused candidate');
+    const count = chosen.length;
+    press(1, 'Tab');
+    assert.equal(chosen.length, count, 'a key outside the model chooses nothing');
+    choiceListHarness.remount();
+
+    const unchosen = await mountBinderChoices([], '');
+    assert.deepEqual(
+      [...unchosen.querySelectorAll('[role="radio"]')].map((radio) => radio.getAttribute('tabindex')),
+      ['0', '-1', '-1', '-1'],
+      'with nothing chosen the first offered candidate is the tab stop'
+    );
+    choiceListHarness.remount();
+
+    const chalkChosen = await mountBinderChoices([], 'chalk');
+    assert.deepEqual(
+      [...chalkChosen.querySelectorAll('[role="radio"]')].map((radio) => radio.getAttribute('tabindex')),
+      ['-1', '0', '-1', '-1'],
+      'the checked candidate is the tab stop'
+    );
+    choiceListHarness.remount();
+  });
+
+  // [held, claimed, needed] per candidate: spare is held less claimed.
+  const fluxStock = { full: [3, 1, 3], spare: [2, 1, 1], exact: [1, 0, 1], refused: [5, 0, 1] };
+  function mountFluxChoices(chosen) {
+    return choiceListHarness.mount({
+      slotId: 'flux',
+      options: Object.entries(fluxStock).map(([id, stock]) => ({
+        id,
+        label: `${id} flux`,
+        needed: stock[2],
+        reason: id === 'exact' ? 'kept for the forge' : undefined,
+        disabled: id === 'refused',
+      })),
+      selectedId: 'full',
+      held: (id) => fluxStock[id][0],
+      claimed: (id) => fluxStock[id][1],
+      onChoose: (...args) => {
+        chosen.push(args);
+      },
+      candidateReading: ({ held, claimed, spare, needed }) => `${held}/${claimed}/${spare}/${needed}`,
+    });
+  }
+
+  it('locks a candidate only when its spare falls below the need, and keeps the tab stop offered', async () => {
+    const target = await mountFluxChoices([]);
+    const [full, spare, exact, refused] = target.querySelectorAll('[role="radio"]');
+    assert.deepEqual(
+      [full, spare, exact, refused].map((radio) => radio.disabled),
+      [true, false, false, true],
+      'two spare of three needed is locked; one spare of one needed is offered; a refusal locks'
+    );
+    assert.equal(target.querySelector(`[id="${full.getAttribute('aria-describedby')}"]`).textContent, '3/1/2/3');
+    assert.deepEqual(
+      [full, spare, exact, refused].map((radio) => radio.getAttribute('tabindex')),
+      ['-1', '0', '-1', '-1'],
+      'a checked candidate claimed elsewhere passes the tab stop to the first offered one'
+    );
+    assert.ok(!exact.classList.contains('is-short'), 'held exactly the need is met');
+    assert.ok(!exact.hasAttribute('aria-describedby'));
+    assert.equal(exact.getAttribute('title'), 'kept for the forge', "the caller's reason is the title");
+    assert.ok(!spare.hasAttribute('title'));
+    choiceListHarness.remount();
+  });
+
+  it('marks an arrow choice as arrow-originated and consumes only the keys it models', async () => {
+    const chosen = [];
+    const target = await mountFluxChoices(chosen);
+    const [, spare, exact] = target.querySelectorAll('[role="radio"]');
+    const press = (radio, key) =>
+      radio.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    assert.equal(press(spare, 'ArrowUp'), false, 'an arrow is consumed');
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact', { via: 'arrow' }], 'ArrowUp wraps to the last offered');
+    assert.equal(press(exact, 'Enter'), false, 'Enter is consumed');
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact'], 'activation carries no arrow origin');
+    exact.click();
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact']);
+    const count = chosen.length;
+    assert.equal(press(exact, 'Tab'), true, 'a key outside the model is left to the browser');
+    assert.equal(chosen.length, count);
+    choiceListHarness.remount();
+  });
+
+  it('truncates a long name inside its list, inks a locked candidate disabled and keeps a short reading', async () => {
+    const stock = { long: [4, 0], locked: [2, 2], short: [0, 0] };
+    const target = await choiceListHarness.mount({
+      slotId: 'binder',
+      options: [
+        { id: 'long', label: 'Everburning Salamander Scale of the Ninth Furnace, Twice Tempered' },
+        { id: 'locked', label: 'Duskglass', icon: 'fas fa-flask' },
+        { id: 'short', label: 'Bone Ash', icon: 'fas fa-bone' },
+      ],
+      needed: 1,
+      held: (id) => stock[id][0],
+      claimed: (id) => stock[id][1],
+      candidateReading: ({ held, needed }) => `${held} held · needs ${needed}`,
+    });
+    const styles = [...globalThis.document.head.querySelectorAll('style')].map((node) => node.textContent);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${styles.join('\n')}</style></head>
+        <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
+        <div data-rail style="width:200px">${target.innerHTML}</div>
+        <span data-probe style="color:var(--fab-text-disabled)"></span></div></body></html>`);
+      const measured = await page.evaluate(() => {
+        const part = (id, selector) => document.querySelector(`[data-choice-id="${id}"] ${selector}`);
+        const name = part('long', '.fab-choice-option-name');
+        const style = (element) => getComputedStyle(element);
+        const right = (selector) => document.querySelector(selector).getBoundingClientRect().right;
+        return {
+          // Against the width the caller gives, not the list, which could grow with its content.
+          overflow: Math.max(right('[data-choice-id="long"]'), right('.fab-choice-option-list')) - right('[data-rail]'),
+          truncated: name.scrollWidth > name.clientWidth,
+          textOverflow: style(name).textOverflow,
+          disabledInk: style(document.querySelector('[data-probe]')).color,
+          locked: [part('locked', '.fab-choice-option-name'), part('locked', '.fab-medallion')].map(
+            (element) => style(element).color
+          ),
+          short: [
+            document.querySelector('[data-choice-id="short"]'),
+            part('short', '.fab-medallion'),
+            part('short', '.fab-choice-option-name'),
+            part('short', '.fab-choice-option-reading'),
+          ].map((element) => style(element).opacity),
+        };
+      });
+      assert.ok(measured.overflow <= 0, `the long candidate stays inside its rail (${measured.overflow}px over)`);
+      assert.ok(measured.truncated, 'the long name is cut');
+      assert.equal(measured.textOverflow, 'ellipsis');
+      assert.deepEqual(measured.locked, [measured.disabledInk, measured.disabledInk], 'name and glyph');
+      assert.deepEqual(measured.short, ['1', '0.6', '0.6', '1'], 'the short reading keeps full opacity');
+    } finally {
+      await browser.close();
+      choiceListHarness.remount();
+    }
   });
 
   it('uses one stage allocation for every essence threshold and states overshoot below sources', async () => {
@@ -530,6 +804,7 @@ describe('run primitives mounted behavior', () => {
       held: () => 3,
       spare: () => 1,
       essenceLabel: (essence) => `${essence} channelled`,
+      meterValueLabel: (got, need) => `${got} of ${need}`,
       sourceReading: (_source, contributions, held, spare) =>
         `${contributions.map((entry) => `+${entry.amount} ${entry.label}`).join(' · ')} each · ${held} held · ${spare} spare`,
       overshootLabel: (essence, amount) => `${essence} is ${amount} over the requirement`,
@@ -543,12 +818,19 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelector('[data-essence-total="shadow"]').textContent.trim(), '4 / 3');
     assert.equal(
       target
-        .querySelector(':scope [data-essence-threshold="shadow"] [role="progressbar"]')
+        .querySelector(':scope [data-essence-threshold="shadow"] [role="meter"]')
         .getAttribute('aria-valuenow'),
       '3',
-      'overshoot does not put the progressbar value beyond its maximum'
+      'overshoot does not put the meter value beyond its maximum'
     );
-    const overshoot = target.querySelector('[data-essence-overshoot]');
+    const radiant = target.querySelector('[data-essence-threshold="radiant"]');
+    const head = radiant.querySelector('.fab-essence-name');
+    const radiantMeter = radiant.querySelector('[role="meter"]');
+    assert.ok(head.id, 'the drawn essence name carries an id');
+    assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
+    assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
+    assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
+    const overshoot = target.querySelector('.fab-essence-overshoots');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
       target.querySelector('[data-essence-sources]').compareDocumentPosition(overshoot) & 4,
@@ -568,6 +850,71 @@ describe('run primitives mounted behavior', () => {
     expectGeometry('EssencePool', '.fab-essence-pool', [/border-radius:\s*9px/u, /padding:\s*var\(--fab-space-3\)/u]);
   });
 
+  // Issue 1644: crafting's adapter opts into `capAtHeld`; the Journal keeps the freeze-when-met cap.
+  it('caps at held stock on request, passes per-item hooks through and reports the new count', async () => {
+    const steps = [];
+    const props = (capAtHeld) => ({
+      thresholds: [
+        {
+          essence: 'fire',
+          amount: 2,
+          props: { 'data-meter': 'fire' },
+          sources: [{ id: 'ember', label: 'Ember', props: { 'data-carrier': 'ember' }, inputProps: { 'data-allocation': 'ember' } }],
+        },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 2,
+      spare: () => 2,
+      held: () => 3,
+      capAtHeld,
+      onStep: (...args) => {
+        steps.push(args);
+      },
+      incrementLabel: () => 'More ember',
+    });
+    const capped = await essenceHarness.mount(props(true));
+    assert.equal(capped.querySelector('[data-meter="fire"]').dataset.essenceThreshold, 'fire');
+    const input = capped.querySelector(':scope [data-carrier="ember"][data-essence-source="ember"] [data-allocation="ember"]');
+    assert.equal(input.getAttribute('max'), '3', 'a met pool still steps up to the held count');
+    capped.querySelector('[aria-label="More ember"]').click();
+    await flushRender();
+    assert.deepEqual(steps, [['ember', 1, 2]]);
+    essenceHarness.remount();
+
+    const journal = await essenceHarness.mount(props(false));
+    assert.equal(journal.querySelector('[data-allocation="ember"]').getAttribute('max'), '1', 'met freezes it');
+    essenceHarness.remount();
+  });
+
+  it('caps an unmet pool at the held count, not at allocation plus spare', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 10, sources: [{ id: 'ember', label: 'Ember', inputProps: { 'data-allocation': 'ember' } }] },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 1,
+      spare: () => 2,
+      held: () => 5,
+      capAtHeld: true,
+    });
+    assert.equal(target.querySelector('[data-allocation="ember"]').getAttribute('max'), '5');
+    essenceHarness.remount();
+  });
+
+  it('adds fractional requirements for one essence before comparing', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 0.1, sources: [{ id: 'ember', label: 'Ember' }] },
+        { essence: 'fire', amount: 0.2, sources: [{ id: 'ember', label: 'Ember' }] },
+      ],
+      allocation: { ember: 3 },
+      yield: () => 0.1,
+    });
+    assert.equal(target.querySelector('[data-essence-total="fire"]').textContent.trim(), '0.3 / 0.3');
+    assert.ok(target.querySelector('[data-essence-total="fire"]').classList.contains('is-met'));
+    essenceHarness.remount();
+  });
+
   it('renders progress separately from a five-number viewed-stage window', async () => {
     const stages = Array.from({ length: 8 }, (_, index) => ({ id: `s${index + 1}`, name: `Stage ${index + 1}` }));
     const viewed = [];
@@ -578,9 +925,17 @@ describe('run primitives mounted behavior', () => {
       blocker: 'Materials needed',
       label: 'Progress',
     });
-    assert.equal(progress.querySelectorAll('[data-run-progress-track]').length, 8);
+    assert.equal(progress.querySelectorAll('[data-stage-bars-stage]').length, 8);
     assert.equal(progress.querySelector('[data-run-progress-blocker]').textContent, 'Materials needed');
-    expectGeometry('RunProgress', '.fab-run-progress-track', [/height:\s*6px/u, /border-radius:\s*999px/u]);
+    const group = progress.querySelector('[role="group"]');
+    assert.equal(
+      group.getAttribute('aria-labelledby'),
+      progress.querySelector('.fab-run-progress-kicker').id,
+      'the drawn kicker names the stage group'
+    );
+    assert.ok(!group.hasAttribute('aria-label'), 'exactly one naming route');
+    assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the run heading draws no captions');
+    expectGeometry('StageBars', '.fab-stage-bars-track', [/height:\s*6px/u, /border-radius:\s*999px/u]);
 
     const nav = await stageNavHarness.mount({
       stages,
@@ -605,7 +960,7 @@ describe('run primitives mounted behavior', () => {
     // Named as the WHOLE selector list.
     expectGeometry(
       'StageNav',
-      ':global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',
+      ':global(.fabricate-icon-button.fabricate-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',
       [/width:\s*26px/u, /height:\s*26px/u, /border-radius:\s*7px/u]
     );
     stageNavHarness.remount();
@@ -698,6 +1053,16 @@ describe('run primitives mounted behavior', () => {
     yieldHarness.remount();
     const bottom = await yieldHarness.mount({ entries, roll: 1, labels });
     assert.match(bottom.querySelector('[data-yield-cut]').textContent, /every find on the scale cleared it/u);
+    yieldHarness.remount();
+
+    // Issue 1644: an authored-rank caller keeps entry order and never cuts, even given a roll.
+    const authored = await yieldHarness.mount({ entries, roll: 41, labels, order: 'authored' });
+    const ids = [...authored.querySelectorAll('[data-yield-entry]')].map((row) => row.getAttribute('data-yield-entry'));
+    assert.deepEqual(ids, ['rare', 'sure', 'mid'], 'entry order, not chance order');
+    assert.ok(!authored.querySelector('[data-yield-cut]'), 'no cut through an unsorted scale');
+    assert.equal(authored.querySelector('[data-yield-shared-roll]').textContent.trim(), 'Rolled 41');
+    assert.ok(authored.querySelector('[data-yield-entry="rare"]').classList.contains('is-missed'));
+    assert.ok(authored.querySelector('[data-yield-entry="mid"]').classList.contains('is-cleared'));
   });
 
   it('states the complete routed outcome ladder including failure without controls', async () => {

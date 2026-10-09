@@ -11,32 +11,32 @@
 
   Controlled; range parsing lives in `utils/craftingCheckExpression.js`. Outside summed roll-over
   against a fixed DC (issue 2005, ruling R2) the strip is a read-only picture from
-  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`.
+  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`:
+  a counting check's (issue 2006) are `Extra successes`, drawn in net successes.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
+  import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
-  import {
-    bandToneFor,
-    bandsAreEditable,
-    buildRoutedBands,
-    describeBandRange,
-    describeBandsUnavailable,
-    previewBandTarget,
-    previewScaleSentence,
-  } from './checkBandModel.js';
+  import { bandToneFor, bandsAreEditable, describeBandsUnavailable } from './checkBandModel.js';
+  import { readonlyBandPicture } from './readonlyBandPicture.js';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckOutcomeRow from './CheckOutcomeRow.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip, checkTypeOptions, outcomeThresholdLabels } from './checksCopy.js';
+  import {
+    checkTargetChip,
+    checkTypeOptions,
+    formulaCardLead,
+    outcomeThresholdLabels,
+  } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -79,6 +79,8 @@
     previewModifierTotal = 0,
     trackMin = null,
     trackMax = null,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -126,14 +128,18 @@
   // `evaluation` is the authored record every control writes back losslessly; `graded` is the one
   // the runtime grades with, which gates the strip, its direction and the outcome column.
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  // The tier a count Botch preset targets, by the engine's own ranking.
+  const lowestTierId = $derived(routedOutcomeOrder({ ...value, type, evaluation })[0] ?? null);
   const graded = $derived(activeCheckEvaluation(value));
   const editableBands = $derived(bandsAreEditable(value?.evaluation));
+  const counts = $derived(graded.product === 'count');
   const multiplyTiers = $derived(
-    graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
+    !counts && graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
   );
   // Which field a relative row's threshold edits: the offset reads `DC ±` only for roll-over against
-  // a fixed DC, and a multiply row edits its multiplier instead.
+  // a fixed DC, `Extra successes` for a count, and a multiply row edits its multiplier instead.
   const outcomeColumn = $derived.by(() => {
+    if (counts) return 'successes';
     if (multiplyTiers) return 'adjustment';
     return editableBands ? 'dc' : 'benefit';
   });
@@ -252,53 +258,40 @@
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
-  // The read-only picture (issue 2005): the runtime's own classification of each total against
-  // the previewed target, toned by rank so the best band takes the same hue in either direction.
-  // A fixed-type check reads no target, so its ranges are drawn as authored.
+  // The read-only picture (issues 2005, 2006), painted with this editor's fill.
   const previewedTier = $derived(
     recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
   );
-  const readonlyTarget = $derived(
-    editableBands || type === 'fixed'
-      ? null
-      : previewBandTarget(
-          {
-            evaluation: graded,
-            anchor: previewDc,
-            tier: previewedTier,
-            character: previewCharacter,
-            modifiers: previewModifierTotal,
-          },
-          text
-        )
-  );
-  const readonlyBands = $derived.by(() => {
-    if (editableBands || (type !== 'fixed' && readonlyTarget?.state !== 'ok')) return [];
-    const bands = buildRoutedBands({
-      evaluation: graded,
-      comparison,
-      anchor: readonlyTarget?.anchor ?? null,
-      targetDelta: readonlyTarget?.delta ?? 0,
-      type,
-      outcomes,
-      min: trackMin,
-      max: trackMax,
-    });
-    return bands.map((band, position) => {
-      const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
-      const tone = bandToneFor(rank, bands.length);
-      return {
-        ...band,
-        range: describeBandRange(band, text),
-        color: bandFill(tone),
-        ink: `var(--fab-${tone}-text)`,
-        swatch: `var(--fab-${tone})`,
-      };
-    });
+  const paintBand = (band, tone, range) => ({
+    ...band,
+    range,
+    color: bandFill(tone),
+    ink: `var(--fab-${tone}-text)`,
+    swatch: `var(--fab-${tone})`,
   });
-  const readonlyScale = $derived(
-    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+  const picture = $derived(
+    readonlyBandPicture(
+      {
+        graded,
+        editableBands,
+        type,
+        outcomes,
+        comparison,
+        anchor: previewDc,
+        tier: previewedTier,
+        character: previewCharacter,
+        modifiers: previewModifierTotal,
+        placement: countPreview?.placement,
+        min: trackMin,
+        max: trackMax,
+        paint: paintBand,
+      },
+      text
+    )
   );
+  const readonlyTarget = $derived(picture.target);
+  const readonlyBands = $derived(picture.bands);
+  const readonlyScale = $derived(picture.scale);
   const bandsFallback = $derived.by(() => {
     if (readonlyTarget && readonlyTarget.state !== 'ok') {
       return describeBandsUnavailable(
@@ -421,7 +414,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
               'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -441,15 +436,17 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>
     </InspectorCard>
 
-    <!-- DIFFICULTY, in its own card, WITH its DC-source chooser: a routed RELATIVE check is
-             DEFINED as bands offset from a DC, so offering the number without its source was
-             incoherent. `bandsAreAbsolute` is the one state with no DC, and it is the SAME named
-             gate the tier list and `PREVIEW AGAINST` read. -->
+    <!-- DIFFICULTY, with its DC-source chooser: a routed relative check is bands offset from a
+         DC. `bandsAreAbsolute` is the one state with no DC, the same gate the tier list and
+         `PREVIEW AGAINST` read. -->
     {#if !bandsAreAbsolute}
       <CheckDifficultyCard
         showDcSource
@@ -459,6 +456,7 @@
         {recordNoun}
         {evaluation}
         character={previewCharacter}
+        countTiers={type === 'fixed' ? null : showTiers ? recipeTiers : []}
         onChange={emit}
       />
     {/if}
@@ -472,6 +470,7 @@
       outcomeOptions={breakageOutcomeOptions}
       showBreakTools={checkDriven}
       {evaluation}
+      {lowestTierId}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}
@@ -479,7 +478,7 @@
   <!-- The tier list renders under BOTH DC modes: the macro takes the tier's DC as its anchor
          and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
-    <!-- `manager-checks-card`, not the bare `.manager-inspector-card` shell, which pads on TOP of
+    <!-- `manager-checks-card`, not the bare `.fabricate-card` shell, which pads on TOP of
              `CheckRecipeTiers`' own card-body padding and insets the tier rows past the cards above.
              `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both for that reason. -->
     <InspectorCard class="manager-checks-card" data-routed-tiers="">
@@ -522,7 +521,7 @@
           {/if}
         </div>
       </div>
-      <div class="manager-checks-card-body is-roomy">
+      <div class="manager-checks-card-body">
         {#if showPreviewAgainst}
           <div class="manager-checks-preview-against" data-preview-against>
             <span class="manager-checks-preview-against-label" id="checks-preview-against-label">
@@ -533,7 +532,7 @@
               value={selectedPreviewRecordId}
               options={previewAgainstOptions}
               ariaLabelledBy="checks-preview-against-label"
-              triggerData={{ 'data-preview-against-select': '' }}
+              triggerProps={{ 'data-preview-against-select': '' }}
               onChange={selectPreviewRecord}
             />
           </div>
@@ -546,9 +545,10 @@
             readonly={!editableBands}
             binding={type === 'fixed' ? 'fixed' : 'relative'}
             bands={bandStripBands}
+            leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
-            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
             boundaryLabel={(band, nextBand) =>
               text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
@@ -557,7 +557,7 @@
                 .replace('{from}', band?.name || '')
                 .replace('{to}', nextBand?.name || '')}
             fallbackNote={bandsFallback}
-            dataAttr="data-outcome-band-strip"
+            data-outcome-band-strip
             onChange={applyBandStripChange}
           />
           {#if editableBands}
@@ -632,7 +632,7 @@
                      the empty sentence and NOTHING to press — the state every routed check starts in.
                      Placed BENEATH that sentence, as `CheckRecipeTiers` and `CheckTriggers` do, on the
                      list's own gap, so the populated state is pixel-unchanged. -->
-        <ManagerButton
+        <Button
           role="dashed"
           class="manager-checks-outcome-add"
           data-add-outcome-tier
@@ -645,7 +645,7 @@
               'Add outcome tier'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </InspectorCard>
   {/if}

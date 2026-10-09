@@ -5,6 +5,7 @@
   | prop | values | default | contract |
   | `rollModel` | `shared`, `perRow`, `unknown` | `shared` | Only explicit shared evidence permits a global cut. |
   | `labels` | callbacks | `{}` | `evidence(entry)` optionally owns field-local recorded text; quantities are caller-formatted. |
+  | `order` | `chance`, `authored` | `chance` | `authored` keeps entry order, where rank is authored, and draws no cut. |
 
   Invariants:
   - Explicit null outcomes remain neutral; row-only evidence never creates a cut.
@@ -17,24 +18,27 @@
     entries = [],
     roll = null,
     rollModel = 'shared',
+    order = 'chance',
     labels = {},
     label = '',
     hint = '',
   } = $props();
 
+  const authored = $derived(order === 'authored');
   const sorted = $derived(
     entries
       .map((entry, index) => ({ ...entry, authoredIndex: index }))
       .sort(
         (left, right) =>
-          Number(right.chance) - Number(left.chance) || left.authoredIndex - right.authoredIndex
+          (authored ? 0 : Number(right.chance) - Number(left.chance)) ||
+          left.authoredIndex - right.authoredIndex
       )
   );
   const hasRoll = $derived(
     rollModel === 'shared' && roll !== null && roll !== undefined && Number.isFinite(Number(roll))
   );
   const cutIndex = $derived(hasRoll ? sorted.findIndex((entry) => cleared(entry) === false) : -1);
-  const hasCut = $derived(hasRoll && sorted.every((entry) => cleared(entry) !== null));
+  const hasCut = $derived(!authored && hasRoll && sorted.every((entry) => cleared(entry) !== null));
 
   function cleared(entry) {
     if (Object.hasOwn(entry, 'cleared'))
@@ -157,7 +161,7 @@
 
   .fab-yield-cut-rule {
     height: 1px;
-    min-width: var(--fab-space-3);
+    min-width: 12px;
     flex: 1 1 auto;
     background: var(--fab-accent-border);
   }

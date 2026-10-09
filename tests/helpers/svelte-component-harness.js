@@ -8,7 +8,7 @@ import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 import { rewriteClientImports } from './rewriteClientImports.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 
 const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -188,7 +188,14 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/actions/anchoredPopover.js',
+  // The typeahead combobox's portalled suggestion list, a wrapper over the action above.
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js'
+]);
+
+/** The typeahead combobox's controller, compiled into every tree that renders a typeahead field. */
+export const TYPEAHEAD_RUNE_MODULES = Object.freeze([
+  'src/ui/svelte/util/typeaheadCombobox.svelte.js'
 ]);
 
 // The compiled `.svelte` modules `SearchablePopover` ITSELF needs when it is the component under
@@ -196,7 +203,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
@@ -208,9 +215,93 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
+]);
+
+// The requirement row's `or…` kind menu (issue 1516): `PickerRow` imports it whether or not a
+// caller passes `allowAny`, so every tree that compiles the row compiles these too.
+export const KIND_MENU_RAW_MODULES = Object.freeze(['src/ui/svelte/util/actionMenuLayout.js']);
+export const KIND_MENU_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/ActionMenu.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte'
+]);
+
+// The result rows beyond `<Select>` (issue 1516): the requirement row, its amount slot, its kind
+// menu and the amount floor their callers read. A tree rendering result or salvage rows spreads
+// both lists, which restate the kind menu's paths because the harness guard reads literals only.
+export const RESULT_ROW_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/actionMenuLayout.js',
+  // Issue 1521: the card and the requirement row localize through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/util/recipeCurrency.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/utils/scalars.js',
+  'src/models/Result.js',
+  'src/utils/choiceGroupShape.js',
+  'src/models/reconstructibleDefaults.js',
+  'src/utils/rollFormulaRollability.js',
+  // Issue 1773: a recipe result renders through the result-side `ChoiceGroup`, whose edits and
+  // essence offer (read by its ingredient form) it imports.
+  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+  'src/ui/model/essenceValidation.js'
+]);
+
+export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/ActionMenu.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  // Issue 1773: a recipe result set's one adder.
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
+  // …and its choice group, with the award header, the range cell and the progressive statement.
+  'src/ui/svelte/components/Callout.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte'
+]);
+
+// Issue 1773: what `ChoiceGroup`'s result-side form adds to every tree compiling the group — its
+// award header and range cell, the edits they write and the amount floor they read. Restated as
+// literals, because the harness guard reads literals only.
+export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/util/recipeCurrency.js',
+  'src/utils/choiceGroupShape.js',
+  'src/models/Result.js',
+  'src/models/reconstructibleDefaults.js',
+  'src/utils/rollFormulaRollability.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/utils/scalars.js'
+]);
+
+export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS
@@ -228,6 +319,16 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Callout.svelte',
 ]);
 
+// The crafting check card's whole compiled closure: its strip, the strip's kicker and chip, and the
+// danger notice beneath it (issue 1521).
+export const CHECK_CARD_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/components/InfoStrip.svelte',
+  'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+]);
+
 // THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
 export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Callout.svelte',
@@ -236,9 +337,41 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/PlayerViewState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
+  'src/ui/svelte/components/Button.svelte',
+  // The search field, card box and switch the player controls converted onto (issue 1518), and
+  // the `Field` its labelled form renders (issue 1782).
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  // The requirement chooser the crafting rail renders (issue 1518), the tile it draws and its well.
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  // The strip of current values the stamina pool and the check card draw (issue 1521), and its chip.
+  'src/ui/svelte/components/InfoStrip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  // The rail's icon variant (issue 1777), and the labelled rows part it imports.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
+  // The row the Journal's Active list draws each run through (issue 1778).
+  'src/ui/svelte/components/ListRow.svelte',
+]);
+
+// The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
+// them and the per-drop breakdown it opens.
+export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/ListRow.svelte',
+  'src/ui/svelte/components/YieldScale.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
+  'src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -253,21 +386,45 @@ export const CHECK_TARGET_RAW_MODULES = Object.freeze([
 /** The result boxes' executed check evidence rows (issue 2005) and their import closure. */
 export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
   'src/ui/presenters/checkEvidenceRows.js',
+  // A count check's rows and its die tiles (issue 2006).
+  'src/ui/presenters/countEvidenceRows.js',
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
   'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+  // The count line the prompt target settles through the router and the pool floor (issue 2006).
+  'src/systems/checkModifierRouter.js',
+  'src/systems/countEvaluation.js',
+  ...CHECK_TARGET_RAW_MODULES,
   'src/utils/fillPlaceholders.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/utils/scalars.js',
 ]);
 
+/**
+ * The additional-dice notice the player stores and views raise (issue 2008): the prompt presenter
+ * and the prompt-safe reach leaf it words refusals through. Their remaining closure is
+ * `CHECK_EVIDENCE_RAW_MODULES`, which every list spreading this one also carries.
+ */
+export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
+  // Issue 1521: `Pagination` localizes through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
   // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
   // converted tile reads.
   'src/ui/svelte/util/craftingArtResolution.js',
+  // Issue 1644: the stack picker's candidates keep focus across a pending command.
+  'src/ui/svelte/util/focusWhenEnabled.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036).
   'src/ui/svelte/util/essenceTint.js',
@@ -283,13 +440,25 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917).
   'src/ui/svelte/util/requirementSlots.js',
+  // The pool's surplus per essence, which the pool and the consumption plan both state.
+  'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
   // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue 846) via this
   // formatter.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
+  'src/ui/presenters/resultOutputRows.js',
+  // Issue 1773: a reward row's glyph and its unit's display name, and the choice-group shape.
+  'src/ui/presenters/resultKindGlyphs.js',
+  'src/utils/choiceGroupShape.js',
+  'src/systems/currencyProfile.js',
+  'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',
+  // Issue 2006: a count card's successes needed, read as the engine reads it.
+  'src/systems/countCheck.js',
+  // Issue 2139: whether the check refuses the character, which the browse status reads.
+  'src/systems/craftingCheckRefusal.js',
   'src/ui/presenters/heldToolBonus.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling
@@ -360,6 +529,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/scopedDefinitions.js',
   'src/systems/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  // Issue 2053: the Craft button records the window a roll prompt opens in.
+  'src/ui/svelte/util/rollPromptOrigin.js',
+  // Issue 2008: `craftingStore` words a refused additional-dice choice through the prompt presenter.
+  ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 
@@ -369,12 +542,15 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s page-size
   // control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
-  // `SearchablePopover`, the `ManagerButton` `SearchablePopover` renders its trigger through (issue
+  // `SearchablePopover`, the `Button` `SearchablePopover` renders its trigger through (issue
   // 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
   // `IconButton` below arrives by.
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
+  // The search field and the card box the crafting controls converted onto (issue 1518).
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on (issue 917).
   'src/ui/svelte/components/Stepper.svelte',
   // The two marks this tree reaches (issue 1505): the eyebrow nine `detail/` components render, and
@@ -388,21 +564,40 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/CraftButton.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
+  // Its route comparison (issue 1778), and the fieldset that group draws, flat for the guard below.
+  'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
+  // Issue 1644: the stack picker adapts the shared candidate radiogroup.
+  'src/ui/svelte/components/ChoiceOptionList.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+  // The check card is a strip of current values (issue 1521).
+  'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
-  // IoTable is the requirement surface's composition root (issue 917) and renders all four of
-  // these.
+  // Its essence, tool and output groups' table (issue 1782).
+  'src/ui/svelte/components/DataTable.svelte',
+  // IoTable is the requirement surface's composition root (issue 917) and renders these; the
+  // rail renders the shared chooser, which draws the shared slot tile.
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-  'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
+  // The shared pool the panel adapts (issue 1644).
+  'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   // The one "N Radiant" contribution chip both of the two panels above render. They
   // are already listed, so omitting this HANGS every mounted crafting suite.
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+  // The shared ladder the table above adapts, and the row each award draws (issue 1644).
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
+  // Issue 1773: the one award pill the three above render.
+  'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
   'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/apps/journal/JournalFactRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
@@ -420,6 +615,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // Its sources picker (issue 1782).
+  'src/ui/svelte/components/SetPicker.svelte',
   // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
   // renders the composition, so this roster is where the crafting suites acquire it.
   'src/ui/svelte/components/Callout.svelte',
@@ -431,7 +628,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 
@@ -470,6 +670,8 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
     async loadRuneModule(modulePath) {
       return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
+    // The same for a declared raw module, so a test reads the module state the mounted tree writes.
+    loadRawModule: (modulePath) => import(pathToFileURL(join(tempRoot, modulePath)).href),
     teardown() {
       if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }

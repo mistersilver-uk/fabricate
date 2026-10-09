@@ -9,7 +9,7 @@
     broken banner -> description -> essences -> sources -> used by -> produced by
 
   — plus, for a salvageable component, the `Info | Salvage` tab strip and the
-  salvage panel.
+  salvage panel, whose one-shot action is the header's primary while that tab is open.
 
   Extracted from the former double-duty `InventoryDetail.svelte` (issue 675),
   which now routes here. Each list paginates independently through the shared
@@ -19,16 +19,19 @@
 -->
 <script>
   import Avatar from '../../../components/Avatar.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Notice from '../../../components/Notice.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
+  import { withRollPromptOrigin } from '../../../util/rollPromptOrigin.js';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
   import InventorySalvagePanel from './InventorySalvagePanel.svelte';
   import InventorySystemSelector from './InventorySystemSelector.svelte';
+  import { salvageAction } from './salvage/salvageAction.js';
 
   let {
     item = null,
@@ -204,8 +207,18 @@
   );
 
   const TABS = [
-    { id: 'info', icon: 'fas fa-circle-info', key: 'FABRICATE.App.Inventory.Detail.TabInfo' },
-    { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' },
+    {
+      id: 'info',
+      icon: 'fas fa-circle-info',
+      labelKey: 'FABRICATE.App.Inventory.Detail.TabInfo',
+      label: 'Info',
+    },
+    {
+      id: 'salvage',
+      icon: 'fas fa-recycle',
+      labelKey: 'FABRICATE.App.Inventory.Detail.TabSalvage',
+      label: 'Salvage',
+    },
   ];
   let activeTab = $state('info');
   // Tab routing is driven by two events, resolved in ONE effect so their ordering is
@@ -250,15 +263,25 @@
     }
   });
 
-  function onTabKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + TABS.length) % TABS.length;
-    activeTab = TABS[nextIndex].id;
-    const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
-    buttons?.[nextIndex]?.focus();
-  }
+  // The pane's one primary: the one-shot salvage, in the header and only while Salvage is open.
+  const action = $derived(
+    salvageAction({ salvage, busy: salvaging, depleted, result: salvageResult })
+  );
+  const headerPrimary = $derived(
+    salvageable && activeTab === 'salvage' && action.shown
+      ? {
+          primaryLabel: localize(action.labelKey),
+          primaryIcon: salvaging ? 'fas fa-spinner fa-spin' : 'fas fa-recycle',
+          primaryDisabled: action.disabled,
+          primaryProps: {
+            'data-inventory-salvage-action': '',
+            'aria-busy': salvaging,
+            'aria-describedby': action.toolBlocked ? 'salvage-footer-note' : undefined,
+          },
+          onclick: (event) => withRollPromptOrigin(event, () => onSalvage?.()),
+        }
+      : {}
+  );
 </script>
 
 <InventoryDetailHeader
@@ -269,6 +292,7 @@
   name={displayName}
   total={totalLabel}
   chips={headerChips}
+  primary={headerPrimary}
 >
   {#if multiSystem}
     <!-- FIRST in the header, before the Info|Salvage tablist: it re-scopes the WHOLE body
@@ -281,47 +305,17 @@
   {/if}
 
   {#if salvageable}
-    <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
-         role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
-         navigation. No tab bar at all when the item is not salvageable.
-
-         HAND-ROLLED, AND CORRECT AS BUILT (issue 1514). This looks like the shared
-         `SegmentedControl` — the same soft track carrying two rounded segments, and the kind
-         filter in `InventoryFilters` converted onto it in this same change — and it is not one.
-         `SegmentedControl` emits a RADIOGROUP: real radios, `aria-checked` by state, and no
-         `aria-controls` at all. This is a genuine tablist wired to two `role="tabpanel"`
-         regions, and the strip is the only thing that names them: converting it would drop
-         `aria-controls`, drop `aria-selected`, and leave two panels with nothing pointing at
-         them. A radiogroup is the right semantics for CHOOSING A VALUE; a tablist is the right
-         semantics for SWITCHING A VIEW, and these are two views of the same item. Its roving
-         `tabindex` is nine lines and its `activeTab` is also driven by a two-branch `$effect` a
-         radio `onChange` would have to reproduce, so the deletion is not a saving either.
-         Refused, and handed to nobody. -->
-    <div
-      class="inventory-detail-tabs"
-      role="tablist"
-      aria-label={localize('FABRICATE.App.Inventory.Detail.TabsLabel')}
-    >
-      {#each TABS as tab, index (tab.id)}
-        <button
-          type="button"
-          role="tab"
-          id={`inventory-detail-tab-${tab.id}`}
-          class="inventory-detail-tab"
-          class:is-active={activeTab === tab.id}
-          aria-selected={activeTab === tab.id}
-          aria-controls={`inventory-detail-panel-${tab.id}`}
-          tabindex={activeTab === tab.id ? 0 : -1}
-          data-keyboard-focus="true"
-          data-inventory-detail-tab={tab.id}
-          onclick={() => (activeTab = tab.id)}
-          onkeydown={(event) => onTabKeydown(event, index)}
-        >
-          <i class={tab.icon} aria-hidden="true"></i>
-          <span>{localize(tab.key)}</span>
-        </button>
-      {/each}
-    </div>
+    <!-- A real tablist, not a radiogroup: it switches between two views of one item and names
+         the panel it shows, which `SegmentedControl` has no `aria-controls` to do. -->
+    <EditorTabs
+      tabs={TABS}
+      {activeTab}
+      onSelect={(tabId) => (activeTab = tabId)}
+      ariaLabelKey="FABRICATE.App.Inventory.Detail.TabsLabel"
+      idStem="inventory-detail"
+      activePanelOnly
+      tabDataAttr="data-inventory-detail-tab"
+    />
   {/if}
 
   {#if salvageable && activeTab === 'salvage'}
@@ -334,10 +328,9 @@
       <InventorySalvagePanel
         {salvage}
         actingSystemName={multiSystem ? (active?.systemName ?? '') : ''}
-        busy={salvaging}
         {depleted}
         result={salvageResult}
-        {onSalvage}
+        toolBlocked={action.toolBlocked}
         onReset={onResetSalvage}
         stages={salvageStages}
         announcement={salvageAnnouncement}
@@ -374,7 +367,7 @@
           <Notice
             tone="danger"
             title={localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}
-            dataAttr="data-inventory-broken-banner"
+            data-inventory-broken-banner=""
           />
         </div>
       {/if}
@@ -439,6 +432,7 @@
         <InventoryDetailPager
           list={sources}
           sectionKey="sources"
+          ariaLabel={localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}
           page={pageOf(sources, 'sources')}
           pageSize={PAGE_SIZE}
           onPage={(value) => setPage('sources', value)}
@@ -466,6 +460,7 @@
             <InventoryDetailPager
               list={contributors}
               sectionKey="contributors"
+              ariaLabel={localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}
               page={pageOf(contributors, 'contributors')}
               pageSize={PAGE_SIZE}
               onPage={(value) => setPage('contributors', value)}
@@ -504,6 +499,7 @@
             <InventoryDetailPager
               list={usedBy}
               sectionKey="used"
+              ariaLabel={localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
               page={pageOf(usedBy, 'used')}
               pageSize={PAGE_SIZE}
               onPage={(value) => setPage('used', value)}
@@ -547,6 +543,7 @@
             <InventoryDetailPager
               list={requiredFor}
               sectionKey="required"
+              ariaLabel={localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}
               page={pageOf(requiredFor, 'required')}
               pageSize={PAGE_SIZE}
               onPage={(value) => setPage('required', value)}
@@ -598,6 +595,7 @@
             <InventoryDetailPager
               list={producedBy}
               sectionKey="produced"
+              ariaLabel={localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}
               page={pageOf(producedBy, 'produced')}
               pageSize={PAGE_SIZE}
               onPage={(value) => setPage('produced', value)}
@@ -612,63 +610,6 @@
 </InventoryDetailHeader>
 
 <style>
-  /* Info | Salvage: the prototype's segmented control — a ruled, soft track carrying
-     two rounded-rect segments, the active one filled with the accent. (The ARIA on top
-     of it — tablist/roving tabindex/arrow keys — is ours; the prototype has none.) */
-  .inventory-detail-tabs {
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: flex;
-    align-items: stretch;
-    gap: 4px;
-    height: 38px;
-    padding: 3px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  /* Foundry's global `.app button` fixed height + centering would crop these; reset
-     the inherited box (the EnvironmentCard pattern). */
-  .inventory-detail-tab {
-    box-sizing: border-box;
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    margin: 0;
-    flex: 1 1 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 30px;
-    padding: 0 12px;
-    border: none;
-    border-radius: 7px;
-    background: none;
-    color: var(--fab-text-muted);
-    font: inherit;
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .inventory-detail-tab:hover {
-    color: var(--fab-text);
-  }
-
-  .inventory-detail-tab.is-active {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-weight: 700;
-  }
-
-  .inventory-detail-tab:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
-  }
-
   /* The panel is a transparent pass-through: the sections keep the detail column's
      own rhythm rather than nesting inside a second box. */
   .inventory-detail-panel {

@@ -43,6 +43,7 @@ export function normalizeCheckEvaluation(input = {}) {
         readMacroUuid: string(additional.readMacroUuid),
         spendMacroUuid: string(additional.spendMacroUuid),
         max: integerInRange(additional.max, 1, 20, 1),
+        label: string(additional.label).trim(),
       },
     },
   };
@@ -74,7 +75,7 @@ function integerAtLeast(value, minimum, fallback) {
   return Number.isInteger(number) && number >= minimum ? number : fallback;
 }
 
-function integerInRange(value, minimum, maximum, fallback) {
+export function integerInRange(value, minimum, maximum, fallback) {
   if ([null, undefined, ''].includes(value)) return fallback;
   const number = Number(value);
   return Number.isInteger(number) ? Math.max(minimum, Math.min(maximum, number)) : fallback;

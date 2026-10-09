@@ -24,8 +24,9 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
 // so their option lists are read off a panel portaled onto the mount target.
 import {
@@ -73,6 +74,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-complications-section-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/util/iconPickerPopover.js',
@@ -105,7 +107,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -429,7 +431,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     // The geometry itself: the harness mounts markup rather than a stylesheet.
     const block = blockIn(effectRowSource, '.fab-complication-effect.is-form-pill');
     assert.match(block, /height:\s*34px/, 'flush with the inputs it shares a line with');
-    assert.match(block, /padding:\s*0 12px/);
+    assert.match(block, /padding:\s*0 var\(--fab-space-3\)/);
     assert.match(block, /border-radius:\s*9px/);
     assert.match(block, /width:\s*max-content/, 'sized to its content, never to the field');
     assert.match(block, /align-items:\s*center/, 'a one-line switch centres against its knob');
@@ -455,7 +457,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     // Non-vacuity: a CONDITION row keeps it.
     assert.match(
       blockIn(effectRowSource, '.fab-complication-effect-reveal'),
-      /margin:\s*10px 0 0 24px/,
+      /margin:\s*var\(--fab-space-3\) 0 0 var\(--fab-space-6\)/,
       'the base indent survives for the form that has a control column'
     );
 
@@ -492,11 +494,11 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('has no scoped rule left to check for the Add control, and the primitive states none', async () => {
-    // The Add control converted to `<ManagerButton>` (issue 1118). Its own
+    // The Add control converted to `<Button>` (issue 1118). Its own
     // `.fab-complications-add` scoped rule declared nothing the role and `fullWidth` did not
     // already state, so it was retired rather than re-chained under `:global(...)` — the
     // previous test in this file asserted its ABSENCE of a `margin` from source; now there is
-    // no rule at all to read. `ManagerButton.svelte` itself deliberately carries no scoped
+    // no rule at all to read. `Button.svelte` itself deliberately carries no scoped
     // `<style>` — a second source of truth for the control is the failure the primitive
     // exists to end — so this checks the two GLOBAL rules that give the control its geometry
     // instead: `is-dashed` and `is-full-width` neither one adds a `margin`, which is what
@@ -509,8 +511,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     const globalCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
     // Both selectors moved in issue 1502.
     for (const selector of [
-      '.fabricate-button.manager-button.fab-manager-button.is-dashed',
-      '.fabricate-button.manager-button.fab-manager-button.is-full-width',
+      '.fabricate-button.fabricate-button.fab-manager-button.is-dashed',
+      '.fabricate-button.fabricate-button.fab-manager-button.is-full-width',
     ]) {
       const block = blockIn(globalCss, selector);
       // NON-VACUITY, stated at the call site rather than left to `blockIn`. A
@@ -869,7 +871,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.equal(added.when.checkTrigger, null, 'the trigger clause is an ID, never a boolean');
   });
 
-  it('renders the Add control as a dashed, full-width ManagerButton (issue 1118)', async () => {
+  it('renders the Add control as a dashed, full-width Button (issue 1118)', async () => {
     // Bound to the `data-complications-add` hook rather than any positional or class
     // selector, so a future markup reshuffle cannot silently retarget this at a neighbour.
     // `dashed` is the append-a-row verb at the foot of `.fab-complications-list`, and
@@ -879,8 +881,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     const { target } = await mountSection({ complications: [] });
     const add = target.querySelector('[data-complications-add]');
     assert.ok(add, 'the hook resolves to an element');
-    assert.equal(add.tagName, 'BUTTON', 'ManagerButton renders a real <button> by default');
-    assert.ok(add.classList.contains('manager-button'), 'the manager control contract');
+    assert.equal(add.tagName, 'BUTTON', 'Button renders a real <button> by default');
+    assert.ok(add.classList.contains('fabricate-button'), 'the manager control contract');
     assert.ok(add.classList.contains('fab-manager-button'), 'the primitive`s own class');
     assert.ok(add.classList.contains('is-dashed'), 'the append-a-row role');
     assert.ok(add.classList.contains('is-full-width'), 'it spans the panel`s single-column grid');
@@ -1002,6 +1004,7 @@ const editorHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-complications-editor-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -1119,12 +1122,13 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
 
 /* THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT. */
 describe('1286 the complication row exposes its name treatment, and prose is not mono', () => {
-  const componentEditViewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+  // The Component Studio's band is the progressive stage list's body (issue 1522).
+  const salvageStagesSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte'),
     'utf8'
   );
-  // The Recipe Studio's band left `RecipeResultItemRow.svelte` at issue 1512: it is the shared
-  // ordered list's BODY now, and `RecipeStageComplicationBand.svelte` is where that call site lives.
+  // The Recipe Studio's band is the shared ordered list's BODY (issue 1512), so
+  // `RecipeStageComplicationBand.svelte` is where that call site lives.
   const recipeStageBandSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte'),
     'utf8'
@@ -1157,7 +1161,7 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     // different claims and only the second one is the finding. A prop nothing passes leaves
     // both strips exactly as they were.
     for (const [name, source] of [
-      ['the Component Studio salvage strip', componentEditViewSource],
+      ['the Component Studio salvage strip', salvageStagesSource],
       ['the Recipe Studio stage strip', recipeStageBandSource],
     ]) {
       assert.match(

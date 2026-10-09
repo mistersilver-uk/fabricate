@@ -113,6 +113,8 @@ Groups in different components cannot alter each other's available quantities, s
 `nodes` MAY be `0`: a set whose groups do not contend is resolved directly and enters no search at all, and reporting that honestly is what makes "an ordinary direct-component recipe does not search" observable rather than asserted.
 This is diagnostic only and changes no resolution outcome: it reports what the resolver already computed rather than altering what it decides.
 It is REQUIRED because the node cap bounds nodes, not work, and an operation count is the only deterministic measure of assignment cost — a wall-clock reading of a resolve is the product of tree size and per-node cost and cannot separate the two terms.
+- `IngredientSet.resolveIngredientSelection` MUST also report `essenceCeiling` on BOTH exits, as specified in `data-models` §Essence-Alternative Consumption.
+It is diagnostic only and changes no resolution outcome, so a display can state an essence alternative's fundability in the resolver's own terms.
 - **Per-node cost MUST NOT grow with held-stack count.** The shared no-double-count ledger is reverted on backtrack by an undo journal recording only the keys a node overwrote, never by copying and restoring the whole ledger, and the stacks matching an option are resolved once per resolve pass rather than re-matched per node.
 Without both, the node cap bounds the search TREE while leaving the work it implies unbounded in inventory size, which is the failure that made "adversarial fixtures remain bounded by the safety cap" an unfalsifiable claim about elapsed time.
 Any index used for this is derived per resolve pass and MUST NOT be retained across calls: nothing mints a revision token when an actor's items change, so a retained index would describe stacks a craft had already consumed.
@@ -146,7 +148,8 @@ This supersedes the issue-561 behaviour that preferred the raw `componentId: X` 
 A wired `RecipeManager` resolves an orphaned component-linked tool to the localized "Unknown Component" rather than the raw id; the bare id/tool-id tail is reached only for a manager that cannot resolve component names.
 - Tool **presence** validation matches via the wide shared tool matcher (durable `roles[systemId].toolId`, the Tool's own source references, then the Tool's snapshot-name fallback), but the item **selected for usage or breakage** must additionally match the tool by **durable-identity matching** per `data-models` (the Tool's own `roles[systemId].toolId`, or the item's own uuid/compendium source — never a transitive `_stats.duplicateSource` reference and never name alone).
 A presence-only match is spared from usage/breakage and recorded as skipped, and where an actor owns both, the durable-identity item is the one used or broken.
-- A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+- A **virtual-present** Tool injected by a canvas Tool station (keyed by its library `toolId` and any linked `componentId`, system-scoped; `data-models/spec.md` § Session-Scoped Active Canvas Tool) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+A version-1 crafting command applies it only when that command itself carries it.
 
 ## Execution Lifecycle
 
@@ -412,7 +415,7 @@ This subsection describes legacy crafting advance; version-1 crafting and gather
 A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
 The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-journal-app/spec.md` *Journal App*).
 
-- Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
+- Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId, presentTools })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
 - On step failure the engine fails the WHOLE run (`failed`) and cleans up run state; there is no per-step retry.
 - Advancing requires ownership of BOTH the crafting actor (the craft writes results to it via `createEmbeddedDocuments`) AND every component-source actor (resolved from the run's persisted `componentSourceActorUuids`; an empty resolution falls back to the crafting actor's own inventory).

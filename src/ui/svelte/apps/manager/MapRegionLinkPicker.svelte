@@ -9,6 +9,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
+  import { recordPickerOptions } from './recordPickerOptions.js';
 
   let { value = '', regions = [], disabled = false, onChoose = () => {} } = $props();
 
@@ -22,49 +23,37 @@
     text('FABRICATE.Admin.Manager.Travel.MapLinks.DisabledSuffix', '(disabled)')
   );
 
-  const options = $derived([
-    { id: '', label: noneLabel, icon: 'fas fa-link-slash' },
-    ...regions.map((region) => ({
-      id: region.id,
-      label: region.name,
-      icon: 'fas fa-map-location-dot',
-      trailing: region.enabled ? '' : disabledSuffix,
-    })),
-  ]);
-
-  const selectedName = $derived(
-    value
-      ? regions.find((region) => region.id === value)?.name ||
-          text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown region')
-      : noneLabel
+  const picker = $derived(
+    recordPickerOptions({
+      records: regions,
+      value,
+      leading: { label: noneLabel, icon: 'fas fa-link-slash' },
+      recordIcon: 'fas fa-map-location-dot',
+      disabledSuffix,
+      staleLabel: text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown region'),
+    })
   );
 </script>
 
 <SearchablePopover
   {value}
-  {options}
+  options={picker.options}
   {disabled}
   pickerClass="manager-map-link-picker"
-  triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-map-link-trigger"
+  triggerClass="fabricate-button manager-travel-picker-trigger manager-map-link-trigger"
   triggerIcon="fas fa-link"
-  triggerLabel={selectedName}
+  triggerLabel={picker.selectedName}
   valueClass="manager-map-link-value"
-  triggerAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel',
-    'Linked Fabricate region'
-  )}
-  dialogAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel',
-    'Linked Fabricate region'
-  )}
+  ariaLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel', 'Linked Fabricate region')}
+  panelLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel', 'Linked Fabricate region')}
   searchPlaceholder={text(
     'FABRICATE.Admin.Manager.Travel.MapLinks.SearchPlaceholder',
     'Search regions...'
   )}
-  searchAriaLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.SearchLabel', 'Search regions')}
+  searchLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.SearchLabel', 'Search regions')}
   emptyHint={text(
     'FABRICATE.Admin.Manager.Travel.MapLinks.NoMatches',
     'No regions match your search.'
   )}
-  onChoose={(id) => onChoose(id || null)}
+  onSelect={(id) => onChoose(id || null)}
 />

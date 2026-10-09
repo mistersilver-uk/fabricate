@@ -253,3 +253,8 @@ export function essencePoolFrom(block) {
     totals: block.delivered,
   };
 }
+
+/** What the held stacks carry per essence id before any group claims, for display only. */
+export function essenceCeilingFrom(essenceIndex) {
+  return Object.freeze(Object.fromEntries(essenceIndex?.ceiling ?? []));
+}

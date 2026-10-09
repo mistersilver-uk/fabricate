@@ -1,10 +1,37 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { promptJournalStageCheck, withPromptActivity } from '../src/bootstrap/journalOperations.js';
+import {
+  journalCheckSeams,
+  promptJournalStageCheck,
+  withPromptActivity,
+} from '../src/bootstrap/journalOperations.js';
 import { buildSinglePromptData, promptCheckRoll } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 describe('Journal roll prompt adapter', () => {
+  it('states a changed check in the reopened prompt, and as a warning toast beside it', async () => {
+    const seams = journalCheckSeams();
+    const toasts = [];
+    const previousUi = globalThis.ui;
+    const warn = (message) => {
+      toasts.push(message);
+    };
+    Object.assign(globalThis, { ui: { notifications: { warn } } });
+    const surface = stubPromptSurface(() => null);
+    try {
+      await seams.promptCheck({ subject: 'Horseshoe' });
+      assert.ok(!('notice' in surface.view), 'a first prompt states no notice');
+      await seams.promptCheck({ subject: 'Horseshoe' }, { changed: true });
+      assert.match(surface.view.notice, /details changed while you were deciding/);
+      seams.onCheckChanged();
+      assert.deepEqual(toasts, [surface.view.notice], 'the toast says the same sentence');
+    } finally {
+      surface.restore();
+      if (previousUi === undefined) delete globalThis.ui;
+      else Object.assign(globalThis, { ui: previousUi });
+    }
+  });
+
   it('shows the prepared formula without its chat-card flavour labels', async () => {
     let received;
     await promptJournalStageCheck(
@@ -99,18 +126,27 @@ describe('Journal roll prompt adapter', () => {
       'a count view carries no retained formula, even when one is supplied'
     );
     assert.deepEqual(view.count, {
-      pool: 3, die: 20, threshold: 13, thresholdSource: null, explode: null, cancel: null, required: 2,
-      destination: 'threshold',
+      pool: 3, die: 20, threshold: 13, thresholdAnchor: null, thresholdSource: null, explode: null, cancel: null,
+      zeroPoolFails: true, required: 2, destination: 'threshold',
     });
     await promptJournalStageCheck({ ...count, product: undefined }, async (options) => {
       received = options;
     });
     assert.ok(!Object.hasOwn(received, 'pool'), 'a summed descriptor forwards no count field');
-    const rules = { thresholdSource: '@abilities.int.mod + 11', explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null } };
+    const rules = {
+      thresholdSource: 'character', thresholdAnchor: 14, zeroPoolFails: false,
+      explode: { kind: 'from', face: 19, once: true }, cancel: { kind: 'worst', face: 20 },
+    };
     await promptJournalStageCheck({ ...count, ...rules }, async (options) => {
       received = options;
     });
-    assert.deepEqual([received.thresholdSource, received.explode, received.cancel], [rules.thresholdSource, rules.explode, rules.cancel]);
+    const forwarded = Object.fromEntries(Object.keys(rules).map((key) => [key, received[key]]));
+    assert.deepEqual(forwarded, rules, 'the anchor, source, zero-pool rule and faces reach the prompt (issue 2006)');
+    assert.equal(
+      buildSinglePromptData(received).count.thresholdAnchor,
+      14,
+      'and survive into the view the note reads'
+    );
   });
 
   it('words a redacted count prompt by its destination and shows no pool, threshold or count', async () => {
@@ -136,8 +172,8 @@ describe('Journal roll prompt adapter', () => {
     );
     assert.deepEqual([view.formula, view.dc, view.neededText, view.labels.formulaNote], ['', null, '', undefined]);
     assert.deepEqual(view.count, {
-      pool: null, die: null, threshold: null, thresholdSource: null, explode: null, cancel: null, required: null,
-      destination: 'threshold',
+      pool: null, die: null, threshold: null, thresholdAnchor: null, thresholdSource: null, explode: null,
+      cancel: null, zeroPoolFails: true, required: null, destination: 'threshold',
     });
   });
 

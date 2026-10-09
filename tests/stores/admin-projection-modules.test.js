@@ -2,6 +2,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { Recipe } from '../../src/models/Recipe.js';
 import { buildRecipeList } from '../../src/ui/svelte/stores/adminRecipeRowProjection.js';
 import {
   buildItemCards,
@@ -13,6 +14,7 @@ import {
   enrichRecipeItemLibrary,
 } from '../../src/ui/svelte/stores/adminSystemInspectorProjection.js';
 import { countingCandidates } from '../helpers/scale/scaleCounters.js';
+import { seededRollClass, withRoll } from '../helpers/seededRoll.js';
 import { recipeItemDefinitionsContaining } from '../../src/utils/recipeItemMembership.js';
 
 // --- Pinned allowlists ------------------------------------------------------
@@ -169,7 +171,9 @@ function makeRecipe(overrides = {}) {
       {
         id: 'set-1',
         name: 'Ore',
-        ingredientGroups: [{ id: 'g-1', options: [{ componentId: 'c-1' }, { componentId: 'c-2' }] }],
+        ingredientGroups: [
+          { id: 'g-1', options: [{ componentId: 'c-1' }, { componentId: 'c-2' }] },
+        ],
         toolIds: ['t-set'],
       },
     ],
@@ -219,7 +223,9 @@ function makeSystem(overrides = {}) {
     componentCategoryIcons: { ore: 'fas fa-gem' },
     itemTags: ['raw'],
     components: [],
-    tools: [{ id: 'tool-1', name: 'Anvil', sourceUuid: 'Item.anvil', fallbackItemIds: ['Item.alt'] }],
+    tools: [
+      { id: 'tool-1', name: 'Anvil', sourceUuid: 'Item.anvil', fallbackItemIds: ['Item.alt'] },
+    ],
     characterPrerequisites: [],
     requirements: { time: { enabled: true }, currency: { enabled: false, units: [] } },
     craftingCheck: {
@@ -267,7 +273,12 @@ const COMPONENTS = [
     category: 'ore',
     tags: ['raw'],
     essences: { earth: 2 },
-    salvage: { enabled: true, ingredientQuantity: 3, toolIds: ['t-1'], resultGroups: [{ id: 'g' }] },
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 3,
+      toolIds: ['t-1'],
+      resultGroups: [{ id: 'g' }],
+    },
   },
   {
     id: 'c-2',
@@ -300,6 +311,47 @@ function makeItemsManager(components) {
 
 // --- Tests ------------------------------------------------------------------
 
+describe('adminRecipeRowProjection: the incomplete chip follows the resolution mode', () => {
+  // A shell with no ingredient set whose result carries a formula Foundry cannot roll.
+  const { Roll } = seededRollClass();
+  const staleShell = () =>
+    new Recipe({
+      id: 'r-stale',
+      name: 'Stale',
+      craftingSystemId: 'sys-1',
+      ingredientSets: [],
+      resultGroups: [
+        {
+          id: 'rg',
+          results: [{ id: 'res', componentId: 'c-1', quantity: 1, quantityFormula: 'max(, 2)' }],
+        },
+      ],
+    });
+  const chip = async (resolutionMode) => {
+    const previousGame = globalThis.game;
+    // ratchet-exempt(lint): restored in the finally below.
+    Object.assign(globalThis, { game: { settings: { get: () => undefined } } });
+    try {
+      return await withRoll(Roll, () => {
+        const system = makeSystem({ resolutionMode });
+        return buildRecipeList(null, makeRecipeManager([staleShell()]), system, '').recipes[0]
+          .incomplete;
+      });
+    } finally {
+      // ratchet-exempt(lint): restores the prior global.
+      globalThis.game = previousGame;
+    }
+  };
+
+  it('reads a progressive shell with a stale formula as incomplete, since the formula is dropped', async () => {
+    assert.equal(await chip('progressive'), true);
+  });
+
+  it('reads the same shell as structurally broken, not incomplete, under another mode', async () => {
+    assert.equal(await chip('routedByCheck'), false);
+  });
+});
+
 describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   it('projects rows carrying exactly the pinned allowlist of fields', () => {
     const recipes = [makeRecipe()];
@@ -307,6 +359,39 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
 
     assert.equal(result.recipes.length, 1);
     assert.deepEqual(sortedKeys(result.recipes[0]), RECIPE_ROW_FIELDS);
+  });
+
+  it('names a counting check pill by its successes needed, never its DC or a missing formula (issue 2006)', () => {
+    const recipes = [
+      makeRecipe({ id: 'r-tier', checkTierId: 'tier-hard' }),
+      makeRecipe({ id: 'r-unset', checkTierId: 'tier-unset' }),
+      makeRecipe({ id: 'r-default' }),
+    ];
+    const pills = (routed) => {
+      const system = makeSystem();
+      Object.assign(system.craftingCheck.routed, routed);
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes.map(
+        (row) => row.checkSummary
+      );
+    };
+    const counting = {
+      rollFormula: '',
+      evaluation: { product: 'count', direction: 'under', pool: { required: 2 } },
+      tiers: [
+        { id: 'tier-hard', dc: 18, successes: 4 },
+        { id: 'tier-unset', dc: 30, successes: null },
+      ],
+    };
+    // An unset tier falls back to the pool's count, as the engine's `countRequired` does.
+    assert.deepEqual(pills(counting), [
+      { kind: 'successes', dc: 4 },
+      { kind: 'successes', dc: 2 },
+      { kind: 'successes', dc: 2 },
+    ]);
+    assert.deepEqual(pills({ ...counting, dcMode: 'dynamic' })[0], {
+      kind: 'dynamicSuccesses',
+      dc: null,
+    });
   });
 
   it('names a roll-under Target and a character value in the check pill, never a DC (issue 2005)', () => {
@@ -326,11 +411,19 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
       { kind: 'target', dc: 15 },
     ]);
     for (const direction of ['over', 'under']) {
-      const attribute = { product: 'sum', direction, target: { source: 'attribute', expression: '@a' } };
-      assert.deepEqual(pills(attribute), [
-        { kind: 'attribute', dc: null },
-        { kind: 'attribute', dc: null },
-      ], `${direction}: a character value sorts with the number-less rows`);
+      const attribute = {
+        product: 'sum',
+        direction,
+        target: { source: 'attribute', expression: '@a' },
+      };
+      assert.deepEqual(
+        pills(attribute),
+        [
+          { kind: 'attribute', dc: null },
+          { kind: 'attribute', dc: null },
+        ],
+        `${direction}: a character value sorts with the number-less rows`
+      );
     }
     assert.deepEqual(pills({ product: 'sum', direction: 'over' })[0], { kind: 'dc', dc: 18 });
 
@@ -377,7 +470,10 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   });
 
   it('filters by search term while counting categories over the unfiltered library', () => {
-    const recipes = [makeRecipe({ id: 'r-1', name: 'Iron Ingot' }), makeRecipe({ id: 'r-2', name: 'Steel Bar', category: 'Alloying' })];
+    const recipes = [
+      makeRecipe({ id: 'r-1', name: 'Iron Ingot' }),
+      makeRecipe({ id: 'r-2', name: 'Steel Bar', category: 'Alloying' }),
+    ];
     const result = buildRecipeList(null, makeRecipeManager(recipes), makeSystem(), 'steel');
 
     assert.deepEqual(
@@ -395,6 +491,7 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(buildRecipeList(null, makeRecipeManager([]), null, ''), {
       recipes: [],
       rosterRecipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -426,6 +523,12 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
       ['r-1', 'r-2'],
       'the roster cohort is unfiltered and in roster order'
     );
+    // Its published table (issue 1773): the same roster, cut to what resolves a taught recipe.
+    assert.deepEqual(
+      searched.recipeRoster.map(({ id, name }) => [id, name]),
+      searched.rosterRecipes.map(({ id, name }) => [id, name])
+    );
+    assert.deepEqual(Object.keys(searched.recipeRoster[0]), ['id', 'name', 'img']);
   });
 
   it('selects the filtered rows positionally, so two recipes sharing an id both survive', () => {
@@ -448,9 +551,18 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   it('keeps the search predicate over the recipe MODELS, not the trimmed projected rows', () => {
     // `makeRecipe`'s description is `' padded '` and `_createRecipeRow` TRIMS it, so a term
     // carrying significant surrounding whitespace matches the model and not the row.
-    const result = buildRecipeList(null, makeRecipeManager([makeRecipe()]), makeSystem(), ' padded ');
+    const result = buildRecipeList(
+      null,
+      makeRecipeManager([makeRecipe()]),
+      makeSystem(),
+      ' padded '
+    );
 
-    assert.equal(result.recipes[0]?.description, 'padded', 'control: the ROW description is trimmed');
+    assert.equal(
+      result.recipes[0]?.description,
+      'padded',
+      'control: the ROW description is trimmed'
+    );
     assert.deepEqual(
       result.recipes.map((row) => row.id),
       ['r-1'],
@@ -467,7 +579,10 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
         {
           id: 'set-tag',
           ingredientGroups: [
-            { id: 'g-tag', options: [{ componentId: 'c-1', match: { type: 'tags', tags: ['herb'] } }] },
+            {
+              id: 'g-tag',
+              options: [{ componentId: 'c-1', match: { type: 'tags', tags: ['herb'] } }],
+            },
           ],
         },
       ],
@@ -491,7 +606,10 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     const manager = makeRecipeManager([makeRecipe()]);
 
     assert.equal(buildRecipeList(null, manager, system, '').showVisibilitySummary, true);
-    assert.equal(buildRecipeList(null, manager, system, 'zzz-no-match').showVisibilitySummary, true);
+    assert.equal(
+      buildRecipeList(null, manager, system, 'zzz-no-match').showVisibilitySummary,
+      true
+    );
   });
 });
 
@@ -882,6 +1000,27 @@ describe('adminSystemInspectorProjection (direct, no store)', () => {
     assert.equal(view.gatheringCraftingCheck.modifierFormulaInertCause, 'noCheck');
   });
 
+  it('reads a counting check with no retained formula as live, never as missing its formula', () => {
+    const counting = { rollFormula: '', dc: 12, evaluation: { product: 'count' } };
+    const system = makeSystem();
+    system.craftingCheck.routed = { ...counting, tiers: [] };
+    system.salvageCraftingCheck.routed = counting;
+    const view = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(
+      view.craftingCheck.modifierFormulaInertCause,
+      null,
+      'the pool rolls, so modifiers apply'
+    );
+    assert.equal(view.salvageCraftingCheck.modifierFormulaInertCause, null);
+    system.craftingCheck.routed = { ...counting, evaluation: { product: 'sum' } };
+    const summed = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(
+      summed.craftingCheck.modifierFormulaInertCause,
+      'noFormula',
+      'a sum still needs one'
+    );
+  });
+
   it('projects the fields a hand-built allowlist has historically dropped', () => {
     const view = buildSelectedSystemViewData(makeSystem(), [], [], [], [], []);
     assert.deepEqual(view.componentCategories, ['ore']);
@@ -924,7 +1063,9 @@ describe('adminSystemInspectorProjection (direct, no store)', () => {
       true
     );
     assert.deepEqual(sortedKeys(enriched[0]), RECIPE_ITEM_DEFINITION_FIELDS, 'same shape');
-    assert.deepEqual(enriched[0].recipes, [{ id: 'r-1', name: 'Iron Ingot', category: 'Smithing' }]);
+    assert.deepEqual(enriched[0].recipes, [
+      { id: 'r-1', name: 'Iron Ingot', category: 'Smithing' },
+    ]);
     assert.equal(enriched[0].derivedType, 'Scroll', 'one member reads as a scroll');
     assert.equal(enriched[0].learnedByCount, 0);
   });

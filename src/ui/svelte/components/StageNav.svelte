@@ -1,7 +1,7 @@
 <!-- Browsing a stage changes the viewed stage, never the executable stage. -->
 <script>
   import IconButton from './IconButton.svelte';
-  import ManagerButton from './ManagerButton.svelte';
+  import Button from './Button.svelte';
 
   let {
     stages = [],
@@ -75,14 +75,14 @@
       <span class="fab-stage-nav-position">{positionLabel(safeView, count)}</span>
     {/if}
     {#if safeView !== safeCurrent}
-      <ManagerButton
+      <Button
         class="fab-stage-nav-return"
         data-stage-nav-return
         onclick={() => select(safeCurrent)}
       >
         <i class="fas fa-bullseye" aria-hidden="true"></i>
         {returnLabel(safeCurrent)}
-      </ManagerButton>
+      </Button>
     {/if}
   </nav>
 {/if}
@@ -99,7 +99,7 @@
      already shared; `font-size` was not, so the arrows - which are `IconButton`s, painted by a
      sheet that sets no size on their glyph - inherited the surrounding body type and drew a
      chevron half again as tall as the digits inside identical boxes. */
-  :global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),
+  :global(.fabricate-icon-button.fabricate-icon-button.fab-stage-nav-arrow),
   .fab-stage-nav-number {
     box-sizing: border-box;
     width: 26px;

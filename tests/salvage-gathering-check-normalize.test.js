@@ -12,6 +12,7 @@ globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { normalizeCheckEvaluation } = await import('../src/systems/normalize/checkEvaluation.js');
+const { normalizeCheckAdvantage } = await import('../src/systems/normalize/checkAdvantage.js');
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -30,6 +31,7 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -41,9 +43,11 @@ test('_normalizeSalvageCraftingCheck adds default simple/routed/progressive sub-
   assert.equal(check.routed.dc, 15);
   assert.deepEqual(check.progressive, {
     awardMode: 'equal',
+    thresholdMode: 'meet',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     checkBreakage: { triggers: [] },
   });
 });
@@ -78,9 +82,11 @@ test('_normalizeGatheringCraftingCheck defaults to disabled with progressive/rou
   assert.equal(check.enabled, false);
   assert.deepEqual(check.progressive, {
     awardMode: 'equal',
+    thresholdMode: 'meet',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     checkBreakage: { triggers: [] },
   });
   assert.equal(check.routed.type, 'relative');

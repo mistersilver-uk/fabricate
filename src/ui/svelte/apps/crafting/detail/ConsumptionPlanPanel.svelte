@@ -16,6 +16,9 @@
   to the active language) and is this panel's DEFAULT, so the locale-aware join is
   what ships. The `formatList` prop stays as an injection seam for tests and for a
   caller that needs a different join.
+
+  `overshoots` is the pool's surplus per essence, from `essenceOvershoots`: one line each,
+  beneath the rows, because no row's quantity states what the craft spends beyond its need.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -28,6 +31,7 @@
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
     plan = null,
+    overshoots = [],
     // Locale-aware list formatter: (string[]) => string. Defaults to the bridge's
     // own, so an omitted prop still joins through the active language. Deliberately
     // NOT guarded with a `typeof … === 'function'` fallback at the call site: such a
@@ -106,6 +110,14 @@
         </li>
       {/each}
     </ul>
+    {#each overshoots as overshoot (overshoot.essenceId)}
+      <p class="consumption-plan-overshoot" data-consumption-overshoot={overshoot.essenceId}>
+        {localize('FABRICATE.App.Crafting.ConsumptionPlan.Overshoot', {
+          essence: overshoot.name,
+          amount: overshoot.amount,
+        })}
+      </p>
+    {/each}
   {/if}
 
   {#if pendingText}
@@ -198,6 +210,12 @@
 
   .consumption-plan-qty.is-short {
     color: var(--fab-danger-text);
+  }
+
+  .consumption-plan-overshoot {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
   }
 
   .consumption-plan-pending {

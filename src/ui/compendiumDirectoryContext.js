@@ -3,6 +3,8 @@
 // `promptSelectCraftingSystem` below is that injected picker, and is the one Foundry-touching
 // function here.
 
+import { warnWorldRegistrationFailure } from './svelte/util/importFolderGroups.js';
+
 // The right-clicked entry's `data-pack`, named so the live runtime key is one visibly-diffed source.
 export const PACK_DATASET_KEY = 'pack';
 
@@ -69,6 +71,7 @@ export function buildCompendiumImportContextOption({
           count: result.sourceFallbacks.length
         }));
       }
+      warnWorldRegistrationFailure(result, { notify, localize });
     }
   };
 }
@@ -93,10 +96,13 @@ export async function promptSelectCraftingSystem(systems, { localize, packName =
     .join('');
 
   const prompt = localize('FABRICATE.Admin.Items.CompendiumImportDialogPrompt', { name: packName ?? '' });
+  // ratchet-exempt(design-system): a one-shot pick from core's Compendium directory menu;
+  // DialogV2 re-serialises its body, so the select stays native
+  const select = `<select name="systemId" style="width: 100%;">${optionsHtml}</select>`;
   const content = `
     <div class="fabricate-compendium-import">
       <p>${escapeHtml(prompt)}</p>
-      <select name="systemId" style="width: 100%;">${optionsHtml}</select>
+      ${select}
     </div>`;
 
   const result = await DialogV2.wait({

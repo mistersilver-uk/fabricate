@@ -157,6 +157,21 @@ describe('1505 Notice — the API the library states', () => {
     harness.remount();
   });
 
+  it('describes an action by its optional description, and only when one is given (issue 2006)', async () => {
+    const described = await harness.mount({
+      title: 'This formula counts successes',
+      action: { label: 'Convert', description: 'Copies the DCs.', onClick: () => {} },
+    });
+    const button = described.querySelector('[data-notice-action]');
+    const id = button.getAttribute('aria-describedby');
+    assert.ok(id, 'the button is described');
+    assert.equal(described.querySelector(`#${id}`).textContent.trim(), 'Copies the DCs.');
+    harness.remount();
+    const plain = await harness.mount({ title: 'x', action: { label: 'Review', onClick: () => {} } });
+    assert.ok(!plain.querySelector('[data-notice-action]').hasAttribute('aria-describedby'));
+    harness.remount();
+  });
+
   it('CLICKS the dismiss control and the notice leaves the DOM', async () => {
     const target = await harness.mount({
       title: 'Unsaved changes',
@@ -193,9 +208,8 @@ describe('1505 Notice — the API the library states', () => {
   it('carries both root hooks verbatim, the bare one as an empty string', async () => {
     const target = await harness.mount({
       title: 'Brewed',
-      dataAttr: 'data-alchemy-banner',
-      stateDataAttr: 'data-alchemy-banner-status',
-      stateDataValue: 'brewing',
+      'data-alchemy-banner': '',
+      'data-alchemy-banner-status': 'brewing',
     });
     const notice = noticeOf(target);
     assert.equal(

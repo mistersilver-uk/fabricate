@@ -9,10 +9,10 @@
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import { MANAGER_MAIN_SELECTOR } from '../../util/overlayBounds.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
-  import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
-  import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
+  import TintPickerButton from '../../components/TintPickerButton.svelte';
+  import TintPicker from '../../components/TintPicker.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
@@ -26,8 +26,8 @@
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ActionMenu from '../../components/ActionMenu.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -152,8 +152,8 @@
   let biomeColorTriggerButton = $state(null);
   // The popover root, registered via registerBiomeColorPopoverNode. It is what `anchoredPopover`
   // portals and positions below, and it is ALSO fed as an `additionalNodes` entry to the
-  // dismissOnOutsideClick wrapping the trigger, the same pattern ManagerColorPicker uses for its
-  // own popover. ManagerColorPopover's own internal dismissal is disabled here
+  // dismissOnOutsideClick wrapping the trigger, the same pattern TintPickerButton uses for its
+  // own popover. TintPicker's own internal dismissal is disabled here
   // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
   // mousedown on the trigger itself would count as "outside" (the trigger is not inside the
   // portaled popover), dismiss on mousedown, then the trigger's own contextmenu handler would
@@ -406,7 +406,7 @@
   // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
   // opened from, so repeating its name in every item widens the panel to restate what the reader
   // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
-  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  // orphaned in `lang/en.json`: the earlier conversions retired the same `{name}` copy.
   function rowMenuItems() {
     return [
       {
@@ -636,8 +636,8 @@
   }
 
   // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
-  // `ManagerColorPicker` records against its own copy of this shape: the panel is
-  // `ManagerColorPopover`, a shared component this view does not own the markup of and whose
+  // `TintPickerButton` records against its own copy of this shape: the panel is
+  // `TintPicker`, a shared component this view does not own the markup of and whose
   // other call sites render it inline. An action is a plain function, so this view applies it to
   // the node the popover registers — same contract, same teardown, no new prop on that component.
   //
@@ -708,13 +708,13 @@
       role="tabpanel"
       aria-labelledby="manager-gathering-nav-environments"
     >
-      <ManagerToolbar
+      <FilterBar
         class="manager-environments-toolbar"
         ariaLabel={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
       >
-        <ManagerSearchField
+        <SearchField
           value={searchTerm}
-          onInput={(next) => (ui.searchTerm = next)}
+          onChange={(next) => (ui.searchTerm = next)}
           placeholder={text(
             'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
             'Search environments...'
@@ -726,7 +726,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={statusFilter}
             options={statusSelectOptions}
             ariaLabel={text(
@@ -739,7 +739,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={selectionFilter}
             options={selectionSelectOptions}
             showTick={false}
@@ -753,7 +753,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Risk', 'Risk')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={riskFilter}
             options={riskSelectOptions}
             ariaLabel={text(
@@ -766,7 +766,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={biomeFilter}
             options={biomeSelectOptions}
             ariaLabel={text(
@@ -782,16 +782,16 @@
             .replace('{total}', environmentList.length)}</Chip
         >
         {#if filtersActive}
-          <ManagerButton
+          <Button
             class="manager-clear-filters"
             data-clear-filters="environments"
             onclick={clearFilters}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-          </ManagerButton>
+          </Button>
         {/if}
-      </ManagerToolbar>
+      </FilterBar>
 
       <section
         class="manager-table-scroll"
@@ -821,13 +821,13 @@
             )}
           >
             <div class="manager-action-group">
-              <ManagerButton role="primary" onclick={onCreateEnvironment}>
+              <Button role="primary" onclick={onCreateEnvironment}>
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span
                   >{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
                 >
-              </ManagerButton>
-              <ManagerButton onclick={() => selectGatheringTab('tasks')}>
+              </Button>
+              <Button onclick={() => selectGatheringTab('tasks')}>
                 <i class="fas fa-list-check" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -835,8 +835,8 @@
                     'Review tasks'
                   )}</span
                 >
-              </ManagerButton>
-              <ManagerButton onclick={() => selectGatheringTab('encounters')}>
+              </Button>
+              <Button onclick={() => selectGatheringTab('encounters')}>
                 <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -844,7 +844,7 @@
                     'Review events'
                   )}</span
                 >
-              </ManagerButton>
+              </Button>
             </div>
           </EmptyState>
         {:else if filteredEnvironments.length === 0}
@@ -859,8 +859,8 @@
               'Clear search and filters to show all environments in this system.'
             )}
           >
-            <ManagerButton onclick={clearFilters}
-              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
+            <Button onclick={clearFilters}
+              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</Button
             >
           </EmptyState>
         {:else}
@@ -988,7 +988,7 @@
                     </IconButton>
                     <ActionMenu
                       items={rowMenuItems()}
-                      triggerLabel={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.ActionsFor',
                         'Environment actions for {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1152,7 +1152,7 @@
             <IconPicker
               value={conditionAddIcon(condition.kind)}
               iconOnly={true}
-              buttonTitle={text(
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Conditions.NewIcon',
                 'New value icon'
               )}
@@ -1166,7 +1166,7 @@
                 oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
               />
             </Field>
-            <ManagerButton
+            <Button
               role="primary"
               type="submit"
               class="manager-add-button"
@@ -1176,7 +1176,7 @@
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </ManagerButton>
+            </Button>
           </form>
 
           <div
@@ -1192,7 +1192,7 @@
                 <IconPicker
                   value={conditionIcon(option, condition.kind)}
                   iconOnly={true}
-                  buttonTitle={text(
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.Environment.Conditions.EditIcon',
                     'Edit icon'
                   )}
@@ -1270,16 +1270,16 @@
               <IconPicker
                 value={biomeIconInput}
                 iconOnly={true}
-                buttonTitle={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Vocabularies.NewBiomeIcon',
                   'New biome icon'
                 )}
                 onChange={(icon) => (biomeIconInput = icon)}
               />
-              <ManagerColorPicker
+              <TintPickerButton
                 colorToken={biomeColorTokenInput}
                 customColor={biomeCustomColorInput}
-                buttonTitle={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Vocabularies.NewBiomeColor',
                   'New biome colour'
                 )}
@@ -1305,7 +1305,7 @@
                 oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
             </Field>
-            <ManagerButton
+            <Button
               role="primary"
               type="submit"
               class="manager-add-button"
@@ -1315,7 +1315,7 @@
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </ManagerButton>
+            </Button>
           </form>
 
           <div
@@ -1345,7 +1345,7 @@
                       iconOnly={true}
                       triggerClass="manager-biome-combined-trigger"
                       triggerStyle={biomeSwatchStyle(option)}
-                      buttonTitle={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Vocabularies.EditBiomeIcon',
                         'Edit biome icon'
                       )}
@@ -1360,7 +1360,7 @@
                         )}
                     />
                     {#if openBiomeColorPickerId === valueId}
-                      <ManagerColorPopover
+                      <TintPicker
                         colorToken={biomeColorToken(option)}
                         customColor={biomeCustomColor(option)}
                         presetGridLabel={text(

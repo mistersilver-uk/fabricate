@@ -15,7 +15,10 @@ import {
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL = 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte';
@@ -31,7 +34,9 @@ const selectionToolbarCss = scopedComponentCss(
 
 /** The threshold the frame declares. Read from its source so the two cannot drift apart. */
 const THRESHOLD_PX = Number(
-  /@container \(max-width: (\d+)px\)/.exec(readFileSync(resolve(repoRoot, FRAME), 'utf8'))?.[1]
+  /@container fabricate-scoped-list \(max-width: (\d+)px\)/.exec(
+    readFileSync(resolve(repoRoot, FRAME), 'utf8')
+  )?.[1]
 );
 /** The manager rail's width, which `main` does not get. */
 const RAIL_PX = 220;
@@ -93,6 +98,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/stores/worldScopeProjection.js',
     // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
@@ -125,8 +131,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -136,6 +142,7 @@ const harness = createMountedComponentHarness({
     FRAME,
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     // The shared frame's membership filter is a segmented track since issue 1373.
     'src/ui/svelte/components/SegmentedControl.svelte',
     SHELL,
@@ -220,8 +227,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   before(async () => {
     assert.ok(
       Number.isFinite(THRESHOLD_PX) && THRESHOLD_PX > 0,
-      'the frame declares no `@container (max-width: Npx)` rule, so this whole gate measures ' +
-        'a breakpoint that does not exist'
+      'the frame declares no `@container fabricate-scoped-list (max-width: Npx)` rule, so ' +
+        'this whole gate measures a breakpoint that does not exist'
     );
     await harness.setup();
     const scope = projectWorldScopeEntity({
@@ -493,7 +500,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       const rowsRegion = column?.querySelector('.manager-scoped-list-rows');
       const list = column?.querySelector('.manager-scoped-list');
       if (!column || !rowsRegion || !list) return { rendered: false };
-      const pagination = column.querySelector('.manager-pagination');
+      const pagination = column.querySelector('.fabricate-pagination');
       return {
         rendered: true,
         hasPagination: Boolean(pagination),
@@ -555,7 +562,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         };
       });
       const rowBox = row.getBoundingClientRect();
-      const search = row.querySelector('.manager-search');
+      const search = row.querySelector('.fabricate-search');
       const band = document.querySelector('[data-scoped-list-selection-toolbar]');
       const bandBox = band ? band.getBoundingClientRect() : null;
       const bandStyle = band ? getComputedStyle(band) : null;
@@ -827,7 +834,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         `${box.columnBottom}: it floated up under the last row instead of staying at the foot`
     );
     // ── AND THE PAGER IS NOT THE THING THAT GREW ────────────────────────────────────────────
-    // `.manager-scoped-list-column > :global(.manager-pagination) { flex: 0 0 auto }` is ungated
+    // `.manager-scoped-list-column > :global(.fabricate-pagination) { flex: 0 0 auto }` is ungated
     // by the assertion above, because a pager that fills the column also ends at the column's
     // foot. The slack belongs to the rows region — that is what puts the footer at the bottom
     // rather than making the footer tall — so it is stated separately.

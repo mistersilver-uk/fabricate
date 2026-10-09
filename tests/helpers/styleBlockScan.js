@@ -25,11 +25,21 @@ export const MAX_VAR_CHAIN_DEPTH = 8;
  */
 const MAX_VALUE_CANDIDATES = 512;
 
-/** A line that is nothing but a `<style …>` opening tag. */
-const STYLE_OPEN_LINE = /^\s*<style\b[^<>]*>\s*$/;
+/** The markup-level openers extraction reads: a comment, a script block or a style block. */
+const MARKUP_OPENER = /(<!--)|(<script\b)|<style\b[^>]*>/giu;
 
-/** A line that is nothing but the matching close. */
-const STYLE_CLOSE_LINE = /^\s*<\/style>\s*$/;
+const COMMENT_CLOSE = /-->/gu;
+const SCRIPT_CLOSE = /<\/script\s*>/giu;
+const STYLE_CLOSE = /<\/style\s*>/giu;
+
+/** The close of the region an opener match starts. */
+function closerOf([, comment, script]) {
+  if (comment !== undefined) return COMMENT_CLOSE;
+  return script === undefined ? STYLE_CLOSE : SCRIPT_CLOSE;
+}
+
+/** `text` as spaces, its newlines kept. */
+const blank = (text) => text.replaceAll(/[^\n]/gu, ' ');
 
 /** One `property: value` pair, anchored to a real declaration boundary. */
 const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-zA-Z][\w-]*)\s*:\s*([^;{}]*)/g;
@@ -42,27 +52,34 @@ const PIXEL_LITERAL = /(?<![\w.])(\d+(?:\.\d+)?|\.\d+)px\b/gi;
 
 /**
  * Replace `source` with same-length text in which everything OUTSIDE a `<style>` block is
- * spaces, so a Svelte file can be scanned as CSS without moving a single character.
+ * spaces, so a Svelte file can be scanned as CSS without moving a single character. A tag opens a
+ * block wherever it sits in markup; one named inside a comment or a script opens nothing.
  *
  * @param {string} source A `.svelte` file's text.
  * @returns {string} Same length, same newlines, CSS only.
  */
 export function maskNonStyleRegions(source) {
-  let inside = false;
-  return String(source ?? '')
-    .split('\n')
-    .map((line) => {
-      if (!inside) {
-        if (STYLE_OPEN_LINE.test(line)) inside = true;
-        return ' '.repeat(line.length);
-      }
-      if (STYLE_CLOSE_LINE.test(line)) {
-        inside = false;
-        return ' '.repeat(line.length);
-      }
-      return line;
-    })
-    .join('\n');
+  const text = String(source ?? '');
+  let masked = '';
+  for (let index = 0; ; ) {
+    MARKUP_OPENER.lastIndex = index;
+    const opener = MARKUP_OPENER.exec(text);
+    if (opener === null) return masked + blank(text.slice(index));
+    const closer = closerOf(opener);
+    const isStyle = closer === STYLE_CLOSE;
+    const body = opener.index + opener[0].length;
+    closer.lastIndex = body;
+    const close = closer.exec(text);
+    const end = close === null ? text.length : close.index;
+    if (isStyle) {
+      masked += blank(text.slice(index, body)) + text.slice(body, end);
+      index = end;
+    } else {
+      const after = close === null ? text.length : end + close[0].length;
+      masked += blank(text.slice(index, after));
+      index = after;
+    }
+  }
 }
 
 /**
@@ -104,7 +121,9 @@ export function collectStyleCorpus({
   extensions = STYLE_CORPUS_EXTENSIONS,
 } = {}) {
   const corpus = {};
-  for (const [file, source] of Object.entries(collectWorkingTreeSources([...roots], [...extensions]))) {
+  for (const [file, source] of Object.entries(
+    collectWorkingTreeSources([...roots], [...extensions])
+  )) {
     const css = styleTextFor(file, source);
     if (css.trim().length > 0) corpus[file] = css;
   }
@@ -240,7 +259,9 @@ export function splitSelectorList(selector) {
 }
 
 /**
- * Every RULE in one comment-stripped stylesheet, as `{ selector, body, line }` (issue 1497).
+ * Every RULE in one comment-stripped stylesheet, as `{ selector, context, body, line, bodyLine }`
+ * (issue 1497). `context` is the enclosing at-rules, e.g. `@media (width < 600px)`, or `''`; `line`
+ * is where the selector begins and `bodyLine` holds the `{`, the first line of `body`.
  *
  * @param {string} css Comment-stripped CSS, offsets intact — from {@link styleTextFor}.
  */
@@ -256,7 +277,7 @@ export function rulesIn(css) {
     if (character === '\n') line += 1;
     if (character === '{') {
       const trimmed = prelude.trim().replace(/\s+/gu, ' ');
-      stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
+      stack.push({ selector: trimmed, start: index + 1, line: preludeLine, bodyLine: line });
       prelude = '';
       preludeStarted = false;
       preludeLine = line;
@@ -265,7 +286,18 @@ export function rulesIn(css) {
     if (character === '}') {
       const open = stack.pop();
       if (open && !open.selector.startsWith('@')) {
-        rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
+        const body = css.slice(open.start, index);
+        const context = stack
+          .filter((enclosing) => enclosing.selector.startsWith('@'))
+          .map((enclosing) => enclosing.selector)
+          .join(' ');
+        rules.push({
+          selector: open.selector,
+          context,
+          body,
+          line: open.line,
+          bodyLine: open.bodyLine,
+        });
       }
       prelude = '';
       preludeStarted = false;
@@ -342,7 +374,9 @@ function expandOnce(text, definitions) {
   if (references.length === 0) return [];
   let combinations = [[]];
   for (const reference of references) {
-    const options = substitutionsFor(reference, definitions) ?? [text.slice(reference.start, reference.end)];
+    const options = substitutionsFor(reference, definitions) ?? [
+      text.slice(reference.start, reference.end),
+    ];
     combinations = combinations.flatMap((prefix) => options.map((option) => [...prefix, option]));
     if (combinations.length > MAX_VALUE_CANDIDATES) {
       throw new Error(
@@ -388,7 +422,11 @@ function expandFrontier(frontier, definitions, candidates) {
  * @param {string} value A declaration's raw value text.
  * @param {Map<string, string[]>} definitions From {@link collectCustomProperties}.
  */
-export function resolveValueCandidates(value, definitions, { maxDepth = MAX_VAR_CHAIN_DEPTH } = {}) {
+export function resolveValueCandidates(
+  value,
+  definitions,
+  { maxDepth = MAX_VAR_CHAIN_DEPTH } = {}
+) {
   const candidates = new Set([value]);
   let frontier = [value];
   let depth = 0;
@@ -406,11 +444,7 @@ export function resolveValueCandidates(value, definitions, { maxDepth = MAX_VAR_
 export function pixelValuesIn(text) {
   const values = [];
   PIXEL_LITERAL.lastIndex = 0;
-  for (
-    let match = PIXEL_LITERAL.exec(text);
-    match !== null;
-    match = PIXEL_LITERAL.exec(text)
-  ) {
+  for (let match = PIXEL_LITERAL.exec(text); match !== null; match = PIXEL_LITERAL.exec(text)) {
     values.push(Number(match[1]));
   }
   return values;

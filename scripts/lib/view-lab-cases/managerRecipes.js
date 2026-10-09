@@ -7,8 +7,13 @@ import {
   BULK_DELETE_CARD_PATTERN,
   CHECKS_ROUTE_MODEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
+  TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
+
+// The selection the inspector draws, and the draft whose refused save the notice reports.
+const RECIPE_ITEM_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/recipe-item\/recipeItemModel\.svelte\.js$/;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -39,7 +44,7 @@ export const CASES = Object.freeze([
       {
         selector:
           '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
-          ' .manager-recipe-status .manager-status-toggle',
+          ' .manager-recipe-status .fabricate-toggle',
       },
     ],
     expectView: 'recipes',
@@ -89,6 +94,66 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  // Issue 1773: the inspector's Produces rows name a currency reward by its label and amount with
+  // its unit, and a knowledge reward by the recipe it teaches, each with its kind's glyph.
+  // Issue 1773: a choice group reads in the inspector as the Requires list's any-one-of box,
+  // captioned with how many it awards and who chooses: the player's pick of up to two, and the
+  // two rolled draws.
+  ...[
+    { suffix: '', state: 'reward-group', member: 'knowledge' },
+    { suffix: '-rolled', state: 'reward-group-rolled', member: 'component' },
+  ].map(({ suffix, state, member }) =>
+    managerCase({
+      id: `manager-recipes-inspector-reward-group${suffix}`,
+      label: `Manager — Recipes inspector Produces a ${suffix ? 'rolled ' : ''}choice of rewards`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-smithing', resultRowState: state },
+      steps: [
+        'Crafting',
+        {
+          selector: '.manager-recipe-row[data-recipe-id="sm-r-horseshoe"] .manager-recipe-identity',
+        },
+      ],
+      expectView: 'recipes',
+      expectSelector: `[data-recipe-inspector] [data-recipe-produces-choice] [data-recipe-produces-kind="${member}"]`,
+      expectContained: [
+        { container: '[data-recipe-inspector]', target: '[data-recipe-produces-choice]' },
+      ],
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/recipes\/Recipe(?:BrowserInspector|ProduceRow)\.svelte$/,
+        /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      ],
+    })
+  ),
+  managerCase({
+    id: 'manager-recipes-inspector-reward-rows',
+    label: 'Manager — Recipes inspector Produces rows of every result kind',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="sm-r-horseshoe"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '[data-recipe-inspector]' +
+      ':has([data-recipe-produces-kind="currency"] i.fa-coins)' +
+      ':has([data-recipe-produces-kind="knowledge"] i.fa-book-open)',
+    expectContained: [
+      {
+        container: '[data-recipe-inspector]',
+        target: '[data-recipe-produces-kind="knowledge"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/Recipe(?:BrowserInspector|ProduceRow)\.svelte$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   }),
   // The inspector's ingredient-set list (issue 1510), at a 1024 window: the inspector restacks
@@ -157,6 +222,22 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
+  }),
+  // The inspector names a switched-off check as the row pill does, never "No check" (issue 2136).
+  managerCase({
+    id: 'manager-recipes-inspector-check-off',
+    label: 'Manager — Recipes inspector, check switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-tidewrack' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="tw-r-tidewater"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    expectSelector: '.fabricate-manager [data-recipe-fact="check"]:has-text("Check off")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',
@@ -358,6 +439,33 @@ export const CASES = Object.freeze([
       ],
     })
   ),
+  // Issue 2006: a counting check's pill names each recipe's successes needed in the mono face, and
+  // the DC sort key reads and sorts by that count.
+  managerCase({
+    id: 'manager-recipes-check-pill-count',
+    label: 'Manager — Recipes check pill and sort, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    // Ungrouped, so the sort reads across the whole library: one success first, five last.
+    steps: [
+      'Crafting',
+      ...chooseSelectOption('[data-recipe-sort]', 'dc'),
+      { selector: '[aria-labelledby="manager-recipe-group-label"]' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-sort]:has-text("Successes needed"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("1 success"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("5 successes"))' +
+      ' .manager-recipe-row [data-recipe-check="successes"].is-mono:has-text("3 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/stores\/(?:adminRecipeRowProjection|recipeCheckSummaryProjection)\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // The bulk axis under a multiplied character value: each tier names its multiplier, never a DC.
   managerCase({
     id: 'manager-recipes-bulk-edit-check-tier-under',
@@ -389,7 +497,40 @@ export const CASES = Object.freeze([
     sourceMatches: [
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+    ],
+  }),
+  // Issue 2006: under a counting check each tier names its successes needed, and the axis says so.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-count',
+    label: 'Manager — Recipes bulk edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has(.fab-bulk-edit-subhint:has-text("The successes needed these recipes"))' +
+      ' > .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes"))' +
+      ':has-text("Default · 3 successes")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
     ],
   }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
@@ -474,7 +615,7 @@ export const CASES = Object.freeze([
       // The inspector aside this route mounts (issue 1505).
       /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
       // The manager router and the Crafting entry model (issue 1151).
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
@@ -494,8 +635,11 @@ export const CASES = Object.freeze([
     // The grid with its accented tile, not the aside root, and `tone="info"` is that tone's one reach in the tree.
     expectSelector: '[data-item-page-stats] [data-stat-tone="info"]',
     kinds: ['manager', 'books-scrolls'],
-    // The inspector only.
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/],
+    // The inspector, and the model whose selection it draws (issue 1721).
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
+      RECIPE_ITEM_MODEL_PATTERN,
+    ],
   }),
   // The browse toolbars' first open-panel frame (issue 1510), and the tightest panel of the commit
   // that converted them: `Limited learning` is 84px of the 128px an unticked row leaves once the
@@ -561,6 +705,30 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, at the editor's notice position.
+  managerCase({
+    id: 'manager-recipe-item-save-failed',
+    label: 'Manager — Recipe item save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', saveFails: '1' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-enabled]' },
+      { selector: '[data-recipe-item-save]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '[data-recipe-item-editor] [data-notice-position] > [data-recipe-item-save-error]',
+    expectCenterHit: '[data-notice-position] > [data-recipe-item-save-error]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(BooksScrollsView|RecipeItemEditor)\.svelte$/,
+      RECIPE_ITEM_MODEL_PATTERN,
+    ],
+  }),
   managerCase({
     id: 'manager-recipe-item-contents',
     label: 'Manager — Recipe item contents',
@@ -575,8 +743,9 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-tab-button="contents"]' },
     ],
     expectView: 'recipe-item-edit',
-    // The panel and the populated list inside it: the list is what says the fixture's membership reached the screen.
-    expectSelector: '[data-recipe-item-tab="contents"] [data-recipe-item-contents-list]',
+    // The tab and a member token in it: the token is what says the fixture's membership reached the screen.
+    expectSelector:
+      '[data-recipe-item-tab="contents"] [data-recipe-item-contents-picker] [data-set-picker-token]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
@@ -608,6 +777,106 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-contents-picker-staged',
+    label: 'Manager — Recipe item contents, the picker holding staged choices',
+    // One choice staged each way (issue 1782): marked, stated in the footer, Apply armed.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-salve"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    // The footer stating the pending change, and its Apply enabled.
+    expectSelector:
+      '.fabricate-manager .fabricate-set-picker-popover [data-set-picker-footer]' +
+      ':has([data-set-picker-pending]) [data-set-picker-apply]:not([disabled])',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-contents-overflow',
+    label: 'Manager — Recipe item contents, more members than the token bound',
+    // Two links applied over the book's three (issue 1782): three tokens, then "+2 more".
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-oil"]' },
+      { selector: '[data-set-picker-apply]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector: '[data-recipe-item-contents-picker] [data-set-picker-more]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  // The Limits tab no case landed on (issue 1782): a learning book's two typeaheads, which grow to
+  // the 38px search shell under maintainer ruling 2, and the Required Knowledge list open.
+  managerCase({
+    id: 'manager-recipe-item-limits',
+    label: 'Manager — Recipe item limits, the learning typeaheads',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="limits"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '[data-recipe-item-tab="limits"] [data-recipe-item-character-prereqs] .fabricate-typeahead',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-limits-suggestions',
+    label: 'Manager — Recipe item limits, the Required Knowledge list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="limits"]' },
+      { selector: '[data-recipe-item-required-knowledge-search]', fill: 'brew' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list [data-recipe-item-required-knowledge-option]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      TYPEAHEAD_COMBOBOX_SOURCE,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -668,15 +937,20 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
       { selector: '[data-recipe-item-link-recipe-option="hb-r-tincture"]' },
       { selector: '[data-recipe-item-link-recipe-option="hb-r-oil"]' },
-      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      // The picker stages its choices (issue 1782), so Apply is what links them and closes it.
+      { selector: '[data-set-picker-apply]' },
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
-    // The trigger, inside the preview, by the hook `triggerData` puts on the button.
-    expectSelector: '[data-recipe-item-preview] [data-inventory-page-size]',
+    // The shared pager's page-size trigger, inside the preview's recipe pager.
+    expectSelector:
+      '[data-recipe-item-preview] [data-inventory-recipe-pager] [data-pagination-size]',
     // In the photograph, not merely in the document.
     expectContained: [
-      { container: '[data-recipe-item-preview]', target: '[data-inventory-page-size]' },
+      {
+        container: '[data-recipe-item-preview]',
+        target: '[data-inventory-recipe-pager] [data-pagination-size]',
+      },
     ],
     kinds: ['manager', 'books-scrolls'],
     // `apps/inventory/detail/` is named here because this is the only case rendering an inventory detail body in the manager.

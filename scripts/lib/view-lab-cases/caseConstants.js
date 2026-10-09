@@ -8,7 +8,7 @@ export const MANAGER = 'fabricate-crafting-system-manager';
 
 // Only the recomposed Journal's reachable render surfaces claim its frames.
 export const JOURNAL_SOURCES =
-  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
+  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
 /** The three GM canvas windows (issue 1520). */
 export const CANVAS_BROWSER = 'fabricate-interactable-browser';
@@ -39,6 +39,18 @@ export const CHECKS_ROUTE_MODEL_PATTERN =
 export const GATHERING_ROUTE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/gathering(?:RouteModel|Display|DraftHandlers|ModifierHandlers)\./;
 
+/** The gathering task editor and the tabs and cards under `gathering-task/` (issue 1522). */
+export const GATHERING_TASK_EDITOR_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(?:GatheringTaskEditView\.svelte$|gathering-task\/)/;
+
+/** The world-scope model and the drop classification behind the world frames (issue 1721). */
+export const WORLD_SCOPE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(worldScopeModel\.svelte|dropUuidClassification)\.js$/;
+
+/** The Premium crafting-icons advert in the two component screens' headers (issue 2220). */
+export const PREMIUM_ICONS_AD_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(ManagerPremiumIconsAd\.svelte|premiumIconsAdModel\.js)$/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
@@ -52,6 +64,12 @@ export const TOOL_LIST_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
+];
+
+/** The component rules editor and the cards it renders (issue 1522). */
+export const COMPONENT_EDITOR_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/component\/Component(?:CategoryTagsCards|DifficultyCard|EssencesCard|IdentityStrip|SalvageStages|SalvageCard|RulesValidationTab)\.svelte$/,
 ];
 
 /** The trigger set every system Tool rules editor frame shares (issue 1373). */
@@ -91,6 +109,9 @@ const CRAFTING_MODE_FILES = Object.freeze({
 
 /** The one not-yet-ready chrome all five player views draw (issue 1514). */
 export const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
+
+/** The identity row every player detail pane leads with (issue 1518). */
+export const PLAYER_DETAIL_HEADER = /^src\/ui\/svelte\/apps\/PlayerDetailHeader\.svelte$/;
 
 /** Everything under `crafting/` that is not one mode's own body. Applies to every crafting case. */
 export const CRAFTING_SHARED = new RegExp(
@@ -158,9 +179,23 @@ export const PLAYER_EXTENSION_SOURCES = Object.freeze([
 /** The shared positioning seam every open popover frame draws (issue 1500). */
 export const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
+  /^src\/ui\/svelte\/actions\/typeaheadPanel\.js$/,
   /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
 ]);
+
+/** The typeahead combobox's holder contract, for a frame whose walk opens a suggestion list. */
+export const TYPEAHEAD_COMBOBOX_SOURCE = /^src\/ui\/svelte\/util\/typeaheadCombobox\.svelte\.js$/;
+
+/** An open requirement-row suggestion list, which renders as a child of the application root. */
+export const REQUIREMENT_SUGGESTION =
+  '.fabricate-manager > .manager-recipe-option-suggestions [data-recipe-option-suggestion]';
 
 /** The environment editor's directory, minus its validation tab (issue 1517). */
 export const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
   /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
+
+/** A count check's default advantage footer (issue 2007): one die either way around the one Roll. */
+export const COUNT_ADVANTAGE_FOOTER =
+  ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1 die"))' +
+  ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
+  ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1 die"))';

@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 
-import { byCodePoint } from '../helpers/ratchetBaseline.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 
 
 export const MANAGER_SERVICE_KEYS = Object.freeze([
@@ -177,6 +177,7 @@ export const PLAYER_SERVICE_KEYS = Object.freeze([
   'listSelectableActors',
   'localize',
   'navigateToCraftingRecipe',
+  'navigateToJournalRun',
   'notify',
   'progressiveOrderRevertMessage',
   'reconcileJournalRunAuthority',
@@ -844,6 +845,7 @@ const PLAYER_ARGUMENTS = Object.freeze({
   getWorldTimeComponents: [1234],
   isTravelMarkerActor: ['Actor.marker'],
   navigateToCraftingRecipe: ['recipe-alpha'],
+  navigateToJournalRun: ['run-alpha'],
   notify: ['a warning'],
   localize: ['FABRICATE.Key'],
   setCraftingComponentSourceIds: [['src-a']],

@@ -1,4 +1,8 @@
 manager-components-normal
+manager-components-premium-ad-dismissed
+manager-components-premium-ad-compact
+manager-components-premium-ad-1150
+manager-components-premium-ad-full
 manager-components-essence-chips
 manager-components-essence-filter-list
 manager-component-edit-inheriting
@@ -14,11 +18,18 @@ manager-components-description-before
 manager-components-description-repaired
 manager-components-description-ingested
 manager-component-edit-normal
+manager-component-edit-save-failed
+manager-component-edit-validation
 manager-component-edit-stacked
 manager-component-edit-salvage
 manager-component-edit-salvage-narrow
+manager-component-edit-salvage-progressive-dc
+manager-component-edit-salvage-stages-narrow
 manager-component-edit-salvage-off
 manager-component-edit-salvage-simple
+manager-component-edit-salvage-rolled-narrow
+manager-component-edit-salvage-suggestions
+manager-component-edit-salvage-kind-list
 manager-component-complications-empty
 manager-component-complications-collapsed
 manager-component-complications-expanded
@@ -32,3 +43,6 @@ manager-component-edit-salvage-override-default
 manager-component-edit-salvage-override-custom
 manager-component-edit-salvage-override-routed
 manager-component-edit-salvage-override-invalid
+manager-component-edit-salvage-override-count-preset
+manager-component-edit-salvage-override-count-custom
+manager-component-edit-salvage-override-count-default

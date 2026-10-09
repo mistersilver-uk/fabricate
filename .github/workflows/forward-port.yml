@@ -207,7 +207,7 @@ jobs:
         # public and would break the day it is not. Minted on the dry-run path too: minting a token
         # is not a mutation. The action fails closed when the private key resolves empty, so a
         # missing/unforwarded RELEASE_BOT_KEY is a red job here rather than a silent anonymous push.
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.RELEASE_BOT_KEY }}

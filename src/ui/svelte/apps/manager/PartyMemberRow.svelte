@@ -198,7 +198,7 @@
 <style>
   /* Theme-ROOT tokens only (`--fab-manager-*` is declared inside `.fabricate-manager` and is
      not in scope for an area-agnostic block). Geometry is the prototype's:
-     radius 9, `--fab-bg-1` fill, 26px tiles, 8px/10px row padding. */
+     radius 9, `--fab-bg-1` fill, 26px tiles, 8px/12px row padding on the scale. */
   .manager-party-member-row {
     list-style: none;
     border: 1px solid var(--fab-border);
@@ -217,8 +217,8 @@
   .manager-party-member-main {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
   }
 
   .manager-party-member-tile {
@@ -288,7 +288,7 @@
   .manager-party-member-move.is-open {
     border-color: var(--fab-accent-border);
     color: var(--fab-accent);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-party-member-remove {
@@ -299,8 +299,8 @@
   .manager-party-move-drawer {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: 8px 10px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2) var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
   }
 
@@ -316,9 +316,9 @@
   .manager-party-move-target {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     width: 100%;
-    padding: 6px 9px;
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-2);
@@ -326,8 +326,8 @@
   }
 
   .manager-party-move-target:hover {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
   .manager-party-move-target > i {

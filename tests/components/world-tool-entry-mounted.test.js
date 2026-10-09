@@ -1,15 +1,22 @@
 /** The world Tool entry, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { tick } from 'svelte';
 
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -18,7 +25,6 @@ import {
   TOOL_TREE_RAW_MODULES,
   WORLD_TOOL_SCOPE_RAW_MODULES,
 } from '../helpers/toolMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -26,9 +32,13 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-tool-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
+    ...CHOICE_GROUP_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into.
@@ -73,7 +83,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
@@ -100,8 +109,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    ...KIND_MENU_COMPILED_MODULES,
+    ...CHOICE_GROUP_COMPILED_MODULES,
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -1317,7 +1332,7 @@ describe('the world Tool entry (issue 1373)', () => {
         'the window is four rows deep in a 300px column'
       );
       assert.ok(
-        Boolean(region.querySelector('.manager-pagination')),
+        Boolean(region.querySelector('.fabricate-pagination')),
         'and the overflow is a pager rather than a sentence with nothing behind it'
       );
       assert.doesNotMatch(region.textContent, /more$/);
@@ -1470,6 +1485,20 @@ describe('the world Tool entry (issue 1373)', () => {
         !trigger.querySelector('.fa-chevron-down, .fa-chevron-up'),
         'a tile carries no select chevron'
       );
+    });
+
+    it('lights the replacement zone on dragover and clears it on an outside dragleave', async () => {
+      const target = await mountBreakage({ mode: 'replaceWith' });
+      const zone = target.querySelector('[data-tool-replacement-drop]');
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      zone.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'over');
+      assert.ok(zone.classList.contains('is-over'), 'the over accent is drawn');
+      zone.dispatchEvent(new Event('dragleave', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      assert.ok(!zone.classList.contains('is-over'), 'and cleared');
     });
 
     // THE DROP RESOLVES PURELY, against the option list the caller passed. Both Tool editors are
@@ -1671,6 +1700,61 @@ describe('the world Tool entry (issue 1373)', () => {
         [],
         'the seed must not travel through the section write path, which would refuse its name'
       );
+    });
+
+    it('writes each edit to a seeded repair row: a name, an amount, then its removal', async () => {
+      const writes = [];
+      const seed = (repairRequirements) => ({
+        onBreak: { mode: 'flagBroken' },
+        repairRequirements,
+      });
+      const blank = { quantity: 1, match: { type: 'component', componentId: null } };
+      const second = {
+        id: 'g2',
+        options: [{ quantity: 3, match: { type: 'component', componentId: 'ingot' } }],
+      };
+      const target = await mountBreakage(null, {
+        worldDefault: seed([{ id: 'g1', options: [blank] }, second]),
+        actions: {
+          setWorldRepairRequirements: (id, groups) => {
+            writes.push([id, groups]);
+            return true;
+          },
+        },
+      });
+      const first = () =>
+        target.querySelector('[data-recipe-group-id="g1"]')?.querySelector('[data-recipe-option]');
+      /** The one write the page made, re-projected as the world default it now holds. */
+      async function written() {
+        await new Promise((done) => setTimeout(done, 0));
+        assert.equal(writes.length, 1, 'one edit makes one write');
+        const [id, groups] = writes.pop();
+        assert.equal(id, 'pick');
+        await harness.setProps({ scope: scopeFor(seed(groups)) });
+        return groups;
+      }
+
+      const search = first().querySelector('[data-recipe-option-search]');
+      search.focus();
+      search.value = 'glass';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+      target.ownerDocument.querySelector('[data-recipe-option-suggestion="shard"]').click();
+      const shard = { ...blank, match: { type: 'component', componentId: 'shard' } };
+      assert.deepEqual(await written(), [{ id: 'g1', options: [shard] }, second]);
+      assert.equal(first().querySelector('[data-recipe-option-chosen]').title, 'Glass Shard');
+
+      first().querySelector('[data-stepper-increment]').click();
+      assert.deepEqual(await written(), [
+        { id: 'g1', options: [{ ...shard, quantity: 2 }] },
+        second,
+      ]);
+      assert.equal(first().querySelector('[data-stepper-input]').value, '2');
+
+      first().querySelector('[data-recipe-remove="alternative"]').click();
+      assert.deepEqual(await written(), [second]);
+      assert.equal(target.querySelectorAll('[data-recipe-group]').length, 1);
+      assert.ok(!first(), 'the removed requirement is no longer drawn');
     });
 
     // ── CURRENCY IS WORLD SCOPE (issue 1373, maintainer round 5) ──────────────────────────

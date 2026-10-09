@@ -181,8 +181,7 @@
         compact
         title={emptyReason}
         hint={emptyDetail || undefined}
-        dataAttr="data-manager-party-add-empty"
-        dataValue={emptyReasonKind}
+        data-manager-party-add-empty={emptyReasonKind || true}
       />
     {/if}
   </div>
@@ -192,19 +191,19 @@
   /* Theme-ROOT tokens only. Prototype geometry: accent-bordered radius-10 panel on
      `--fab-bg-1`, a 30px search row, and a 190px scrolling candidate list. */
   .manager-party-add-panel {
-    padding: 10px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
   }
 
   .manager-party-add-search {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     height: 30px;
-    margin-bottom: 8px;
-    padding: 0 10px;
+    margin-bottom: var(--fab-space-2);
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-0);
@@ -248,7 +247,7 @@
   .manager-party-add-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
     max-height: 190px;
     overflow: auto;
   }
@@ -256,18 +255,18 @@
   .manager-party-add-candidate {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: var(--fab-space-2);
     width: 100%;
-    padding: 7px 10px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-2);
     text-align: left;
   }
 
   .manager-party-add-candidate:hover {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
   /* The tile is the row's ONLY leading element, portrait or not, so every candidate name

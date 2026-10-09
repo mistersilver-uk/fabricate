@@ -9,6 +9,42 @@ import {
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
+/** A Core Downtime frame whose last step clicks one strip tab, so the pointer leaves that tab's description showing (issue 1779). */
+function downtimeStripPointerCase({ tabId, tooltip, attributes = [], ...entry }) {
+  const tab = `[data-downtime-tab="${tabId}"]`;
+  return managerCase({
+    smokeLabels: [],
+    reaches: 'beyond',
+    steps: [{ selector: '#manager-world-nav-downtime', press: 'Enter' }, { selector: tab }],
+    expectView: 'world-downtime',
+    expectSelector: `[data-downtime-panel="${tabId}"]`,
+    expectAttributes: [
+      { selector: tab, name: 'aria-selected', value: 'true' },
+      ...attributes,
+      { selector: tab, name: 'aria-describedby', value: `world-downtime-tooltip-${tabId}` },
+      ...['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+        selector: `[data-downtime-tab="${id}"]`,
+        name: 'aria-controls',
+        value: `world-downtime-panel-${id}`,
+      })),
+    ],
+    expectVisible: `[data-downtime-tooltip="${tabId}"]:has-text("${tooltip}")`,
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectCenterHit: tab,
+    expectOverflowY: '.downtime-preview-scroll',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+    ...entry,
+  });
+}
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-travel-default-collapsed',
@@ -22,8 +58,11 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^styles\/fabricate\.css$/,
+      // The collapsed rail draws the Downtime parent, so the group that renders it selects this case
+      // (NavSidebar and its rows are broad signals, which name `manager-world-downtime-collapsed`).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
     ],
   }),
   managerCase({
@@ -40,7 +79,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -57,10 +96,11 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
     ],
   }),
   managerCase({
@@ -76,7 +116,7 @@ export const CASES = Object.freeze([
     position: { width: 1100, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
@@ -99,9 +139,34 @@ export const CASES = Object.freeze([
     position: { width: 680, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
       /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-card-700',
+    label: 'Manager — World Parties card at 700px',
+    // Inside the 680-720 band: the card stacks on the ladder's 680 rung, so here it keeps both columns.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector:
+      '[data-travel-panel="parties"] [data-manager-party-body="lab-party"]' +
+      ':has([data-manager-party-add-open="lab-party"])' +
+      ':has([data-manager-party-actor-trigger="lab-party"])',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '[data-manager-party-body="lab-party"]',
+      expectedTracks: 2,
+    },
+    position: { width: 700, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
   managerCase({
@@ -118,7 +183,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
       // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right column.
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
@@ -137,7 +202,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
     ],
   }),
   managerCase({
@@ -266,6 +331,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recordPickerOptions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
       ...ANCHORED_POPOVER_SOURCES,
@@ -363,8 +430,9 @@ export const CASES = Object.freeze([
       position: { width: 1330, height: 900 },
       kinds: ['manager', 'world', 'downtime'],
       sourceMatches: [
-        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
         /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
         /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       ],
     })
@@ -434,8 +502,9 @@ export const CASES = Object.freeze([
     position: { width: 960, height: 900 },
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -483,8 +552,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -569,8 +639,11 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      // The one frame that draws the title bar's PREMIUM mark (issue 1777).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
@@ -608,17 +681,17 @@ export const CASES = Object.freeze([
       {
         selector: '[data-manager-header-action="lab-back"]',
         name: 'class',
-        value: 'fabricate-button manager-button is-ghost',
+        value: 'fabricate-button is-ghost',
       },
       {
         selector: '[data-manager-header-action="lab-delete"]',
         name: 'class',
-        value: 'fabricate-button manager-button is-danger',
+        value: 'fabricate-button is-danger',
       },
       {
         selector: '[data-manager-header-action="lab-save"]',
         name: 'class',
-        value: 'fabricate-button manager-button is-primary',
+        value: 'fabricate-button is-primary',
       },
       // The companion's screen is still mounted: the header changed, the mount did not.
       {
@@ -634,8 +707,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/svelte\/components\/Chip\.svelte$/,
@@ -673,8 +747,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 1000 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
@@ -721,11 +796,46 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^styles\/fabricate\.css$/,
     ],
+  }),
+  // The wrapped strip's last tab, reached by a pointer, so the frame shows its description at the card's end (issue 1779).
+  downtimeStripPointerCase({
+    id: 'manager-world-downtime-narrow-settings',
+    label: 'Manager — World Downtime narrow strip, Settings by pointer',
+    tabId: 'settings',
+    tooltip: 'Preview campaign calendar, permissions and resolution settings in Fabricate Premium',
+    attributes: [
+      {
+        selector: '[data-downtime-tab="settings"]',
+        name: 'aria-label',
+        value: 'Open campaign calendar, permissions and resolution settings',
+      },
+    ],
+    query: { system: 'lab-smithing', longDowntimeLabels: '1' },
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.fabricate-manager',
+    ],
+    position: { width: 960, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+  }),
+  // The wide strip's first tab under the pointer, with no CTA step to take focus, so the frame shows its description (issue 1779).
+  downtimeStripPointerCase({
+    id: 'manager-world-downtime-tracking-described',
+    label: 'Manager — World Downtime Tracking described by pointer',
+    tabId: 'tracking',
+    tooltip: 'Preview Downtime Tracking · Fabricate Premium',
+    query: { system: 'lab-smithing' },
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
   }),
 ]);

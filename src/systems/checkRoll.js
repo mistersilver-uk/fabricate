@@ -7,18 +7,21 @@
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
+import { resolveAdvantageOffer } from './checkAdvantage.js';
 import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
+import { evaluateKeptRoll } from './checkKeepTransform.js';
 import {
   resolveCheckModifierFormula,
   resolvedLibraryContributions,
 } from './checkModifierResolver.js';
-import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
+import { resolveModifierPreRolls } from './checkModifierRolls.js';
 import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { defersModifierChoice, resolveCheckDecision } from './checkRollDecision.js';
 import {
   checkRollHandoff,
   postCheckRoll,
   preRollEvidence,
+  reportedVisibility,
   rolledDiceGroups,
 } from './checkRollOutput.js';
 import {
@@ -34,17 +37,22 @@ import {
   progressiveTargetRefusal,
   targetFlavorSuffix,
 } from './checkTarget.js';
-import { preparedCountEvaluation } from './countCheck.js';
+import { preparedCountEvaluation, preparedCountOptions } from './countCheck.js';
 import {
+  carryAdditionalDice,
   evaluateCountCheckRoll,
   preparedCountResult,
   runCountPassFail,
   runCountProgressive,
   runCountRouted,
 } from './countCheckRoll.js';
+import { authorizedPreparedDecision, validatedPreparedDecision } from './preparedDecisionPolicy.js';
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
-export { rolledDiceGroups } from './checkRollOutput.js';
+export { postCheckRollHandoff, rolledDiceGroups } from './checkRollOutput.js';
+
+const noRoll = () => ({ engine: false, total: 0, diceGroups: [], resolvedFormula: null });
+const cancelled = (data) => ({ success: false, cancelled: true, outcome: null, value: null, data });
 
 /**
  * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
@@ -110,13 +118,6 @@ function routedTriggerEvidence({ forcedDisposition, tierStepApplied }) {
   };
 }
 
-/** The executed roll mode, on a result whose caller asked for it; never persisted. */
-function reportedVisibility(rolled) {
-  return rolled && Object.hasOwn(rolled, 'rollMode')
-    ? { visibility: { rollMode: rolled.rollMode, secret: false } }
-    : {};
-}
-
 /**
  * The formula this module actually rolls and its modifier placement: the retired-placeholder shim
  * (issue 1094), then the library append for `evaluation`. One derivation, because the roll, the
@@ -175,31 +176,24 @@ function resolveRolledCheck(
  * returns (issues 770, 1055); otherwise `craftingModifier` appends before anything reads the
  * formula. A cancelled prompt returns `cancelled: true` so the runner aborts with zero mutation.
  * Separately evaluated modifiers settle before the main roll and return their ordered placement.
+ * `advantage` is the check's normalized advantage rule, the normalizer's default when absent.
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   // A count check rolls its structured pool, so its retained formula never reaches `Roll`.
   if (ownEvaluation(options).product === 'count') return evaluateCountCheckRoll(actor, options);
-  if (typeof globalThis.Roll !== 'function')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  if (typeof globalThis.Roll !== 'function') return noRoll();
   // The retirement shim runs first, unconditionally (issue 1094): a surviving token never
   // reaches `Roll` or double-counts against the appended term.
   const authoredFormula = stripRetiredModifierPlaceholder(String(formula));
   // A formula the shim emptied is not a check. The usability readers already gate on it; this
   // backstop keeps `new Roll('')` (a rolled, consuming failure) unreachable by any other route.
-  if (authoredFormula.trim() === '')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  if (authoredFormula.trim() === '') return noRoll();
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const evaluation = ownEvaluation(options);
   const deferred = defersModifierChoice(options);
   const resolvedCheck = deferred
     ? { formula: authoredFormula, selected: [] }
-    : resolveRolledCheck(
-        authoredFormula,
-        actor,
-        options?.craftingModifier,
-        globalThis.Roll,
-        evaluation
-      );
+    : resolveRolledCheck(authoredFormula, actor, options?.craftingModifier, undefined, evaluation);
   const decision = await resolveCheckDecision({
     authoredFormula,
     actor,
@@ -211,7 +205,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     Roll: globalThis.Roll,
   });
   if (decision.cancelled) {
-    return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
+    return carryAdditionalDice({ ...noRoll(), engine: true, cancelled: true }, decision);
   }
   const {
     formula: effectiveFormula,
@@ -226,31 +220,24 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     { Roll: globalThis.Roll, rollData }
   );
 
-  // `allowInteractive: false`: no manual-fulfilment dialog mid-craft, as in V13 `Roll.simulate`.
-  const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
-    allowInteractive: false,
-  });
+  // Construct, keep (issue 2007), then evaluate with no manual-fulfilment dialog mid-craft.
+  const { roll, kept } = await evaluateKeptRoll(effectiveFormula, rollData, decision.keep);
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
   const flavor = settledFlavor(options, effectiveFlavor, evaluation, modifierPlacement);
 
-  await postCheckRoll({ roll, preRolls, options, flavor, rollMode: effectiveRollMode });
+  const posting = { roll, options, flavor, rollMode: effectiveRollMode };
   const result = {
     engine: true,
     total,
     diceGroups: rolledDiceGroups(roll),
-    resolvedFormula,
+    resolvedFormula: kept ? roll.formula : resolvedFormula,
     modifierPlacement,
     ...(benefitTerms?.length > 0 && { benefitTerms }),
     ...(options?.reportVisibility === true && { rollMode: effectiveRollMode ?? null }),
+    ...(await postCheckRoll({ ...posting, preRolls })),
   };
-  const rollHandoff = checkRollHandoff({
-    roll,
-    placement: modifierPlacement,
-    options,
-    flavor,
-    rollMode: effectiveRollMode,
-  });
+  const rollHandoff = checkRollHandoff({ ...posting, placement: modifierPlacement });
   if (rollHandoff) result.rollHandoff = rollHandoff;
   return result;
 }
@@ -282,31 +269,6 @@ function ownEvaluation(...sources) {
   return SUM_OVER_EVALUATION;
 }
 
-function validatedPreparedDecision(decision, modifierChoice) {
-  const source = decision && typeof decision === 'object' ? decision : {};
-  const offered = new Set(
-    (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [])
-      .map((modifier) => modifier?.id)
-      .filter((id) => typeof id === 'string')
-  );
-  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : []).filter(
-    (id) => typeof id === 'string' && offered.has(id)
-  );
-  const advantage = ['advantage', 'disadvantage'].includes(source.advantage)
-    ? source.advantage
-    : null;
-  const rollMode = ['publicroll', 'gmroll', 'blindroll', 'selfroll'].includes(source.rollMode)
-    ? source.rollMode
-    : null;
-  // Absent ids fall through to the descriptor's defaults; an empty array is an answer.
-  return {
-    bonus: typeof source.bonus === 'string' ? source.bonus : null,
-    advantage,
-    rollMode,
-    ...(Array.isArray(source.modifierIds) && { chosenModifierIds: selected }),
-  };
-}
-
 /**
  * Evaluate a GM-retained check plan from player decisions. Client totals, formulas and modifier
  * values are absent from the accepted boundary; eligible modifier ids are revalidated here.
@@ -317,7 +279,14 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   const source = preparation && typeof preparation === 'object' ? preparation : {};
   const options = source.options && typeof source.options === 'object' ? source.options : {};
   const secret = source.secret === true;
-  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice);
+  // The prepare-time snapshot's own offer: a button it excludes never reaches the roll.
+  const advantageOffer = resolveAdvantageOffer({
+    advantage: options.advantage,
+    evaluation: ownEvaluation(options),
+    authoredFormula: stripRetiredModifierPlaceholder(String(source.formula ?? '')),
+    Roll: globalThis.Roll,
+  });
+  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice, advantageOffer);
   // Secrecy is authoritative, not a default that the player's roll-mode choice may override.
   if (secret) rollDecision.rollMode = 'gmroll';
   const result = await evaluateCheckRoll(source.formula, actor, {
@@ -337,6 +306,8 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     resolvedFormula: null,
     modifierPlacement: result.modifierPlacement,
     ...(result.refusal && { refusal: result.refusal }),
+    ...(result.bought && { bought: result.bought }),
+    ...(result.cancelled && carryAdditionalDice({ cancelled: true }, result)),
     ...(result.policy && {
       policy: result.policy,
       zeroPool: result.zeroPool === true,
@@ -346,7 +317,7 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   };
 }
 
-function preparedCheckKind(preparation) {
+export function preparedCheckKind(preparation) {
   const slot = String(preparation?.slot ?? '').toLowerCase();
   const mode = String(preparation?.mode ?? '').toLowerCase();
   if (slot.includes('progressive') || mode.includes('progressive')) return 'progressive';
@@ -472,6 +443,32 @@ function gradePreparedTotal(
 }
 
 /**
+ * The options a prepared check rolls with, every one from its prepare-time capture: the advantage
+ * rule is the snapshot's, so a config edit between prepare and execute changes nothing.
+ */
+function preparedRollOptions(
+  preparation,
+  { config, advantage, evaluation, count, kind, secret, anchor, rollMode, user }
+) {
+  return {
+    flavor:
+      preparation?.flavor ?? preparation?.publicPrompt?.label ?? config.label ?? 'Crafting check',
+    rollMode: secret ? 'gmroll' : (rollMode ?? 'selfroll'),
+    craftingModifier: config.craftingModifier ?? null,
+    modifierChoice: config.modifierChoice ?? null,
+    toolContributions: config.toolContributions ?? [],
+    evaluation,
+    advantage,
+    speaker: preparation?.speaker ?? config.speaker ?? null,
+    ...preparedCountOptions(count, { secret, kind, type: config.type }),
+    // A pass/fail roll names its final target; a secret one never carries it.
+    ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
+    reportVisibility: true,
+    user,
+  };
+}
+
+/**
  * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
  * formula or total. This is the authority-side twin of the three existing formula runners; it
  * places by the prepared evaluation and grades against the captured `decisionPolicy.target`.
@@ -480,7 +477,7 @@ export async function evaluatePreparedRunCheck(
   preparation,
   actor,
   decision = {},
-  { secret = false, failureMessage = 'Check failed', label = 'Crafting' } = {}
+  { secret = false, failureMessage = 'Check failed', label = 'Crafting', user = null } = {}
 ) {
   const checkConfig =
     preparation?.checkConfig && typeof preparation.checkConfig === 'object'
@@ -502,39 +499,27 @@ export async function evaluatePreparedRunCheck(
     return checkTargetRefusal('invalid', label, { refusedInput: 'pool' });
   }
   const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
-  const authoritativeDecision = {
-    ...decision,
-    bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
-    advantage: decision?.allowAdvantage === true ? decision.advantage : null,
-  };
+  const authoritativeDecision = authorizedPreparedDecision(decision);
+  if (authoritativeDecision.additionalDiceRefusal) {
+    return carryAdditionalDice(cancelled({}), authoritativeDecision);
+  }
+  const options = preparedRollOptions(preparation, {
+    config,
+    advantage: checkConfig.advantage,
+    evaluation,
+    count,
+    kind,
+    secret,
+    anchor,
+    rollMode: authoritativeDecision.rollMode,
+    user,
+  });
   const rolled = await evaluatePreparedCheck(
-    {
-      formula: preparation?.rollFormula,
-      secret,
-      options: {
-        flavor:
-          preparation?.flavor ??
-          preparation?.publicPrompt?.label ??
-          config.label ??
-          'Crafting check',
-        rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
-        craftingModifier: config.craftingModifier ?? null,
-        modifierChoice: config.modifierChoice ?? null,
-        toolContributions: config.toolContributions ?? [],
-        evaluation,
-        speaker: preparation?.speaker ?? config.speaker ?? null,
-        ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
-        // A pass/fail roll names its final target; a secret one never carries it.
-        ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
-        reportVisibility: true,
-      },
-    },
+    { formula: preparation?.rollFormula, secret, options },
     actor,
     authoritativeDecision
   );
-  if (rolled.cancelled) {
-    return { success: false, cancelled: true, outcome: null, value: null, data: {} };
-  }
+  if (rolled.cancelled) return carryAdditionalDice(cancelled({}), rolled);
   if (count) {
     const grading = { config, required: count.required, secret, failureMessage, label };
     return preparedCountResult(kind, rolled, grading);
@@ -592,45 +577,6 @@ export function evaluatePreparedCraftingCheck(preparation, actor, decision = {},
     failureMessage: 'Crafting check failed',
     ...options,
   });
-}
-
-/** Reconstruct and post an entitled GM-evaluated roll, including serialized pre-rolls without rerolling. */
-export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } = {}) {
-  if (!handoff?.serializedRoll || typeof Roll?.fromData !== 'function') {
-    return { success: false, reason: 'invalid-roll-handoff' };
-  }
-  try {
-    const roll = Roll.fromData(handoff.serializedRoll);
-    if (!roll) {
-      return { success: false, reason: 'invalid-roll-handoff' };
-    }
-    const serializedPreRolls = handoff.serializedPreRolls;
-    if (Array.isArray(serializedPreRolls) && serializedPreRolls.length > 0) {
-      const preRolls = serializedPreRolls.map((data) => Roll.fromData(data));
-      if (preRolls.some((entry) => !entry)) {
-        return { success: false, reason: 'invalid-roll-handoff' };
-      }
-      await postBundledCheckRoll({
-        mainRoll: roll,
-        preRolls,
-        speaker: handoff.speaker ?? undefined,
-        flavor: handoff.flavor ?? undefined,
-        rollMode: handoff.rollMode,
-      });
-    } else {
-      if (typeof roll.toMessage !== 'function') {
-        return { success: false, reason: 'invalid-roll-handoff' };
-      }
-      await roll.toMessage(
-        { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
-        { ...chatModeOption(handoff.rollMode), create: true }
-      );
-    }
-    return { success: true };
-  } catch (error) {
-    console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
-    return { success: false, reason: 'chat-post-failed' };
-  }
 }
 
 /**
@@ -753,9 +699,7 @@ async function rollRunnerFormula({ formula, actor, options, label, kind = '', da
       },
     };
   }
-  if (rolled.cancelled) {
-    return { exit: { success: false, cancelled: true, outcome: null, value: null, data } };
-  }
+  if (rolled.cancelled) return { exit: carryAdditionalDice(cancelled(data), rolled) };
   if (!rolled.engine) return { exit: headless };
   const { total, diceGroups, resolvedFormula } = rolled;
   return { rolled, total, diceGroups, resolvedFormula };
@@ -846,7 +790,8 @@ export async function runFormulaPassFail({
 /**
  * A progressive check: the total becomes the `value` progressive awarding spends, and the
  * activity always proceeds unless the roll itself throws or the prompt is cancelled. A forced
- * success awards everything (`MAX_SAFE_INTEGER`), a forced failure nothing.
+ * success awards everything (`MAX_SAFE_INTEGER`), a forced failure nothing. `thresholdMode` is
+ * read only as a counting check's per-die test, else the slot's own from `rollOptions`.
  */
 export async function runFormulaProgressive({
   formula: rawFormula,
@@ -855,18 +800,13 @@ export async function runFormulaProgressive({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  thresholdMode,
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
   if (evaluation.product === 'count') {
-    return runCountProgressive({
-      rollOptions,
-      evaluation,
-      craftingModifier,
-      triggers,
-      actor,
-      label,
-    });
+    const count = { rollOptions, evaluation, thresholdMode, craftingModifier };
+    return runCountProgressive({ ...count, triggers, actor, label });
   }
   const refusal = progressiveTargetRefusal(evaluation);
   if (refusal) return checkTargetRefusal(refusal, label);

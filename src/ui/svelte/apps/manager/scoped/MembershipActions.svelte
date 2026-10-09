@@ -11,7 +11,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import { scopedEnableable } from './scopedStudio.js';
@@ -109,10 +109,10 @@
       />
     {/if}
     {#if copyable}
-      <ManagerButton {disabled} data-scoped-membership-copy onclick={() => onCopyFrom()}>
+      <Button {disabled} data-scoped-membership-copy onclick={() => onCopyFrom()}>
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Scoped.Membership.CopyFrom', 'Copy from…')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
     <ArmedDangerButton
       token={removeToken}
@@ -129,10 +129,10 @@
       onConfirm={() => onRemove()}
     />
   {:else}
-    <ManagerButton role="primary" {disabled} data-scoped-membership-add onclick={() => onAdd()}>
+    <Button role="primary" {disabled} data-scoped-membership-add onclick={() => onAdd()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Scoped.Membership.Add', 'Add to this system')}</span>
-    </ManagerButton>
+    </Button>
     {#if hint}
       <p class="manager-muted" data-scoped-membership-hint>
         {text(

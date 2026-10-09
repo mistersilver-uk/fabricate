@@ -18,7 +18,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
@@ -32,6 +32,7 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import {
     RECIPE_SORT_KEYS,
+    recipeCheckPill,
     recipeCheckSortLabel,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
@@ -40,8 +41,8 @@
   } from '../../../model/recipeBrowserModel.js';
   import IconButton from '../../components/IconButton.svelte';
   import Notice from '../../components/Notice.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -315,10 +316,10 @@
   // tier- or set-keyed mode has no single outputs number, so it reports the RESULT-GROUP count
   // with a routing glyph instead.
   function groupsText(count) {
-    // "1 groups" is not a sentence. The singular is its own key.
+    // "1 sets" is not a sentence. The singular is its own key.
     return count === 1
-      ? text('FABRICATE.Admin.Manager.Recipe.CountResultGroupsOne', '1 group')
-      : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} groups', { count });
+      ? text('FABRICATE.Admin.Manager.Recipe.CountResultGroupsOne', '1 set')
+      : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} sets', { count });
   }
 
   function ioReadout(recipe) {
@@ -340,65 +341,9 @@
       : text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step');
   }
 
-  // The five check states. `none` is the one WARNING: a system that cannot roll for this recipe
-  // is a thing the GM must be able to scan a library for. `ingredients` is its neutral sibling —
-  // a routedByIngredients system resolves off the ingredient set that was used, so no check is a
-  // working configuration, not a gap.
-  const CHECK_PILLS = {
-    dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
-    // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
-    target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
-    attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
-    dynamicTarget: [
-      'FABRICATE.Admin.Manager.Recipe.CheckDynamicTarget',
-      'Dynamic target',
-      'fas fa-dice-d20',
-    ],
-    dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
-    progressive: [
-      'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
-      'Progressive',
-      'fas fa-list-ol',
-    ],
-    ingredients: [
-      'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
-      'By ingredients',
-      'fas fa-code-branch',
-    ],
-    // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
-    // treatment as `progressive` and `ingredients`: a working configuration, not a fault.
-    checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
-  };
-
-  const CHECK_TOOLTIPS = {
-    ingredients: [
-      'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
-      'This system routes results by the ingredient set used, with no crafting check.',
-    ],
-    checkOff: [
-      'FABRICATE.Admin.Manager.Recipe.CheckOffTooltip',
-      'This system’s crafting check is switched off, so every matched attempt resolves as a success.',
-    ],
-    none: [
-      'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
-      'This system has no usable crafting check.',
-    ],
-  };
-
   // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot resolve
   // `checkTierId` to a tier DC, nor the system's mode, on its own.
-  function checkPill(recipe) {
-    const summary = recipe?.checkSummary || { kind: 'none', dc: null };
-    const [labelKey, fallback, icon] = CHECK_PILLS[summary.kind] || CHECK_PILLS.none;
-    const tooltip = CHECK_TOOLTIPS[summary.kind];
-    return {
-      kind: summary.kind,
-      icon,
-      label: format(labelKey, fallback, { dc: summary.dc ?? '' }),
-      title: tooltip ? text(tooltip[0], tooltip[1]) : '',
-    };
-  }
+  const checkPill = (recipe) => recipeCheckPill(recipe?.checkSummary, format);
 
   function isSelectedRecipe(recipe) {
     return !!selectedRecipeId && recipe.id === selectedRecipeId;
@@ -432,7 +377,7 @@
           detail={flashDetail}
           dismissable
           dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-          dataAttr="data-recipe-flash"
+          data-recipe-flash=""
         />
       {/if}
     {/key}
@@ -441,7 +386,7 @@
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
        1157) — see the twin note in `EssenceBrowserView`. The manager root addresses it through
        `data-recipe-toolbar`. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-recipe-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -449,9 +394,9 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >
     <div class="manager-recipe-filter-row">
-      <ManagerSearchField
+      <SearchField
         value={recipeSearchTerm || ''}
-        onInput={(next) => onSearchChange(next)}
+        onChange={(next) => onSearchChange(next)}
         placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
       />
@@ -463,7 +408,7 @@
           'FABRICATE.Admin.Manager.Recipe.StatusFilterLabel',
           'Filter recipes by status'
         )}
-        dataAttr="data-recipe-status-filter"
+        data-recipe-status-filter
         optionDataAttr="data-recipe-status-option"
         onChange={(value) => {
           ui.statusFilter = value;
@@ -478,7 +423,7 @@
           'FABRICATE.Admin.Manager.Recipe.LockFilterLabel',
           'Filter recipes by lock state'
         )}
-        dataAttr="data-recipe-lock-filter"
+        data-recipe-lock-filter
         optionDataAttr="data-recipe-lock-option"
         onChange={(value) => {
           ui.lockFilter = value;
@@ -503,7 +448,7 @@
             'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
             'Filter recipes by category'
           )}
-          triggerData={{ 'data-recipe-category-filter': '' }}
+          triggerProps={{ 'data-recipe-category-filter': '' }}
           onChange={(next) => {
             ui.categoryFilter = next;
             ui.pageIndex = 0;
@@ -532,10 +477,10 @@
           value={ui.sortKey}
           options={sortSelectOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
-          triggerData={{ 'data-recipe-sort': '' }}
+          triggerProps={{ 'data-recipe-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
-        <ManagerButton
+        <Button
           class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
           aria-label={text(
@@ -555,7 +500,7 @@
               ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </div>
 
@@ -608,7 +553,7 @@
       onSelectAllResults={selection.selectAllResults}
       onClear={selection.clear}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll"
@@ -633,8 +578,8 @@
           'No recipes match your filters.'
         )}
       >
-        <ManagerButton data-clear-filters="recipes" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="recipes" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}
@@ -697,7 +642,7 @@
                         art={resolveRecipeImage(recipe)}
                         alt=""
                         icon="fas fa-scroll"
-                        size={40}
+                        size={38}
                       />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
@@ -749,7 +694,7 @@
                            kinds stay in the UI face. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
-                        mono={check.kind === 'dc' || check.kind === 'target'}
+                        mono={check.mono}
                         icon={check.icon}
                         data-recipe-check={check.kind}
                         title={check.title || undefined}
@@ -823,7 +768,7 @@
                         primitive renders its own `<label>` for the association and click target.
                       -->
                       <SelectionCheckbox
-                        size="lg"
+                        density="comfortable"
                         wrapper="label"
                         checked={bulkSelectedIds.has(recipe.id)}
                         ariaLabel={format(

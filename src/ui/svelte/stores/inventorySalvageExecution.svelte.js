@@ -9,6 +9,8 @@
  * injected thunk, so there is no import back to the store and no helper declared twice.
  */
 
+import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
+
 // The shared "nothing fired" list (issue 1286). Frozen and hoisted so every un-fired
 // state — pre-roll, time-gated, runless, and a resolution that fired nothing — reaches
 // `markFiredStageComplications` as the SAME empty array, which returns the stage list by
@@ -120,6 +122,13 @@ function failureSnapshot(result, systemId, componentId) {
       img: typeof entry?.img === 'string' ? entry.img : null,
     })),
   };
+}
+
+/** The salvaging actor's name, which an additional-dice notice names (issue 2008). */
+function salvagingActorName(row, participation) {
+  const sources = Array.isArray(row?.sources) ? row.sources : [];
+  const actorId = participation?.salvage?.targetActorId;
+  return sources.find((source) => source?.actorId === actorId)?.actorName;
 }
 
 /**
@@ -265,8 +274,7 @@ export function createSalvageExecution({
     try {
       const flush = await flushOrder?.();
       if (flush?.ok === false) {
-        // The revert and its live-region announcement already happened inside the
-        // flush. Consume nothing.
+        // The flush already reverted and announced it, so consume nothing.
         return { success: false, message: orderAnnouncement?.() ?? '' };
       }
       const result = await services?.salvageComponent?.({
@@ -276,6 +284,7 @@ export function createSalvageExecution({
         componentId,
         interactive: true,
       });
+      notifyAdditionalDice(result, services, salvagingActorName(row, participation));
       return await recordOutcome(result, row, systemId, componentId);
     } catch (error) {
       const message = error?.message ?? String(error);

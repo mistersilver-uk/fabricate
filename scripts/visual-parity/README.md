@@ -87,7 +87,7 @@ State it as a rule rather than as a preference: **a pass run against a mirror ca
 A fixture is a mirror of what its author believed the app renders, and **a hand-maintained mirror does not fail — it drifts.**
 It drifts in the way nobody looks for, too.
 This one did not merely keep a stale class: its `roll` screen modelled `SimpleCraftingCheckEditor`'s static-DC card, which was never broken, and never modelled `CraftingCheckEditor`'s routed tier list at all.
-When that list shipped wrapped in the bare `.manager-inspector-card` shell — 12px of padding the studio card contract exists to strip, insetting every tier row past the Difficulty card above it — the comparison reported *no drift*, because **it could not be wrong about a component it did not model.**
+When that list shipped wrapped in the bare `.fabricate-card` shell — 12px of padding the studio card contract exists to strip, insetting every tier row past the Difficulty card above it — the comparison reported *no drift*, because **it could not be wrong about a component it did not model.**
 A maintainer caught it by eye.
 
 So the mirror is retired.
@@ -285,7 +285,7 @@ Add the property to that region's `exemptions` in the **fixture**, next to the m
 
 ```json
 "exemptions": {
-  "width": "SHARED PRIMITIVE. The switch is the manager-wide `.manager-status-toggle` …"
+  "width": "SHARED PRIMITIVE. The switch is the manager-wide `.fabricate-toggle` …"
 }
 ```
 
@@ -386,7 +386,7 @@ Two of these matter most, because each is a failure this harness was extended fo
 
 **The card control**, worked by gating `CraftingCheckEditor`'s check-type card off: the pass went from reporting that card as matched to `MISSING CARD "Check type" … the subject has no card with that title`, and restoring it returned the run to its previous findings.
 
-**The alignment control**, worked by reverting the same component's tier-list wrapper from `manager-inspector-card manager-checks-card` to the bare `manager-inspector-card` — the defect that motivated pointing this pass at the real app.
+**The alignment control**, worked by reverting the same component's tier-list wrapper from `fabricate-card manager-checks-card` to the bare `fabricate-card` — the defect that motivated pointing this pass at the real app.
 The run named it twice, in the region and in the relationship:
 
 ```text

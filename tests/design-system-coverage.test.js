@@ -13,7 +13,10 @@ import {
 } from '../scripts/lib/designSystemPrimitives.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
+import { readDeclaration } from './helpers/apiConvention.js';
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
+import { componentAstOf } from './helpers/parsedSource.js';
+import { PRIMITIVE_DIRECTORY, assertMovedByDiff, registerBase } from './helpers/registerBase.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +39,7 @@ const MANIFEST_NAMES = MANIFEST_ROWS.filter((row) => row.library !== null).map((
   row.library.slice(1, -1)
 );
 
-/** The nine name-shaped ruled-out candidates, DERIVED rather than re-typed. */
+/** The ten name-shaped ruled-out candidates, DERIVED rather than re-typed. */
 const RULED_OUT_NAMES = RULED_OUT.flatMap((entry) => primitiveNamesIn(entry.name));
 
 /** Every shipped component, as the repository-relative POSIX path a manifest row names. */
@@ -50,58 +53,68 @@ const SHIPPED_COMPONENT_NAMES = new Set(
   SHIPPED_COMPONENT_PATHS.map((file) => path.basename(file, '.svelte'))
 );
 
-/**
- * The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive.
- *
- * Its `startsWith` test decides only where a manifest row is compulsory (issue 1481 item 2); a
- * component in a nested `apps/manager` directory may hold a row and is not compelled to.
- */
-const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
-
 test('the corpus every property below quantifies over is alive', () => {
   assert.ok(library.blockCount > 0, 'the parser found no spec-head block; the anchor is dead');
   assert.ok(MANIFEST_ROWS.length > 0, 'the manifest is empty, so every comparison is vacuous');
-  assert.equal(
-    RULED_OUT_NAMES.length,
-    9,
-    'the name-shaped ruled-out register changed size; it is the subtrahend in the residue check ' +
-      'below, so a silent change there silently changes what counts as an orphan citation'
-  );
+  assert.ok(RULED_OUT_NAMES.length > 0, 'the name-shaped ruled-out register is empty');
   assert.ok(
     SHIPPED_COMPONENT_NAMES.size > 50,
     `the component walk found ${SHIPPED_COMPONENT_NAMES.size} files, so it is not walking`
   );
 });
 
-test('the library has the exact structure the parser assumes', () => {
-  // EXACT rather than floors. Every one of these is a fact about a hand-authored file that the
-  // properties below read as if it were a database, and each moves only when someone edits that
-  // file — at which point the edit should be accepted deliberately rather than absorbed (issue
-  // 1371).
-  assert.equal(library.blockCount, 59, 'spec-head block count');
+test('the library has the exact structure the parser assumes', (t) => {
+  // Each count is the base's plus this diff's own additions and removals (issue 1495), so an edit
+  // is accepted by the diff that shows it rather than by a literal two PRs both rewrite.
   assert.equal(
     library.headingCount,
-    59,
+    library.blockCount,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 71, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    71,
+    library.names.length,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
-  assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
-
-  // The only pair that pins the ANCHOR as narrower than a file-wide scan.
-  assert.equal(library.fileWideNames.length, 82, 'file-wide primitive-shaped names');
-  assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
+  const base = registerBase();
+  if (base.skipped) return t.skip(base.skipped);
+  const was = base.library;
+  const sets = [
+    ['spec-head blocks', was.headings, library.headings, library.blockCount],
+    ['distinct primitive names', was.names, library.names, library.names.length],
+    [
+      'section-prose blocks',
+      was.nonPrimitiveHeadings,
+      library.nonPrimitiveHeadings,
+      library.nonPrimitiveHeadings.length,
+    ],
+    [
+      'naming blocks',
+      was.headings.filter((heading) => !was.nonPrimitiveHeadings.includes(heading)),
+      library.headings.filter((heading) => !library.nonPrimitiveHeadings.includes(heading)),
+      library.headings.length - library.nonPrimitiveHeadings.length,
+    ],
+    // The pair that pins the ANCHOR as narrower than a file-wide scan.
+    [
+      'file-wide primitive-shaped names',
+      was.fileWideNames,
+      library.fileWideNames,
+      library.fileWideNames.length,
+    ],
+    [
+      'names outside every spec-head heading',
+      was.namesOutsideHeadings,
+      library.namesOutsideHeadings,
+      library.namesOutsideHeadings.length,
+    ],
+  ];
+  for (const [label, before, now, count] of sets) assertMovedByDiff(label, before, now, count);
 });
 
 /**
- * The 20 `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
+ * The `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
  * decoded text.
  */
 const NON_PRIMITIVE_HEADINGS = [
@@ -150,10 +163,10 @@ test('every recorded section-prose heading is still in the library', () => {
   }
 });
 
-test('the section-prose register is pinned at its measured size and holds no primitive name', () => {
+test('the section-prose register matches the library prose blocks and holds no primitive name', () => {
   assert.equal(
     NON_PRIMITIVE_HEADINGS.length,
-    20,
+    library.nonPrimitiveHeadings.length,
     'without this pin the cheapest way to green a new `<h4>Toggle</h4>` is to append `Toggle` ' +
       'here, which is the drift the census exists to catch'
   );
@@ -190,17 +203,12 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 26 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512, when the specified primitive
- * shipped, and the count this docblock states is the array's own length.
+ * The library entries with no shipped implementation (issue 1505), re-derived from the array: an
+ * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
-  'DataTable', 'InfoStrip', 'LogList', 'Menu',
-  'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
-  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
-  'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'Well', 'XrefList',
+  'AppTitleBar',
+  'TierTrack', 'ViewToggle', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -438,22 +446,27 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
  * 1502).
  */
 const RE_ROOTED_ROWS = [
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  'src/ui/svelte/components/DataTable.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/PageHeader.svelte',
+  'src/ui/svelte/components/NavSidebar.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  'src/ui/svelte/components/Typeahead.svelte',
 ];
 
 /** The gate that PROVES a family is not application-rooted, read for its component paths only. */
@@ -496,6 +509,26 @@ test('every member row records a scope from the closed vocabulary, and no non-me
         'a member of the vocabulary may render; on a row the register has adjudicated OUT of the ' +
         'vocabulary it is a decision about a component the register says is not a member. This is ' +
         'the same boundary the status clause above draws, for the same reason.'
+    );
+  }
+});
+
+/** The ruled-out register's verdicts; only `merged` names a library entry as its replacement. */
+const RULED_OUT_VERDICTS = ['composition', 'foundry-owns', 'merged', 'out-of-scope'];
+
+test('every ruled-out verdict is from the closed set, and a merged name points at an entry', () => {
+  for (const entry of RULED_OUT) {
+    assert.ok(
+      RULED_OUT_VERDICTS.includes(entry.verdict),
+      `${entry.name} carries verdict ${JSON.stringify(entry.verdict)}, outside the closed set`
+    );
+  }
+  const merged = RULED_OUT.filter((entry) => entry.verdict === 'merged');
+  assert.ok(merged.length > 0, 'no entry is merged, so the replacement half has no domain');
+  for (const entry of merged) {
+    assert.ok(
+      library.names.includes(entry.replacement),
+      `${entry.name} was merged into ${JSON.stringify(entry.replacement)}, which heads no entry`
     );
   }
 });
@@ -579,6 +612,101 @@ test('every entry recorded as specified-but-unbuilt is declared a target', () =>
   }
 });
 
+/**
+ * Names issue 1782 built, which must read `shipped` in the library. The status clause above reads
+ * member rows only and the target ratchet fails only on additions, so a non-member such as
+ * `StageBars` left at `target` would pass both.
+ */
+const BUILT_BY_1782 = [
+  'Meter',
+  'BandedBar',
+  'StageBars',
+  'ValidationSummary',
+  'RuleRow',
+  'RuleSentence',
+  'SetPicker',
+  'Rail',
+  'LogList',
+  'DataTable',
+  // Restyled to the specimen rather than built, by maintainer ruling 2 (2026-09-19).
+  'Search',
+  // Born shipped, never `target`: the one shared type-to-search control the maintainer named.
+  'Typeahead',
+];
+
+/** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
+const DELETED_BY_1782 = ['ValidationList'];
+
+/** Names issue 1777 merged away (decision E2), held to the same register as issue 1782's. */
+const MERGED_BY_1777 = ['AppRail'];
+
+/** Names issue 1778 merged away (decision D2): a browse card is ListRow's card layout. */
+const MERGED_BY_1778 = ['BrowseCard'];
+
+test('every name issue 1782 built reads shipped in the library', () => {
+  for (const name of BUILT_BY_1782) {
+    assert.equal(
+      PER_NAME_STATUS.get(name),
+      'shipped',
+      `${name} ships as a component and its specimen still declares ` +
+        JSON.stringify(PER_NAME_STATUS.get(name))
+    );
+  }
+});
+
+test('every name issue 1782, 1777 or 1778 merged away is no entry and is recorded as ruled out', () => {
+  for (const name of [...DELETED_BY_1782, ...MERGED_BY_1777, ...MERGED_BY_1778]) {
+    assert.ok(!library.names.includes(name), `${name} was merged and still heads an entry`);
+    const entry = RULED_OUT.find((row) => primitiveNamesIn(row.name).includes(name));
+    assert.ok(entry, `${name} was merged and the register omits it`);
+    assert.equal(entry.verdict, 'merged', `${name} is on the register under another verdict`);
+  }
+});
+
+test("the spec's closed-vocabulary sentence counts the library's naming headings and names", () => {
+  const spec = readFileSync(path.join(REPO_ROOT, 'openspec/specs/design-system/spec.md'), 'utf8');
+  const stated = spec.match(/the (\d+) naming headings declare (\d+) distinct names/u);
+  assert.ok(stated, 'the spec no longer states how many names the library declares');
+  assert.deepEqual(
+    [Number(stated[1]), Number(stated[2])],
+    [NAMING_BLOCKS.length, library.names.length],
+    'the spec states a heading or name count the library does not hold'
+  );
+});
+
+test('the library\'s "Ruled out" section draws one Merged well per merged name on the register', () => {
+  const section = librarySource.match(/<section id="ruledout">([\s\S]*?)<\/section>/u)?.[1];
+  assert.ok(section, 'the library has no "Ruled out" section to read');
+  const wells = [
+    ...section.matchAll(
+      /<span class="tag t-out">Merged<\/span><span class="k-mono"[^>]*>&lt;(\w+)&gt;<\/span>/gu
+    ),
+  ].map((match) => match[1]);
+  const merged = RULED_OUT.flatMap((entry) =>
+    entry.verdict === 'merged' ? primitiveNamesIn(entry.name) : []
+  );
+  assert.ok(merged.length > 0, 'the register merges nothing, so this has no domain');
+  assert.deepEqual(
+    wells.toSorted(byCodePoint),
+    merged.toSorted(byCodePoint),
+    'a Merged well and the ruled-out register disagree'
+  );
+});
+
+test('the <ValidationSummary> specimen names every prop its shipped component declares', () => {
+  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<ValidationSummary>');
+  assert.ok(row, 'no manifest row names <ValidationSummary>, so there is no component to read');
+  const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
+  const block = library.blocks.find((entry) => entry.names.includes('ValidationSummary'));
+  const named = new Set(block?.apiNames);
+  assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
+  assert.deepEqual(
+    props.filter((name) => !named.has(name)),
+    [],
+    'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
+  );
+});
+
 test('a divergent entry names the issue that decided it', () => {
   // NO DOMAIN GUARD, and that is deliberate rather than an omission.
   const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');
@@ -607,8 +735,7 @@ test('a divergent entry names the issue that decided it', () => {
  * Shipped manifest rows without a named library specimen.
  */
 const UNDOCUMENTED_ROWS = [
-  // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
-  // the set that no `library.html` specimen names (issue 1458).
+  // `components/ActionMenu` left at issue 1516, when it claimed `<Menu>`.
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   // Issue 2005's executed check evidence rows: no specimen names a key-and-value evidence list.
@@ -617,10 +744,10 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  // Issue 1521's one rename field for the party card and the realm inspector.
+  'src/ui/svelte/apps/manager/InlineRenameField.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
@@ -634,6 +761,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
   // Issue 2005's Preview-as picker and the check overrides' Player sees block: no specimen names a
   // character picker or a player-view line, and each composes entries that do exist.
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  // Issue 2008's option group: a titled `<Well>` composition, which no specimen names.
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
@@ -646,17 +776,14 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
-  'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
 

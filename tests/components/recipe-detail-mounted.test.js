@@ -1,13 +1,16 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
@@ -16,8 +19,10 @@ import {
   recipe,
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -120,17 +125,87 @@ describe('RecipeDetail mounted behavior', () => {
           `${testCase.mode} body renders the ${section} section`
         );
       }
-      assert.ok(target.querySelector('[data-crafting-craft]'), 'craft button present');
-      // The craft button is a fixed footer OUTSIDE the scrolling detail region.
+      // The Craft primary lives in the identity header, outside the scrolling detail region.
+      assert.ok(
+        target.querySelector('[data-recipe-header]').querySelector('[data-crafting-craft]'),
+        'the craft primary is in the header'
+      );
       const scroll = target.querySelector('[data-crafting-detail-scroll]');
       assert.ok(scroll, 'the detail content has a dedicated scroll region');
-      assert.equal(
-        scroll.querySelector('[data-crafting-craft]'),
-        null,
-        'the craft button is not inside the scroll region'
+      assert.ok(
+        !scroll.querySelector('[data-crafting-craft]'),
+        'the craft primary is not inside the scroll region'
       );
     });
   }
+
+  for (const testCase of MODE_CASES) {
+    it(`draws one primary for a craftable ${testCase.mode} recipe, in the identity header`, async () => {
+      const crafted = [];
+      const target = await harness.mount({
+        recipe: testCase.fixture,
+        selectedSetId: testCase.fixture.defaultSetId,
+        craftability: craftability(),
+        onCraft: () => {
+          crafted.push(testCase.mode);
+        },
+      });
+
+      const pane = target.querySelector('[data-crafting-detail-state="selected"]');
+      const row = assertIdentityHeader(pane, { primaries: 1, name: testCase.fixture.name });
+      const [primary] = primaryButtons(row);
+      assert.ok(primary.hasAttribute('data-crafting-craft'), 'and it is the Craft verb');
+      assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'false');
+      primary.click();
+      assert.deepEqual(crafted, [testCase.mode]);
+    });
+  }
+
+  it('names the primary Craft before a roll and Craft another after one', async () => {
+    const label = (target) => primaryButtons(target)[0].textContent.trim();
+    const fresh = await harness.mount({ recipe: recipe(), craftability: craftability() });
+    assert.equal(label(fresh), 'FABRICATE.App.Crafting.Button.Craft');
+    harness.remount();
+    const again = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      rollResult: { success: true, items: [] },
+    });
+    assert.equal(label(again), 'FABRICATE.App.Crafting.Button.CraftAnother');
+  });
+
+  // Availability is a cache the boot and journal hooks refresh, so a stale refusal must not
+  // remove the pane's only way forward: the primary stays live beside the stated refusal.
+  it('keeps the primary live under an authority refusal', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, false);
+    assert.ok(
+      target.querySelector('[data-recipe-blocking]').hasAttribute('data-recipe-authority-blocked')
+    );
+  });
+
+  it('keeps the one primary, disabled and renamed, while a craft is in flight', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      busy: true,
+    });
+
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, true);
+    assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'true');
+    assert.match(primary.textContent, /Button\.Crafting/u);
+    assert.ok(Boolean(primary.querySelector('i.fa-spinner')));
+    // The inputs a craft in flight has spent are not a shortfall.
+    assert.ok(!target.querySelector('.crafting-detail-pip'), 'no missing-materials pip');
+    assert.ok(!target.querySelector('[data-recipe-blocking]'), 'and no missing-materials notice');
+  });
 
   it('renders ingredients as rail slot tiles with state-coloured borders and pips', async () => {
     const target = await harness.mount({
@@ -168,18 +243,23 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(sufficient.getAttribute('data-slot-state'), 'met');
     assert.equal(short.getAttribute('data-slot-state'), 'short');
     // A fixed requirement is not selectable.
-    assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
-    assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
+    assert.notEqual(sufficient.tagName, 'BUTTON', 'a fixed slot is not a button');
+    assert.ok(
+      sufficient.querySelector('[role="img"]').getAttribute('aria-label').includes('Iron'),
+      'and its tile carries a name'
+    );
 
     assert.ok(sufficient.querySelector('[data-medallion="image"] img'), 'tile renders the image');
     assert.equal(
-      sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
+      sufficient.querySelector('.fab-slot-pip').textContent.trim(),
       '2/2',
       'pip shows have/need'
     );
-    const shortPip = short.querySelector('.requirement-slot-pip');
-    assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
-    assert.ok(shortPip.classList.contains('is-short'), 'short pip is red');
+    assert.equal(short.querySelector('.fab-slot-pip').textContent.trim(), '1/3');
+    assert.ok(
+      short.querySelector('.fab-slot-tile').classList.contains('is-short'),
+      'the short tile paints from the danger state'
+    );
   });
 
   it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
@@ -225,7 +305,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
-    assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
+    assert.equal(tiles[0].querySelector('.fab-slot-pip').textContent.trim(), '1/2');
     assert.equal(
       tiles[1].querySelector('[data-medallion="image"] img').getAttribute('src'),
       'icons/iron.webp'
@@ -251,7 +331,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const label = target.querySelector(
-      '[data-io-group="tools"] .crafting-io-row .crafting-io-tool-label'
+      '[data-io-group="tools"] tr[data-io-satisfied] .crafting-io-tool-label'
     );
     assert.ok(label, 'tool label wrapper rendered');
     const thumb = label.querySelector('[data-medallion="image"] img');
@@ -264,7 +344,7 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('renders routed ingredient options as cards under the check with status + products', async () => {
+  it('compares routed ingredient options as radio cards under the check, with status + products', async () => {
     const onChoose = [];
     const target = await harness.mount({
       recipe: recipe({
@@ -306,30 +386,61 @@ describe('RecipeDetail mounted behavior', () => {
 
     const section = target.querySelector('[data-recipe-section="ingredient-sets"]');
     assert.ok(section, 'ingredient options section rendered');
-    const cards = section.querySelectorAll('.crafting-option-card');
-    assert.equal(cards.length, 2, 'one card per option');
+    // One radio group, so the arrow keys move between routes; no route is a button.
+    const radios = [...section.querySelectorAll(':scope fieldset input[type="radio"]')];
+    assert.equal(radios.length, 2, 'one route radio per option');
+    assert.ok(radios[0].name, 'the routes share a group name');
+    assert.ok(radios.every((radio) => radio.name === radios[0].name), 'one group, not two');
+    assert.equal(section.querySelectorAll(':scope button').length, 0, 'no route is a button');
+    const group = section.querySelector(':scope fieldset');
+    assert.deepEqual(
+      [
+        group.classList.contains('is-config-cards'),
+        group.classList.contains('is-legend-visible'),
+        group.querySelector(':scope > legend')?.textContent.trim(),
+      ],
+      [true, true, 'FABRICATE.App.Crafting.Detail.IngredientSetsTitle'],
+      'config cards, as the Journal draws routes, under a shown "Ingredient options" legend'
+    );
 
     const cardA = section.querySelector('[data-set-id="set-a"]');
     const cardB = section.querySelector('[data-set-id="set-b"]');
-    assert.equal(cardA.getAttribute('aria-pressed'), 'true', 'selected option marked');
-    assert.equal(cardA.getAttribute('data-option-status'), 'craftable');
-    assert.equal(cardB.getAttribute('data-option-status'), 'blocked', 'missing tool → blocked');
-    assert.ok(
-      cardA.querySelector('.crafting-option-status.tone-success'),
-      'craftable status is green'
+    assert.deepEqual(
+      [cardA.tagName, cardA.querySelector('input').checked, cardB.querySelector('input').checked],
+      ['LABEL', true, false],
+      'each route is a radio card, and the chosen one is checked'
     );
-    assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
+    assert.match(cardA.textContent, /SelectedRoute/, 'the chosen route says so');
+    assert.doesNotMatch(cardB.textContent, /SelectedRoute/, 'and only the chosen one');
 
-    // Product tile with a quantity pip.
-    assert.ok(
-      cardA.querySelector('.crafting-option-product [data-medallion="image"] img'),
-      'product image'
+    const statusA = cardA.querySelector('[data-option-status]');
+    const statusB = cardB.querySelector('[data-option-status]');
+    assert.deepEqual(
+      [statusA.dataset.optionStatus, statusA.dataset.optionStatusTone, chipToneOf(statusA)],
+      ['craftable', 'success', 'positive'],
+      'craftable status is the green chip'
     );
-    assert.equal(
-      cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
-      '×1',
-      'quantity pip'
+    assert.deepEqual(
+      [statusB.dataset.optionStatus, chipToneOf(statusB)],
+      ['blocked', 'danger'],
+      'missing tool → the blocked, red chip'
     );
+
+    // Each route's products are dense list rows with a 22px mark, chosen or not.
+    for (const [card, quantity] of [
+      [cardA, '×1'],
+      [cardB, '×2'],
+    ]) {
+      const rows = card.querySelectorAll(':scope .fabricate-list-row');
+      assert.equal(rows.length, 1, 'one row per product');
+      const [row] = rows;
+      assert.equal(row.dataset.listRow, 'dense');
+      assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Warding Shield Boss');
+      assert.equal(row.querySelector('.fabricate-list-row-quantity').textContent, quantity);
+      const mark = row.querySelector('[data-medallion="image"]');
+      assert.match(mark.getAttribute('style'), /width: ?22px; ?height: ?22px/, 'the dense row’s mark');
+      assert.ok(mark.querySelector('img'), 'product image');
+    }
 
     // The options render AFTER the crafting check in document order.
     const check = target.querySelector('[data-recipe-section="check"]');
@@ -338,9 +449,39 @@ describe('RecipeDetail mounted behavior', () => {
       'ingredient options come after the crafting check'
     );
 
-    cardB.click();
+    // An arrow key moves a native radio group's selection and fires `change` (measured in
+    // Chromium by `crafting-rows-rendered`); the change is what chooses the route.
+    assert.equal(radios[1].disabled, false, 'the blocked route stays choosable');
+    radios[1].checked = true;
+    radios[1].dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
-    assert.deepEqual(onChoose, ['set-b'], 'clicking a card selects that route');
+    assert.deepEqual(onChoose, ['set-b'], 'choosing a route radio selects that route');
+  });
+
+  it('names each route selector its own radio group, so two never share one', async () => {
+    const names = [];
+    for (const pass of [1, 2]) {
+      const target = await harness.mount({
+        recipe: recipe({
+          modeToken: 'routedByIngredients',
+          defaultSetId: 'set-a',
+          ingredientSets: ['set-a', 'set-b'].map((id) => ({
+            id,
+            label: `Route ${id} (${pass})`,
+            craftability: craftability({ canCraft: true }),
+            products: [],
+          })),
+        }),
+        selectedSetId: 'set-a',
+        craftability: craftability({ canCraft: true }),
+      });
+      const radios = target.querySelectorAll(':scope [data-recipe-section="ingredient-sets"] input');
+      names.push(...new Set([...radios].map((radio) => radio.name)));
+      harness.remount();
+    }
+    assert.equal(names.length, 2, `one name per selector: ${names.join(', ')}`);
+    assert.ok(names.every(Boolean), 'and neither is empty');
+    assert.notEqual(names[0], names[1], 'two selectors, two radio groups');
   });
 
   it('routes the Produces output to the selected ingredient set', async () => {
@@ -410,87 +551,192 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(hint(single), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHint');
   });
 
-  it('colours tiered outcomes green for success and red for failure', async () => {
-    const target = await harness.mount({
-      recipe: recipe({
-        modeToken: 'routedByCheck',
-        modeLabel: 'Routed by check',
-        check: {
-          dc: 15,
-          rollFormula: '1d20',
-          skill: null,
-          optional: false,
-          mandatory: true,
-          usable: true,
-        },
-        result: { items: [], time: null, timeLabel: null, xp: null },
-        outcomeTiers: [
-          {
-            id: 't-success',
-            names: ['Success'],
-            success: true,
-            awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
-          },
-          { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
-        ],
-      }),
+  // Issue 1644: the tiers are the shared `OutcomeLadder`, its rows `data-tier-success`-hooked.
+  const routedRecipe = (outcomeTiers) =>
+    recipe({
+      modeToken: 'routedByCheck',
+      modeLabel: 'Routed by check',
+      check: CHECK,
+      result: { items: [], time: null, timeLabel: null, xp: null },
+      outcomeTiers,
+    });
+  const mountTiers = (outcomeTiers, rollResult = null) =>
+    harness.mount({
+      recipe: routedRecipe(outcomeTiers),
       selectedSetId: recipe().defaultSetId,
       craftability: craftability(),
+      rollResult,
     });
+  const tierSection = (target) => target.querySelector('[data-recipe-section="outcome-tiers"]');
+  const rolledTiers = (target) =>
+    [...tierSection(target).querySelectorAll('[data-outcome-rolled]')].map((node) =>
+      node.getAttribute('data-outcome-tier')
+    );
+  const COLLAPSED = [
+    {
+      id: 't-flawed',
+      ids: ['t-flawed', 't-standard', 't-fine'],
+      names: ['Flawed', 'Standard', 'Fine'],
+      success: true,
+      awardedResults: [{ name: 'Bronze Ingot', img: null, qty: 2 }],
+    },
+    {
+      id: 't-master',
+      ids: ['t-master'],
+      names: ['Masterwork'],
+      success: true,
+      awardedResults: [{ name: 'Steel Ingot', img: null, qty: 1 }],
+    },
+    { id: 't-ruined', ids: ['t-ruined'], names: ['Ruined'], success: false, awardedResults: [] },
+  ];
+  const rolled = (outcomeId, success = true) => ({
+    success,
+    checkResult: { success, data: { outcomeId } },
+  });
 
-    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
+  it('tones tiered outcomes by success and failure, with no band chip and no control', async () => {
+    const target = await mountTiers([
+      {
+        id: 't-success',
+        names: ['Success'],
+        success: true,
+        awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
+      },
+      { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
+    ]);
+    const section = tierSection(target);
     const successRow = section.querySelector('[data-tier-success="true"]');
     const failureRow = section.querySelector('[data-tier-success="false"]');
-    assert.ok(successRow.classList.contains('is-success'), 'success tier reads green');
-    assert.ok(failureRow.classList.contains('is-failure'), 'failure tier reads red');
-    assert.ok(
-      successRow.querySelector('.crafting-tier-flag.tone-success'),
-      'success flag uses the success tone'
+    assert.ok(successRow.matches('.fab-outcome-tier:not(.is-failure)'), 'success tier is not failed');
+    assert.ok(failureRow.matches('.fab-outcome-tier.is-failure'), 'failure tier reads as failed');
+    assert.ok(successRow.querySelector('.fa-circle-check'), 'success tier states a check glyph');
+    assert.ok(failureRow.querySelector('.fa-circle-xmark'), 'failure tier states a cross glyph');
+    const status = (row) => row.querySelector('.visually-hidden[data-outcome-status]')?.textContent;
+    assert.equal(status(successRow), 'FABRICATE.Check.Evidence.Success', 'the glyph is named');
+    assert.equal(status(failureRow), 'FABRICATE.Check.Evidence.Failure');
+    assert.equal(
+      failureRow.querySelector('[data-outcome-empty]').textContent.trim(),
+      'FABRICATE.App.Crafting.Detail.TierNoAward',
+      'an empty tier says it awards nothing'
     );
-    assert.ok(
-      failureRow.querySelector('.crafting-tier-flag.tone-danger'),
-      'failure flag uses the danger tone'
+    assert.equal(section.querySelectorAll('.fab-outcome-tier').length, 2, 'the rows are drawn');
+    assert.equal(
+      section.querySelectorAll(':scope .fab-outcome-tier-heading .manager-chip').length,
+      0,
+      'crafting tiers carry no band, so no chip'
     );
+    assert.equal(section.querySelectorAll('button, input, select').length, 0, 'no control');
   });
 
   it('renders a collapsed tier group as one row listing every tier name', async () => {
-    const target = await harness.mount({
-      recipe: recipe({
-        modeToken: 'routedByCheck',
-        modeLabel: 'Routed by check',
-        check: {
-          dc: 15,
-          rollFormula: '1d20',
-          skill: null,
-          optional: false,
-          mandatory: true,
-          usable: true,
-        },
-        result: { items: [], time: null, timeLabel: null, xp: null },
-        outcomeTiers: [
-          {
-            id: 't-flawed',
-            names: ['Flawed', 'Standard', 'Fine', 'Masterwork'],
-            success: true,
-            awardedResults: [{ name: 'Bronze Ingot', img: null, qty: 2 }],
-          },
-          { id: 't-ruined', names: ['Ruined'], success: false, awardedResults: [] },
-        ],
-      }),
-      selectedSetId: recipe().defaultSetId,
-      craftability: craftability(),
-    });
-
-    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
-    const rows = section.querySelectorAll('.crafting-tier-row');
-    assert.equal(rows.length, 2, 'one collapsed success row + one failure row');
+    const target = await mountTiers(COLLAPSED);
+    const rows = tierSection(target).querySelectorAll('.fab-outcome-tier');
+    assert.equal(rows.length, 3, 'one collapsed success row, one more success, one failure');
     assert.equal(
-      rows[0].querySelector('.crafting-tier-name').textContent.trim(),
-      'Flawed, Standard, Fine, Masterwork',
+      rows[0].querySelector('.fab-outcome-tier-name').textContent.trim(),
+      'Flawed, Standard, Fine',
       'the collapsed row lists every contributing tier name'
     );
-    const awards = rows[0].querySelectorAll('.crafting-tier-award');
-    assert.equal(awards.length, 1, 'the shared result is shown once');
+    assert.equal(rows[0].querySelectorAll('[data-list-row]').length, 1, 'the shared result once');
+  });
+
+  it('marks "Your roll" on the row a success outcome id was merged into', async () => {
+    const target = await mountTiers(COLLAPSED, rolled('t-standard'));
+    assert.deepEqual(rolledTiers(target), ['t-flawed'], 'exactly the row Standard merged into');
+    const pill = tierSection(target).querySelector(':scope [data-outcome-rolled] [data-outcome-reached]');
+    assert.equal(pill.textContent.trim(), 'FABRICATE.App.Crafting.Detail.YourRoll');
+    harness.remount();
+    const own = await mountTiers(COLLAPSED, rolled('t-master'));
+    assert.deepEqual(rolledTiers(own), ['t-master'], "a row's own id marks it");
+  });
+
+  it('marks the row a live craft result names, and none for a failed one', async () => {
+    // The engine's own result shape: a successful stage records its routed tier (issue 1644).
+    const run = { id: 'run-1', status: 'completed', runRevision: 2, currentStepIndex: null };
+    const live = (success) =>
+      versionedTransitionResult(run, {
+        success,
+        disposition: success ? 'succeeded' : 'failed',
+        ...(success && { outcomeId: 't-fine' }),
+      });
+    const target = await mountTiers(COLLAPSED, live(true));
+    assert.deepEqual(rolledTiers(target), ['t-flawed'], 'exactly the row Fine merged into');
+    harness.remount();
+    const failed = await mountTiers(COLLAPSED, live(false));
+    assert.deepEqual(rolledTiers(failed), [], 'a failed craft marks no row');
+  });
+
+  it('marks no row before a roll, after a failed roll, or for an unknown outcome', async () => {
+    const before = await mountTiers(COLLAPSED);
+    assert.deepEqual(rolledTiers(before), [], 'nothing is marked before a roll');
+    harness.remount();
+    const failed = await mountTiers(COLLAPSED, rolled('t-ruined', false));
+    assert.deepEqual(rolledTiers(failed), [], 'a failing outcome marks nothing');
+    harness.remount();
+    const unknown = await mountTiers(COLLAPSED, rolled('t-elsewhere'));
+    assert.deepEqual(rolledTiers(unknown), [], 'an outcome no row names marks nothing');
+    assert.equal(tierSection(unknown).querySelectorAll('.fab-outcome-tier').length, 3);
+  });
+
+  it('draws each result kind on the shared row with its kind hook', async () => {
+    const target = await mountTiers([
+      {
+        id: 't-pass',
+        ids: ['t-pass'],
+        names: ['Pass'],
+        success: true,
+        awardedResults: [
+          { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
+          {
+            kind: 'currency',
+            name: 'Gold',
+            img: null,
+            glyph: 'fa-solid fa-coins',
+            qty: 5,
+            amountText: '5 gp',
+          },
+          {
+            kind: 'knowledge',
+            name: 'Runeblade',
+            img: null,
+            glyph: 'fa-solid fa-book-open',
+            qty: 1,
+            amountText: 'Recipe knowledge',
+          },
+          {
+            kind: 'group',
+            name: 'Choose one',
+            img: null,
+            glyph: 'fa-solid fa-layer-group',
+            qty: 1,
+            amountText: 'Ruby · Opal',
+            members: [
+              { name: 'Ruby', img: null, qty: 1 },
+              { name: 'Opal', img: null, qty: 1 },
+            ],
+          },
+        ],
+      },
+    ]);
+    const row = (kind) =>
+      tierSection(target).querySelector(`[data-list-row][data-award-kind="${kind}"]`);
+    const text = (node, part) =>
+      node.querySelector(`.fabricate-list-row-${part}`)?.textContent.trim() ?? null;
+    const item = row('component');
+    assert.equal(text(item, 'name'), 'Iron Sword');
+    assert.equal(text(item, 'quantity'), '×2', 'an item states its count');
+    assert.equal(item.querySelector('img').getAttribute('src'), 'icons/sword.webp');
+    const currency = row('currency');
+    assert.equal(text(currency, 'quantity'), '5 gp', 'a credit states its amount');
+    assert.ok(currency.querySelector('.fa-coins'), 'a credit draws its glyph');
+    const knowledge = row('knowledge');
+    assert.equal(text(knowledge, 'quantity'), 'Recipe knowledge');
+    assert.ok(knowledge.querySelector('.fa-book-open'), 'a recipe draws its glyph');
+    const group = row('group');
+    assert.equal(text(group, 'name'), 'Choose one');
+    assert.equal(text(group, 'detail'), 'Ruby · Opal', 'a choice group lists its members');
+    assert.equal(text(group, 'quantity'), null, 'and states no count of its own');
+    assert.ok(group.querySelector('.fa-layer-group'));
   });
 
   it('shows the check formula resolved against the selected actor', async () => {
@@ -514,9 +760,9 @@ describe('RecipeDetail mounted behavior', () => {
     const formula = target.querySelector('[data-check-formula]');
     assert.ok(formula, 'check formula rendered');
     assert.equal(formula.getAttribute('data-check-formula-resolved'), 'true');
-    const code = formula.querySelector('code');
-    assert.equal(code.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
-    assert.equal(code.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
+    const value = formula.querySelector('.fabricate-info-strip-value');
+    assert.equal(value.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
+    assert.equal(formula.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
     assert.equal(
       target.querySelector('[data-check-formula-error]'),
       null,
@@ -545,15 +791,22 @@ describe('RecipeDetail mounted behavior', () => {
     const formula = target.querySelector('[data-check-formula]');
     assert.equal(formula.getAttribute('data-check-formula-resolved'), 'false');
     assert.equal(
-      formula.querySelector('code').textContent.trim(),
+      formula.querySelector('.fabricate-info-strip-value').textContent.trim(),
       '1d20 + @prof',
       'the raw formula stays visible in the error state'
     );
-    assert.ok(target.querySelector('[data-check-formula-error]'), 'error note rendered');
-    assert.ok(
-      target.querySelector('.crafting-check-card.is-formula-error'),
-      'the check card is marked as an error'
+    // Issue 1521: the error is a danger notice after the strip, inside the check section, and the
+    // strip itself is never tinted.
+    const error = target.querySelector(
+      ':scope [data-recipe-section="check"] > .fabricate-info-strip + .fab-notice.is-danger[data-check-formula-error]'
     );
+    assert.ok(Boolean(error), 'the danger notice follows the strip inside the check section');
+    assert.equal(
+      error.textContent.trim(),
+      'FABRICATE.App.Crafting.Check.FormulaUnresolved',
+      'it carries only its reason'
+    );
+    assert.ok(!target.querySelector('.is-formula-error'), 'no card tint marks the error');
   });
 
   it('renders only the teaser header for a redaction-redacted recipe — no ingredient/result detail', async () => {
@@ -697,7 +950,10 @@ describe('RecipeDetail mounted behavior', () => {
     );
     // Every rail in the list gets its OWN DOM id namespace.
     assert.equal(
-      steps[0].querySelector('[data-recipe-section="essence-pool"]').getAttribute('id'),
+      steps[0]
+        .querySelector('[data-recipe-section="essence-pool"]')
+        .closest('[role="region"]')
+        .getAttribute('id'),
       'fabricate-req-step-step-ess-1-panel'
     );
   });
@@ -808,7 +1064,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const chip = target.querySelector(
-      '.crafting-detail-header-meta [data-recipe-duration]'
+      '.player-detail-header-meta [data-recipe-duration]'
     );
     assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
     // Largest-unit-first compact formatting (mirrors the manager Overview).
@@ -919,9 +1175,8 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(
       blocking.getAttribute('data-recipe-blocking'),
       '',
-      'the hook was written BARE on the deleted element, so it is passed with an empty ' +
-        '`dataValue` rather than being coerced to `="true"` the way a bare attribute on a ' +
-        'component tag would be'
+      'the hook was written bare on the deleted element, so it is passed `=""` rather ' +
+        'than being coerced to `="true"` the way a bare attribute on a component tag would be'
     );
     assert.ok(
       !blocking.querySelector('li'),
@@ -930,14 +1185,12 @@ describe('RecipeDetail mounted behavior', () => {
         'most ONE reason for every browse status there is, so the bulleted list was always a ' +
         'one-item list. A second reason would land in `detail` rather than being dropped'
     );
-    // A non-craftable recipe still renders a (disabled) craft button.
-    const craftButton = target.querySelector('[data-crafting-craft]');
-    assert.ok(craftButton, 'craft button present');
-    assert.equal(
-      craftButton.getAttribute('data-crafting-craft-disabled'),
-      'true',
-      'craft button disabled when materials missing'
+    // An unavailable commit verb leaves the header with no primary, and nothing takes its place.
+    assert.ok(
+      !target.querySelector('[data-crafting-craft]'),
+      'no craft primary while the materials are missing'
     );
+    assert.equal(primaryButtons(target).length, 0, 'and no second-choice primary in its place');
   });
 
   it('moves the status onto a thumbnail pip and drops the header badge when uncraftable', async () => {
@@ -953,11 +1206,22 @@ describe('RecipeDetail mounted behavior', () => {
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-thumb.is-uncraftable .crafting-detail-pip'),
+      header.querySelector('.player-detail-header-tile.is-dimmed .crafting-detail-pip'),
       'error pip overlays the faded thumbnail'
     );
+    // The pip is the shared icon-only chip at its published default square, not a local disc.
+    const pip = header.querySelector(':scope .crafting-detail-pip > .manager-chip');
+    assert.deepEqual(
+      ['is-icon-only', 'is-solid', 'is-danger'].filter((name) => !pip.classList.contains(name)),
+      []
+    );
+    assert.ok(!pip.classList.contains('is-list') && !pip.classList.contains('is-row'));
+    assert.equal(pip.getAttribute('role'), 'img');
+    assert.match(pip.getAttribute('aria-label'), /Status\.MissingMaterials/);
+    assert.equal(pip.getAttribute('data-crafting-status'), 'missingMaterials');
+    assert.equal(chipGroundAlpha(pip, THEMES), 1, 'opaque over the artwork it covers');
     assert.equal(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
@@ -969,15 +1233,78 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
+  // The listing bakes `available`; an override to a short alternative, a short set or a pool
+  // stepped below its need re-evaluates craftability without reloading the listing.
+  it('reads a listed-available recipe the live evaluation refuses as missing materials', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'the commit verb is unavailable');
+    assert.ok(
+      !header.querySelector(':scope .player-detail-header-meta [data-crafting-status]'),
+      'so no chip may still say the recipe is ready'
+    );
+    const tile = header.querySelector('.player-detail-header-tile.is-dimmed');
+    assert.ok(Boolean(tile.querySelector('.crafting-detail-pip')), 'the status moves to the pip');
+    assert.equal(
+      tile.querySelector('[data-crafting-status]').getAttribute('data-crafting-status'),
+      'missingMaterials',
+      'which states the live status, not the listed one'
+    );
+    const notice = header.querySelector('[data-recipe-blocking]');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+    assert.ok(
+      notice.textContent.includes('FABRICATE.App.Crafting.Blocking.MissingMaterials'),
+      'and the absent primary is explained in words'
+    );
+  });
+
+  it('leads the callout with the live shortfall when the authority also refuses', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const text = target.querySelector('[data-recipe-blocking]').textContent;
+    const shortfall = text.indexOf('Blocking.MissingMaterials');
+    assert.ok(
+      shortfall !== -1 && shortfall < text.indexOf('No GM is connected.'),
+      'the blocker the player can act on comes first'
+    );
+  });
+
+  // No craftability is no evaluation, as on the no-actor view: no readiness claim, no shortfall
+  // claim, and no commit verb.
+  it('claims neither readiness nor a shortfall when nothing evaluated the recipe', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: null,
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'no commit verb without a craftable reading');
+    assert.ok(!header.querySelector('[data-crafting-status]'), 'no ready chip and no status pip');
+    assert.ok(!header.querySelector('.crafting-detail-pip'));
+    assert.ok(!header.querySelector('[data-recipe-blocking]'), 'and no invented shortfall');
+    assert.ok(Boolean(header.querySelector('.crafting-detail-mode-chip')), 'the facts remain');
+  });
+
   it('keeps the labelled status badge (no pip) for a craftable recipe', async () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       'craftable recipe keeps the labelled status badge'
     );
     assert.equal(
@@ -992,9 +1319,10 @@ describe('RecipeDetail mounted behavior', () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
-    const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+    const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');
     assert.ok(chip.classList.contains('manager-chip'), 'the badge IS the shared chip now');
     assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
     assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');

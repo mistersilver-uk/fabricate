@@ -59,7 +59,7 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Knowledge.Tabs.Label"
   ariaLabel="Knowledge sections"
   idStem="knowledge"
-  hookAttribute="data-knowledge-tab"
-  countAttribute="data-knowledge-tab-count"
+  tabDataAttr="data-knowledge-tab"
+  countDataAttr="data-knowledge-tab-count"
   containerClass="manager-editor-tabs manager-knowledge-tabs"
 />

@@ -23,8 +23,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -48,8 +49,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -68,8 +70,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       // Issue 1707 moved this column's markup out of the root; `world/` has no directory regex,
       // so each travel case claims the leaf by name or it stops being photographed.
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
@@ -103,7 +106,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
     ],
   }),
   managerCase({
@@ -121,8 +125,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -146,8 +151,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -172,8 +178,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -195,8 +202,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -219,8 +227,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -243,8 +252,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -275,6 +285,32 @@ export const CASES = Object.freeze([
       // ruling this frame now asks for one when the chain changes, since it is the only case that
       // photographs the settings arm at all.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+    ],
+  }),
+  // A Gathering Rules select open (issue 1777): the rewards rule, the card's first row, so the
+  // ticked list drops below its trigger inside the inspector rail.
+  managerCase({
+    id: 'manager-gathering-rules-select-open',
+    label: 'Manager — Gathering rules rewards list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '#manager-gathering-rule-rewards' },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="limitedDrops"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   // The conditions card's current-value list (issue 1510), pinned at a 1024 window: the settings
@@ -369,7 +405,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -393,7 +429,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -418,12 +454,12 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
       {
         selector:
-          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="More actions"]',
+          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="More actions"]',
       },
     ],
     expectView: 'environment-edit',
@@ -449,7 +485,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-validation' },
     ],

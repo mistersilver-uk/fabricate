@@ -1,5 +1,6 @@
 <!-- A requirement row composes fixed or selectable material evidence supplied by its caller. -->
 <script>
+  import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
   import ChoiceOptionList from './ChoiceOptionList.svelte';
   import SlotTile from './SlotTile.svelte';
 
@@ -32,8 +33,15 @@
     return componentId ? Math.max(0, Number(held(componentId)) || 0) : 0;
   }
 
+  // A partly delivered essence is partial even though the solver still reports its group missing.
+  function partlyDelivered(requirement) {
+    const met = Number(requirement.poolsMet) || 0;
+    return met < Number(requirement.poolsRequired) && (met > 0 || requirement.poolsStarted > 0);
+  }
+
   function tileState(requirement) {
     if (requirement.kind === 'choice' && !componentFor(requirement)) return 'open';
+    if (requirement.kind === 'essence' && partlyDelivered(requirement)) return 'partial';
     if (requirement.available === false) return 'short';
     if (requirement.kind === 'essence') {
       return Number(requirement.poolsMet) >= Number(requirement.poolsRequired) ? 'met' : 'short';
@@ -59,13 +67,19 @@
     onOpen(next);
   }
 
-  function choose(slotId, componentId) {
+  let root;
+  // An arrow moves the choice and keeps the list open; activation closes it onto its slot tile.
+  function choose(slotId, componentId, how) {
     onChoose(slotId, componentId);
+    if (how?.via === 'arrow') return;
     openSlot = '';
+    const tiles = [...root.querySelectorAll('[data-slot-id]')];
+    const tile = tiles.find((entry) => entry.dataset.slotId === slotId);
+    focusWhenEnabled(tile?.querySelector('button'));
   }
 </script>
 
-<div class="fab-slot-row" data-slot-row>
+<div class="fab-slot-row" data-slot-row bind:this={root}>
   {#if label || hint}
     <div class="fab-slot-row-heading">
       {#if label}<span class="fab-slot-row-kicker">{label}</span>{/if}

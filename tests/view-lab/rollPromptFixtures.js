@@ -2,6 +2,17 @@
 import { resolveModifierLibrary } from '../../src/systems/characterLibraries.js';
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 
+import {
+  ADDITIONAL_DICE_BULK_STATES,
+  ADDITIONAL_DICE_JOURNAL_STATES,
+  ADDITIONAL_DICE_PROMPT_STATES,
+  seedAdditionalDiceBulk,
+  seedAdditionalDiceJournal,
+  seedAdditionalDicePrompt,
+} from './additionalDiceFixtures.js';
+import { CHAT_CARD_STATES, seedChatCardState } from './chatCardFixtures.js';
+import { COUNT_RESULT_STATES, seedCountResult } from './countResultFixtures.js';
+
 export async function seedRollPromptFixture(world, state) {
   if (!state || !world) return;
   const manager = world.fabricate.craftingSystemManager;
@@ -13,14 +24,39 @@ export async function seedRollPromptFixture(world, state) {
         simple: {
           ...system.craftingCheck.simple,
           rollFormula: state === 'advantage' ? '1d20 + @abilities.int.mod' : '2d6 + @abilities.int.mod',
+          // The single-Roll captures: a plain `2d6` would otherwise offer keep (issue 2007).
+          ...(state !== 'advantage' && {
+            advantage: { ...system.craftingCheck.simple.advantage, mode: 'off' },
+          }),
         },
       },
     });
   }
   if (state === 'under') await seedRollUnder(world);
+  if (Object.hasOwn(ADVANTAGE_STATES, state)) await seedAdvantage(world, ADVANTAGE_STATES[state]);
   if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
-  if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
+  if (state === 'salvage-fixed-routed') await seedFixedRoutedSalvage(world);
+  if (Object.hasOwn(COUNT_POOLS, state)) await seedCount(world, state);
+  if (Object.hasOwn(COUNT_ADVANTAGE, state)) {
+    await seedCount(world, 'count');
+    await patchSimpleCheck(world, 'lab-smithing', { advantage: COUNT_ADVANTAGE[state] });
+  }
+  if (state === 'journal-bonus') await seedJournalBonus(world);
+  // Issue 1521: a formula naming a value the crafter lacks, and a smithing stamina pool of 6/10.
+  if (state === 'formula-unresolved') {
+    await patchSimpleCheck(world, 'lab-smithing', { rollFormula: '1d20 + @skills.missing.level' });
+  }
+  if (state === 'gathering-stamina') await seedSmithingStamina();
+  if (Object.hasOwn(CHAT_CARD_STATES, state)) await seedChatCardState(world, state);
+  if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
+  if (Object.hasOwn(ADDITIONAL_DICE_PROMPT_STATES, state)) {
+    await seedAdditionalDicePrompt(world, state);
+  }
+  if (Object.hasOwn(ADDITIONAL_DICE_BULK_STATES, state)) await seedAdditionalDiceBulk(world, state);
+  if (Object.hasOwn(ADDITIONAL_DICE_JOURNAL_STATES, state)) {
+    await seedAdditionalDiceJournal(world, state);
+  }
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -181,11 +217,11 @@ async function nameFrameSubject(world, recipeUpdates) {
 
 const under = (target) =>
   normalizeCheckEvaluation({ product: 'sum', direction: 'under', ...(target && { target }) });
-const pooled = (required) =>
+const pooled = (required, cancel = { enabled: false }) =>
   normalizeCheckEvaluation({
     product: 'count',
     direction: 'over',
-    pool: { die: 10, base: '4', threshold: '8', required, modifierDestination: 'pool' },
+    pool: { die: 10, base: '4', threshold: '8', required, modifierDestination: 'pool', cancel },
   });
 
 /** Smithing's simple salvage evaluation, then Runework's routed one, for each bulk salvage state. */
@@ -196,10 +232,33 @@ const SALVAGE_CHECKS = {
     under({ source: 'attribute', expression: '@abilities.int.value' }),
   ],
   'salvage-count': () => [pooled(2), pooled(1)],
+  // Issue 2137: Runework cancels on the worst face, so its routed panel closes on a Botch row.
+  'salvage-count-cancel': () => [
+    pooled(2),
+    pooled(1, { enabled: true, faces: { kind: 'worst' } }),
+  ],
   // Smithing stays at or under the salvager's Smithing level, so its Salvage tab names a source.
   'salvage-under-skill': () => [
     under({ source: 'attribute', expression: '@skills.smith.level' }),
     under(),
+  ],
+  'salvage-advantage-mixed': () => SALVAGE_CHECKS['salvage-under'](),
+  'salvage-advantage-shared': () => SALVAGE_CHECKS['salvage-under'](),
+};
+
+/**
+ * Issue 2007: both salvage checks offer a bonus die. `-mixed` differs in size, so the batch agrees
+ * on the buttons and on no note; `-shared` (frame 36, `pBulk`) offers the SAME `1d6` bonus, so the
+ * batch's sub-label shows once for both rows.
+ */
+const SALVAGE_ADVANTAGE = {
+  'salvage-advantage-mixed': [
+    { mode: 'bonus', bonusExpression: '1d6' },
+    { mode: 'bonus', bonusExpression: '1d8' },
+  ],
+  'salvage-advantage-shared': [
+    { mode: 'bonus', bonusExpression: '1d6' },
+    { mode: 'bonus', bonusExpression: '1d6' },
   ],
 };
 
@@ -210,6 +269,7 @@ const SALVAGE_CHECKS = {
  */
 async function seedSalvageChecks(world, state) {
   const [smithingEvaluation, runeworkEvaluation] = SALVAGE_CHECKS[state]();
+  const [smithingAdvantage, runeworkAdvantage] = SALVAGE_ADVANTAGE[state] ?? [];
   const salvager = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
   salvager.system.skills = { ...salvager.system.skills, smith: { level: 12 } };
   const rollFormula = smithingEvaluation.product === 'count' ? '' : '1d20';
@@ -219,14 +279,46 @@ async function seedSalvageChecks(world, state) {
     salvageCraftingCheck: {
       ...smithing.salvageCraftingCheck,
       enabled: true,
-      simple: { rollFormula, dc: 12, thresholdMode: 'meet', evaluation: smithingEvaluation },
+      simple: {
+        rollFormula,
+        dc: 12,
+        thresholdMode: 'meet',
+        evaluation: smithingEvaluation,
+        ...(smithingAdvantage && { advantage: smithingAdvantage }),
+      },
     },
   });
   const runework = manager.getSystem('lab-runework');
   await manager.updateSystem(runework.id, {
     salvageCraftingCheck: {
       ...runework.salvageCraftingCheck,
-      routed: { ...runework.salvageCraftingCheck.routed, rollFormula, evaluation: runeworkEvaluation },
+      routed: {
+        ...runework.salvageCraftingCheck.routed,
+        rollFormula,
+        evaluation: runeworkEvaluation,
+        ...(runeworkAdvantage && { advantage: runeworkAdvantage }),
+      },
+    },
+  });
+}
+
+/**
+ * Issue 2152: Runework's routed salvage on authored fixed segments of a `1d20 - 3`, its Ruined
+ * tier wholly below zero. The tier names keep the slag's outcome routing.
+ */
+async function seedFixedRoutedSalvage(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  const runework = manager.getSystem('lab-runework');
+  const routed = runework.salvageCraftingCheck.routed;
+  const segments = { Masterwork: [12, 17], Standard: [0, 11], Ruined: [-2, -1] };
+  const fixedOutcomes = routed.relativeOutcomes.map(({ id, name, success, breakTools }) => {
+    const [start, end] = segments[name];
+    return { id, name, success, breakTools, start, end };
+  });
+  await manager.updateSystem(runework.id, {
+    salvageCraftingCheck: {
+      ...runework.salvageCraftingCheck,
+      routed: { ...routed, type: 'fixed', rollFormula: '1d20 - 3', fixedOutcomes },
     },
   });
 }
@@ -235,27 +327,67 @@ async function seedSalvageChecks(world, state) {
  * Smithing's simple slot counts successes with one applied modifier, "Steady hands +1". `count` is
  * frame 35: six d10s, each qualifying at 8 or more, the best face exploding and the worst
  * cancelling. `count-threshold` is frame 30: two d20s, each qualifying at or under a threshold
- * read from the character, and modifiers move the threshold. Both need two successes; the retained
- * roll formula stays authored and inert, so the prompt must not show it. The subtitles are the
- * frames': "Sera Vane · Fine Craft" and "Sera Vane · Complex Work".
+ * read from the character, and modifiers move the threshold. `count-explode` explodes once from a
+ * chosen face and cancels from another, so the note names the actual faces (issue 2006), and
+ * `count-zero` rolls a pool of no dice that the modifier cannot grow. Each needs two successes; the
+ * retained roll formula stays authored and inert, so the prompt must not show it. The subtitles
+ * are the frames': "Sera Vane · Fine Craft" and "Sera Vane · Complex Work".
  */
+const COUNT_POOLS = {
+  count: {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '5',
+      threshold: '8',
+      explode: { enabled: true, faces: { kind: 'best' } },
+      cancel: { enabled: true, faces: { kind: 'worst' } },
+      modifierDestination: 'pool',
+    },
+  },
+  'count-threshold': {
+    direction: 'under',
+    subject: 'Complex Work',
+    pool: {
+      die: 20,
+      base: '2',
+      threshold: '@abilities.int.mod + 10',
+      modifierDestination: 'threshold',
+    },
+  },
+  'count-explode': {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '5',
+      threshold: '7',
+      explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'from', value: 2 } },
+      modifierDestination: 'pool',
+    },
+  },
+  'count-zero': {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '0',
+      threshold: '8',
+      modifierDestination: 'threshold',
+      zeroPoolFails: true,
+    },
+  },
+};
+
 async function seedCount(world, state) {
   const store = world.fabricate.characterLibrariesStore;
   await store.saveModifiers([
     { id: 'lab-mod-steady-hands', label: 'Steady hands', icon: 'fa-solid fa-hand', expression: '1' },
     ...store.listModifiers().filter((entry) => entry.id !== 'lab-mod-steady-hands'),
   ]);
-  const pool =
-    state === 'count'
-      ? {
-          die: 10,
-          base: '6',
-          threshold: '8',
-          explode: { enabled: true, faces: { kind: 'best' } },
-          cancel: { enabled: true, faces: { kind: 'worst' } },
-          modifierDestination: 'pool',
-        }
-      : { die: 20, base: '2', threshold: '@abilities.int.mod + 11', modifierDestination: 'threshold' };
+  const { direction, subject, pool } = COUNT_POOLS[state];
   const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
   await manager.updateSystem(system.id, {
@@ -267,13 +399,13 @@ async function seedCount(world, state) {
         ...system.craftingCheck.simple,
         evaluation: normalizeCheckEvaluation({
           product: 'count',
-          direction: state === 'count' ? 'over' : 'under',
+          direction,
           pool: { ...pool, required: 2 },
         }),
       },
     },
   });
-  await nameFrameSubject(world, { name: state === 'count' ? 'Fine Craft' : 'Complex Work' });
+  await nameFrameSubject(world, { name: subject });
 }
 
 /** Nine long-named world modifiers Herbalism's check offers, so the prompt meets the height cap. */
@@ -295,6 +427,88 @@ async function seedCompactChoice(world) {
         ...system.craftingCheck.defaultModifierIds,
         ...notes.map((note) => note.id),
       ],
+    },
+  });
+}
+
+/**
+ * Issue 2007's prompt footers on Smithing's simple crafting check: each state names its formula,
+ * its advantage rule over the default (keep, one extra die, disadvantage offered), whether it
+ * rolls under frame 29's target, and whether it narrates to chat for a result-card case.
+ */
+const BONUS_1D6 = Object.freeze({ mode: 'bonus', bonusExpression: '1d6' });
+const ADVANTAGE_STATES = {
+  'keep-multi': { rollFormula: '2d6 + @abilities.int.mod' },
+  'advantage-under': { under: true, rollFormula: '3d6' },
+  'advantage-bonus': { rollFormula: '2d6 + @abilities.int.mod', advantage: BONUS_1D6 },
+  'advantage-only': {
+    rollFormula: '2d6 + @abilities.int.mod',
+    advantage: { ...BONUS_1D6, offerDisadvantage: false },
+  },
+  'advantage-long': {
+    under: true,
+    rollFormula: '1d20',
+    advantage: { mode: 'bonus', bonusExpression: '2d4 + 1d6 + 1d8 + 1d10 + 2' },
+  },
+  'advantage-result-keep': { chat: true, rollFormula: '1d20 + @abilities.int.mod' },
+  // Disadvantage lowers frame 29's target of 11 by the pre-rolled `1d8 + 1`, to 2 at the least,
+  // which a `1d2` never exceeds.
+  'advantage-under-disadvantage': {
+    under: true,
+    rollFormula: '1d2',
+    advantage: { mode: 'bonus', bonusExpression: '1d8 + 1' },
+  },
+  // A total no roll can miss DC 15 with, so the card is a success whatever the dice.
+  'advantage-result-bonus': { chat: true, rollFormula: '1d4 + 20', advantage: BONUS_1D6 },
+};
+
+/** Frame 35's pool: the default single die either way, two dice, then one offering none. */
+const COUNT_ADVANTAGE = {
+  'count-advantage-one': {},
+  'count-advantage': { countDice: 2 },
+  'count-advantage-off': { countEnabled: false },
+};
+
+async function seedAdvantage(world, { under: rollsUnder, chat, rollFormula, advantage = {} }) {
+  if (rollsUnder) await seedRollUnder(world);
+  await patchSimpleCheck(world, 'lab-smithing', { rollFormula, advantage }, chat);
+}
+
+/** Merge `patch` (its `advantage` over the check's own) into a system's simple crafting check. */
+async function patchSimpleCheck(world, systemId, { advantage, ...patch }, chatOutput = false) {
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem(systemId);
+  const simple = system.craftingCheck.simple;
+  await manager.updateSystem(system.id, {
+    ...(chatOutput && { features: { ...system.features, chatOutput: true } }),
+    craftingCheck: {
+      ...system.craftingCheck,
+      simple: { ...simple, ...patch, advantage: { ...simple.advantage, ...advantage } },
+    },
+  });
+}
+
+/** Smithing keeps its node limit and gains a stamina pool every character seeds at 6 of 10. */
+async function seedSmithingStamina() {
+  const settings = globalThis.game.settings;
+  const config = settings.get('fabricate', 'gatheringConfig');
+  const slice = config.systems['lab-smithing'];
+  const economy = { ...slice.economy, stamina: { enabled: true, max: '10', start: '6' } };
+  await settings.set('fabricate', 'gatheringConfig', {
+    ...config,
+    systems: { ...config.systems, 'lab-smithing': { ...slice, economy } },
+  });
+}
+
+/** Runework's routed check, which the Journal's versioned prompt reads, offers `1d8 + 1`. */
+async function seedJournalBonus(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem('lab-runework');
+  const routed = system.craftingCheck.routed;
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      routed: { ...routed, advantage: { ...routed.advantage, mode: 'bonus', bonusExpression: '1d8 + 1' } },
     },
   });
 }

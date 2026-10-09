@@ -23,9 +23,16 @@
  */
 
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
+import { journalCommandRefusal, notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 import { isResolvedFailureOutcome, journalRefusalMessage } from '../util/journalRunReasons.js';
 
 import { createListingLoad } from './browseListing.svelte.js';
+
+/** The brewing actor's name, which an additional-dice notice names (issue 2008). */
+function actorNameOf(services, actorId) {
+  const actors = services?.getCraftingSourceActors?.() ?? [];
+  return (Array.isArray(actors) ? actors : []).find((actor) => actor?.id === actorId)?.name;
+}
 
 export function createAlchemyStore({ services } = {}) {
   let activeSystemId = $state(services?.getSelectedAlchemySystemId?.() || null);
@@ -476,8 +483,7 @@ export function createAlchemyStore({ services } = {}) {
     if (brewInFlight || !brewEnabled) return null;
     brewInFlight = true;
     const priorKnown = new Set((Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id));
-    // Capture the pre-brew target/selection so a Tiered success can be flagged as a
-    // tiered-tier banner even after the bench is cleared and the listing reloads.
+    // The pre-brew target/selection still flags a Tiered success once the bench clears.
     const priorTarget = target;
     const priorSelected = selectedRecipe;
     try {
@@ -488,6 +494,7 @@ export function createAlchemyStore({ services } = {}) {
         componentSourceActorIds: currentSourceIds(),
         interactive: true,
       });
+      notifyAdditionalDice(result, services, actorNameOf(services, currentActorId()));
       if (result && result.cancelled === true) return result;
       workbench = {};
       selectedRecipeId = null;
@@ -539,13 +546,11 @@ export function createAlchemyStore({ services } = {}) {
       } else if (result && result.disposition === 'no-match') {
         lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
       } else if (typeof result?.reason === 'string' && result.reason.trim() !== '') {
-        const refusal = journalRefusalMessage(
-          result,
-          services?.localize,
-          services?.craftErrorMessage?.()
-        );
+        const generic = services?.craftErrorMessage?.();
+        const refusal = journalCommandRefusal(result, services?.localize, generic);
         lastBrew = { status: 'refused', discovered: null, message: refusal };
-        if (refusal) services?.notify?.(refusal);
+        // Refused dice already raised their one warning above.
+        if (refusal && !result.additionalDiceRefusal) services?.notify?.(refusal);
       } else {
         const message = journalRefusalMessage(result, services?.localize, '');
         lastBrew = { status: 'no-match-fizzle', discovered: null, message };

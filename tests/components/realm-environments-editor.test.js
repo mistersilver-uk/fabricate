@@ -12,7 +12,7 @@ import {
   createSvelteCompiler,
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -67,6 +67,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
+    for (const modulePath of LOCALIZE_OR_RAW_MODULES) writeRawModule(modulePath);
     // The editor's lifted picker view-state (issue 1438).
     writeRawModule('src/ui/model/managerBrowserViewState.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -77,7 +78,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
       writeCompiledSvelte(selectModule);
     }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte.js')).href);
     RealmEnvironmentsEditor = mod.default;

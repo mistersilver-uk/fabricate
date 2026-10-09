@@ -7,7 +7,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // Issue 1510: all three toolbar filters are shared `<Select>`s.
 import {
   assertSelectHasResolvedName,
@@ -25,6 +25,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
     // wires the drop listeners through the dragDrop action. Omitting either raw
@@ -40,8 +41,8 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // Issue 1515: the filter bar has a search field now, and it is the shared one.
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
   ],

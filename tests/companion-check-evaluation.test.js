@@ -20,10 +20,10 @@ describe('companion check evaluation boundary', () => {
         { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
         { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true },
         { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
-        { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false },
-        { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+        { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true },
+        { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
       ],
-      additionalDice: false,
+      additionalDice: true,
     });
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES));
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES.modes));
@@ -38,12 +38,13 @@ describe('companion check evaluation boundary', () => {
       target: { expression: 12, baseAdjustment: -1.5 },
       pool: {
         die: 6,
-        additionalDice: { enabled: true, source: 'macro', max: 4 },
+        additionalDice: { enabled: true, source: 'macro', max: 4, label: 'Momentum' },
       },
     };
     const result = resolveCompanionCheckEvaluation(input);
     assert.equal(result.ok, true);
     assert.deepEqual(result.evaluation, normalizeCheckEvaluation(input));
+    assert.equal(result.evaluation.pool.additionalDice.label, 'Momentum');
     // The base row: sum/over/fixed, interactive.
     assert.equal(supportsCompanionCheckEvaluation(result.evaluation, true), true);
     // sum/under/fixed and sum/over/attribute are both published, and both interactive (issue 2005).
@@ -52,11 +53,11 @@ describe('companion check evaluation boundary', () => {
       supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }, true),
       true
     );
-    // count/over/fixed (issue 2004) is published too, but not interactively.
+    // count/over/fixed (issue 2004) is published too, and interactive once composed (issue 2006).
     assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }), true);
     assert.equal(
       supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }, true),
-      false
+      true
     );
     assert.equal(
       supportsCompanionCheckEvaluation({
@@ -119,6 +120,9 @@ describe('companion check evaluation boundary', () => {
       { pool: { additionalDice: { max: 21 } } },
       { pool: { additionalDice: { readMacroUuid: 1 } } },
       { pool: { additionalDice: { spendMacroUuid: {} } } },
+      { pool: { additionalDice: { label: 3 } } },
+      { pool: { additionalDice: { label: null } } },
+      { pool: { additionalDice: { label: ['Momentum'] } } },
     ];
     for (const value of invalid) {
       assert.deepEqual(resolveCompanionCheckEvaluation(value), { ok: false }, JSON.stringify(value));
@@ -132,6 +136,8 @@ describe('companion check evaluation boundary', () => {
       { pool: { required: 20 } },
       { pool: { additionalDice: { max: 1 } } },
       { pool: { additionalDice: { max: 20 } } },
+      { pool: { additionalDice: { label: 'Momentum' } } },
+      { pool: { additionalDice: { enabled: true, source: 'path', label: '' } } },
       { pool: { die: 6, explode: { faces: { value: 6 } }, cancel: { faces: { value: 1 } } } },
       { pool: { explode: { faces: { value: null } } } },
       { target: { baseAdjustment: null } },

@@ -15,7 +15,7 @@ const FIXTURE = `
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="crafting-settings">
       <div style="grid-column: 1 / -1;">
-        <fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">Recipe resolution</legend>
           <div class="manager-resolution-mode-options">
             <label class="manager-resolution-option">
@@ -23,7 +23,7 @@ const FIXTURE = `
               <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
               <span class="manager-resolution-option-body">
                 <span class="manager-resolution-option-name">Simple</span>
-                <span class="manager-resolution-option-desc">One ingredient set and one result group, with an optional pass/fail check.</span>
+                <span class="manager-resolution-option-desc">One ingredient set and one result set, with an optional pass/fail check.</span>
               </span>
             </label>
             <label class="manager-resolution-option is-active">
@@ -31,7 +31,7 @@ const FIXTURE = `
               <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></span>
               <span class="manager-resolution-option-body">
                 <span class="manager-resolution-option-name">Routed by ingredients</span>
-                <span class="manager-resolution-option-desc">Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.</span>
+                <span class="manager-resolution-option-desc">Multiple ingredient sets and result sets; the chosen ingredient set selects which result set is produced. The crafting check is optional.</span>
               </span>
             </label>
           </div>
@@ -77,7 +77,7 @@ test('config-card resolution radios stay a 16px dot and never starve the option 
       );
     }
     for (const [i, style] of geo.radioStyle.entries()) {
-      // Round, not square. The generic .manager-field text-field treatment squared the dot to
+      // Round, not square. The generic .fabricate-field text-field treatment squared the dot to
       // a 6px-radius box; the custom radio must keep its circle (border-radius: 50%) and its
       // stripped native chrome (appearance: none). Guards the square-radio regression directly.
       assert.equal(

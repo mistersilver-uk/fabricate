@@ -11,7 +11,6 @@
     composition = { tasks: [], events: [], counts: {} },
     selectedKind = '',
     selectedId = '',
-    onUpdateEnvironment = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -21,7 +20,8 @@
 
   // The inspector is tab-specific: Overview always shows the environment summary
   // (never a selected record); Tasks/Events show the selected record of their
-  // own kind, so a stale cross-tab selection never leaks between tabs.
+  // own kind, so a stale cross-tab selection never leaks between tabs. Every pane is
+  // read-only (issue 1522), so this rail is handed no writer.
   const recordKind = $derived(activeTab === 'events' ? 'event' : 'task');
   const recordEntry = $derived(
     (() => {
@@ -41,9 +41,9 @@
   )}
 >
   {#if activeTab === 'overview'}
-    <EnvironmentSummaryInspector {environment} {composition} onUpdate={onUpdateEnvironment} />
+    <EnvironmentSummaryInspector {environment} {composition} />
   {:else if recordEntry}
-    <RecordInspector kind={recordKind} {environment} entry={recordEntry} {onUpdateEnvironment} />
+    <RecordInspector kind={recordKind} {environment} entry={recordEntry} />
   {:else}
     <EmptyState
       fill
@@ -66,8 +66,7 @@
             'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint',
             'Add or include tasks in this environment so they appear here.'
           )}
-      dataAttr="data-record-inspector-empty"
-      dataValue={recordKind}
+      data-record-inspector-empty={recordKind || true}
     />
   {/if}
 </aside>

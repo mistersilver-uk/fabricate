@@ -373,8 +373,7 @@
         statusLabel={text(badge[0], badge[1])}
         statusTone={badge[2]}
         bodyClamp={3}
-        dataAttr="data-progressive-stage-complication"
-        dataValue={lead.id}
+        data-progressive-stage-complication={lead.id || true}
       />
       <!-- The FIRST in fire order plus a count, never the whole list: the inspector column
            is 300px and an unbounded list turns one row into several prose paragraphs. The
@@ -602,10 +601,9 @@
     padding: var(--fab-space-2);
   }
 
-  /* NO `margin-top`. The band's `border-top` IS the divider between it and the line above,
-     and a rule only reads as a divider when the two surfaces meet — a gap in the row's own
-     fill turns it into a short line floating above a detached panel. This is the structure
-     `RecipeResultItemRow` already ships, and the player prototype draws the same one. */
+  /* No `margin-top`: the band's `border-top` is the divider between it and the line above, and a
+     rule only reads as a divider when the two surfaces meet. The manager's stage band
+     (`RecipeStageComplicationBand`) and the player prototype draw the same structure. */
   .crafting-stage-complications {
     display: flex;
     flex-direction: column;

@@ -1,8 +1,16 @@
 /** The mount-harness module closure of `ComponentEditView.svelte`. */
 
+import { resolve } from 'node:path';
+
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
-import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
+import {
+  CHECK_TARGET_RAW_MODULES,
+  createMountedComponentHarness,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+} from './svelte-component-harness.js';
 
 /** Raw (uncompiled) modules the harness copies into the temp tree verbatim. */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
@@ -21,6 +29,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/utils/rollExpressionAverage.js',
   'src/utils/rollFormulaRollability.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
   // (issue 1050); the tree reaches it through the salvage check override's custom field.
@@ -43,6 +52,9 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+  // A count check's override line reads the required count and the pool description (issue 2006).
+  'src/systems/countCheck.js',
+  'src/systems/countEvaluation.js',
   // The three converted selects' option vocabularies (issue 1510), mapped beside the view.
   'src/ui/svelte/apps/manager/component/componentEditSelectOptions.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
@@ -70,7 +82,17 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/dropUtils.js',
   // The rules editor's own Validation tab model (issue 1371, parity round 4).
   'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
+  // …and its row action's focus and announcement halves (issue 1522).
+  'src/ui/svelte/apps/manager/validationFocus.js',
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
+  // Both salvage result rows are the requirement row (issue 1516), whose search is a typeahead.
+  ...RESULT_ROW_RAW_MODULES,
+  'src/ui/svelte/actions/typeaheadPanel.js',
 ]);
+
+/** Rune modules the harness compiles: the requirement row's typeahead. */
+export { TYPEAHEAD_RUNE_MODULES as COMPONENT_EDIT_VIEW_RUNE_MODULES } from './svelte-component-harness.js';
 
 /** `.svelte` modules the harness compiles. */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
@@ -80,7 +102,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/components/Chip.svelte',
   // The manager's ONE icon-only push-button (issue 1422).
@@ -112,7 +134,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   // The manager's ONE labelled push-button (issue 1096); every salvage add control and
   // the Manage presets link render through it since issue 1118 task 9.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The manager's ONE on/off switch (issue 1040). Reached twice over: the salvage gate
   // renders it directly, and `ToggleCard` above renders it too.
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -132,8 +154,6 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  // `ExplainerCard`'s own card shell, two rungs down from this tree's root.
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
@@ -149,5 +169,56 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+  ...RESULT_ROW_COMPILED_MODULES,
+  // The rules editor's cards and Validation tab (issue 1522).
+  'src/ui/svelte/apps/manager/component/ComponentCategoryTagsCards.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentDifficultyCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);
+
+/** A mount harness for one of the editor's cards under `component/` (issue 1522). */
+export function componentCardHarness(name) {
+  return createMountedComponentHarness({
+    repoRoot: resolve(import.meta.dirname, '../..'),
+    tmpPrefix: `fabricate-${name}-`,
+    rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
+    componentPath: `src/ui/svelte/apps/manager/component/${name}.svelte`,
+  });
+}
+
+/** A mount harness for the whole `ComponentEditView` (issue 1522). */
+export function componentEditViewHarness(tmpPrefix) {
+  return createMountedComponentHarness({
+    repoRoot: resolve(import.meta.dirname, '../..'),
+    tmpPrefix,
+    rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
+    componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
+  });
+}
+
+/** The fallback-only `text` and interpolating `format` a card takes from its host. */
+export const cardText = (_key, fallback) => fallback;
+export const cardFormat = (_key, fallback, data) =>
+  Object.entries(data ?? {}).reduce(
+    (result, [token, value]) => result.replaceAll(`{${token}}`, String(value)),
+    fallback
+  );
+
+/** A call log, and callbacks that append `[name, ...args]` to it. */
+export function callRecorder() {
+  const calls = [];
+  const record =
+    (name) =>
+    (...args) => {
+      calls.push([name, ...args]);
+    };
+  return { calls, record };
+}

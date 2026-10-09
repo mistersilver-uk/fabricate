@@ -304,10 +304,10 @@ Inherited from issue 1071's headless harness and not re-invented.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Note the difference from issue 1071: there, class 1 is committed to `benchmarks/baselines/` and asserted by a drift test.
+Note the difference from issue 1071: there, class 1 is measured at the base commit and at head, and asserted by a drift test.
 Here it is not, and cannot be.
 A count taken inside a live Foundry is invariant only *given the Foundry build and the game system*, because those decide document schemas, what a `create` call preserves and which hooks fire.
-The committed, cross-machine baseline is the headless one; this profile is the instrument that tells you whether the headless model still resembles reality.
+The cross-machine guard is the headless one; this profile is the instrument that tells you whether the headless model still resembles reality.
 
 **Report ratios, never absolute milliseconds.**
 `scripts/lib/foundryPerfRecord.js` refuses to compare two runs whose Node version, CPU model, architecture, arm, Foundry build, image, game system, browser build, fixture profile or fixture seed differ, naming every field that does.
@@ -480,6 +480,7 @@ There is deliberately no allowlist.
 
 `scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no Foundry, no Docker, and no world, and writes one PNG per registry case into `ui-screenshot-artifact/apps/`.
 The chrome those windows wear is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches.
+Cases render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context over one browser, and nothing written depends on which render finishes first.
 
 ```sh
 npm run viewlab:chrome:harvest     # extract chrome + core art into the gitignored .foundry-chrome/
@@ -487,6 +488,7 @@ npm run viewlab:chrome:status      # what is cached, and whether it is intact
 node scripts/view-lab-screenshots.mjs apps            # every case
 node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
 node scripts/view-lab-screenshots.mjs apps --clean    # wipe ui-screenshot-artifact/apps/ first
+VIEW_LAB_CONCURRENCY=1 node scripts/view-lab-screenshots.mjs apps <id,id>  # one case at a time
 npm run viewlab:index              # regenerate the index without a capture
 ```
 
@@ -565,6 +567,38 @@ Where the two disagree about the same view, the smoke is right.
 | Operations needing real Foundry documents | `game.fabricate` is the REAL runtime facade (`labWorld.js` installs it after `initialize()`), so service calls through it do run — that is how the import case reaches its report. What is not drivable is anything needing document or compendium behaviour past what the shim models: `Item` supports creation and uuid resolution, not the full document API. Those END states are fixture-able; the operations are not. |
 | Legacy set-level essence requirements | `RecipeManager.initialize()` migrates a stored `ingredientSet.essences` map into a first-class essence group, so the pre-migration shape cannot be reached from settings-seeded data at all. The smoke escapes it only because it authors that recipe through `createRecipe` after init. |
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Fidelity of the Primitive Lab
+
+The Primitive Lab (`npm run lab`, below) is a developer harness and not a normative artifact.
+It proves that each catalogued component mounts as the real Svelte component, styled by the real `styles/fabricate.css` inside Foundry's harvested chrome.
+It does not prove behaviour under a Foundry runtime: there is no booted `game`, no documents and no hooks.
+Props are plain JSON, so a member that needs a function, an element or live state cannot be mounted and stays in `AWAITING_SPECIMEN` in `tests/design-system-lab-coverage.test.js`, each line with its reason.
+Where the lab and the live smoke disagree, the smoke is right.
+
+## The Primitive Lab (`npm run lab`)
+
+A second page in the View Lab's Vite app, at `/tests/view-lab/primitives.html`, renders `openspec/specs/design-system/library.html` and stands each catalogued drawing up as the real component it ships.
+It is not a capture surface and publishes no frame.
+
+```sh
+npm run lab          # open the page in a browser
+npm run lab:check    # mount every catalogued row; fail on any console, page or request error
+npm run lab:parity   # compare every unreplaced element with library.html opened bare
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Fact | Detail |
+|---|---|
+| It renders `library.html` rather than reimplementing it | `tests/view-lab/primitives/library.js` fetches the file through the raw `/@design-library/` mount and adopts its body, and `inject.js` swaps individual drawings for live components. Prose, captions, notes, deltas and cites render as authored, and a drawing with no catalogue row stays a drawing. |
+| The raw mount is not optional | Vite's HTML transform rewrites any `.html` under the dev root, so reading the spec artifact through it would read a rewritten copy. |
+| The library's palette is stripped on purpose | Its `:root` `--fab-*` block is removed and `styles/fabricate.css` supplies the tokens, so drift between the palette the library hardcodes and the one that ships shows on the page. |
+| Each specimen is its own iframe | The page links no Foundry stylesheet, so core cannot repaint the library's drawings. Each specimen document loads `foundry2.css`, Font Awesome and `fabricate.css` in the game view's order and builds `.application > .window-content > .fabricate-manager` around one component; a row without a `slot` sets that subtree to `display: contents`. |
+| `lab:check` and `lab:parity` are maintainer gates, not CI | Both call `resolveChromeCache` and refuse without a harvest, the fail-closed rule this file records for the View Lab: a missing harvest answers 503, and a `<link>` that 503s neither throws nor logs. |
+| It does not boot the runtime | Each specimen installs `installFoundryShim` over `createMinimalLabWorld()` rather than `buildLabWorld()`, so `src/main.js` and its migrations never run. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -688,6 +722,14 @@ Issue 1010 retired that waiver from the full smoke after it hid a real defect fo
 
 The setup → license → auth → launch → join path is shared with the full smoke through `scripts/lib/foundryBrowserBoot.js`, so both harnesses log in the same way and the join-control select-vs-tile fallback exists once.
 That module takes a Playwright `page` but never imports Playwright, and reporting (step records, screenshots, progress output) is injected by the caller.
+`scripts/lib/foundryReadyWorld.js` composes it into the one "joined, Fabricate-ready Gamemaster" boot this arm and the roll-terms recorder share.
+
+### Recording Roll terms (`--check=roll-terms`)
+
+`node scripts/foundry-test.mjs --check=roll-terms [--arm=v13]` boots the arm's Foundry and runs `scripts/foundry-roll-terms-record.mjs`, which records `new Roll(formula, data).terms` for every formula in `scripts/lib/rollTermsCorpus.js`, plus keep-transform probes that read every formula surface before and after `resetFormula()`.
+It writes `tests/fixtures/recorded-roll-terms/foundry-<version>.json`, already Prettier-formatted.
+It also records, under `fragments`, each check-modifier fragment in `FRAGMENT_VALIDITY_CORPUS`: its `Roll.validate` verdict, its maximized evaluation, and whether a real roll completes; `tests/check-modifier-dice.test.js` fails when `RECORDED_FRAGMENT_VALIDITY` disagrees with the 14.365 recording.
+The test doubles replay those recordings (`tests/helpers/termBearingRoll.js`), and `tests/roll-terms-recording.test.js` fails when a corpus formula lacks a recording on either build, so a formula added to the corpus has to be recorded on both arms.
 
 ### Phases
 
@@ -719,6 +761,13 @@ Each is full-profile only, leaves the world as it found it, and rides an existin
 - `chat-craft-card` — the chat sidebar clipped to the crafting result card posted by the Phase E craft.
 - `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
   The id predates issue 1915's retirement of the tabs and is kept for golden and evidence-map stability; there is no tab to open, the band is addressed by `[data-vocabulary-panel="componentTags"]`, and its direction toggle is clicked first so the frame shows the vocabulary sorted descending, as the View Lab case of the same id does.
+
+Phase E also crafts issue 2006's success-counting cards on a dedicated `Smoke Counting Forge`, each rolled publicly and deterministic by construction: `chat-craft-card-count-pass`, `chat-craft-card-count-fail`, `chat-craft-card-count-botch`, `chat-craft-card-count-zero` and the summed `chat-craft-card-over-control`.
+Their assertions bind to the card each craft created and to its count Roll's own die flags, and run in every profile; only the frames wait on `RUN_SCREENSHOT_PHASES`.
+On Foundry 14 the same forge then buys issue 2008's additional die, `chat-craft-card-count-bought`: two d20s at or under 20 need three successes, so only the die bought from the crafter's stored `system.resources.primary.value` can pass.
+It asserts that the resource fell from 3 to 2 before the card was posted, that the one count Roll rolled three dice, and that the card marks the last original tile bought and states the `Additional dice` row; the V13 arm records the step as skipped.
+Issue 2005's roll-under cards follow on a `Smoke Roll-Under Forge`, each decided by construction whatever the dice show: `chat-craft-card-under-pass` (the crafter's Strength raised by a typed situational `1d4`), `chat-craft-card-under-fail` (a fixed target), `chat-craft-card-under-otherwise` (a routed multiplied Strength that no tier admits) and `chat-craft-card-under-misconfigured`, compared against `chat-craft-card-over-control`.
+The rolled cases assert the card's pill, dice line and evidence rows against the posted roll and pre-roll; the refusing case asserts that the craft refuses before any prompt, posts no message, leaves the chat log's crafting card count unchanged, and that the Crafting tab's check card shows the refusal.
 
 ### Test artifacts
 

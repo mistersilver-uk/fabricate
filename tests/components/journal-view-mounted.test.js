@@ -1,8 +1,14 @@
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -10,9 +16,6 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
@@ -21,7 +24,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
@@ -31,21 +38,41 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    // Issue 1773: a reward row's glyph.
+    'src/ui/presenters/resultKindGlyphs.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
+    // Issue 1773: the award face's rows.
+    'src/ui/presenters/awardChoiceRows.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     // The roll line signs an executed margin with the shared formatter (issue 2005).
     'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The run kinds the store filters by and the kind filter draws and counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
+    // The real store the kind filter drives (issue 1518), and its raw closure.
+    'src/ui/presenters/additionalDicePrompt.js',
+    'src/systems/additionalDiceReach.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/localizeWithFallback.js',
+    'src/systems/countEvaluation.js',
+    'src/systems/countTriggerReach.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/checkEvaluation.js',
+    'src/systems/checkTarget.js',
+  ],
+  runeModules: [
+    'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    component('Pagination'),
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    component('ManagerButton'),
+    component('Button'),
     component('RunActionBar'),
     component('SlotTile'),
     component('ChoiceOptionList'),
@@ -53,25 +80,30 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
-    component('ListRow'),
-    component('YieldScale'),
-    component('OutcomeLadder'),
+    'src/ui/svelte/components/ListRow.svelte',
+    'src/ui/svelte/components/YieldScale.svelte',
+    'src/ui/svelte/components/OutcomeLadder.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
+    // The run-type multi-select and the box its rows draw (issue 1644).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -106,7 +138,7 @@ function makeJournal(overrides = {}) {
     selectedRunId: '',
     viewedStageIndex: 0,
     search: '',
-    kindFilter: 'all',
+    kindFilter: ['crafting', 'gathering', 'salvage', 'alchemy'],
     activeStatusFilter: 'all',
     activeSort: 'soonestReady',
     historySort: 'newest',
@@ -116,7 +148,7 @@ function makeJournal(overrides = {}) {
     tickWorldTime() {},
     select: (value) => calls.select.push(value),
     setSearch: (value) => calls.search.push(value),
-    setKindFilter: (value) => calls.kind.push(value),
+    toggleKind: (value) => calls.kind.push(value),
     setActiveStatusFilter: (value) => calls.status.push(value),
     setActiveSort: (value) => calls.activeSort.push(value),
     setHistorySort: (value) => calls.historySort.push(value),
@@ -182,6 +214,70 @@ function oddsChipOf(row) {
   return chips[0];
 }
 
+const RUN_KINDS = ['crafting', 'gathering', 'salvage', 'alchemy'];
+
+/** One run per kind on each list, two of them matching the search `silver`. */
+function kindListing() {
+  const active = (id, kind, title, derivedStatus) =>
+    makeCraftingRun({
+      id, key: `active-${id}`, runType: kind === 'alchemy' ? 'crafting' : kind, activityKind: kind,
+      derivedStatus, names: { title, subtitle: '' },
+    });
+  const finished = (id, kind, title, finishedAt) =>
+    makeSucceededRun({
+      id, key: `history-${id}`, runType: kind === 'alchemy' ? 'crafting' : kind, activityKind: kind,
+      finishedAt, names: { title, subtitle: '' },
+    });
+  const activeRuns = [
+    active('a-craft', 'crafting', 'Silver Sword', 'ready'),
+    active('a-gather', 'gathering', 'Silver Herbs', 'waiting'),
+    active('a-salvage', 'salvage', 'Copper Scrap', 'ready'),
+    active('a-brew', 'alchemy', 'Copper Draught', 'paused'),
+  ];
+  const history = [
+    finished('h-craft', 'crafting', 'Copper Nail', 40),
+    finished('h-gather', 'gathering', 'Copper Ore', 30),
+    finished('h-salvage', 'salvage', 'Silver Shard', 20),
+    finished('h-brew', 'alchemy', 'Silver Tonic', 10),
+  ];
+  return {
+    selectedActorId: 'Actor.actor-1',
+    selectedActorUuid: 'Actor.actor-1',
+    counts: { active: activeRuns.length, history: history.length },
+    activeRuns,
+    history,
+  };
+}
+
+/** Every subset of the four kinds, the empty one included. */
+const KIND_SUBSETS = Array.from({ length: 16 }, (_unused, mask) =>
+  RUN_KINDS.filter((_kind, index) => mask & (1 << index))
+);
+
+const KIND_KEY = 'FABRICATE.App.Journal.Filters.Kind.';
+const kindTrigger = (target) =>
+  target.querySelector(':scope [data-journal-kind-filter] [data-journal-kind-trigger]');
+
+/** The run-type panel, opened from its trigger when it is shut; portaled to the app root. */
+function openKinds(target) {
+  if (kindTrigger(target).getAttribute('aria-expanded') !== 'true') {
+    kindTrigger(target).click();
+    flushSync();
+  }
+  const panel = target.querySelector(':scope .journal-kind-popover');
+  assert.ok(Boolean(panel), 'the run-type trigger opened its panel');
+  return panel;
+}
+
+const kindOption = (target, kind) =>
+  openKinds(target).querySelector(`[data-journal-kind-option="${kind}"]`);
+
+/** Ticks or unticks one kind's row, as a player does, and settles. */
+function chooseKind(target, kind) {
+  kindOption(target, kind).click();
+  flushSync();
+}
+
 async function mountHistory(run) {
   const { store } = makeJournal({
     historyPageItems: [run],
@@ -244,8 +340,12 @@ describe('JournalView mounted behavior', () => {
     await settle();
     const rows = [...target.querySelectorAll('[data-history-run-id]')];
     assert.equal(rows.length, 4);
+    const finished = target.querySelector('.journal-history-list');
+    assert.equal(finished.getAttribute('aria-label'), 'FABRICATE.App.Journal.History.Title', 'the Finished list is named');
+    assert.ok(rows.every((row) => row.getAttribute('role') === 'button'), 'each Finished entry opens through a button');
+    assert.equal(finished.querySelectorAll(':scope > [role="listitem"]').length, 4, 'one listitem per entry');
     assert.equal(target.querySelectorAll('[data-pagination-compact]').length, 2);
-    assert.ok(!target.querySelector('[data-history-quantity], .journal-history-meta .manager-chip'));
+    assert.ok(!target.querySelector('[data-history-quantity], .fab-log-list-meta .manager-chip'));
     assert.deepEqual(rows.map((row) => row.querySelector('[data-history-outcome]')?.getAttribute('data-history-outcome')),
       ['succeeded', 'failed', 'cancelled', 'unknown']);
     assert.ok(rows.every((row) => row.querySelector('[data-history-outcome]')?.getAttribute('aria-label')));
@@ -275,9 +375,9 @@ describe('JournalView mounted behavior', () => {
     const finishedList = target.querySelector('[data-journal-list="finished"]');
     assert.ok(activeList.querySelector('[data-journal-list-scroll]'));
     assert.ok(finishedList.querySelector('[data-journal-list-scroll]'));
-    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.manager-pagination')));
-    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.manager-pagination')));
-    assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
+    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.fabricate-pagination')));
+    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.fabricate-pagination')));
+    assert.equal(target.querySelectorAll('.journal-list-footer .fabricate-pagination').length, 2);
     assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-list="finished"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-detail]'));
@@ -317,7 +417,7 @@ describe('JournalView mounted behavior', () => {
     const search = target.querySelector('[data-journal-search] input');
     search.value = 'herb';
     search.dispatchEvent(new Event('input', { bubbles: true }));
-    chooseSelectOption(target, '[data-journal-kind-filter]', 'gathering');
+    chooseKind(target, 'gathering');
     target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
     chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
     chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
@@ -384,6 +484,55 @@ describe('JournalView mounted behavior', () => {
     target.querySelector('[data-journal-dismiss]').click();
     assert.deepEqual(calls.dismiss, [run]);
     assert.deepEqual(calls.select, []);
+  });
+
+  it('presses exactly the Finished entry whose run key is selected, even among equal ids', async () => {
+    const first = makeSucceededRun({ id: 'same', key: 'history-first' });
+    const second = makeSucceededRun({ id: 'same', key: 'history-second' });
+    const { store } = makeJournal({
+      historyPageItems: [first, second], historyCount: 2, selectedRunKey: 'history-second',
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    const pressed = [...target.querySelectorAll('[data-history-run-id]')]
+      .map((row) => row.getAttribute('aria-pressed'));
+    assert.deepEqual(pressed, ['false', 'true'], 'the run key, not the shared id, picks the row');
+  });
+
+  it('refuses to select a Finished run that has no id', async () => {
+    const run = makeSucceededRun({ id: '', key: 'history-idless' });
+    const { store, calls } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const row = target.querySelector(':scope .journal-history-list [role="button"]');
+    row.click();
+    row.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.deepEqual(calls.select, [], 'an id-less run is not opened');
+  });
+
+  it('tones only a failed Finished row as danger, and names its dismiss control by the run', async () => {
+    const failed = makeSucceededRun({
+      id: 'f', key: 'f', status: 'failed', derivedStatus: 'failed', names: { title: 'Cracked Vial', subtitle: '' },
+    });
+    const done = makeSucceededRun({ id: 's', key: 's' });
+    const { store } = makeJournal({ historyPageItems: [failed, done], historyCount: 2 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const [failedItem, doneItem] = target.querySelectorAll(':scope .journal-history-list > [role="listitem"]');
+    assert.ok(failedItem.firstElementChild.classList.contains('is-danger'));
+    assert.ok(!doneItem.firstElementChild.classList.contains('is-danger'));
+    assert.match(
+      target.querySelector('[data-journal-dismiss="f"]').getAttribute('aria-label'),
+      /Cracked Vial/,
+      'the dismiss control is named by the run it dismisses'
+    );
+  });
+
+  it('falls back to the default bag art for a Finished run with no image', async () => {
+    const run = makeSucceededRun({ img: '' });
+    const { store } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.match(
+      target.querySelector(':scope .journal-history-list img').getAttribute('src'),
+      /icons\/svg\/item-bag\.svg$/
+    );
   });
 
   it('uses the shared action bar for primary, pause, completion preference, and armed cancellation', async () => {
@@ -669,7 +818,7 @@ describe('JournalView mounted behavior', () => {
     const target = await harness.mount({ services: makeServices(store) });
     assert.equal(target.querySelectorAll('[data-yield-scale]').length, 1, 'active scale has no duplicate received aggregate');
     assert.ok(target.querySelector('[data-yield-cut]'));
-    assert.match(target.querySelector('.journal-detail-meta').textContent, /d100/u);
+    assert.match(target.querySelector('.player-detail-header-meta').textContent, /d100/u);
 
     harness.remount();
     const routed = makeGatheringRun({
@@ -687,8 +836,8 @@ describe('JournalView mounted behavior', () => {
     });
     const routedTarget = await harness.mount({ services: makeServices(routedStore) });
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
-    assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
-    assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    assert.match(routedTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('.player-detail-header-meta').textContent, /null/u);
     const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
     assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
 
@@ -719,7 +868,7 @@ describe('JournalView mounted behavior', () => {
     const straightTarget = await harness.mount({ services: makeServices(straightStore) });
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
     assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
-    assert.match(straightTarget.querySelector('.journal-detail-meta').textContent, /Mode\.straight/u);
+    assert.match(straightTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.straight/u);
   });
 
   it('personalizes active d100 chances without replacing terminal evidence', async () => {
@@ -915,6 +1064,30 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!cleared.querySelector('[data-journal-command-error]'));
   });
 
+  it('records the window a retry came from as the host of the roll it starts (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store } = makeJournal({
+      selectedRun: run,
+      selectedRunKey: run.key,
+      commandError: { runKey: run.key, actorUuid: run.actorUuid, message: 'The run changed.' },
+    });
+    let origin = 'unread';
+    store.retryCommandError = async () => {
+      origin = activeRollPromptOrigin();
+    };
+    const target = await harness.mount({ services: makeServices(store) });
+    const notice = target.querySelector('[data-journal-command-error]');
+    const retry = notice.querySelector('[data-notice-action]');
+    retry.click();
+    await Promise.resolve();
+    const root = retry.closest('.fabricate-app, .fabricate-manager');
+    assert.ok(root && origin === root, 'the retry runs with its own window recorded as the origin');
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the retry settles');
+  });
+
   it('offers the GM the release on the very run whose own evidence is uncertain', async () => {
     // M27: the run holding the uncertain effect reports `recoveryRequired` from its OWN
     // evidence, so the notice that describes it used to answer `claim: null` and withhold the
@@ -949,5 +1122,275 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-recovery]'));
     assert.match(target.textContent, /Hidden recipe/);
     assert.doesNotMatch(target.textContent, /selectedIngredientSetId/);
+  });
+
+  describe('the run-type multi-select through the real store', () => {
+    let createJournalStore;
+    before(async () => {
+      ({ createJournalStore } = await harness.loadRuneModule(
+        'src/ui/svelte/stores/journalStore.svelte.js'
+      ));
+    });
+
+    async function mountStore(listing = kindListing()) {
+      const store = createJournalStore({
+        services: {
+          listJournalForActor: async () => listing,
+          getSelectedActorId: () => 'Actor.actor-1',
+          getWorldTime: () => 0,
+        },
+      });
+      await store.load();
+      const target = await harness.mount({ services: makeServices(store) });
+      await settle();
+      return { store, target, listing };
+    }
+
+    const shown = (target, attribute) =>
+      [...target.querySelectorAll(`[${attribute}]`)].map((row) => row.getAttribute(attribute)).sort(byCodePoint);
+    const selectedOf = (target, kind) => kindOption(target, kind).getAttribute('aria-selected');
+    const summaryOf = (target) =>
+      kindTrigger(target).querySelector('.fabricate-select-value').textContent.trim();
+
+    /** Tick or untick the rows whose state differs from `kinds`, then settle. */
+    async function showOnly(target, kinds) {
+      for (const kind of RUN_KINDS) {
+        const selected = selectedOf(target, kind) === 'true';
+        if (selected !== kinds.includes(kind)) chooseKind(target, kind);
+      }
+      await settle();
+    }
+
+    it('shows the union of the ticked kinds, under every combination and with search', async () => {
+      const { store, target, listing } = await mountStore();
+      assert.deepEqual(
+        RUN_KINDS.map((kind) => selectedOf(target, kind)),
+        ['true', 'true', 'true', 'true'],
+        'every kind starts shown'
+      );
+      for (const query of ['', 'silver']) {
+        const search = target.querySelector(':scope [data-journal-search] input');
+        search.value = query;
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+        for (const kinds of KIND_SUBSETS) {
+          await showOnly(target, kinds);
+          const expect = (runs) =>
+            runs
+              .filter((run) => kinds.includes(run.activityKind))
+              .filter((run) => run.names.title.toLowerCase().includes(query))
+              .map((run) => run.id)
+              .sort(byCodePoint);
+          const label = `kinds [${kinds}] with search "${query}"`;
+          assert.deepEqual([...store.kindFilter].sort(byCodePoint), [...kinds].sort(byCodePoint), `${label}: the store set`);
+          assert.deepEqual(shown(target, 'data-run-id'), expect(listing.activeRuns), `${label}: active`);
+          assert.deepEqual(
+            shown(target, 'data-history-run-id'),
+            expect(listing.history),
+            `${label}: finished`
+          );
+          for (const kind of RUN_KINDS) {
+            assert.equal(
+              selectedOf(target, kind),
+              String(kinds.includes(kind)),
+              `${label}: ${kind} reads its own state`
+            );
+          }
+        }
+      }
+    });
+
+    it('keeps the status control exclusive inside the shown kinds', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, ['crafting', 'salvage', 'alchemy']);
+      const checked = () =>
+        [...target.querySelectorAll(':scope [data-journal-status-filter] input:checked')].map(
+          (input) => input.value
+        );
+      target.querySelector(':scope [data-journal-status-filter] input[value="ready"]').click();
+      await settle();
+      assert.deepEqual(checked(), ['ready']);
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-craft', 'a-salvage']);
+      target.querySelector(':scope [data-journal-status-filter] input[value="paused"]').click();
+      await settle();
+      assert.deepEqual(checked(), ['paused'], 'choosing a second status releases the first');
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-brew']);
+    });
+
+    it('words an empty list as filtered while any kind is hidden, and as plain when none is', async () => {
+      const partial = kindListing();
+      partial.history = partial.history.filter((entry) => entry.activityKind !== 'alchemy');
+      const { target } = await mountStore(partial);
+      await showOnly(target, ['alchemy']);
+      assert.match(
+        target.querySelector('[data-journal-empty="history"]').textContent,
+        /Empty\.MatchingHistory/u,
+        'one kind shown over no run of it is a filtered empty'
+      );
+      harness.remount();
+
+      const { target: allOn } = await mountStore({ ...kindListing(), activeRuns: [], history: [] });
+      const plain = allOn.querySelector('[data-journal-empty="history"]').textContent;
+      assert.match(plain, /Empty\.History/u, 'every kind shown over an empty journal is plain');
+      assert.doesNotMatch(plain, /Matching/u);
+    });
+
+    it('names each option by its visible kind name, and the whole row ticks it', async () => {
+      const { store, target } = await mountStore();
+      const option = kindOption(target, 'gathering');
+      assert.equal(option.getAttribute('role'), 'option');
+      assert.match(
+        option.querySelector('.journal-kind-name').textContent,
+        /Kind\.Gathering/u,
+        'the row names its kind'
+      );
+      assert.ok(!option.hasAttribute('aria-label'), 'named by its own content, not a hidden string');
+      assert.ok(!option.hasAttribute('aria-labelledby'), 'and not by an id ref');
+      option.click();
+      await settle();
+      assert.equal(selectedOf(target, 'gathering'), 'false', 'clicking the row unticks it');
+      assert.ok(!store.kindFilter.includes('gathering'));
+    });
+
+    it('opens a multi-selectable list under a listbox trigger, with no query field', async () => {
+      const { target } = await mountStore();
+      const field = target.querySelector(':scope [data-journal-kind-filter]');
+      assert.ok(Boolean(field), 'the control keeps its data-journal-kind-filter hook');
+      assert.equal(field.dataset.journalKindShown, RUN_KINDS.join(' '));
+      assert.equal(target.querySelectorAll('[data-journal-kind-toggle]').length, 0);
+      const trigger = kindTrigger(target);
+      assert.equal(trigger.tagName, 'BUTTON');
+      assert.equal(trigger.getAttribute('aria-haspopup'), 'listbox');
+      assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+      assert.equal(trigger.dataset.keyboardFocus, 'true');
+      assert.ok(trigger.querySelector('i.fa-layer-group'), 'the trigger leads with the layers glyph');
+      assert.ok(trigger.querySelector('i.fa-chevron-down'), 'and trails a closed chevron');
+      assert.equal(summaryOf(target), `${KIND_KEY}All`, 'every kind shown reads as all of them');
+      assert.equal(
+        trigger.getAttribute('aria-label'),
+        `${KIND_KEY}Name:${JSON.stringify({ label: `${KIND_KEY}Label`, summary: `${KIND_KEY}All` })}`,
+        'named by the filter label plus its summary'
+      );
+
+      const panel = openKinds(target);
+      assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+      assert.ok(trigger.querySelector('i.fa-chevron-up'), 'the chevron flips while open');
+      assert.equal(panel.querySelectorAll('input').length, 0, 'four options need no search');
+      const list = panel.querySelector('[role="listbox"]');
+      assert.equal(list.getAttribute('aria-multiselectable'), 'true');
+      assert.equal(list.getAttribute('aria-label'), `${KIND_KEY}Label`);
+      assert.equal(trigger.getAttribute('aria-controls'), list.id);
+      const rows = [...list.querySelectorAll('[data-journal-kind-option]')];
+      assert.deepEqual(rows.map((row) => row.dataset.journalKindOption), RUN_KINDS, 'in label order');
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.journal-kind-glyph').classList[2]),
+        ['fa-hammer', 'fa-leaf', 'fa-recycle', 'fa-flask']
+      );
+      for (const row of rows) {
+        assert.equal(row.dataset.keyboardFocus, 'true');
+        const box = row.querySelector('.fab-selection-check');
+        assert.equal(box.getAttribute('aria-hidden'), 'true', 'the box only draws the row state');
+        assert.ok(box.classList.contains('is-checked'));
+      }
+      const showAll = panel.querySelector('[data-journal-kind-show-all]');
+      assert.equal(showAll.dataset.keyboardFocus, 'true');
+      assert.match(showAll.textContent, /Kind\.ShowAll/u);
+      assert.equal(showAll.disabled, true, 'nothing is hidden, so there is nothing to switch back on');
+      assert.ok(
+        list.querySelector('.fab-selection-check').classList.contains('is-sm'),
+        'the row box is the compact density'
+      );
+    });
+
+    it('filters both lists by two ticked kinds and summarises them in label order', async () => {
+      const { store, target } = await mountStore();
+      await showOnly(target, []);
+      assert.equal(summaryOf(target), `${KIND_KEY}None`);
+      chooseKind(target, 'salvage');
+      chooseKind(target, 'crafting');
+      await settle();
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'true', 'the panel stays open');
+      assert.deepEqual([...store.kindFilter], ['crafting', 'salvage']);
+      assert.equal(summaryOf(target), `${KIND_KEY}Crafting, ${KIND_KEY}Salvage`, 'label order');
+      assert.equal(
+        target.querySelector(':scope [data-journal-kind-filter]').dataset.journalKindShown,
+        'crafting salvage',
+        'the field hook carries the partial set, in label order'
+      );
+      assert.equal(
+        openKinds(target).querySelector('[data-journal-kind-show-all]').disabled,
+        false,
+        'hidden kinds enable the footer'
+      );
+      assert.match(kindTrigger(target).getAttribute('aria-label'), /Kind\.Crafting, .*Kind\.Salvage/u);
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-craft', 'a-salvage']);
+      assert.deepEqual(shown(target, 'data-history-run-id'), ['h-craft', 'h-salvage']);
+      for (const kind of RUN_KINDS) {
+        const ticked = ['crafting', 'salvage'].includes(kind);
+        const row = kindOption(target, kind);
+        assert.equal(row.getAttribute('aria-selected'), String(ticked), `${kind} row state`);
+        assert.equal(row.querySelector('.fab-selection-check').classList.contains('is-checked'), ticked);
+      }
+    });
+
+    it('clears the filter from "Show all run types", so every kind shows again', async () => {
+      const { store, target, listing } = await mountStore();
+      await showOnly(target, ['salvage']);
+      openKinds(target).querySelector('[data-journal-kind-show-all]').click();
+      await settle();
+      assert.deepEqual([...store.kindFilter], RUN_KINDS);
+      assert.equal(summaryOf(target), `${KIND_KEY}All`);
+      assert.deepEqual(
+        shown(target, 'data-run-id'),
+        listing.activeRuns.map((run) => run.id).sort(byCodePoint)
+      );
+      assert.deepEqual(RUN_KINDS.map((kind) => selectedOf(target, kind)), ['true', 'true', 'true', 'true']);
+    });
+
+    it('counts each kind across both lists, before search and the kind filter narrow them', async () => {
+      const listing = kindListing();
+      listing.activeRuns.push(
+        makeCraftingRun({ id: 'a-craft-2', key: 'active-a-craft-2', activityKind: 'crafting' })
+      );
+      listing.history = listing.history.filter((run) => run.activityKind !== 'alchemy');
+      const { target } = await mountStore(listing);
+      const counts = () =>
+        RUN_KINDS.map((kind) =>
+          openKinds(target).querySelector(`[data-journal-kind-count="${kind}"]`).textContent.trim()
+        );
+      assert.deepEqual(counts(), ['3', '2', '2', '1']);
+      const search = target.querySelector(':scope [data-journal-search] input');
+      search.value = 'silver';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await showOnly(target, ['gathering']);
+      assert.deepEqual(counts(), ['3', '2', '2', '1'], 'the counts are the journal total, not the view');
+    });
+
+    it('closes on Escape and hands focus back to the trigger', async () => {
+      const { target } = await mountStore();
+      openKinds(target).querySelector('[data-journal-kind-show-all]').focus();
+      assert.ok(document.activeElement !== kindTrigger(target), 'focus starts inside the panel');
+      document.activeElement.dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+      await settle();
+      await settle();
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'false');
+      assert.ok(document.activeElement === kindTrigger(target), 'focus is back on the trigger');
+    });
+
+    it('draws the empty state for both lists when no kind is shown', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, []);
+      for (const list of ['active', 'history']) {
+        const empty = target.querySelector(`[data-journal-empty="${list}"]`);
+        assert.ok(Boolean(empty), `the ${list} list draws its empty state`);
+        assert.ok(empty.classList.contains('manager-empty'), 'through the shared EmptyState');
+        assert.match(empty.textContent, /Empty\.Matching/u, 'and words it as a filtered empty');
+      }
+      assert.equal(target.querySelectorAll('[data-run-id], [data-history-run-id]').length, 0);
+      assert.equal(target.querySelectorAll('.journal-run-list, .journal-history-list').length, 0);
+    });
   });
 });

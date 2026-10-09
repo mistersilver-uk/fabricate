@@ -135,7 +135,7 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
     // THE SECOND SUBJECT acceptance 11 names: a site this change actually converted.
     const converted = await captionClickLegs(
       'currency',
-      '[data-world-currency-strategy] .manager-field > span',
+      '[data-world-currency-strategy] .fabricate-field > span',
       '[data-world-currency-strategy-select]'
     );
     assert.equal(
@@ -359,7 +359,8 @@ const CONVERTED_SITES = Object.freeze([
       values,
     })),
   ].map((site) =>
-    Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'toolbar' })
+    // `form`: each shares its bar's row with the 38px search, so takes the same shell (issue 1782).
+    Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'form' })
   ),
   // And the conditions card's current-value picker, whose value a prop seeds. Its counterpart is
   // one sheet rule off the demoted field's class, as the danger ceiling's is.
@@ -476,7 +477,7 @@ async function driveRenderedOption(page, hook, value) {
  * @returns {Promise<{shipped: number, unfloored: number, face: string, column: number,
  *   rung: string, label: string}>}
  */
-async function measureTrigger(subject, hook, value, columnSelector = '.manager-field', drive = false) {
+async function measureTrigger(subject, hook, value, columnSelector = '.fabricate-field', drive = false) {
   const page = await openFixture(subject, drive ? '' : value);
   try {
     if (drive) await driveRenderedOption(page, hook, value);
@@ -628,7 +629,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
   for (const site of RESTING_WIDTH_SITES) {
     it(`holds ${site.name} at its column width`, async () => {
       // No second value to compare, so the claim is the one the counterpart exists to make: the
-      // trigger fills its column instead of hugging. `.fabricate-field.manager-field select`
+      // trigger fills its column instead of hugging. `.fabricate-field.fabricate-field select`
       // supplied that width natively and is element-typed, so it reaches no `<button>`.
       const measured = await measureTrigger(site.subject, site.hook, '', site.columnSelector);
       assertRung(site, measured.rung);
@@ -659,7 +660,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
         const trigger = document.querySelector(selector);
         if (!trigger) return null;
         const shipped = trigger.getBoundingClientRect().width;
-        const column = trigger.closest('.manager-field')?.getBoundingClientRect().width ?? 0;
+        const column = trigger.closest('.fabricate-field')?.getBoundingClientRect().width ?? 0;
         return {
           label: trigger.textContent.replaceAll(/\s+/gu, ' ').trim(),
           shipped: Number(shipped.toFixed(2)),
@@ -806,7 +807,7 @@ describe('the two hints the currency card draws read in one treatment (issue 151
     // THE CARD HAS TWO HINTS AND ONE OF THEM IS THE PRIMITIVE'S. The provider adopted
     // `Select hint=`, which draws `.fabricate-select-note`; the strategy line is drawn by the
     // caller because its copy is conditional. Putting the class on the caller's `<small>` was
-    // INERT: `.fabricate-field.manager-field small` is ELEMENT-TYPED at (0,2,1) and the note
+    // INERT: `.fabricate-field.fabricate-field small` is ELEMENT-TYPED at (0,2,1) and the note
     // class is (0,1,0), so the sheet's small print out-ranked it and the two hints went on
     // rendering in two different faces with the class present. The caller writes the same
     // ELEMENT the primitive does now. That is a cascade question and happy-dom computes no
@@ -837,7 +838,7 @@ describe('the two hints the currency card draws read in one treatment (issue 151
         provider,
         'the spend-strategy hint and the provider hint sit one above the other in the same card ' +
           'and must read the same. The strategy line is drawn by the caller, so it carries the ' +
-          'note class itself — and on a `<small>` inside a `.manager-field` that class is ' +
+          'note class itself — and on a `<small>` inside a `.fabricate-field` that class is ' +
           'out-ranked by the sheet`s element-typed small print, which is why the element matters.'
       );
     } finally {

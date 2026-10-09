@@ -56,7 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte',
@@ -425,7 +425,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     return { root, row };
   }
 
-  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`.
+  // DEFECT 1. `Delete modifier` and `Done` shipped a bare hand-written button class.
   it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
     const { row } = await openEditor();
 
@@ -440,13 +440,13 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'Done is the quiet verb, as Back is in the Tool Studio'
     );
 
-    // Both go through `ManagerButton`, which is what stops the pair drifting apart again.
+    // Both go through `Button`, which is what stops the pair drifting apart again.
     for (const [name, button] of [
       ['Delete modifier', del],
       ['Done', done],
     ]) {
       assert.ok(
-        button.classList.contains('manager-button') &&
+        button.classList.contains('fabricate-button') &&
           button.classList.contains('fab-manager-button'),
         `${name} renders through the shared primitive, not a hand-written class string`
       );
@@ -460,7 +460,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     // header-actions class, and this change converted only this one.
     const actions = [
       ...root.querySelectorAll(
-        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .manager-button'
+        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .fabricate-button'
       ),
     ];
 

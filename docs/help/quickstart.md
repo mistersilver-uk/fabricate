@@ -126,12 +126,14 @@ They are authored once and composed into environments.
 
 1. Open the **Tasks** tab under Gathering and create a task
 2. Give it a **Name** and optional **Biomes** (empty means "matches any biome")
-3. Add **Drop rows**.
+3. Open the **Results** tab and add **Drop rows**.
   These are (optionally) ordered rows, each pointing at a component with a **quantity** and a **drop rate** from 0 to 100.
   The drop row order is the rank used by the system's Gathering Rules when you choose "Highest ranked successful drop" in the gathering reward rules.
-4. Optionally set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
+4. Optionally, on the **Requirements** tab, set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
+5. If **Save** is disabled, open the **Validation** tab.
+  It lists each blocking issue with a **View** action that takes you to the field to fix.
 
-{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, with the task identity and availability cards on the left and the selected drop rule on the right." %}
+{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor on its Overview tab, with the task identity and Gathering resolution cards." %}
 
 {% include screenshot.html case="manager-gathering-settings-normal" caption="The gathering Settings tab, with the resolution mode and limitation cards on the left and the system gathering rules on the right." %}
 
@@ -194,6 +196,6 @@ The Crafting tab provides recipe browsing, actor and source selection, craft but
 ## See Also
 
 - [Crafting Systems]({% link crafting-systems/index.md %}) covers resolution modes, features, and system configuration
-- [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
+- [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result sets, recipe authoring, and player crafting
 - [API Reference]({% link api/index.md %}) is the full developer documentation
 - [Troubleshooting]({% link help/troubleshooting.md %}) has solutions for common setup issues

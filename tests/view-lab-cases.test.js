@@ -1,7 +1,7 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, relative, resolve, sep as SEP } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
@@ -33,6 +33,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  parseRunStateRegions,
   partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
@@ -51,10 +52,17 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
+import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
+import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
+import { importedModules } from './helpers/svelteStructureContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -169,6 +177,9 @@ const DRIVER_HOOKS = [
   // `fabricate-manager` is deliberately NOT here.
 ];
 
+/** The one module outside `src/ui/` that renders a chat card: the GM-only complication card. */
+const CHAT_CARD_EMITTERS = new Set(['src/systems/complicationRuntime.js']);
+
 /**
  * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
  * component that actually renders the thing rather than to the whole tree.
@@ -179,7 +190,8 @@ function renderSources() {
       ([file]) =>
         file.endsWith('.svelte') ||
         file === 'lang/en.json' ||
-        (file.startsWith('src/ui/') && file.endsWith('.js'))
+        (file.startsWith('src/ui/') && file.endsWith('.js')) ||
+        CHAT_CARD_EMITTERS.has(file)
     )
   );
 }
@@ -206,9 +218,14 @@ function emittingSources() {
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
-/** The components that RENDER the manager rail. */
+/** The item model the rail's rows, ids and labels are built from (issue 1777). */
+const RAIL_ITEM_MODEL = 'src/ui/svelte/apps/manager/managerNavItems.js';
+
+/** The components that RENDER the manager rail, and the model that authors its rows. */
 function railRenderingFiles(sources) {
-  return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+  return [...sources].filter(
+    ([file, text]) => text.includes(RAIL_BUTTON_CLASS) || file === RAIL_ITEM_MODEL
+  );
 }
 
 function relativeImportsOf(file, text) {
@@ -369,7 +386,9 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /** Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix. */
 const LAB_HOOK = /^(?:data-)?lab-/;
-const labHarnessSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+const labHarnessSource = ['tests/view-lab/mount.js', 'tests/view-lab/labCompanionRoll.js']
+  .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
+  .join('\n');
 
 /** A selector with every `:not(…)` group removed, brackets balanced. */
 function stripNegations(selector) {
@@ -656,13 +675,15 @@ function caseSelectors(viewCase) {
   if (typeof viewCase.expectLayout?.fillSelector === 'string') {
     selectors.push(viewCase.expectLayout.fillSelector);
   }
+  for (const control of viewCase.expectLayout?.controls ?? []) selectors.push(control.selector);
   return selectors;
 }
 
-// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// The six player cases whose layout expectation asserts "this STACKED at 1024px": one
 // resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
+  'player-inventory-book-read-learn-stacked',
   'player-gathering-stacked',
   'player-crafting-stacked',
   'player-alchemy-stacked',
@@ -686,11 +707,73 @@ const RAIL_FILL_LAYOUT_CASES = {
   'manager-world-downtime-narrow': { tracks: 2, width: 960 },
 };
 const RAIL_FILL_LAYOUT_CASE_IDS = Object.keys(RAIL_FILL_LAYOUT_CASES);
+// And one case inside each band the app ladder's rungs moved: 680-720 and 960-1000, where the
+// arrangement a viewport query or an off-ladder rung used to stack now keeps both columns.
+const BAND_LAYOUT_CASES = {
+  'manager-world-parties-card-700': { tracks: 2, width: 700, height: 900 },
+  'world-component-entry-980': { tracks: 2, width: 980, height: 860 },
+};
+const BAND_LAYOUT_CASE_IDS = Object.keys(BAND_LAYOUT_CASES);
+// And the Component Rules header either side of the advert's 1320 rung, where the page heading
+// keeps 320px beside the advert on the real header (a floor, so no grid).
+const HEADING_FLOOR_LAYOUT_CASES = {
+  'manager-components-premium-ad-1150': { width: 1150, height: 820 },
+  'manager-components-premium-ad-full': { width: 1330, height: 820 },
+};
+const HEADING_FLOOR_LAYOUT_CASE_IDS = Object.keys(HEADING_FLOOR_LAYOUT_CASES);
+// And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
+// at its own window.
+const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
+  'manager-recipe-edit-results-rolled',
+  'manager-recipe-edit-results-rolled-hearth-herb',
+  'manager-recipe-edit-results-rolled-narrow',
+  'manager-recipe-edit-results-kinds',
+  'manager-recipe-edit-results-kinds-narrow',
+  'manager-recipe-edit-results-adder-menu',
+  'manager-recipe-edit-results-progressive',
+  'manager-recipe-edit-results-progressive-adder',
+  'manager-recipe-edit-results-narrow',
+  'manager-gathering-task-editor-straight-rolled',
+  'manager-component-edit-salvage-rolled-narrow',
+  'manager-component-edit-salvage-narrow',
+];
+// And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
+// 1521): every `Button` verb the retired rail button drew, by the case that renders it.
+const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
+// The measured controls that are not verbs: the `rule` fact row's subtitle ink, and the On craft
+// primer's item list offset and lead (issue 1521).
+const PRIMER = '[data-essence-on-craft-explainer]';
+const NON_VERB_CONTROLS = Object.freeze({
+  'world-essence-catalogue': [
+    {
+      selector: '[data-scoped-list-inherit-note="effectSource"]',
+      styles: 'color: var(--fab-text-muted)',
+    },
+  ],
+  'manager-essence-edit-unscoped-on-craft': [
+    { selector: `${PRIMER} .manager-callout-items`, styles: 'margin-top: var(--fab-space-2)' },
+    {
+      selector: `${PRIMER} .manager-callout-item:first-child .manager-callout-item-lead`,
+      styles: 'color: var(--fab-text); font-weight: 600',
+    },
+  ],
+});
+const NON_VERB_SELECTORS = new Set(
+  Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
+);
+const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
+const CONTROL_LAYOUT_CASE_IDS = [
+  ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
+];
 const LAYOUT_CASE_IDS = [
+  ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
+  ...CONTROL_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
   ...RAIL_FILL_LAYOUT_CASE_IDS,
+  ...BAND_LAYOUT_CASE_IDS,
+  ...HEADING_FLOOR_LAYOUT_CASE_IDS,
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
@@ -700,6 +783,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
+    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id)) continue;
     if (
       viewCase.query?.journalCaseState === 'wide' ||
       viewCase.query?.journalCaseState === 'narrow'
@@ -710,11 +794,30 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
       continue;
     }
+    if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+      assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
+      assert.equal(typeof viewCase.expectLayout.containerSelector, 'string', 'but a container');
+      const { oneLineRows, wrappedRows } = viewCase.expectLayout;
+      assert.ok(
+        typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
+        `${viewCase.id} states its rows as one line or as wrapped lines`
+      );
+      continue;
+    }
+    if (HEADING_FLOOR_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+      assert.deepEqual(viewCase.position, HEADING_FLOOR_LAYOUT_CASES[viewCase.id]);
+      assert.equal(viewCase.expectLayout.gridSelector, undefined, 'a floor needs no grid');
+      assert.equal(viewCase.expectLayout.minInlineSize.pixels, 320);
+      assert.match(viewCase.expectLayout.minInlineSize.selector, /\.manager-heading$/u);
+      continue;
+    }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
     // shared literal would be asserting one screen's threshold about another's.
     assert.deepEqual(viewCase.position, layoutCasePosition(viewCase.id));
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
+    const band = BAND_LAYOUT_CASES[viewCase.id];
+    if (band) assert.equal(viewCase.expectLayout.expectedTracks, band.tracks);
   }
   for (const viewCase of declared.filter((entry) =>
     RESPONSIVE_LAYOUT_CASE_IDS.includes(entry.id)
@@ -755,13 +858,57 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     // And the side rail runs the body's full height below the 1120px rung (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
-  for (const viewCase of declared.filter((entry) =>
-    RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
-  )) {
+  for (const viewCase of declared.filter((entry) => RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id))) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
     assert.equal(viewCase.expectLayout.expectedTracks, RAIL_FILL_LAYOUT_CASES[viewCase.id].tracks);
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
+  }
+});
+
+test('the inspector-rail cases measure every verb on the manager rung, one primary in success', () => {
+  const byText = (left, right) => left.localeCompare(right);
+  const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
+  assert.deepEqual(
+    measured
+      .filter(isVerbControl)
+      .map((control) => control.selector)
+      .sort(byText),
+    INSPECTOR_VERB_SITES.map((site) => site.selector).sort(byText),
+    'the cases measure exactly the eight rail verbs'
+  );
+  for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
+    const { expectLayout } = getCaseById(id);
+    const verbs = expectLayout.controls.filter(isVerbControl);
+    assert.equal(expectLayout.gridSelector, undefined, `${id} measures controls, not a grid`);
+    assert.deepEqual(
+      verbs.map((control) => control.selector),
+      sites.map((site) => site.selector),
+      `${id} measures each verb it renders`
+    );
+    const success = verbs
+      .filter((control) => control.styles.includes('background-color: var(--fab-success)'))
+      .map((control) => control.selector);
+    assert.deepEqual(
+      success,
+      sites.filter((site) => site.role === 'primary').map((site) => site.selector),
+      `${id} measures its primary, and only it, in the success family`
+    );
+    for (const { selector, styles } of verbs) {
+      for (const declaration of ['min-height: 34px', 'border-radius: 9px', 'font-size: 0.72rem']) {
+        assert.ok(styles.includes(declaration), `${id} ${selector} measures ${declaration}`);
+      }
+    }
+  }
+});
+
+test('the subtitle ink and the primer items are measured by the cases that draw them', () => {
+  for (const [caseId, expected] of Object.entries(NON_VERB_CONTROLS)) {
+    assert.deepEqual(
+      getCaseById(caseId).expectLayout.controls.filter((candidate) => !isVerbControl(candidate)),
+      expected,
+      `${caseId} measures its non-verb controls`
+    );
   }
 });
 
@@ -770,9 +917,11 @@ test('exactly the declared layout cases carry complete layout expectations', () 
 test('the side-rail band cases name the scroller that owns their overflow', () => {
   const scrollers = {
     'manager-recipe-edit-step-narrow': 'main.manager-recipe-edit-main',
-    'manager-gathering-task-editor-selector-narrow': 'main.manager-gathering-task-edit-view',
-    'manager-gathering-task-editor-straight-narrow': 'main.manager-gathering-task-edit-view',
-    'manager-gathering-task-editor-routed-narrow': 'main.manager-gathering-task-edit-view',
+    // The task editor's tab panel scrolls under its fixed tab bar (issue 1522).
+    'manager-gathering-task-editor-selector-narrow': '[data-gathering-task-panel="overview"]',
+    // A Results tab of one result card fits the window, so only Overview overflows (issue 1522).
+    'manager-gathering-task-editor-straight-narrow': undefined,
+    'manager-gathering-task-editor-routed-narrow': undefined,
     'world-tool-catalogue-stacked': '.manager-scoped-list-layout',
   };
   for (const [id, scroller] of Object.entries(scrollers)) {
@@ -793,7 +942,11 @@ test('the side-rail band cases name the scroller that owns their overflow', () =
 });
 
 function layoutCasePosition(id) {
-  if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 980, height: 860 };
+  if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 960, height: 860 };
+  if (BAND_LAYOUT_CASE_IDS.includes(id)) {
+    const { width, height } = BAND_LAYOUT_CASES[id];
+    return { width, height };
+  }
   if (RAIL_FILL_LAYOUT_CASE_IDS.includes(id)) {
     return { width: RAIL_FILL_LAYOUT_CASES[id].width, height: 900 };
   }
@@ -801,7 +954,9 @@ function layoutCasePosition(id) {
 }
 
 test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
-  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-history-batch-')
+  );
   assert.equal(cases.length, 10);
   for (const width of [1240, 1024]) {
     for (const state of ['full', 'partial', 'empty', 'restored', 'tools']) {
@@ -809,7 +964,11 @@ test('compact Journal captures add full, short, empty, restored and tool witness
       assert.equal(capture.position.width, width);
       assert.equal(capture.expectTab, 'journal');
       assert.match(capture.expectSelector, /data-history-items="tools"/);
-      if (state === 'partial') assert.equal(capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length, 4);
+      if (state === 'partial')
+        assert.equal(
+          capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length,
+          4
+        );
       if (state === 'restored') assert.equal(capture.steps.at(-1).fill, '');
       if (state === 'empty') assert.match(capture.expectSelector, /is-fill/);
     }
@@ -819,14 +978,57 @@ test('compact Journal captures add full, short, empty, restored and tool witness
 // The evidence each history-data state exists to photograph, keyed by its own witness.
 const HISTORY_DATA_EVIDENCE = [
   // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
-  ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
+  [
+    'legacy-row-rolls',
+    [
+      /legacy-iron-ore-roll-12"\]\.is-cleared/,
+      /legacy-copper-ore-roll-94"\]\.is-cleared/,
+      /:not\(:has\(\[data-yield-cut\]\)\)/,
+    ],
+  ],
   ['shared-roll-control', [/:has\(\[data-yield-cut\]\)/, /shared-ruby:2"\]\.is-missed/]],
-  ['recovered-materials', [/title="Steel Billet"/, /title="Coal"/, /consumed"\] i\.fa-box/, /produced"\] \[title="Steel Ingot"\]/]],
-  ['unknown-material-resolution', [/data-yield-shared-roll/, /data-history-unattributed\] \+ \[data-history-items="produced"/, /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/]],
-  ['settled-zero', [/data-journal-verdict="failed"/, /barren-iron-ore"\]\.is-missed/, /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/]],
-  ['uncertain-awards', [/data-effect-phase="applied"\] \[data-list-row\]/, /data-effect-phase="applying"\] \[data-list-row\]/, /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/]],
+  [
+    'recovered-materials',
+    [
+      /title="Steel Billet"/,
+      /title="Coal"/,
+      /consumed"\] i\.fa-box/,
+      /produced"\] \[title="Steel Ingot"\]/,
+    ],
+  ],
+  [
+    'unknown-material-resolution',
+    [
+      /data-yield-shared-roll/,
+      /data-history-unattributed\] \+ \[data-history-items="produced"/,
+      /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'settled-zero',
+    [
+      /data-journal-verdict="failed"/,
+      /barren-iron-ore"\]\.is-missed/,
+      /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'uncertain-awards',
+    [
+      /data-effect-phase="applied"\] \[data-list-row\]/,
+      /data-effect-phase="applying"\] \[data-list-row\]/,
+      /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/,
+    ],
+  ],
   ['fizzle', [/data-history-summary="none"/, /title="Quicksilver"/, /img\.fab-medallion-img/]],
-  ['salvage', [/data-history-items="produced"\] \+ \[data-journal-fact\]/, /produced"\] \[data-list-row\] ~ \[data-list-row\]/, /:not\(:has\(\[data-history-items="consumed"\]\)\)/]],
+  [
+    'salvage',
+    [
+      /data-history-items="produced"\] \+ \[data-journal-fact\]/,
+      /produced"\] \[data-list-row\] ~ \[data-list-row\]/,
+      /:not\(:has\(\[data-history-items="consumed"\]\)\)/,
+    ],
+  ],
 ];
 
 test('the history-data witnesses name their defining evidence on the selected record', () => {
@@ -865,10 +1067,11 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    73
+    75
   );
   assert.equal(
-    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
+      .length,
     10
   );
 });
@@ -906,7 +1109,8 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  assert.equal(cases.length, 73);
+  // 75 since issue 1644 added the run-type panel open over two ticked kinds and the auto-completing waiting run.
+  assert.equal(cases.length, 75);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -973,7 +1177,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
     'history-settling',
   ]) {
     assert.ok(byState.has(state), `issue #1648 v4 explicitly requires ${state}`);
@@ -997,28 +1201,28 @@ test('layout expectation selectors name UI that still exists', () => {
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
-    collectSelectorHookFailures(
-      viewCase,
-      viewCase.expectLayout.containerSelector,
-      sources,
-      haystack,
-      missing
-    );
-    collectSelectorHookFailures(
-      viewCase,
-      viewCase.expectLayout.gridSelector,
-      sources,
-      haystack,
-      missing
-    );
-    if (viewCase.expectLayout.fillSelector) {
-      collectSelectorHookFailures(
-        viewCase,
-        viewCase.expectLayout.fillSelector,
-        sources,
-        haystack,
-        missing
-      );
+    const {
+      containerSelector,
+      gridSelector,
+      fillSelector,
+      minInlineSize,
+      controls = [],
+      ...rows
+    } = viewCase.expectLayout;
+    for (const selector of [
+      containerSelector,
+      gridSelector,
+      fillSelector,
+      rows.oneLineRows,
+      rows.wrappedRows?.rows,
+      ...(rows.wrappedRows?.lines.flat() ?? []),
+      rows.alignedRight,
+      rows.alignedLeft,
+      rows.unclipped,
+      minInlineSize?.selector,
+      ...controls.map((control) => control.selector),
+    ]) {
+      if (selector) collectSelectorHookFailures(viewCase, selector, sources, haystack, missing);
     }
   }
   assert.deepEqual(
@@ -1136,13 +1340,24 @@ test('the capture runner threads the per-case console allowance into the render'
   assert.deepEqual(
     declaring,
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
-    // roll-under craft or salvage raises the resolved-failure toast the lab reports as a warning
-    // (issues 2005 and 2092).
+    // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
+    // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
+    // is reported as a warning beside the card that names it (issue 2153). A refused Tool save
+    // raises the store's own failure toast (issue 1522).
     [
       'manager-recipes-blocked-enable-flash',
+      'manager-tool-editor-save-failed',
       'manager-knowledge-error',
       'player-salvage-under-result-fail',
       'player-crafting-roll-result-under-fail',
+      'player-crafting-chat-card-under-fail',
+      'player-crafting-chat-card-gm-complication-fault',
+      'player-crafting-roll-result-count-fail',
+      'player-crafting-roll-result-count-botch',
+      'player-crafting-roll-result-count-botch-light',
+      'player-crafting-roll-result-count-zero',
+      'player-crafting-roll-result-count-zero-penalty',
+      'player-crafting-roll-result-count-disadvantage-zero',
     ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
@@ -1341,7 +1556,7 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
+  // Eleven selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
   // go stale (issue 1095).
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
@@ -1359,8 +1574,8 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
   // NON-EMPTY, and of the EXPECTED CARDINALITY (issue 1095).
   assert.equal(
     found.length,
-    10,
-    `expected 10 combination-rule selectors in the registry, found ${found.length} — ` +
+    11,
+    `expected 11 combination-rule selectors in the registry, found ${found.length} — ` +
       `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
       'renamed here, or cases carrying it were added or deleted'
   );
@@ -1536,7 +1751,7 @@ test('the 680px World Parties case pins the card-column container breakpoint', (
   const normal = getCaseById('manager-world-parties-normal');
   const narrow = getCaseById('manager-world-parties-card-stacked-680');
 
-  assert.ok(narrow, 'the <=720px party-card layout needs registered screenshot evidence');
+  assert.ok(narrow, 'the <=680px party-card layout needs registered screenshot evidence');
   assert.deepEqual(narrow.position, { width: 680, height: 900 });
   assert.deepEqual(narrow.query, normal.query);
   assert.deepEqual(narrow.steps, normal.steps);
@@ -1547,6 +1762,12 @@ test('the 680px World Parties case pins the card-column container breakpoint', (
   assert.deepEqual(narrow.smokeLabels, []);
   assert.equal(narrow.reaches, 'beyond');
   assert.ok(narrow.kinds.includes('responsive'));
+
+  // Its twin inside the 680-720 band reaches the same card, which keeps both columns there.
+  const band = getCaseById('manager-world-parties-card-700');
+  assert.deepEqual(band.position, { width: 700, height: 900 });
+  assert.deepEqual([band.query, band.steps], [narrow.query, narrow.steps]);
+  assert.equal(band.expectSelector, narrow.expectSelector);
 });
 
 test('the World Parties fixture is legal, and its search and pager cases claim what it seeds', () => {
@@ -1704,9 +1925,9 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   );
 
   const filtered = getCaseById('manager-world-parties-search-filtered');
-  // The hook on the INPUT, not the row's own class: the field is `ManagerSearchField` as of
+  // The hook on the INPUT, not the row's own class: the field is `SearchField` as of
   // issue 1515, whose `class` prop lands on the `<label>` — a `fill` step targeting the label
-  // would throw — so the case types into the `inputAttrs` hook the caller passes through.
+  // would throw — so the case types into the `inputProps` hook the caller passes through.
   assert.deepEqual(filtered.steps.at(-1), {
     selector: '[data-manager-party-search]',
     fill: WORLD_PARTIES_SEARCH_TERM,
@@ -1904,6 +2125,11 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-test-companion-rollup',
       // Issue 1332 — the companion NAVIGATING, appended for the same reason.
       'manager-world-downtime-test-companion-tab-navigation',
+      // Issue 1779 — the wrapped strip's last tab, appended last so it neither moves the index
+      // above nor ties the companion frame for this route's surface-coverage slot.
+      'manager-world-downtime-narrow-settings',
+      // Issue 1779 — the wide strip's first tab described, appended last for the same reason.
+      'manager-world-downtime-tracking-described',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot share
@@ -1925,12 +2151,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   const companionChrome = named('manager-world-downtime-test-companion-chrome');
   const rollup = named('manager-world-downtime-test-companion-rollup');
   const cases = allCases.filter((entry) => !withCompanion.includes(entry));
+  // The Core frames that prove the strip's pointer target, each reached by clicking that tab and
+  // taking no CTA step after it, so the pointer leaves the tab's description showing.
+  const STRIP_HIT_TABS = {
+    'manager-world-downtime-narrow-settings': 'settings',
+    'manager-world-downtime-tracking-described': 'tracking',
+  };
+  for (const [caseId, tabId] of Object.entries(STRIP_HIT_TABS)) {
+    const stripHit = getCaseById(caseId);
+    assert.equal(stripHit.expectCenterHit, `[data-downtime-tab="${tabId}"]`);
+    assert.deepEqual(stripHit.steps.at(-1), { selector: `[data-downtime-tab="${tabId}"]` });
+    assert.ok(!stripHit.expectClick, `${caseId} takes no CTA click after the tab`);
+    assert.ok(stripHit.expectVisible.startsWith(`[data-downtime-tooltip="${tabId}"]`));
+  }
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
     assert.ok(viewCase.expectOverflowY);
     assert.ok(viewCase.expectVisible, `${viewCase.id} proves its keyboard tooltip is visible`);
     assert.equal(viewCase.expectContained.length, 2, `${viewCase.id} checks both World rail icons`);
+    if (Object.hasOwn(STRIP_HIT_TABS, viewCase.id)) continue;
     assert.equal(
       viewCase.expectCenterHit,
       '.downtime-preview:not([hidden]) .downtime-cta',
@@ -2017,6 +2257,12 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       `${viewCase.id} expects the shipped ${tabKey} tooltip verbatim`
     );
   }
+  assert.ok(
+    getCaseById('manager-world-downtime-tracking-described').expectVisible.includes(
+      downtimeTabs.Tracking.Tooltip
+    ),
+    'the described frame expects the shipped Tracking tooltip verbatim'
+  );
 
   // Issue 1185 — the premium-installed frame.
   assert.equal(premium.expectView, 'world-downtime');
@@ -2212,7 +2458,8 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
   assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
   assert.match(worldSource, /Map Region Links Across the Active Scene/);
-  assert.match(runnerSource, /evidence frame is byte-identical to/);
+  // The check itself is exercised in `tests/view-lab-render-pool.test.js`; this pins that it runs.
+  assert.match(runnerSource, /rejectDuplicateEvidence\(cases, outcomes\)/);
 });
 
 test('system Travel Map no-regions evidence reaches its world through the lab flag', () => {
@@ -2292,8 +2539,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    62,
-    `expected the 62 crafting-path cases to be examined, saw ${examined.length}`
+    134,
+    `expected the 134 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2338,8 +2585,17 @@ test('every case declaring an expectView targets the manager', () => {
     );
   }
   // Every manager case must declare one: it is the only guard against capturing the wrong screen.
+  // A SPECIMEN (issue 1782) mounts a fixture in place of the manager root, so it has no route to
+  // name; its `expectSelector` is that guard instead, and it declares no route it does not render.
   for (const viewCase of VIEW_LAB_CASES) {
     if (viewCase.app !== 'fabricate-crafting-system-manager') continue;
+    if (viewCase.query?.specimen) {
+      assert.ok(
+        !viewCase.expectView && typeof viewCase.expectSelector === 'string',
+        `specimen case "${viewCase.id}" must guard its frame with expectSelector, not a route`
+      );
+      continue;
+    }
     assert.ok(
       viewCase.expectView,
       `manager case "${viewCase.id}" must declare expectView, or a mis-click captures silently`
@@ -2438,6 +2694,8 @@ test('changed files map to the windows they affect', () => {
     'fabricate-app-shell',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
+    // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
+    'manager-gathering-task-editor-normal-hearth-herb',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -2460,9 +2718,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
       'manager-components-normal',
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
-      'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
-      // THE NINTH AND TENTH OVERRIDES (issue 1513), and they are two capabilities rather than two
+      // THE EIGHTH AND NINTH OVERRIDES (issue 1513), and they are two capabilities rather than two
       // more instances of one.
       'manager-recipe-item-contents-picker',
       'manager-world-parties-actor-picker',
@@ -2479,7 +2736,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // The representative pair plus the panel's fifteen overrides.
+  // The representative pair plus the panel's fourteen overrides.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -2489,7 +2746,6 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-crafting-modifier-cap-reached',
-      'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
       'manager-recipe-item-contents-picker',
       'manager-recipes-bulk-edit-check-tier',
@@ -2504,9 +2760,10 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The thirty-three frames a change to the shared positioning seam must publish: every case whose
+// The forty-four frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
-// canvas windows (issues 1500, 1503, 1504, 1520). Issue 1510's thirteen are the converted manager
+// canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
+// suggestion list open over the scroller that used to clip it, and issue 1782's three a `Typeahead`'s. Issue 1510's thirteen are the converted manager
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
@@ -2517,22 +2774,34 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-books-scrolls-cap-filter-list',
   'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
+  'manager-component-edit-salvage-kind-list',
+  'manager-component-edit-salvage-suggestions',
   'manager-components-essence-filter-list',
   'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-condition-current-list',
+  'manager-gathering-rules-select-open',
   'manager-gathering-task-availability-menu',
+  'manager-gathering-task-component-tag-suggestions',
+  'manager-gathering-task-drop-modifier-suggestions',
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
+  'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
+  'manager-recipe-edit-ingredients-suggestions',
+  'manager-recipe-edit-results-adder-menu',
+  'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
+  'manager-recipe-item-contents-picker-staged',
+  'manager-recipe-item-limits-suggestions',
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-recipes-inspector-route-list',
+  'manager-selected-condition-select-long-option',
   'manager-system-edit-lists',
   'manager-tool-preview-actor-list',
   'manager-tool-rules-sort-key-list',
@@ -2544,12 +2813,15 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-inventory-page-size',
   'player-inventory-sort-list',
   'player-journal-sort-list',
+  'world-tool-entry-on-break-repair-suggestions',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 
 // The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
-// in the tree is either a `*-popover` or the action menu's `fabricate-action-menu-panel`.
-const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel/u;
+// in the tree is a `*-popover`, the action menu's `fabricate-action-menu-panel`, or a typeahead
+// combobox's suggestion list addressed as a child of the application root.
+const ANCHORED_PANEL_CLAIM =
+  /popover|action-menu-panel|> \.(?:manager-recipe-option-suggestions|fabricate-typeahead-list)/u;
 
 // The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
 // `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than
@@ -2579,6 +2851,7 @@ test('every anchored-popover frame claims an open panel in its own expectSelecto
 
 for (const seamFile of [
   'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js',
 ]) {
   test(`${seamFile} publishes every frame that rests on an open panel`, () => {
@@ -3012,30 +3285,83 @@ function caseLiteralLines(id) {
   return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
 }
 
-test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
-  // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
-  // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
-  // summary, the Gathering tab's in-flight rows.
-  const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
-  const everything = publishableCases();
-  const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
+const labRunStatesFile = fileAt(LAB_RUN_STATES_PATH);
 
-  assert.ok(selected.length > 0, 'a run-state change must select evidence, not none');
-  assert.ok(
-    selected.length < everything.length,
-    'a run-state change must not still select every frame'
+/** Every line of one run state's entries, in both of the fixture's tables. */
+function runStateLines(state) {
+  const regions = parseRunStateRegions(labRunStatesFile.source).filter(
+    (region) => region.key === state
   );
+  assert.equal(regions.length, 2, `"${state}" must have a run-id entry and a factory entry`);
+  return regions.flatMap(({ start, end }) =>
+    Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+  );
+}
 
-  // Derived, not listed: EVERY player case and ONLY player cases, so a player case added tomorrow
-  // is covered without anyone remembering to add its id anywhere.
+/** The publishable cases whose query names one run state, derived rather than listed. */
+const casesOfRunState = (state) =>
+  publishableCases()
+    .filter((viewCase) => viewCase.query?.journalCaseState === state)
+    .map((viewCase) => viewCase.id);
+
+test('the run-state fixture parses into an entry for every state its run table names', () => {
+  const regions = parseRunStateRegions(labRunStatesFile.source);
+  assert.ok(regions, `${LAB_RUN_STATES_PATH} no longer parses into its run-state tables`);
+  // The spread history-data states are defined in their own module, which a patch names instead.
+  const named = Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS).filter(
+    (state) => !LAB_HISTORY_DATA_STATES.includes(state)
+  );
+  assert.deepEqual([...new Set(regions.map((region) => region.key))].sort(), named.sort());
+});
+
+test('adding one run state to labRunStates selects only the cases that render it', () => {
+  const state = 'paused';
+  const expected = casesOfRunState(state);
+  const players = publishableCases().filter((viewCase) => viewCase.app === 'fabricate-app');
+  assert.ok(expected.length > 0, `no case renders "${state}", so this proves nothing`);
+  assert.ok(expected.length < players.length, 'one state must be narrower than every player case');
+
   assert.deepEqual(
-    selected,
-    players.map((viewCase) => viewCase.id)
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches(runStateLines(state))),
+    expected
   );
-  assert.ok(
-    selected.includes('fabricate-journal'),
-    'the Journal is the run browser; it cannot be outside a run-state selection'
+  // A line inside a multi-line factory entry belongs to that entry, not to shared code.
+  const continuation = labRunStatesFile.lineOf("        waiting('lab-v1-paused', single(), {");
+  assert.deepEqual(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([continuation])),
+    expected
   );
+});
+
+test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
+  const helper = labRunStatesFile.lineOf(
+    'function stageBrowserRun(context, recipe, pastCheck = null) {'
+  );
+  const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
+  // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
+  const players = publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+
+  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), players, 'no patch at all');
+  for (const line of [helper, importLine]) {
+    assert.deepEqual(
+      selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([line])),
+      players,
+      `line ${line} sits outside every run state's entry`
+    );
+  }
+
+  const withState = new Set(
+    selectedIds(
+      [LAB_RUN_STATES_PATH],
+      labRunStatesFile.patches([helper, ...runStateLines('paused')])
+    )
+  );
+  for (const id of [...players, ...casesOfRunState('paused')]) {
+    assert.ok(withState.has(id), `the union dropped "${id}"`);
+  }
 });
 
 test('every lab input the registry cannot attribute selects surface coverage', () => {
@@ -3059,6 +3385,9 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
+    'scripts/lib/viewLabRenderPool.js',
+    'scripts/lib/viewLabShards.js',
+    'scripts/view-lab-shards.mjs',
   ]) {
     assert.deepEqual(
       selectedIds([file]),
@@ -3308,11 +3637,7 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   // shared code and therefore inside no region at all.
   const journal = fileAt(fileDeclaring('  ...journalBlindRunCases(),'));
   const spread = journal.lineOf('  ...journalBlindRunCases(),');
-  assert.equal(
-    journal.source[spread - 2],
-    '  }),',
-    'the line above the spread must close a case'
-  );
+  assert.equal(journal.source[spread - 2], '  }),', 'the line above the spread must close a case');
   const closedCase = caseIdByLineIn(journal.path).get(spread - 1);
   assert.ok(closedCase, 'the line above the spread must be inside a parsed case region');
 
@@ -3503,9 +3828,13 @@ const SHARED_CASE_MODULES = Object.freeze([
   'broadSignals.js',
   'caseConstants.js',
   'caseFactories.js',
+  'journalAwardChoiceCases.js',
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',
+  'playerAdditionalDicePromptCases.js',
+  'playerAdvantagePromptCases.js',
+  'playerCountResultCases.js',
 ]);
 
 const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
@@ -3561,7 +3890,7 @@ test('every case file opens its array exactly once, on the line the selector par
   }
 });
 
-test('a patch inside any case file attributes to that file\'s own case, and nothing else', () => {
+test("a patch inside any case file attributes to that file's own case, and nothing else", () => {
   const attributed = new Set();
   for (const { path, cases } of VIEW_LAB_CASE_FILES) {
     const file = fileAt(path);
@@ -3604,7 +3933,9 @@ test('every case literal parses as its own attributable region', () => {
     assert.deepEqual(
       inline.filter((id) => {
         const selected = selectedIds([path], file.patches([caseIdLine(id)]));
-        return selected.length !== 1 || selected[0] !== id;
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        const expected = cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id));
+        return selected.join(',') !== expected.map((entry) => entry.id).join(',');
       }),
       [],
       `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +
@@ -3785,7 +4116,8 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
   // cost this narrowing exists to remove.
-  const COMMENT = "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
+  const COMMENT =
+    "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
   const file = fileAt(fileDeclaring(COMMENT));
   assert.deepEqual(selectedIds([file.path], file.patches([file.lineOf(COMMENT)])), [
     FALLBACK_CASE_ID,
@@ -5064,12 +5396,47 @@ test('the capture workflow renders and publishes the one id list it computed', (
     1,
     'a second id list would let render and publish disagree about what the PR selected'
   );
+  // Sharded (issue 2119): the shard plan is cut from that same list, each render shard consumes
+  // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /CASE_IDS: \$\{\{ steps\.select\.outputs\.ids }}/,
-    "the renderer must consume the selection step's own output"
+    /view-lab-shards\.mjs plan "\$IDS" "\$RENDER"/,
+    'the shard plan must be cut from the one computed id list'
   );
-  assert.match(workflow, /view-lab-screenshots\.mjs apps "\$CASE_IDS"/);
+  assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ matrix\.ids }}\n\s+run: node scripts\/view-lab-screenshots\.mjs apps "\$CASE_IDS"/,
+    'each render shard must render exactly its own slice'
+  );
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ needs\.select\.outputs\.ids }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
+    'the merge must account for the whole selection and write the directory publish reads'
+  );
+  assert.match(workflow, /name: view-lab-shard-\$\{\{ matrix\.shard }}/);
+  assert.match(workflow, /pattern: view-lab-shard-\*\n\s+path: ui-screenshot-artifact\/shards/);
+  // Only PNGs and the manifest leave a shard, named file by file (the LICENSING header).
+  assert.match(
+    workflow,
+    /path: \|\n\s+ui-screenshot-artifact\/apps\/\*\.png\n\s+ui-screenshot-artifact\/apps\/manifest\.json\n/
+  );
+  assert.doesNotMatch(workflow, /path:[^\n]*foundry-chrome/);
+  // The chrome-dependent suites verify one harvest, so they run once, in their own job beside the
+  // shards, and the publish still waits for them.
+  const jobOf = (name) => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    assert.notEqual(start, -1, `pr-screenshots.yml has no ${name} job`);
+    const next = workflow.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+    return workflow.slice(start, next === -1 ? undefined : start + 1 + next);
+  };
+  assert.match(jobOf('verify-chrome'), /- name: Run every chrome-dependent suite/);
+  assert.doesNotMatch(jobOf('render'), /chrome-dependent suite, where/);
+  assert.match(jobOf('verify-chrome'), /\n {4}needs: \[select, warm-foundry]\n/);
+  assert.match(jobOf('capture'), /\n {4}needs: \[select, render, verify-chrome]\n/);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.match(jobOf(name), /uses: \.\/\.github\/actions\/prepare-view-lab\n/);
+  }
 
   // The publish step names the directory the renderer writes. Derived from the runner rather than
   // trusted twice, so a moved output directory fails here instead of publishing an empty set.
@@ -5092,17 +5459,20 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/manager/headerModel.svelte.js',
     'src/ui/svelte/apps/manager/ManagerPageHeader.svelte',
-    'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte',
+    'src/ui/svelte/apps/manager/headerBreadcrumbs.js',
     'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
     'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',
+    'src/ui/svelte/apps/manager/managerNavItems.js',
     'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',
     'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js',
+    'src/ui/svelte/apps/manager/worldScopeModel.svelte.js',
+    'src/ui/svelte/apps/manager/recipe-item/recipeItemModel.svelte.js',
   ]
     .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
     .join('\n');
@@ -5198,6 +5568,118 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
     [FALLBACK_CASE_ID],
     'an unmatched UI path falls through to the fallback, which is what the probe rules out'
   );
+});
+
+// The component rules editor's cards (issue 1522), named files rather than a directory walk, so a
+// pattern that stops matching a file that still exists fails here. The identity strip predates
+// the extraction and draws on every frame the editor does.
+const COMPONENT_EDITOR_VIEW = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
+const COMPONENT_CARD_DIR = 'src/ui/svelte/apps/manager/component/';
+const COMPONENT_EDITOR_CARDS = Object.freeze([
+  ...COMPONENT_EDITOR_CARD_FILES,
+  `${COMPONENT_CARD_DIR}ComponentIdentityStrip.svelte`,
+]);
+
+/** The `component/*.svelte` files the editor imports, and those they import in turn. */
+function componentCardClosure(file, found = new Set()) {
+  for (const specifier of importedModules(componentAstOf(file))) {
+    const path = relative(ROOT, resolve(ROOT, dirname(file), specifier)).replaceAll(SEP, '/');
+    if (!path.startsWith(COMPONENT_CARD_DIR) || !path.endsWith('.svelte') || found.has(path)) {
+      continue;
+    }
+    found.add(path);
+    componentCardClosure(path, found);
+  }
+  return found;
+}
+
+test('the rules-editor card list is every card the editor renders without frames of its own', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.ok(existsSync(resolve(ROOT, card)), `${card} exists`);
+  }
+  const closure = [...componentCardClosure(COMPONENT_EDITOR_VIEW)];
+  // A file selecting a frame the editor does not has cases of its own, and routes by them.
+  const ownFramed = closure.filter((file) => ids(file).some((id) => !editorFrames.includes(id)));
+  assert.ok(ownFramed.length > 0, 'the exclusion is exercised');
+  assert.deepEqual(
+    new Set(closure.filter((file) => !ownFramed.includes(file))),
+    new Set(COMPONENT_EDITOR_CARDS),
+    'a new card joins this list and COMPONENT_EDITOR_MATCHES'
+  );
+});
+
+test('a change confined to one rules-editor card selects every frame the editor selects', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const expected of [
+    'manager-component-edit-normal',
+    'manager-component-edit-inheriting',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-simple',
+    'manager-component-complications-salvage-stage-strip',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.deepEqual(ids(card), editorFrames, `${card} selects the editor's frames`);
+  }
+});
+
+test('a change to the scoped component model selects the frames that draw its attribution note', () => {
+  // Issue 2218: the sentence is built in the model, so the rules editor callout and the list
+  // inspector's Shared identity card are photographed with the world catalogue.
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  ]).map((viewCase) => viewCase.id);
+  for (const expected of [
+    'manager-component-edit-inheriting',
+    'manager-components-normal',
+    'world-component-catalogue',
+  ]) {
+    assert.ok(selected.includes(expected), `the model selects ${expected}`);
+  }
+});
+
+// The gathering task editor's tabs and cards (issue 1522): every file under `gathering-task/`.
+const GATHERING_TASK_EDITOR_VIEW = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+const GATHERING_TASK_PART_DIR = 'src/ui/svelte/apps/manager/gathering-task/';
+
+test('a change confined to one gathering task tab or card selects every task-editor frame', () => {
+  const taskFrames = (file) =>
+    mapChangedFilesToCases([file])
+      .map((viewCase) => viewCase.id)
+      .filter((id) => id.startsWith('manager-gathering-task-'));
+  const editorFrames = taskFrames(GATHERING_TASK_EDITOR_VIEW);
+  for (const expected of [
+    'manager-gathering-task-editor-normal',
+    'manager-gathering-task-editor-requirements',
+    'manager-gathering-task-editor-results',
+    'manager-gathering-task-editor-straight',
+    'manager-gathering-task-editor-check-add',
+    'manager-gathering-task-stamina-modifier-list',
+    'manager-gathering-task-editor-progressive-legacy',
+    'manager-gathering-task-editor-progressive-results',
+    'manager-gathering-task-editor-routed-no-tiers',
+    'manager-gathering-task-editor-reward-rule',
+    'manager-gathering-task-editor-validation',
+    'manager-gathering-task-editor-validation-warnings',
+    'manager-gathering-task-editor-validation-blocking',
+    'manager-gathering-task-editor-validation-narrow',
+    // The drop rows these two select sit on the Results tab.
+    'manager-gathering-task-drop-modifiers-normal',
+    'manager-gathering-task-drop-condition-modifier-attached',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  const parts = readdirSync(resolve(ROOT, GATHERING_TASK_PART_DIR)).map(
+    (name) => `${GATHERING_TASK_PART_DIR}${name}`
+  );
+  assert.ok(parts.length >= 14, `found only ${parts.length} parts`);
+  for (const part of parts) {
+    assert.deepEqual(taskFrames(part), editorFrames, `${part} selects the editor's frames`);
+  }
 });
 
 // The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT
@@ -5823,17 +6305,14 @@ test('the recipe-item contents cases open a definition the lab world holds, with
 
   assert.ok(
     linked > 0,
-    'manager-recipe-item-contents expects the LINKED list; with no membership `hb-book` draws ' +
-      'the `data-recipe-item-contents-empty` line, its expectSelector matches nothing, and the ' +
-      'capture fails WHOLE'
+    'manager-recipe-item-contents expects member TOKENS; with no membership `hb-book` draws ' +
+      'none, its expectSelector matches nothing, and the capture fails WHOLE'
   );
   assert.ok(
-    systemRecipes > linked,
-    'manager-recipe-item-contents-picker expects an OPENABLE trigger over a populated panel. ' +
-      '`RecipeItemContentsTab` passes `triggerAriaDisabled={linkable.length === 0}`, and the ' +
-      'primitive refuses to open on that flag exactly as it does on `disabled`, so a book ' +
-      `linking every recipe in its system (${linked} of ${systemRecipes}) leaves a trigger the ` +
-      'driver clicks to no effect and a panel that never opens'
+    systemRecipes > linked + 1,
+    'the staged and overflow contents cases each choose recipes `hb-book` does not link, and the ' +
+      `overflow case needs two of them; a book linking ${linked} of ${systemRecipes} leaves the ` +
+      'driver clicking options that stage a removal instead'
   );
 });
 
@@ -5956,19 +6435,49 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   const MANAGER = 'src/ui/svelte/apps/manager';
   const shell = [`${MANAGER}/CraftingSystemManagerRoot.svelte`];
   const extracted = [
-    'ManagerPageHeader',
-    'ManagerHeaderBreadcrumbs',
-    'ManagerHeaderActions',
-    'ManagerHeaderCraftingActions',
-    'ManagerHeaderGatheringActions',
-  ].map((unit) => `${MANAGER}/${unit}.svelte`);
+    ...[
+      'ManagerPageHeader',
+      'ManagerHeaderActions',
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+    ].map((unit) => `${MANAGER}/${unit}.svelte`),
+    // The trail model `ManagerPageHeader` renders through `PageHeader` (issue 1777).
+    `${MANAGER}/headerBreadcrumbs.js`,
+  ];
   const ids = (paths) =>
     [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id ?? entry))].sort();
   const expected = ids(shell);
   // NON-VACUITY: the shell selects a real, large case set, so an empty answer cannot pass.
   assert.ok(expected.length > 40, `the shell selects only ${expected.length} cases`);
-  assert.deepEqual(ids(extracted), expected, 'the page header no longer reaches the shell\u2019s views');
+  assert.deepEqual(
+    ids(extracted),
+    expected,
+    'the page header no longer reaches the shell\u2019s views'
+  );
   for (const path of extracted) {
     assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
   }
+});
+
+/**
+ * The title bar renders on every manager screen, so a change to it alone publishes a
+ * representative subset of the shell's set rather than all of it (issue 1777): the six system
+ * frames and the one frame that draws its PREMIUM mark.
+ */
+test('the title bar selects the system frames and the premium-installed frame', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  const ids = (paths) =>
+    [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id))].sort(byCodePoint);
+  const titleBar = ids([`${MANAGER}/ManagerTitleBar.svelte`]);
+  assert.deepEqual(titleBar, [
+    'manager-default-selection',
+    'manager-rail-collapsed',
+    'manager-rail-expanded',
+    'manager-selected-normal',
+    'manager-selected-stacked',
+    'manager-systems-empty',
+    'manager-world-downtime-test-companion-installed',
+  ]);
+  const shell = new Set(ids([`${MANAGER}/CraftingSystemManagerRoot.svelte`]));
+  for (const id of titleBar) assert.ok(shell.has(id), `${id} is not a frame the shell draws`);
 });

@@ -16,7 +16,7 @@
   - `{...rest}` lands on THE HOST'S INTERACTIVE ELEMENT — the `<button>`, the indicator `<span>`, or
     the checkbox's `<input>`. The input rather than its `<label>` is not a detail:
     `tests/components/tool-studio-mounted.test.js` resolves a hook there and walks
-    `.closest('.manager-status-toggle')`, and `scripts/foundry-test-run.mjs` pointer-hit-tests it
+    `.closest('.fabricate-toggle')`, and `scripts/foundry-test-run.mjs` pointer-hit-tests it
     against the transparent input that receives the click. `class` is a named prop, and
     `data-keyboard-focus="true"` is written on the button host only and before the spread; both
     rules are `openspec/specs/design-system/spec.md`'s.
@@ -73,7 +73,6 @@
   const classes = $derived(
     [
       'fabricate-toggle',
-      'manager-status-toggle',
       HOST_CLASSES[host] ?? '',
       extraClass,
       on ? STATE_CLASSES.on : STATE_CLASSES.off,

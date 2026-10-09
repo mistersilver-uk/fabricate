@@ -5,10 +5,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
-  import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
-  // THE SHARED SOURCE-REFERENCE WALK (issue 1373).
-  import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
   import {
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
@@ -33,7 +30,7 @@
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
-  import { cloneRollData, listPreviewActors, resolvePreviewActor } from './checks/checkPreview.js';
+  import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import {
@@ -62,7 +59,7 @@
     toBulkEssenceEdit,
   } from '../../../model/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -109,6 +106,7 @@
   import { createImportFlowModel } from './importFlowModel.svelte.js';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import ManagerPageHeader from './ManagerPageHeader.svelte';
+  import ManagerTitleBar from './ManagerTitleBar.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -140,6 +138,7 @@
   } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
+  import { isLearnedKnowledgeObservable } from '../../../../systems/learnedKnowledgeObservability.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -151,8 +150,8 @@
   import WorldToolCataloguePage from './scoped/WorldToolCataloguePage.svelte';
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
-  import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
-  import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
+  import { scopedEntryName } from './scoped/scopedEntryRoutes.js';
+  import { essenceShortValueName } from './scoped/essenceScoped.js';
   // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
   // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
@@ -164,6 +163,8 @@
   import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
   import { createNavRailModel } from './navRailModel.svelte.js';
   import { createHeaderModel } from './headerModel.svelte.js';
+  import { createWorldScopeModel } from './worldScopeModel.svelte.js';
+  import { createRecipeItemModel } from './recipe-item/recipeItemModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -376,19 +377,9 @@
   // The selected Downtime preview is owned here rather than inside the extension host
   // because the rail, the page header and the breadcrumb all name it.
   let worldDowntimeTabId = $state('tracking');
-  // The selected recipe item on the Books & Scrolls surface (issue 511).
-  let selectedRecipeItemId = $state('');
   // The recipe selected on the Access surface (visibility=restricted); drives the
   // GrantAccessInspector aside.
   let selectedRecipeIdForAccess = $state('');
-  // Recipe-item editor draft (recipe-item-edit route).
-  let recipeItemDraft = $state(null);
-  let recipeItemDraftBaseline = $state(null);
-  let recipeItemLinkedSourceSnapshot = $state(null);
-  let recipeItemEditSaving = $state(false);
-  // Set on every failed recipe-item save.
-  let recipeItemSaveFailed = $state(false);
-  let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker.
   let worldItemOptions = $state([]);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
@@ -469,6 +460,7 @@
     !['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
+  const essenceOptions = $derived(canShowEssences ? selectedSystem?.essenceDefinitions || [] : []);
   // Experimental toggle (issue 745): the Crafting group is now unconditional; this
   // gate only decides whether the unimplemented Graph placeholder is advertised.
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
@@ -594,8 +586,8 @@
 
   // The world projection's entry for the SELECTED row, and that entry's row for THIS system.
   const componentInspectorWorldEntry = $derived(
-    (Array.isArray(worldScopeState.component?.entries)
-      ? worldScopeState.component.entries
+    (Array.isArray(worldScope.worldScopeState.component?.entries)
+      ? worldScope.worldScopeState.component.entries
       : []
     ).find((entry) => String(entry?.id ?? '') === String(selectedComponent?.id ?? '')) ?? null
   );
@@ -633,10 +625,6 @@
       ? listPreviewActors()
       : []
   );
-  function resolveOverrideCharacter(actorId) {
-    const actor = resolvePreviewActor(actorId);
-    return actor ? { name: actor.name, rollData: cloneRollData(actor) } : null;
-  }
   // System components offered to the salvage yield picker.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
@@ -876,7 +864,6 @@
 
   $effect(() => modifiers.resetSearchOnDrop());
   $effect(() => modifiers.resetSearchOnEvent());
-  $effect(() => modifiers.syncSearchDirection());
   $effect(() => modifiers.reconcileDropPickers());
   $effect(() => modifiers.reconcileEventPickers());
 
@@ -932,15 +919,12 @@
     return store.getRecipeSignatureConflicts?.(recipeDraft.id, recipeDraft) || [];
   });
 
-  // --- Recipe editor context rail (issue 643 §4b) --------------------------------
-  // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the same
-  // craftingEffect matrix the nav and Crafting Settings read, so there is exactly one
-  // source of truth for which conditional surface a visibility mode implies.
+  // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the craftingEffect
+  // matrix the nav and Crafting Settings read: one source for what a visibility mode implies.
   const recipeVisibilityEffect = $derived(
     craftingEffect(selectedSystem?.visibilityMode || 'knowledge')
   );
-  // Resolution happens in the STORE (the tab never touches ids): granted characters resolve over
-  // EVERY world actor, not the player-character roster.
+  // Resolved in the STORE over EVERY world actor, not the roster; the tab never touches ids.
   const recipeAccessRoster = $derived(
     store.resolveRecipeAccess?.(recipeDraft?.access, {
       players: $viewState.worldUsers || [],
@@ -1143,99 +1127,50 @@
     'world-vocabulary',
   ]);
   const isWorldScopedRoute = $derived(WORLD_SCOPED_VIEWS.includes(currentView));
-  // The world corpus behind the rail leaves' count badges.
-  const worldScopeState = $derived($viewState.worldScope || {});
-  const worldScopedCounts = $derived({
-    components: worldScopeState.component?.entities?.length ?? 0,
-    essences: worldScopeState.essence?.entities?.length ?? 0,
-    tools: worldScopeState.tool?.entities?.length ?? 0,
-    // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
-    // reason is a one-way door.
-    vocabulary: worldScopeState.vocabulary?.total ?? 0,
+  // The world corpus, the open entry and its editors, and the world writes a drop makes.
+  const worldScope = createWorldScopeModel({
+    store: () => store,
+    services: () => services,
+    viewState: () => $viewState,
+    view: () => currentView,
+    selectedSystemId: () => selectedSystemId,
+    selectedEssenceForInspector: () => selectedEssenceForInspector,
+    parseUuid: () => globalThis.foundry?.utils?.parseUuid,
+    openWorldScopedEntry,
+    text,
+    format,
   });
 
   // ── THE WORLD-SCOPE DATA SEAM (issue 1374) ─────────────────────────────────────────────
   const componentScopeProps = $derived({
-    scope: worldScopeState.component ?? null,
+    scope: worldScope.worldScopeState.component ?? null,
     actions: store?.worldScope?.component ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const essenceScopeProps = $derived({
-    scope: worldScopeState.essence ?? null,
+    scope: worldScope.worldScopeState.essence ?? null,
     actions: store?.worldScope?.essence ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const toolScopeProps = $derived({
-    scope: worldScopeState.tool ?? null,
+    scope: worldScope.worldScopeState.tool ?? null,
     actions: store?.worldScope?.tool ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
 
-  // ── THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2) ────────────────────────
-  const worldComponentOptions = $derived(
-    (worldScopeState.component?.entries ?? []).map((entry) => ({
-      id: entry.id,
-      name: entry.entity?.name || entry.id,
-      img: entry.entity?.img || '',
-      // CARRIED FOR THE DROP TARGET.
-      ...(entry.entity?.registeredItemUuid && {
-        registeredItemUuid: entry.entity.registeredItemUuid,
-      }),
-      ...(entry.entity?.originItemUuid && { originItemUuid: entry.entity.originItemUuid }),
-    }))
-  );
-
-  // WORLD-DISABLED ESSENCES ARE WITHHELD FROM THE OFFER, which is exactly what
-  // `selectableEssenceOptions` does with a system-disabled one.
-  const worldEssenceOptions = $derived(
-    (worldScopeState.essence?.entries ?? []).map((entry) => ({
-      ...(entry.entity ?? {}),
-      id: entry.id,
-      enabled: entry.worldEnabled !== false,
-    }))
-  );
-
-  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT.
-  const worldComponentTags = $derived(
-    [
-      ...new Set(
-        (worldScopeState.component?.entries ?? []).flatMap((entry) =>
-          Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
-        )
-      ),
-    ].sort((left, right) => String(left).localeCompare(String(right)))
-  );
-
-  // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
-  const inspectedEssenceWorldEntry = $derived(
-    (worldScopeState.essence?.entries ?? []).find(
-      (candidate) => candidate?.id === selectedEssenceForInspector?.id
-    ) ?? null
-  );
-  const inspectedEssenceSystemRows = $derived(
-    worldScopeState.essence?.available === true &&
-      Array.isArray(inspectedEssenceWorldEntry?.systems)
-      ? inspectedEssenceWorldEntry.systems
-      : []
-  );
-  // The inherit map for THIS system, or `null` when there is no membership record.
-  const inspectedEssenceInherited = $derived(
-    inspectedEssenceSystemRows.find((row) => row?.systemId === selectedSystemId)?.inherited ?? null
-  );
-
   // ── THE SYSTEM ESSENCE RULES HEADER (issue 1372, maintainer parity round 7) ───────────────
   const essenceRulesWorldEntry = $derived(
     currentView === 'essence-edit' && selectedEssenceId
-      ? ((worldScopeState.essence?.entries ?? []).find(
+      ? ((worldScope.worldScopeState.essence?.entries ?? []).find(
           (candidate) => candidate?.id === selectedEssenceId
         ) ?? null)
       : null
   );
   const essenceRulesMode = $derived(
-    worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
+    worldScope.worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
   );
 
   // Name and glyph follow the world record wherever there is one (issue 1654): `1.34.0` merges
@@ -1270,236 +1205,21 @@
     })
   );
 
-  // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
-  let worldScopedEntryId = $state('');
-  const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
-
-  /**
-   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer parity
-   * round 6).
-   */
-  let scopedEntryDraftIdentity = $state(null);
-
-  /** One scoped entry editor's buffered identity, or `null` to withdraw it. */
-  function handleScopedEntryDraftIdentity(identity) {
-    scopedEntryDraftIdentity = identity && typeof identity === 'object' ? { ...identity } : null;
-  }
-
-  /** One buffered identity field as a string, or `null` when no editor is reporting one. */
-  function scopedEntryDraftField(field) {
-    if (!scopedEntryDraftIdentity) return null;
-    const value = scopedEntryDraftIdentity[field];
-    return typeof value === 'string' ? value : null;
-  }
-
   // TRIMMED on both branches, because `scopedEntryName` trims and a crumb that changed its
   // whitespace handling the moment an editor opened would be a difference nobody authored.
   const worldScopedEntryCrumb = $derived(
-    scopedEntryDraftField('name')?.trim() ??
+    worldScope.scopedEntryDraftField('name')?.trim() ??
       scopedEntryName(
-        worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
-        worldScopedEntryId
+        worldScope.worldScopeState[worldScope.worldScopedEntryRoute?.entityType]?.entities,
+        worldScope.worldScopedEntryId
       )
   );
-
-  // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
-  const worldEssenceEntryRecord = $derived(
-    currentView === 'world-essence-entry'
-      ? ((worldScopeState.essence?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  // `count` is the projection's own member total and `total` is the crafting-system roster the same
-  // entry was built against.
-  const worldEssenceEntrySubtitle = $derived(
-    worldEssenceEntryRecord
-      ? interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Scoped.EssenceEntryIdentitySubtitle',
-            'World definition · used by {count} of {total} systems'
-          ),
-          {
-            count: Number(worldEssenceEntryRecord.membershipCount) || 0,
-            total: Array.isArray(worldEssenceEntryRecord.systems)
-              ? worldEssenceEntryRecord.systems.length
-              : 0,
-          }
-        )
-      : ''
-  );
-
-  /** THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT. */
-  let worldEssenceEntryHandle = null;
-  let worldEssenceEntryDirty = $state(false);
-  let worldEssenceEntrySaving = $state(false);
-
-  function handleWorldEssenceEntryDraft(handle) {
-    worldEssenceEntryHandle = handle ?? null;
-    if (!handle) worldEssenceEntryDirty = false;
-  }
-
-  function handleWorldEssenceEntryDirty(dirty) {
-    worldEssenceEntryDirty = dirty === true;
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
-  const worldEssenceEntryName = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldEssenceEntryRecord.entity?.name ?? '')
-      : ''
-  );
-
-  // AND SO DOES THE MEDALLION BESIDE IT (issue 1372, maintainer parity round 6).
-  const worldEssenceEntryIcon = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('icon') ?? worldEssenceEntryRecord.entity?.icon ?? '')
-      : ''
-  );
-  const worldEssenceEntryTint = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('colorToken') ?? worldEssenceEntryRecord.entity?.colorToken ?? '')
-      : ''
-  );
-
-  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL.
-  const worldToolEntryRecord = $derived(
-    currentView === 'world-tool-entry'
-      ? ((worldScopeState.tool?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
-  let worldToolEntrySubtitle = $state('');
-
-  function handleWorldToolEntrySubline(subline) {
-    worldToolEntrySubtitle = typeof subline === 'string' ? subline : '';
-  }
-
-  /** THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are. */
-  let worldToolEntryHandle = null;
-  let worldToolEntryDirty = $state(false);
-  let worldToolEntrySaving = $state(false);
-
-  function handleWorldToolEntryDraft(handle) {
-    worldToolEntryHandle = handle ?? null;
-    if (!handle) {
-      worldToolEntryDirty = false;
-      worldToolEntrySubtitle = '';
-    }
-  }
-
-  function handleWorldToolEntryDirty(dirty) {
-    worldToolEntryDirty = dirty === true;
-  }
-
-  /**
-   * THE WORLD TOOL ENTRY'S HEADER `Delete`, which the design draws between Back and Save
-   * (`tmp/proto/tool-entry.png`) and which this screen did not have (issue 1373).
-   */
-  let worldToolEntryDelete = $state(null);
-  let worldToolEntryDeleteArmed = $state('');
-
-  function handleWorldToolEntryDelete(descriptor) {
-    worldToolEntryDelete = descriptor ?? null;
-    if (!descriptor) worldToolEntryDeleteArmed = '';
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
-  // with the linked-item tile this page draws from the same buffered value.
-  const worldToolEntryName = $derived(
-    worldToolEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldToolEntryRecord.entity?.name ?? '')
-      : ''
-  );
-
-  /** Flush the world tool entry editor's buffered edit. */
-  async function saveWorldToolEntry() {
-    if (!worldToolEntryHandle) return false;
-    worldToolEntrySaving = true;
-    try {
-      return (await worldToolEntryHandle.save()) !== false;
-    } finally {
-      worldToolEntrySaving = false;
-    }
-  }
-
-  /** THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371). */
-  let worldComponentEntryHandle = null;
-  let worldComponentEntryDirty = $state(false);
-  let worldComponentEntrySaving = $state(false);
-
-  function handleWorldComponentEntryDraft(handle) {
-    worldComponentEntryHandle = handle ?? null;
-    if (!handle) {
-      worldComponentEntryDirty = false;
-      worldComponentEntrySubtitle = '';
-    }
-  }
-
-  function handleWorldComponentEntryDirty(dirty) {
-    worldComponentEntryDirty = dirty === true;
-  }
-
-  /** THE WORLD COMPONENT ENTRY ROUTE'S HEADER NAMES THE COMPONENT (issue 1371, parity round 4). */
-  const worldComponentEntryRecord = $derived(
-    currentView === 'world-component-entry'
-      ? ((worldScopeState.component?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
-  let worldComponentEntrySubtitle = $state('');
-
-  function handleWorldComponentEntrySubline(subline) {
-    worldComponentEntrySubtitle = typeof subline === 'string' ? subline : '';
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK, off the shared `scopedEntryDraftIdentity`
-  // channel the breadcrumb's last crumb also reads.
-  const worldComponentEntryName = $derived(
-    worldComponentEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldComponentEntryRecord.entity?.name ?? '')
-      : ''
-  );
-  const worldComponentEntryImage = $derived(
-    worldComponentEntryRecord
-      ? (scopedEntryDraftField('img') ?? worldComponentEntryRecord.entity?.img ?? '')
-      : ''
-  );
-
-  /** Flush the world component entry editor's buffered edit. */
-  async function saveWorldComponentEntry() {
-    if (!worldComponentEntryHandle) return false;
-    worldComponentEntrySaving = true;
-    try {
-      return (await worldComponentEntryHandle.save()) !== false;
-    } finally {
-      worldComponentEntrySaving = false;
-    }
-  }
-
-  /** Flush the world essence entry editor's buffered edit. */
-  async function saveWorldEssenceEntry() {
-    if (!worldEssenceEntryHandle) return false;
-    worldEssenceEntrySaving = true;
-    try {
-      return (await worldEssenceEntryHandle.save()) !== false;
-    } finally {
-      worldEssenceEntrySaving = false;
-    }
-  }
 
   // Open an entry route ON a world entity.
   function openWorldScopedEntry(view, entityId) {
     const nextEntryId = typeof entityId === 'string' ? entityId : String(entityId ?? '');
     return afterTruthyResult(confirmRouteExit(view), () => {
-      worldScopedEntryId = nextEntryId;
+      worldScope.worldScopedEntryId = nextEntryId;
       activeView = view;
     });
   }
@@ -1558,25 +1278,6 @@
     });
   }
 
-  async function createWorldEssence() {
-    const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name.
-    const id = mintEssenceId(
-      name,
-      worldScopeState.essence?.entities ?? [],
-      worldScopeState.essence?.retiredIds ?? []
-    );
-    const created = await store?.worldScope?.essence?.createEntity?.({
-      id,
-      name,
-      icon: 'fas fa-flask-vial',
-      colorToken: '',
-      description: '',
-    });
-    if (created === false) return;
-    openWorldScopedEntry('world-essence-entry', id);
-  }
-
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
   //
   // Suppressing the `<aside class="manager-inspector">` here and releasing the grid column in
@@ -1604,7 +1305,10 @@
   // stylesheet's own, so a route released here and not there (or the reverse) fails at test
   // time rather than as a dead 300px strip.
   function isGatheringTaskFullWidth(view, context) {
-    return view === 'gathering-task-edit' && context.resultGroupTaskMode === true;
+    return (
+      view === 'gathering-task-edit' &&
+      (context.resultGroupTaskMode === true || context.gatheringTaskTab !== 'results')
+    );
   }
 
   const FULL_WIDTH_VIEWS = Object.freeze([
@@ -1615,12 +1319,12 @@
       predicate: (view) => view === 'environment-edit',
     },
     {
-      // ROUTE + EDITOR MODE. d100 keeps its drop inspector; Direct and Check own all of
-      // their result authoring in the main pane, so the shared inspector has no content.
+      // ROUTE + EDITOR MODE + TAB. Only a d100 task's Results tab keeps the drop inspector;
+      // Direct and Check own all of their result authoring in the main pane.
       id: 'gathering-task-edit',
       layoutClass: 'full-width-2-track',
       selector:
-        '.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"] .manager-body',
+        '.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"] .manager-body',
       predicate: isGatheringTaskFullWidth,
     },
     {
@@ -1925,56 +1629,25 @@
   const selectedRecipeForAccess = $derived(
     ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeIdForAccess) || null
   );
-  // The projected recipe item selected on Books & Scrolls (drives the inspector).
-  const selectedRecipeItem = $derived(
-    (recipeItemDefinitions || []).find((def) => def.id === selectedRecipeItemId) || null
-  );
-  // ---- Recipe-item editor draft derivations (recipe-item-edit route) ---------
-  const recipeItemEditDirty = $derived(
-    Boolean(recipeItemDraft) &&
-      JSON.stringify(recipeItemDraft) !== JSON.stringify(recipeItemDraftBaseline)
-  );
-  const canSaveRecipeItemEdit = $derived(
-    recipeItemEditDirty === true && recipeItemEditSaving !== true
-  );
-  // The linked linked world item for the editor's Overview preview.
-  const recipeItemEditorLinkedItem = $derived.by(() => {
-    const uuid = String(recipeItemDraft?.originItemUuid || '');
-    if (!uuid) return null;
-    if (recipeItemLinkedSourceSnapshot?.uuid === uuid) {
-      return { ...recipeItemLinkedSourceSnapshot };
-    }
-    const persisted = (recipeItemDefinitions || []).find((def) => def.originItemUuid === uuid);
-    if (persisted) {
-      return {
-        uuid,
-        name: persisted.resolvedName,
-        img: persisted.resolvedImg,
-        type: persisted.derivedType,
-        description: persisted.description || '',
-      };
-    }
-    const option = (worldItemOptions || []).find((item) => item.uuid === uuid);
-    return option ? { ...option } : { uuid, name: '', img: '', type: '' };
+  // The Books & Scrolls selection and the recipe-item editor's draft (issue 1721).
+  const recipeItem = createRecipeItemModel({
+    store: () => store,
+    services: () => services,
+    viewState: () => $viewState,
+    selectedSystemId: () => selectedSystemId,
+    recipeItemDefinitions: () => recipeItemDefinitions,
+    visibilityMode: () => craftingVisibilityMode,
+    worldItemOptions: () => worldItemOptions,
+    navRail: () => navRail,
+    setWorldItemOptions: (options) => {
+      worldItemOptions = options;
+    },
+    setActiveView: (view) => {
+      activeView = view;
+    },
+    afterTruthyResult,
+    confirmRouteExit,
   });
-  // Recipes contained by the edited recipe item, and the pool that can still be added.
-  const recipeItemDraftRecipeIds = $derived(
-    new Set((recipeItemDraft?.recipeIds || []).map((id) => String(id)))
-  );
-  const recipeItemEditorLinkedRecipes = $derived(
-    recipeItemDraft
-      ? ($viewState.recipes || []).filter((recipe) =>
-          recipeItemDraftRecipeIds.has(String(recipe?.id))
-        )
-      : []
-  );
-  const recipeItemEditorAvailableRecipes = $derived(
-    recipeItemDraft
-      ? ($viewState.recipes || []).filter(
-          (recipe) => !recipeItemDraftRecipeIds.has(String(recipe?.id))
-        )
-      : []
-  );
   // ─────────────────────────────────────────────────────────────────────────────────────────
   // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
   const crumbSubject = (name, key, fallback) => {
@@ -2006,7 +1679,7 @@
   // its own: it is a world item plus the recipes it contains.
   const recipeItemCrumb = $derived(
     crumbSubject(
-      recipeItemEditorLinkedItem?.name,
+      recipeItem.recipeItemEditorLinkedItem?.name,
       'FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb',
       'Edit recipe item'
     )
@@ -2099,17 +1772,14 @@
       selectedMapRegionUuid = mapCurrentSceneRegions[0].sceneRegionUuid;
     }
   });
-  function isGatheringResultGroupMode(mode) {
-    return ['straight', 'routed'].includes(mode);
-  }
-  // The ONE read of the full-width set. `null` means the route keeps its inspector. Gathering
-  // passes its selected task mode into this same decision so aside suppression and track release
-  // cannot disagree during a mode switch.
+  // The ONE read of the full-width set; `null` keeps the inspector. The task editor's mode and tab
+  // feed this same decision, so aside suppression and track release cannot disagree.
   const fullWidthLayout = $derived(
     FULL_WIDTH_VIEWS.find((entry) =>
       entry.predicate(currentView, {
         travelTab: activeTravelTab,
-        resultGroupTaskMode: isGatheringResultGroupMode(gathering.gatheringTaskResolutionMode),
+        resultGroupTaskMode: gathering.gatheringTaskResultGroupMode,
+        gatheringTaskTab: gathering.gatheringTaskTab,
       })
     ) ?? null
   );
@@ -2129,8 +1799,9 @@
   let unadoptedToolId = $state('');
   const unadoptedWorldTool = $derived(
     unadoptedToolId
-      ? ((worldScopeState.tool?.entries ?? []).find((entry) => entry.id === unadoptedToolId) ??
-          null)
+      ? ((worldScope.worldScopeState.tool?.entries ?? []).find(
+          (entry) => entry.id === unadoptedToolId
+        ) ?? null)
       : null
   );
 
@@ -2141,7 +1812,7 @@
   const selectedLibraryToolInherited = $derived.by(() => {
     const toolId = String(inspectedLibraryTool?.id ?? '');
     if (!toolId) return {};
-    const entry = (worldScopeState.tool?.entries ?? []).find(
+    const entry = (worldScope.worldScopeState.tool?.entries ?? []).find(
       (candidate) => String(candidate?.id ?? '') === toolId
     );
     const systemRow = (Array.isArray(entry?.systems) ? entry.systems : []).find(
@@ -2188,6 +1859,7 @@
   $effect(() => gathering.reselectTask());
   $effect(() => gathering.reselectEvent());
   $effect(() => gathering.reselectDrop());
+  $effect(() => gathering.resetTaskTab());
 
   $effect(() => {
     services?.registerEssenceDirtyGuard?.(() =>
@@ -2223,12 +1895,6 @@
       result = result.replaceAll(`{${token}}`, String(value));
     }
     return result;
-  }
-
-  function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
-    const key = count === 1 ? keySingular : keyPlural;
-    const fallback = count === 1 ? fallbackSingular : fallbackPlural;
-    return `${count} ${text(key, fallback)}`;
   }
 
   // The recipe editor's header subline: "<category> · <resolution mode>".
@@ -2276,25 +1942,15 @@
     );
   }
 
-  // The titlebar's right-hand status line.
+  // The title bar's status line: no selection draws none.
+  const titlebarModeLabel = $derived(
+    selectedSystem ? resolutionModeLabel(selectedSystem.resolutionMode) : ''
+  );
   const titlebarOutcomeTierCount = $derived(
     selectedSystem?.resolutionMode === 'routedByCheck'
       ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)
       : 0
   );
-
-  function titlebarStatusLabel() {
-    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    if (titlebarOutcomeTierCount <= 0) return mode;
-    const tiers = formatCount(
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTier',
-      'outcome tier',
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTiers',
-      'outcome tiers',
-      titlebarOutcomeTierCount
-    );
-    return `${mode} · ${tiers}`;
-  }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // `checks` is RETAINED as a redirect to the first available child (issue 1096), so existing
@@ -2360,7 +2016,7 @@
     return buildComponentEditorState(selectedSystem, item).showEssences === true;
   }
 
-  // The page header's six answers, one derivation each (issue 1720). Every leg is passed as a
+  // The page header's answers, one derivation each (issue 1720). Every leg is passed as a
   // thunk so `createHeaderModel` reads this shell's live `$derived` values rather than the ones
   // they held when it was built.
   const header = createHeaderModel({
@@ -2385,23 +2041,26 @@
       downtimeHeaderArtwork: () => downtimeHeaderArtwork,
       enabledPartyCount: () => enabledPartyCount,
       essenceRulesMode: () => essenceRulesMode,
+      experimentalFeaturesEnabled: () => experimentalFeaturesEnabled,
       format: () => format,
       gatheringTabPageHint: () => gathering.gatheringTabPageHint,
       gatheringTabPageTitle: () => gathering.gatheringTabPageTitle,
       playerCharacterUuids: () => playerCharacterUuids,
+      premiumInstalled: () => premiumInstalled,
       recipeDraft: () => recipeDraft,
       recipeEditSubtitle: () => recipeEditSubtitle,
       selectedCharacterPrerequisites: () => selectedCharacterPrerequisites,
       selectedCurrencyUnits: () => selectedCurrencyUnits,
       selectedSystem: () => selectedSystem,
       selectedSystemModifiers: () => selectedSystemModifiers,
+      services: () => services,
       showEssenceSourceUi: () => showEssenceSourceUi,
       text: () => text,
       travelParties: () => travelParties,
-      worldComponentEntryRecord: () => worldComponentEntryRecord,
-      worldEssenceEntryRecord: () => worldEssenceEntryRecord,
+      worldComponentEntryRecord: () => worldScope.worldComponentEntryRecord,
+      worldEssenceEntryRecord: () => worldScope.worldEssenceEntryRecord,
       worldRulesPageTitle: () => worldRulesPageTitle,
-      worldToolEntryRecord: () => worldToolEntryRecord,
+      worldToolEntryRecord: () => worldScope.worldToolEntryRecord,
     },
   });
 
@@ -2488,27 +2147,27 @@
   const routeExitGuards = buildRouteExitGuards({
     'world-essence-entry': {
       active: () => activeView === 'world-essence-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldEssenceEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.essenceEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
-      save: () => saveWorldEssenceEntry(),
-      discard: () => worldEssenceEntryHandle?.discard?.(),
+      save: () => worldScope.essenceEntry.save(),
+      discard: () => worldScope.essenceEntry.discard(),
     },
     'world-tool-entry': {
       active: () => activeView === 'world-tool-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldToolEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.toolEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
-      save: () => saveWorldToolEntry(),
-      discard: () => worldToolEntryHandle?.discard?.(),
+      save: () => worldScope.toolEntry.save(),
+      discard: () => worldScope.toolEntry.discard(),
     },
     'world-component-entry': {
       active: () => activeView === 'world-component-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldComponentEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.componentEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyComponentDraft?.(),
-      save: () => saveWorldComponentEntry(),
-      discard: () => worldComponentEntryHandle?.discard?.(),
+      save: () => worldScope.componentEntry.save(),
+      discard: () => worldScope.componentEntry.discard(),
     },
     'environment-edit': {
       active: () => activeView === 'environment-edit',
@@ -2563,16 +2222,15 @@
     },
     'recipe-item-edit': {
       active: () => activeView === 'recipe-item-edit',
-      isDirty: () => recipeItemEditDirty === true,
+      isDirty: () => recipeItem.recipeItemEditDirty === true,
       confirm: () => store.confirmDiscardDirtyRecipeItemDraft?.(),
       finish: async (action) => {
         if (action === 'cancel' || action === false) return false;
         if (action === 'save') {
-          const saved = await saveRecipeItemDraft();
+          const saved = await recipeItem.saveRecipeItemDraft();
           return saved !== false;
         }
-        recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
-        recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(recipeItemDraftBaseline);
+        recipeItem.discard();
         return true;
       },
     },
@@ -3968,228 +3626,6 @@
       .replace('{disabled}', disabled);
   }
 
-  /**
-   * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
-   *
-   * @returns {object|null} The world scope entry, or `null` when no record names that Item.
-   */
-  function worldToolForSourceItem(uuid) {
-    const needle = String(uuid ?? '').trim();
-    if (!needle) return null;
-    return (
-      (worldScopeState.tool?.entries ?? []).find((entry) =>
-        getItemMatchUuids(entry?.entity).includes(needle)
-      ) ?? null
-    );
-  }
-
-  /** Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry. */
-  async function createWorldToolFromItemDrop(data) {
-    if (!data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const sourceUuid = source.uuid || uuid;
-    const existing = worldToolForSourceItem(sourceUuid);
-    if (existing) {
-      notifyInfo(existingWorldToolMessage(existing));
-      openWorldScopedEntry('world-tool-entry', existing.id);
-      return true;
-    }
-    const entityId = String(store?.randomID?.() || '');
-    if (!entityId) return false;
-    const created = await store?.worldScope?.tool?.createEntity?.({
-      id: entityId,
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: sourceUuid,
-      registeredItemUuid: sourceUuid,
-    });
-    if (created !== true) return false;
-    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
-    // then have to find it in. Routed through the same guard every other entry navigation uses.
-    openWorldScopedEntry('world-tool-entry', entityId);
-    return true;
-  }
-
-  /** What a GM is told when their drop landed on a world Tool that already existed. */
-  function existingWorldToolMessage(entry) {
-    const name = String(entry?.entity?.name || entry?.id || '');
-    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix.
-    const message =
-      entry?.worldEnabled === false
-        ? text(
-            'FABRICATE.Admin.Manager.Scoped.Tool.DropExistingDisabled',
-            '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Scoped.Tool.DropExisting',
-            '{name} already exists for that Item. Opened it instead of creating a second.'
-          );
-    return message.replace('{name}', name);
-  }
-
-  /** RE-POINT a world Tool at another world Item. */
-  /** The actors the world Tool entry's `Preview as` region offers. */
-  const worldToolPreviewActors = $derived(
-    currentView === 'world-tool-entry'
-      ? ($viewState.actorOptions || [])
-          .filter((actor) => actor?.uuid && actor.isPlayerCharacter === true)
-          .map((actor) => ({
-            id: String(actor.uuid),
-            name: String(actor.name ?? actor.uuid),
-            img: typeof actor.img === 'string' ? actor.img : '',
-          }))
-      : []
-  );
-
-  /** ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites. */
-  function worldToolPreviewRollData(actorUuid) {
-    if (!actorUuid) return null;
-    return store?.getActorRollData?.(actorUuid) ?? null;
-  }
-
-  async function relinkWorldToolSource(data) {
-    const entityId = worldScopedEntryId;
-    if (!entityId || !data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: source.uuid || uuid,
-      registeredItemUuid: source.uuid || uuid,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** UNLINK a world Tool from its world Item. */
-  async function unlinkWorldToolSource(entityId) {
-    if (!entityId) return false;
-    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
-      originItemUuid: null,
-      registeredItemUuid: null,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** Whether a uuid names an Item EMBEDDED in another document (issue 1371). */
-  function isEmbeddedItemUuid(uuid) {
-    const parseUuid = globalThis.foundry?.utils?.parseUuid;
-    if (typeof parseUuid !== 'function') return true;
-    try {
-      const parsed = parseUuid(uuid);
-      if (!parsed || typeof parsed !== 'object') return true;
-      return Number(parsed.embedded?.length) > 0;
-    } catch {
-      return true;
-    }
-  }
-
-  /** The world component whose source-link fields already name one Item, or `null`. */
-  function worldComponentForSourceItem(uuid) {
-    const needle = String(uuid ?? '').trim();
-    if (!needle) return null;
-    return (
-      (worldScopeState.component?.entries ?? []).find((entry) =>
-        getItemMatchUuids(entry?.entity).includes(needle)
-      ) ?? null
-    );
-  }
-
-  /** Create a WORLD component from an Item dropped on the world Component Catalogue. */
-  async function createWorldComponentFromItemDrop(data) {
-    if (!data) return false;
-    // The payload arrives UNRESOLVED, so the drop shape is normalised before anything reads it.
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    if (isEmbeddedItemUuid(uuid)) {
-      notifyWarn(
-        text(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
-          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
-        )
-      );
-      return false;
-    }
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const sourceUuid = source.uuid || uuid;
-    const existing = worldComponentForSourceItem(sourceUuid);
-    if (existing) {
-      notifyInfo(
-        format(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropExisting',
-          '{name} is already a world component, so this drop opened it instead of making a second one.',
-          { name: String(existing.entity?.name || existing.id || '') }
-        )
-      );
-      openWorldScopedEntry('world-component-entry', existing.id);
-      return true;
-    }
-    const entityId = String(store?.randomID?.() || '');
-    if (!entityId) return false;
-    const created = await store?.worldScope?.component?.createEntity?.({
-      id: entityId,
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: sourceUuid,
-      registeredItemUuid: sourceUuid,
-    });
-    if (created !== true) return false;
-    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
-    // then have to find it in. Routed through the same guard every other entry navigation uses.
-    openWorldScopedEntry('world-component-entry', entityId);
-    return true;
-  }
-
-  /** RE-POINT a world component at a different world-scoped Item, from the entry's own card. */
-  async function relinkWorldComponentSource(data) {
-    const entityId = worldScopedEntryId;
-    if (!entityId || !data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    if (isEmbeddedItemUuid(uuid)) {
-      notifyWarn(
-        text(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
-          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
-        )
-      );
-      return false;
-    }
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: source.uuid || uuid,
-      registeredItemUuid: source.uuid || uuid,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** UNLINK a world component from its world-scoped Item. */
-  async function unlinkWorldComponentSource(entityId) {
-    if (!entityId) return false;
-    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
-      originItemUuid: null,
-      registeredItemUuid: null,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
   async function toggleFocusedToolEnabled(enabled) {
     if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
     return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
@@ -4409,168 +3845,10 @@
     openCraftingSection('recipes');
   }
 
-  // ---- Books & Scrolls surface handlers (issue 511, PR-B redesign) ----------
-  // Select a recipe item row (opens the ItemPageInspector aside).
-  function selectRecipeItem(recipeItemId) {
-    selectedRecipeItemId = recipeItemId;
-  }
-
-  // The ItemPageInspector quick-limit toggle emits a boolean; turn it into the right caps patch for
-  // the active visibility mode (live-apply, no draft).
-  function toggleRecipeItemQuickLimit(recipeItemId, limited) {
-    const patch =
-      craftingVisibilityMode === 'item'
-        ? { item: { limitUses: limited === true, maxUses: 1 } }
-        : {
-            learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 },
-          };
-    store.updateRecipeItemCaps?.(recipeItemId, patch);
-  }
-
-  // Deep PLAIN clone for the recipe-item draft + baseline.
-  function cloneRecipeItemDraft(source) {
-    return source ? JSON.parse(JSON.stringify(source)) : null;
-  }
-
-  function recipeItemSourceSnapshot(source) {
-    const uuid = String(source?.originItemUuid || '');
-    if (!uuid) return null;
-    return {
-      uuid,
-      name: source?.resolvedName || source?.name || '',
-      img: source?.resolvedImg || source?.img || '',
-      type: source?.derivedType || source?.type || '',
-      description: source?.description || '',
-    };
-  }
-
-  // Recursively deep-merge a partial patch into the recipe-item draft.
-  function deepMergeDraft(base, patch) {
-    const result = { ...(base || {}) };
-    for (const [key, value] of Object.entries(patch || {})) {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        result[key] = deepMergeDraft(result[key], value);
-      } else {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
-  function patchRecipeItemDraft(patch) {
-    if (!recipeItemDraft || !patch) return;
-    recipeItemDraft = deepMergeDraft(recipeItemDraft, patch);
-  }
-
-  // Open the full-window recipe-item editor for a definition (recipe-item-edit route).
-  function editRecipeItem(recipeItemId) {
-    afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
-      selectedRecipeItemId = recipeItemId;
-      recipeItemEditSaving = false;
-      recipeItemSaveFailed = false;
-      recipeItemActiveTab = 'overview';
-      const source = (recipeItemDefinitions || []).find((def) => def.id === recipeItemId) || null;
-      recipeItemDraft = cloneRecipeItemDraft(source);
-      recipeItemDraftBaseline = cloneRecipeItemDraft(source);
-      recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
-      activeView = 'recipe-item-edit';
-      navRail.expandGroup('crafting');
-      Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
-        worldItemOptions = options || [];
-      });
-    });
-  }
-
-  function clearRecipeItemDraft() {
-    recipeItemDraft = null;
-    recipeItemDraftBaseline = null;
-    recipeItemLinkedSourceSnapshot = null;
-    recipeItemSaveFailed = false;
-  }
-
-  // Commit the staged recipe-item draft in a single updateRecipeItemDefinition call (via the
-  // store's saveRecipeItem wrapper).
-  async function saveRecipeItemDraft() {
-    if (recipeItemEditSaving) return false;
-    if (!recipeItemDraft?.id) return false;
-    recipeItemEditSaving = true;
-    recipeItemSaveFailed = false;
-    try {
-      const result = await store.saveRecipeItem?.(recipeItemDraft.id, {
-        enabled: recipeItemDraft.enabled !== false,
-        originItemUuid: recipeItemDraft.originItemUuid ?? null,
-        recipeIds: Array.isArray(recipeItemDraft.recipeIds) ? recipeItemDraft.recipeIds : [],
-        caps: recipeItemDraft.caps || {},
-      });
-      if (result === false) {
-        recipeItemSaveFailed = true;
-        return false;
-      }
-      recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
-      activeView = 'books-scrolls';
-      return result;
-    } catch {
-      recipeItemSaveFailed = true;
-      return false;
-    } finally {
-      recipeItemEditSaving = false;
-    }
-  }
-
-  async function deleteRecipeItemFromEdit() {
-    if (!recipeItemDraft?.id || recipeItemEditSaving) return;
-    const result = await store.deleteRecipeItemDefinition?.(recipeItemDraft.id);
-    if (result === false) return; // cancelled or failed → stay in the editor
-    clearRecipeItemDraft();
-    activeView = 'books-scrolls';
-  }
-
   function backToBooksScrolls() {
     afterTruthyResult(confirmRouteExit('books-scrolls'), () => {
       activeView = 'books-scrolls';
     });
-  }
-
-  // Link / unlink the linked world item behind the edited recipe item (staged).
-  async function linkRecipeItemSource(uuid) {
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    recipeItemLinkedSourceSnapshot = { ...source, uuid: source.uuid || uuid };
-    patchRecipeItemDraft({ originItemUuid: source.uuid || uuid });
-    return true;
-  }
-
-  function unlinkRecipeItemSource() {
-    recipeItemLinkedSourceSnapshot = null;
-    patchRecipeItemDraft({ originItemUuid: null });
-  }
-
-  // Add / remove a recipe on the edited book.
-  function linkRecipeToItem(recipeId) {
-    if (!recipeItemDraft?.id || !recipeId) return;
-    // Function-local scratch: the draft is patched with the spread array below, so the Set
-    // never reaches state.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
-    next.add(String(recipeId));
-    patchRecipeItemDraft({ recipeIds: [...next] });
-  }
-
-  function unlinkRecipeFromItem(recipeId) {
-    if (!recipeItemDraft?.id || !recipeId) return;
-    const next = (recipeItemDraft.recipeIds || [])
-      .map((id) => String(id))
-      .filter((id) => id !== String(recipeId));
-    patchRecipeItemDraft({ recipeIds: next });
-  }
-
-  // Create a recipe item from a dropped world/compendium Item (issue 844).
-  async function dropRecipeItem(uuid) {
-    if (!uuid) return;
-    const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
-    const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
-    if (newId) editRecipeItem(newId);
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -4663,7 +3941,7 @@
       );
     if (summary.resultGroupCount > 0)
       parts.push(
-        text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace(
+        text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result sets').replace(
           '{count}',
           summary.resultGroupCount
         )
@@ -4786,53 +4064,16 @@
 <div
   class="fabricate-manager"
   data-manager-view={currentView}
-  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit' ? 'results' : undefined}
+  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit' ? 'full' : undefined}
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
-  <!--
-    The manager titlebar: a thin, always-present identity strip above the header.
-  -->
-  <!--
-    THE TITLE BAND RENDERS ON THE TOOL ROUTES TOO (issue 1373).
-  -->
-  <div
-    class="manager-titlebar"
-    data-manager-titlebar
-    aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
-  >
-    <!--
-    The layer-group icon and "Crafting Systems" product label used to lead this strip.
-  -->
-    {#if premiumInstalled}
-      <span
-        class="manager-titlebar-badge"
-        data-manager-titlebar-premium
-        title={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-      >
-    {/if}
-    {#if selectedSystem}
-      <span
-        class="manager-titlebar-status"
-        data-manager-titlebar-status
-        title={titlebarStatusLabel()}
-        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-      >
-        <!-- The reference marks this line with an INFORMATION glyph, not a die. What follows
-             it is a statement about how the selected system resolves, which a d20 reads as a
-             dice-roll control rather than as a caption (issue 1373). -->
-        <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
-        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-      </span>
-    {/if}
-  </div>
+  <ManagerTitleBar
+    {text}
+    {premiumInstalled}
+    modeLabel={titlebarModeLabel}
+    outcomeTierCount={titlebarOutcomeTierCount}
+  />
 
   <ManagerPageHeader
     {header}
@@ -4846,20 +4087,20 @@
     {resolveRecipeImage}
     {componentForEdit}
     {downtimeHeaderArtwork}
-    {worldEssenceEntryIcon}
-    {worldEssenceEntryTint}
-    {worldEssenceEntryName}
-    {worldEssenceEntrySubtitle}
+    worldEssenceEntryIcon={worldScope.worldEssenceEntryIcon}
+    worldEssenceEntryTint={worldScope.worldEssenceEntryTint}
+    worldEssenceEntryName={worldScope.worldEssenceEntryName}
+    worldEssenceEntrySubtitle={worldScope.worldEssenceEntrySubtitle}
     {essenceEditIcon}
     {essenceEditTint}
     {essenceEditName}
     {essenceEditSubline}
-    {worldComponentEntryImage}
-    {worldComponentEntryName}
-    {worldComponentEntrySubtitle}
-    {worldToolEntryRecord}
-    {worldToolEntryName}
-    {worldToolEntrySubtitle}
+    worldComponentEntryImage={worldScope.worldComponentEntryImage}
+    worldComponentEntryName={worldScope.worldComponentEntryName}
+    worldComponentEntrySubtitle={worldScope.componentEntry.subline}
+    worldToolEntryRecord={worldScope.worldToolEntryRecord}
+    worldToolEntryName={worldScope.worldToolEntryName}
+    worldToolEntrySubtitle={worldScope.toolEntry.subline}
     environmentDraftForDisplay={gathering.environmentDraftForDisplay}
     {isWorldRoute}
     {isWorldDowntimeRoute}
@@ -4868,7 +4109,7 @@
     {isWorldScopedRoute}
     {isChecksRoute}
     checksActiveTab={checks.checksActiveTab}
-    {worldScopedEntryRoute}
+    worldScopedEntryRoute={worldScope.worldScopedEntryRoute}
     {worldScopedEntryCrumb}
     {worldRulesTab}
     {worldRulesPageTitle}
@@ -4895,21 +4136,21 @@
     backToGatheringTaskLibrary={drafts.backToGatheringTaskLibrary}
     backToGatheringEventLibrary={drafts.backToGatheringEventLibrary}
     {selectedSystemId}
-    {worldEssenceEntryDirty}
-    {worldEssenceEntrySaving}
+    worldEssenceEntryDirty={worldScope.essenceEntry.dirty}
+    worldEssenceEntrySaving={worldScope.essenceEntry.saving}
     {backToWorldEssences}
-    {saveWorldEssenceEntry}
-    {worldToolEntryDirty}
-    {worldToolEntrySaving}
-    {worldToolEntryDelete}
+    saveWorldEssenceEntry={worldScope.essenceEntry.save}
+    worldToolEntryDirty={worldScope.toolEntry.dirty}
+    worldToolEntrySaving={worldScope.toolEntry.saving}
+    worldToolEntryDelete={worldScope.worldToolEntryDelete}
     {worldToolDeleteAction}
     {backToWorldTools}
-    {saveWorldToolEntry}
-    {worldComponentEntryDirty}
-    {worldComponentEntrySaving}
+    saveWorldToolEntry={worldScope.toolEntry.save}
+    worldComponentEntryDirty={worldScope.componentEntry.dirty}
+    worldComponentEntrySaving={worldScope.componentEntry.saving}
     {backToWorldComponents}
-    {saveWorldComponentEntry}
-    {createWorldEssence}
+    saveWorldComponentEntry={worldScope.componentEntry.save}
+    createWorldEssence={worldScope.createWorldEssence}
     {downtimeCoreFallback}
     {downtimeHeaderStatus}
     {downtimeHeaderActions}
@@ -4929,13 +4170,12 @@
     {selectedRecipeId}
     {deleteRecipeFromEdit}
     {saveRecipeDraft}
-    {recipeItemDraft}
-    {recipeItemEditDirty}
-    {recipeItemEditSaving}
-    {recipeItemSaveFailed}
-    {canSaveRecipeItemEdit}
-    {deleteRecipeItemFromEdit}
-    {saveRecipeItemDraft}
+    recipeItemDraft={recipeItem.recipeItemDraft}
+    recipeItemEditDirty={recipeItem.recipeItemEditDirty}
+    recipeItemEditSaving={recipeItem.recipeItemEditSaving}
+    canSaveRecipeItemEdit={recipeItem.canSaveRecipeItemEdit}
+    deleteRecipeItemFromEdit={recipeItem.deleteRecipeItemFromEdit}
+    saveRecipeItemDraft={recipeItem.saveRecipeItemDraft}
     {openComponentAddFromCatalogue}
     {componentEditCombinedDirty}
     {componentEditSaving}
@@ -5008,7 +4248,7 @@
       displayedGatheringTab={gathering.displayedGatheringTab}
       openGatheringSection={drafts.openGatheringSection}
       {experimentalFeaturesEnabled}
-      {worldScopedCounts}
+      worldScopedCounts={worldScope.worldScopedCounts}
       {isWorldRoute}
       {openWorldParties}
       {travelParties}
@@ -5047,27 +4287,27 @@
         onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onOpenVocabulary={() => setView('world-vocabulary')}
-        onCreateFromItemDrop={createWorldComponentFromItemDrop}
+        onCreateFromItemDrop={worldScope.createWorldComponentFromItemDrop}
         worldItems={worldItemOptions}
-        worldEssences={worldEssenceOptions}
+        worldEssences={worldScope.worldEssenceOptions}
         bind:browserState={managerBrowserState.worldComponentCatalogue}
       />
     {:else if currentView === 'world-component-entry'}
       <WorldComponentEntryPage
         {...componentScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         worldItems={worldItemOptions}
-        worldEssences={worldEssenceOptions}
+        worldEssences={worldScope.worldEssenceOptions}
         onBackToCatalogue={() => setView('world-components')}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onOpenWorldVocabulary={() => setView('world-vocabulary')}
-        onSourceDrop={relinkWorldComponentSource}
-        onUnlinkSource={() => unlinkWorldComponentSource(worldScopedEntryId)}
+        onSourceDrop={worldScope.relinkWorldComponentSource}
+        onUnlinkSource={() => worldScope.unlinkWorldComponentSource(worldScope.worldScopedEntryId)}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-        onDraftChange={handleWorldComponentEntryDraft}
-        onDirtyChange={handleWorldComponentEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
-        onSublineChange={handleWorldComponentEntrySubline}
+        onDraftChange={worldScope.componentEntry.onDraft}
+        onDirtyChange={worldScope.componentEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
+        onSublineChange={worldScope.componentEntry.onSubline}
       />
     {:else if currentView === 'world-essences'}
       <WorldEssenceCataloguePage
@@ -5079,12 +4319,12 @@
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage
         {...essenceScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
         onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
-        onDraftChange={handleWorldEssenceEntryDraft}
-        onDirtyChange={handleWorldEssenceEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
+        onDraftChange={worldScope.essenceEntry.onDraft}
+        onDirtyChange={worldScope.essenceEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage
@@ -5092,33 +4332,33 @@
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
         worldItems={worldItemOptions}
         onOpenSystemRules={(entityId, systemId) => openSystemToolRules(entityId, systemId)}
-        onCreateFromItemDrop={createWorldToolFromItemDrop}
+        onCreateFromItemDrop={worldScope.createWorldToolFromItemDrop}
       />
     {:else if currentView === 'world-tool-entry'}
       <WorldToolEntryPage
         {...toolScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         worldItems={worldItemOptions}
         prerequisiteOptions={selectedCharacterPrerequisites}
         modifierOptions={selectedSystemModifiers}
-        componentOptions={worldComponentOptions}
-        essenceOptions={worldEssenceOptions}
-        itemTags={worldComponentTags}
+        componentOptions={worldScope.worldComponentOptions}
+        essenceOptions={worldScope.worldEssenceOptions}
+        itemTags={worldScope.worldComponentTags}
         currencyUnits={selectedCurrencyUnits}
-        previewActors={worldToolPreviewActors}
-        getPreviewRollData={worldToolPreviewRollData}
+        previewActors={worldScope.worldToolPreviewActors}
+        getPreviewRollData={worldScope.worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}
-        onSourceDrop={relinkWorldToolSource}
-        onUnlinkSource={() => unlinkWorldToolSource(worldScopedEntryId)}
-        onDraftChange={handleWorldToolEntryDraft}
-        onDirtyChange={handleWorldToolEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
-        onSublineChange={handleWorldToolEntrySubline}
-        onDeleteChange={handleWorldToolEntryDelete}
+        onSourceDrop={worldScope.relinkWorldToolSource}
+        onUnlinkSource={() => worldScope.unlinkWorldToolSource(worldScope.worldScopedEntryId)}
+        onDraftChange={worldScope.toolEntry.onDraft}
+        onDirtyChange={worldScope.toolEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
+        onSublineChange={worldScope.toolEntry.onSubline}
+        onDeleteChange={worldScope.handleWorldToolEntryDelete}
       />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage
-        vocabulary={worldScopeState.vocabulary ?? null}
+        vocabulary={worldScope.worldScopeState.vocabulary ?? null}
         actions={store?.worldScope?.vocabulary ?? null}
         systems={allSystems}
       />
@@ -5448,14 +4688,16 @@
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={gathering.editingGatheringTask}
+        activeTab={gathering.gatheringTaskTab}
+        onTabChange={(tab) => (gathering.gatheringTaskTab = tab)}
         staminaEnabled={gathering.selectedGatheringTaskStaminaEnabled}
         nodesEnabled={gathering.selectedGatheringTaskNodesEnabled}
         resolutionMode={gathering.gatheringTaskResolutionMode}
         routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
         checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
         previewActors={overridePreviewActors}
-        resolvePreviewCharacter={resolveOverrideCharacter}
-        resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
+        {resolvePreviewCharacter}
+        validation={gathering.gatheringTaskValidation}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={modifiers.gatheringConditionOptions('weather')}
@@ -5481,9 +4723,6 @@
         onUpdateDrop={drafts.updateGatheringTaskDrop}
         onMoveDrop={drafts.moveGatheringTaskDrop}
         onImportDrop={drafts.importGatheringTaskDrop}
-        onAddModifier={modifiers.addGatheringDropModifier}
-        onUpdateModifier={modifiers.updateGatheringDropModifier}
-        onDeleteModifier={modifiers.deleteGatheringDropModifier}
         onAddToolReference={drafts.addToolReferenceToSelectedTask}
         onRemoveToolReference={drafts.removeToolReferenceFromSelectedTask}
       />
@@ -5528,9 +4767,7 @@
         focusValidationNonce={toolValidationFocusNonce}
         managedItems={selectedSystem?.managedItemOptions || []}
         itemTags={selectedSystem?.itemTags || []}
-        essenceOptions={selectedSystem?.features?.essences === true
-          ? selectedSystem?.essenceDefinitions || []
-          : []}
+        {essenceOptions}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedCharacterPrerequisites}
@@ -5624,7 +4861,7 @@
           {salvageCheckDc}
           {salvageCheckConfig}
           previewActors={overridePreviewActors}
-          resolvePreviewCharacter={resolveOverrideCharacter}
+          {resolvePreviewCharacter}
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}
@@ -5691,13 +4928,13 @@
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
+        recipeOptions={$viewState.recipeRoster || []}
+        knowledgeObservable={isLearnedKnowledgeObservable(selectedSystem)}
         timeRequirementsEnabled={selectedTimeRequirementsEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
-        essenceOptions={selectedSystem?.features?.essences
-          ? selectedSystem?.essenceDefinitions || []
-          : []}
+        {essenceOptions}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         checkEvaluation={recipeCheckTierEvaluation}
@@ -5758,10 +4995,10 @@
       <BooksScrollsView
         recipeItems={recipeItemDefinitions}
         visibilityMode={craftingVisibilityMode}
-        {selectedRecipeItemId}
-        onSelectRecipeItem={(id) => selectRecipeItem(id)}
-        onOpenRecipeItem={(id) => editRecipeItem(id)}
-        onDropRecipeItem={(uuid) => dropRecipeItem(uuid)}
+        selectedRecipeItemId={recipeItem.selectedRecipeItemId}
+        onSelectRecipeItem={(id) => recipeItem.selectRecipeItem(id)}
+        onOpenRecipeItem={(id) => recipeItem.editRecipeItem(id)}
+        onDropRecipeItem={(uuid) => recipeItem.dropRecipeItem(uuid)}
         dropEnabled={!!selectedSystemId}
         onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
       />
@@ -5779,20 +5016,21 @@
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
       <RecipeItemEditor
-        recipeItem={recipeItemDraft}
-        linkedItem={recipeItemEditorLinkedItem}
-        linkedRecipes={recipeItemEditorLinkedRecipes}
-        availableRecipes={recipeItemEditorAvailableRecipes}
+        recipeItem={recipeItem.recipeItemDraft}
+        linkedItem={recipeItem.recipeItemEditorLinkedItem}
+        linkedRecipes={recipeItem.recipeItemEditorLinkedRecipes}
+        availableRecipes={recipeItem.recipeItemEditorAvailableRecipes}
         characterPrerequisites={selectedCharacterPrerequisites}
         visibilityMode={craftingVisibilityMode}
-        activeTab={recipeItemActiveTab}
-        onSelectTab={(tab) => (recipeItemActiveTab = tab)}
-        onPatch={(patch) => patchRecipeItemDraft(patch)}
-        onLinkItem={(uuid) => linkRecipeItemSource(uuid)}
-        onUnlinkItem={() => unlinkRecipeItemSource()}
+        activeTab={recipeItem.recipeItemActiveTab}
+        saveFailed={recipeItem.recipeItemSaveFailed}
+        onSelectTab={(tab) => (recipeItem.recipeItemActiveTab = tab)}
+        onPatch={(patch) => recipeItem.patchRecipeItemDraft(patch)}
+        onLinkItem={(uuid) => recipeItem.linkRecipeItemSource(uuid)}
+        onUnlinkItem={() => recipeItem.unlinkRecipeItemSource()}
         onCopyItemUuid={(uuid) => copyComponentSource(uuid)}
-        onLinkRecipe={(id) => linkRecipeToItem(id)}
-        onRemoveRecipe={(id) => unlinkRecipeFromItem(id)}
+        onLinkRecipe={(id) => recipeItem.linkRecipeToItem(id)}
+        onRemoveRecipe={(id) => recipeItem.unlinkRecipeFromItem(id)}
       />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
@@ -5927,7 +5165,6 @@
             eventCharacterModifierSearchSuggestions={modifiers.eventCharacterModifierSearchSuggestions}
             {sortedDangerTags}
             {selectedSystemModifiers}
-            characterModifierSearchOpenUp={modifiers.characterModifierSearchOpenUp}
             gatheringConditionAvailableOptions={modifiers.gatheringConditionAvailableOptions}
             gatheringConditionLabel={gathering.gatheringConditionLabel}
             gatheringConditionModifierRows={modifiers.gatheringConditionModifierRows}
@@ -5963,7 +5200,6 @@
             {truncateDescription}
             travelSaving={$viewState.travelSaving === true}
             environmentSaveError={$viewState.environmentSaveError}
-            bind:characterModifierSearchAnchor={modifiers.characterModifierSearchAnchor}
             bind:characterModifierSearchTerm={modifiers.characterModifierSearchTerm}
             onDuplicateDrop={drafts.duplicateGatheringTaskDrop}
             onDeleteDrop={drafts.deleteGatheringTaskDrop}
@@ -6005,8 +5241,8 @@
               sourceName={essenceEditDraft.sourceName || ''}
               macroName={essenceEditDraft.macroName ||
                 essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
-              inherited={inspectedEssenceInherited}
-              previewCarrier={inspectedEssenceWorldEntry?.previewCarrier ?? null}
+              inherited={worldScope.inspectedEssenceInherited}
+              previewCarrier={worldScope.inspectedEssenceWorldEntry?.previewCarrier ?? null}
             />
           {:else if currentView === 'essences' && essenceBulk.count > 0}
             <EssenceBulkEditPanel
@@ -6032,9 +5268,9 @@
               managedItemOptions={selectedSystem?.managedItemOptions || []}
               sourceUuid={selectedEssenceSourceUuid()}
               systemName={selectedSystem?.name || ''}
-              inherited={inspectedEssenceInherited}
-              systemRows={inspectedEssenceSystemRows}
-              memberCount={Number(inspectedEssenceWorldEntry?.membershipCount) || 0}
+              inherited={worldScope.inspectedEssenceInherited}
+              systemRows={worldScope.inspectedEssenceSystemRows}
+              memberCount={Number(worldScope.inspectedEssenceWorldEntry?.membershipCount) || 0}
               rosterSize={allSystems.length}
               onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
               onEdit={(id) => editEssence(id)}
@@ -6098,7 +5334,7 @@
                   'Essence resources'
                 )}
               >
-                <ManagerButton
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/essences"
                   target="_blank"
@@ -6111,8 +5347,8 @@
                       'Essence docs'
                     )}</span
                   >
-                </ManagerButton>
-                <ManagerButton
+                </Button>
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/essences/effect-transfer"
                   target="_blank"
@@ -6125,7 +5361,7 @@
                       'Effect transfer'
                     )}</span
                   >
-                </ManagerButton>
+                </Button>
               </div>
             </section>
           {:else}
@@ -6253,7 +5489,7 @@
                   'Component resources'
                 )}
               >
-                <ManagerButton
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/components/"
                   target="_blank"
@@ -6266,8 +5502,8 @@
                       'Component docs'
                     )}</span
                   >
-                </ManagerButton>
-                <ManagerButton
+                </Button>
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
                   target="_blank"
@@ -6280,7 +5516,7 @@
                       'Quickstart'
                     )}</span
                   >
-                </ManagerButton>
+                </Button>
               </div>
             </section>
           {:else}
@@ -6333,9 +5569,9 @@
               recipeCount={($viewState.recipes || []).length}
               componentCount={selectedCounts.components}
               componentOptions={selectedSystem?.managedItemOptions || []}
-              essenceOptions={selectedSystem?.features?.essences
-                ? selectedSystem?.essenceDefinitions || []
-                : []}
+              {essenceOptions}
+              recipeOptions={$viewState.recipeRoster || []}
+              currencyUnits={selectedCurrencyUnits}
               {showRecipeCategories}
               showVisibilitySummary={$viewState.showVisibilitySummary}
               onEdit={() => editRecipe(selectedRecipe?.id)}
@@ -6372,11 +5608,11 @@
           />
         {:else if currentView === 'books-scrolls'}
           <ItemPageInspector
-            item={selectedRecipeItem}
+            item={recipeItem.selectedRecipeItem}
             visibilityMode={craftingVisibilityMode}
-            onOpenRecipeItem={(id) => editRecipeItem(id)}
+            onOpenRecipeItem={(id) => recipeItem.editRecipeItem(id)}
             onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
-            onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
+            onToggleQuickLimit={(id, limited) => recipeItem.toggleRecipeItemQuickLimit(id, limited)}
           />
         {:else}
           <SystemBrowserInspector
@@ -6417,7 +5653,7 @@
     open={componentAddFromCatalogueOpen}
     systemId={selectedSystemId || ''}
     systemName={selectedSystem?.name || ''}
-    entries={worldScopeState.component?.entries ?? []}
+    entries={worldScope.worldScopeState.component?.entries ?? []}
     onAdd={async (entityId, targetSystemId) =>
       (await store?.worldScope?.component?.addToSystem?.(entityId, targetSystemId)) === true}
     onClose={() => (componentAddFromCatalogueOpen = false)}
@@ -6443,18 +5679,18 @@
 -->
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
-    token={worldToolEntryDelete?.token ?? ''}
-    armed={Boolean(worldToolEntryDelete?.token) &&
-      worldToolEntryDeleteArmed === worldToolEntryDelete.token}
-    idleLabel={worldToolEntryDelete?.label ?? ''}
-    armedLabel={worldToolEntryDelete?.armedLabel ?? ''}
-    idleAriaLabel={worldToolEntryDelete?.idleAriaLabel ?? ''}
-    armedAriaLabel={worldToolEntryDelete?.armedAriaLabel ?? ''}
-    onArm={(token) => (worldToolEntryDeleteArmed = token)}
-    onDisarm={() => (worldToolEntryDeleteArmed = '')}
+    token={worldScope.worldToolEntryDelete?.token ?? ''}
+    armed={Boolean(worldScope.worldToolEntryDelete?.token) &&
+      worldScope.worldToolEntryDeleteArmed === worldScope.worldToolEntryDelete.token}
+    idleLabel={worldScope.worldToolEntryDelete?.label ?? ''}
+    armedLabel={worldScope.worldToolEntryDelete?.armedLabel ?? ''}
+    idleAriaLabel={worldScope.worldToolEntryDelete?.idleAriaLabel ?? ''}
+    armedAriaLabel={worldScope.worldToolEntryDelete?.armedAriaLabel ?? ''}
+    onArm={(token) => (worldScope.worldToolEntryDeleteArmed = token)}
+    onDisarm={() => (worldScope.worldToolEntryDeleteArmed = '')}
     onConfirm={() => {
-      worldToolEntryDeleteArmed = '';
-      worldToolEntryDelete?.run?.();
+      worldScope.worldToolEntryDeleteArmed = '';
+      worldScope.worldToolEntryDelete?.run?.();
     }}
   />
 {/snippet}

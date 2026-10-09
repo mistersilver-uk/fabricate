@@ -25,7 +25,7 @@ const CRAFTING_ACTIONS = `${MANAGER}/ManagerHeaderCraftingActions.svelte`;
 const ADMIN_STORE = 'src/ui/svelte/stores/adminStore.js';
 const BROWSER_VIEW = `${MANAGER}/ComponentsBrowserView.svelte`;
 const EDIT_VIEW = `${MANAGER}/ComponentEditView.svelte`;
-const ADD_BUTTON = { at: 'ManagerButton', where: ['data-component-add-from-catalogue', true] };
+const ADD_BUTTON = { at: 'Button', where: ['data-component-add-from-catalogue', true] };
 
 /** EVERY route token the gateway enumerated on `origin/main`, pinned as a literal list. */
 const ROUTE_TOKENS = Object.freeze([
@@ -82,11 +82,11 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
             '../../../model/componentBulkEditModel.js',
             // Moved by issue 1509's file move, and it is neither a screen nor a new dependency.
             '../../components/ArmedDangerButton.svelte',
+            '../../components/Button.svelte',
             // `ChanceSlider.svelte` left in issue 1707 phase 2 with the drop-rate slider that imported
             // it; `EmptyState` moved by issue 1710's file move.
             '../../components/EmptyState.svelte',
             // `Kicker.svelte` and `Medallion.svelte` left in issue 1720 with the page header.
-            '../../components/ManagerButton.svelte',
             '../../util/componentEditor.js',
             './ComponentEditView.svelte',
             './ComponentsBrowserView.svelte',
@@ -154,6 +154,15 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   defineStructureContract('ROUTE ENUMERATION: and neither does the gateway', ROOT, {
     comparedLiterals: [['currentView', ROUTE_TOKENS.filter((token) => token !== 'systems')]],
   });
+  defineStructureContract(
+    'ROUTE ENUMERATION: and the world-scope model tests only the entry routes',
+    `${MANAGER}/worldScopeModel.svelte.js`,
+    {
+      comparedLiterals: [
+        ['currentView', ['world-component-entry', 'world-essence-entry', 'world-tool-entry']],
+      ],
+    }
+  );
 });
 
 // AC-4, ONE DIRECTION ONLY: the component bundle spreads four keys and a screen legitimately
@@ -192,8 +201,16 @@ describe('the world component entry’s gateway-owned wires are pinned', () => {
     ROOT,
     {
       gives: [
-        { at: 'WorldComponentEntryPage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
-        { at: 'WorldComponentCataloguePage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
+        {
+          at: 'WorldComponentEntryPage',
+          attribute: 'worldEssences',
+          is: 'worldScope.worldEssenceOptions',
+        },
+        {
+          at: 'WorldComponentCataloguePage',
+          attribute: 'worldEssences',
+          is: 'worldScope.worldEssenceOptions',
+        },
         {
           at: 'WorldComponentCataloguePage',
           attribute: 'onOpenEntry',

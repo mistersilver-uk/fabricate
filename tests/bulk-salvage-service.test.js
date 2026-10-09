@@ -2,7 +2,7 @@
  * `BulkSalvageService` — one player gesture, N salvage attempts, one aggregated card (issue 859).
  */
 
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -11,7 +11,7 @@ import {
   BulkSalvageService,
   classifySalvageOutcome,
 } from '../src/systems/BulkSalvageService.js';
-import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
+import { resolveAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { attachAwardReceipts, createItemReceiptCollector } from '../src/systems/runHistoryEvidence.js';
 import { createOrStackComponentItem } from '../src/systems/componentStacking.js';
 import {
@@ -21,6 +21,8 @@ import {
   craftingSystemLookup,
   recordingSalvage,
 } from './helpers/bulkSalvageFixtures.js';
+import { countEvaluation } from './helpers/countFixtures.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 
 /** Swallow the service's per-item `console.error` for one test, and restore after. */
 function silenceErrors(t) {
@@ -775,6 +777,12 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
 });
 
 describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the system', () => {
+  let restoreDie = null;
+  beforeEach(() => {
+    restoreDie = installCoreDie();
+  });
+  afterEach(() => restoreDie());
+
   /** Run one prompt and hand back the `allowAdvantage` it was offered. */
   async function offeredAdvantage(systems, componentIds) {
     let offered = null;
@@ -804,13 +812,14 @@ describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the sys
   });
 
   it('withholds it when ANY usable-check subject does not', async () => {
-    // Offering advantage that only some rolls could honour is a lie about half the batch:
-    // `applyD20Advantage` leaves a non-plain-d20 formula unchanged, so those rows would
-    // roll normally under an Advantage button.
+    // Offering advantage that only some rolls could honour is a lie about half the batch: the
+    // keep leaves a nested first group unchanged, so those rows would roll normally under an
+    // Advantage button. A plain `2d6 + 1` now keeps (R1 class (a), issue 2007), so the refusing
+    // subject is a nested d20 (R1 class (b2)).
     const offered = await offeredAdvantage(
       [
         bulkSystem({ id: 'sys-a', rollFormula: '1d20 + 3', components: [ORE] }),
-        bulkSystem({ id: 'sys-b', rollFormula: '2d6 + 1', components: [HIDE] }),
+        bulkSystem({ id: 'sys-b', rollFormula: '(1d20 + 2) * 2', components: [HIDE] }),
       ],
       ['comp-ore', 'comp-hide']
     );
@@ -818,14 +827,15 @@ describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the sys
   });
 
   it('agrees with evaluateCheckRoll for a TOOL-BONUSED plain-d20 formula', async () => {
-    // The evaluator computes its own `allowAdvantage` as `hasPlainD20(effectiveFormula)`.
+    // The evaluator offers by the one derivation, `resolveAdvantageOffer`, on its own formula.
     const formula = '1d20 + @tools';
-    assert.equal(hasPlainD20(formula), true, 'the evaluator would offer advantage');
+    const offer = resolveAdvantageOffer({ authoredFormula: formula });
+    assert.equal(offer.advantage, true, 'the evaluator would offer advantage');
     const offered = await offeredAdvantage(
       [bulkSystem({ rollFormula: formula, components: [ORE] })],
       ['comp-ore']
     );
-    assert.equal(offered, hasPlainD20(formula), 'and so does the service');
+    assert.equal(offered, offer.advantage, 'and so does the service');
   });
 
   it('ignores a subject with NO usable check when deciding', async () => {
@@ -1647,5 +1657,224 @@ describe('BulkSalvageService.run: the aggregate card carries the fired complicat
       false,
       'a run that fired nothing is byte-identical to what it was before this feature'
     );
+  });
+});
+
+describe('BulkSalvageService.run: additional dice (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+  const PAID = { enabled: true, source: 'path', path: PATH, max: 3, label: 'Momentum' };
+  const SCRAP = bulkComponent({ id: 'comp-scrap', name: 'Scrap', img: 'icons/scrap.webp' });
+
+  /** A salvage system rolling a d10 pool of 2 at ≥ 8 needing 1, paid for by `additionalDice`. */
+  const countSystem = ({ id = 'sys-a', components = [ORE, HIDE, BONE], additionalDice = PAID, ...pool } = {}) =>
+    bulkSystem({ id, components, check: { evaluation: countEvaluation({ additionalDice, ...pool }) } });
+
+  /** A service over `systems` whose one budget read answers `budget`, recording every read. */
+  function diceService({ systems, salvage, choice, budget = { ok: true, source: 'path', available: 5 } }) {
+    const prompts = [];
+    const reads = [];
+    const posted = [];
+    const service = new BulkSalvageService({
+      salvage,
+      getCraftingSystem: craftingSystemLookup(systems),
+      promptRollDecision: async (args) => {
+        prompts.push(args);
+        return choice;
+      },
+      postChatMessage: async (message) => {
+        posted.push(message);
+      },
+      getActor: (uuid) => ({ uuid, getRollData: () => ({}) }),
+      readAdditionalDiceBudget: async (request) => {
+        reads.push(request);
+        return budget;
+      },
+    });
+    return { service, prompts, reads, posted };
+  }
+
+  const targets = (...componentIds) =>
+    componentIds.map(([componentId, systemId = 'sys-a', actorUuid = 'Actor.a1']) =>
+      bulkTarget({ componentId, systemId, actorUuid })
+    );
+
+  it('offers one choice over the covered rows and spends it on each of them alone (AD44, AD8)', async () => {
+    const { seam, calls } = recordingSalvage();
+    const { service, prompts, reads } = diceService({
+      systems: [
+        countSystem({ components: [ORE, HIDE] }),
+        countSystem({ id: 'sys-c', components: [BONE], additionalDice: { ...PAID, max: 1 } }),
+        bulkSystem({ id: 'sys-b', rollFormula: '1d20', components: [SCRAP] }),
+      ],
+      salvage: seam,
+      choice: { confirmed: true, advantage: 'normal', additionalDice: 1 },
+      budget: { ok: true, source: 'path', available: 7 },
+    });
+
+    await service.run({
+      targets: targets(['comp-ore'], ['comp-hide'], ['comp-bone', 'sys-c'], ['comp-scrap', 'sys-b']),
+      interactive: true,
+    });
+
+    assert.equal(reads.length, 1, 'one budget read for the whole batch');
+    assert.deepEqual(
+      [reads[0].additionalDice.max, reads[0].payload.rolls, reads[0].payload.activity],
+      [1, 3, 'salvage']
+    );
+    assert.deepEqual(prompts[0].additionalDiceOffer, {
+      available: 7,
+      limit: 1,
+      max: 1,
+      resourceLabel: 'Momentum',
+      unavailable: null,
+      reach: null,
+    });
+    assert.deepEqual(prompts[0].subjects[0].additionalDice, {
+      countDice: { base: 2, poolDelta: 0, zeroPoolFails: true, destination: 'pool' },
+      reach: { needed: 1, perDieMost: 1, explode: 'off', rescued: false },
+    });
+    assert.ok(!('additionalDice' in prompts[0].subjects[3]), 'a summed row is not covered');
+    assert.deepEqual(
+      calls.map(({ componentId, options }) => [
+        componentId,
+        options.rollDecision.additionalDice,
+        options.additionalDiceRolls,
+      ]),
+      [
+        ['comp-ore', 1, 3],
+        ['comp-hide', 1, 3],
+        ['comp-bone', 1, 3],
+        ['comp-scrap', undefined, undefined],
+      ]
+    );
+  });
+
+  it('bounds the batch by what the resource affords every roll', async () => {
+    const { service, prompts } = diceService({
+      systems: [countSystem()],
+      salvage: recordingSalvage().seam,
+      choice: { confirmed: true, advantage: 'normal' },
+      budget: { ok: true, source: 'path', available: 5 },
+    });
+    await service.run({ targets: targets(['comp-ore'], ['comp-hide'], ['comp-bone']), interactive: true });
+    assert.equal(prompts[0].additionalDiceOffer.limit, 1, 'floor(5 / 3), never the 5 available');
+  });
+
+  it('offers nothing across two actors or two resources, and reads no budget (AD46)', async () => {
+    const elsewhere = { ...PAID, path: 'system.resources.luck.value' };
+    for (const [label, systems, picked] of [
+      ['two actors', [countSystem()], targets(['comp-ore'], ['comp-hide', 'sys-a', 'Actor.a2'])],
+      [
+        'two resources',
+        [countSystem({ components: [ORE] }), countSystem({ id: 'sys-c', components: [HIDE], additionalDice: elsewhere })],
+        targets(['comp-ore'], ['comp-hide', 'sys-c']),
+      ],
+    ]) {
+      const { seam, calls } = recordingSalvage();
+      const { service, prompts, reads } = diceService({
+        systems,
+        salvage: seam,
+        choice: { confirmed: true, advantage: 'normal', additionalDice: 1 },
+      });
+      await service.run({ targets: picked, interactive: true });
+      assert.equal(reads.length, 0, `${label}: no shared budget`);
+      assert.equal(prompts[0].additionalDiceOffer, undefined, label);
+      assert.equal(prompts[0].additionalDiceMixed, true, label);
+      assert.ok(calls.every(({ options }) => !('additionalDice' in options.rollDecision)), label);
+    }
+  });
+
+  const STOPPING = ['resourceChanged', 'spendRefused', 'spendUnconfirmed', 'choiceAboveLimit'];
+  const UNAVAILABLE = ['resourceMacroFailed', 'resourceOverridden', 'resourceNotWritable', 'resourceUnreadable'];
+  for (const reason of [...STOPPING, ...UNAVAILABLE]) {
+    it(`stops the batch when a spend refuses ${reason}, keeping the rolls already made (AD45)`, async () => {
+      const notice = { dice: 1, limit: 1, available: 0, label: 'Momentum', source: 'path' };
+      const { seam, calls } = recordingSalvage((componentId) =>
+        componentId === 'comp-hide'
+          ? { success: false, cancelled: true, additionalDiceRefusal: reason, additionalDiceNotice: notice }
+          : { success: true, results: [] }
+      );
+      const { service, posted } = diceService({
+        systems: [countSystem(), bulkSystem({ id: 'sys-b', rollFormula: '1d20', components: [SCRAP] })],
+        salvage: seam,
+        choice: { confirmed: true, advantage: 'normal', additionalDice: 1 },
+      });
+      const result = await service.run({
+        targets: targets(['comp-ore'], ['comp-hide'], ['comp-bone'], ['comp-scrap', 'sys-b']),
+        interactive: true,
+      });
+      assert.deepEqual(
+        calls.map(({ componentId }) => componentId),
+        ['comp-ore', 'comp-hide'],
+        'nothing after the refusal is rolled'
+      );
+      assert.deepEqual(
+        result.items.map((item) => [item.outcome, item.skipReason]),
+        [
+          ['succeeded', null],
+          ['skipped', 'resourceExhausted'],
+          ['skipped', 'resourceExhausted'],
+          ['skipped', 'resourceExhausted'],
+        ]
+      );
+      assert.deepEqual(result.items[1].additionalDiceExhaustion, {
+        resourceLabel: 'Momentum',
+        done: 1,
+        rolls: 3,
+      });
+      assert.deepEqual(
+        [result.items[1].additionalDiceRefusal, result.items[1].additionalDiceNotice],
+        [reason, notice],
+        'the stopped row names its reason and notice facts, so the notice names them once'
+      );
+      assert.ok(
+        result.items.every((item, index) => index === 1 || !('additionalDiceRefusal' in item)),
+        'only the row that stopped the batch carries the refusal'
+      );
+      assert.equal(posted.length, 1, 'the aggregate card posts for the rolls that stand');
+    });
+  }
+
+  it('carries on past a refusal that leaves the resource usable', async () => {
+    const { seam, calls } = recordingSalvage((componentId) =>
+      componentId === 'comp-ore'
+        ? { success: false, cancelled: true, additionalDiceRefusal: 'notOffered' }
+        : { success: true, results: [] }
+    );
+    const { service } = diceService({
+      systems: [countSystem()],
+      salvage: seam,
+      choice: { confirmed: true, advantage: 'normal', additionalDice: 1 },
+    });
+    const result = await service.run({ targets: targets(['comp-ore'], ['comp-hide']), interactive: true });
+    assert.equal(calls.length, 2);
+    assert.deepEqual(result.items.map((item) => item.outcome), ['cancelled', 'succeeded']);
+  });
+
+  it('cancels the whole batch, mutating nothing, when the prompt answers a refused choice', async () => {
+    const { seam, calls } = recordingSalvage();
+    const { service } = diceService({
+      systems: [countSystem()],
+      salvage: seam,
+      choice: { confirmed: true, advantage: 'normal', additionalDice: 4, additionalDiceRefusal: 'choiceAboveLimit' },
+    });
+    const result = await service.run({ targets: targets(['comp-ore']), interactive: true });
+    assert.equal(calls.length, 0);
+    assert.deepEqual(
+      [result.cancelled, result.additionalDiceRefusal, result.additionalDiceNotice.label],
+      [true, 'choiceAboveLimit', 'Momentum']
+    );
+  });
+
+  it('leaves a row whose Tools could move the pool unjudged, so it never disables an action', async () => {
+    const forged = bulkComponent({ id: 'comp-ore', salvage: { toolIds: ['hammer'] } });
+    const system = { ...countSystem({ components: [forged] }), tools: [{ id: 'hammer', name: 'Hammer' }] };
+    const { service, prompts } = diceService({
+      systems: [system],
+      salvage: recordingSalvage().seam,
+      choice: { confirmed: true, advantage: 'normal' },
+    });
+    await service.run({ targets: targets(['comp-ore']), interactive: true });
+    assert.deepEqual(prompts[0].subjects[0].additionalDice, { countDice: null, reach: null });
   });
 });

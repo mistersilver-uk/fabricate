@@ -35,7 +35,7 @@
    - onCopy(targetIds): answers whether the write landed, so the card can report it.
 -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -108,7 +108,7 @@
       <h3 class="manager-card-title manager-scoped-entity-title">{title}</h3>
       <p class="manager-muted manager-scoped-copy-blurb">{blurb}</p>
     </div>
-    <ManagerButton
+    <Button
       data-scoped-copy-rules-open
       disabled={disabled || targets.length === 0}
       onclick={() => {
@@ -117,7 +117,7 @@
       }}
     >
       <span>{actionLabel}</span>
-    </ManagerButton>
+    </Button>
   </div>
 
   {#if open}
@@ -126,7 +126,7 @@
         {#each targets as system (system.id)}
           <li class="manager-scoped-copy-option">
             <SelectionCheckbox
-              size="sm"
+              density="compact"
               checked={selectedIds.includes(system.id)}
               ariaLabel={formatted(
                 'FABRICATE.Admin.Manager.Scoped.CopyRules.SelectSystem',
@@ -141,7 +141,7 @@
         {/each}
       </ul>
       <div class="manager-scoped-copy-actions">
-        <ManagerButton
+        <Button
           role="primary"
           data-scoped-copy-rules-confirm
           disabled={disabled || busy || selectedIds.length === 0}
@@ -153,7 +153,7 @@
               ? text('FABRICATE.Admin.Manager.Scoped.CopyRules.Copying', 'Copying…')
               : text('FABRICATE.Admin.Manager.Scoped.CopyRules.Confirm', 'Copy rules')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </div>
   {/if}
@@ -192,7 +192,7 @@
     flex: none;
     width: 34px;
     height: 34px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-secondary);
   }
@@ -215,7 +215,7 @@
     text-transform: none;
   }
 
-  .manager-scoped-copy-head :global(.manager-button) {
+  .manager-scoped-copy-head :global(.fabricate-button) {
     flex: none;
     white-space: nowrap;
   }
@@ -233,7 +233,7 @@
     min-width: 0;
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 

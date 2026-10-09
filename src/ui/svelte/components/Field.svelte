@@ -1,5 +1,5 @@
 <!--
-  THE manager's labelled form field — the `.manager-field` column that stacks a caption over its
+  THE manager's labelled form field — the `.fabricate-field` column that stacks a caption over its
   control.
 
   Props:
@@ -27,10 +27,10 @@
   - `fieldset` is a member of the set rather than an allowlisted exception: its one caller,
     `RadioCardGroup.svelte`, renders a `<legend>`, holds a radio group, and forwards `disabled`,
     which only a `<fieldset>` applies to its descendants.
-  - Its `font: inherit` floor is written at `.fabricate-field :is(input, select, textarea)`, its
-    element-typed chrome is a second rule, its focus pair excludes `select`, and it writes no scoped
-    `<style>` — all four for the reasons the class-family requirement states. Widening the floor
-    instead would re-type the radios, ranges and steppers that rule deliberately excludes.
+  - Its `font: inherit` floor is written at `.fabricate-field :is(input, textarea)`, its
+    element-typed chrome is a second rule, and it writes no scoped `<style>` — all three for the
+    reasons the class-family requirement states; a select inside it is `Select`, which types its
+    own trigger. Widening the floor would re-type the radios, ranges and steppers it excludes.
 -->
 <script>
   let { as = undefined, class: extraClass = '', children = undefined, ...rest } = $props();
@@ -40,9 +40,7 @@
   const FALLBACK_HOST = 'div';
 
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
-  const classes = $derived(
-    ['fabricate-field', 'manager-field', extraClass].filter(Boolean).join(' ')
-  );
+  const classes = $derived(['fabricate-field', extraClass].filter(Boolean).join(' '));
 
   $effect(() => {
     if (HOSTS.has(as)) return;

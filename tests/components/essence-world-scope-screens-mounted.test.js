@@ -11,7 +11,8 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +22,7 @@ const SCOPED_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
@@ -55,10 +57,6 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
-  // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
-  // FAIL the suite, it HANGS it and reports `# cancelled` — see
-  // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
@@ -68,8 +66,8 @@ const SHELL_MODULES = [
   // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
   // this shell rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
@@ -79,6 +77,8 @@ const SHELL_MODULES = [
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
   // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
   'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+  // The world-default cards render through the fact row (issue 1521).
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 
@@ -128,12 +128,13 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
+    // The preview's player tile is a ListRow card (issue 1778).
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
@@ -272,9 +273,20 @@ describe('the essence catalogue opens with its first shown row inspected', () =>
     assert.deepEqual(selectedIds(root), [], 'a stale catalogue id leaves the inspector resting');
     assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
   });
+
+  it('rolls the member systems up into one enabled card beside the world defaults', async () => {
+    const root = await pageHarness.mount(pageProps());
+    const card = root.querySelector('[data-scoped-list-extra-card]');
+    assert.ok(Boolean(card?.closest('[data-scoped-list-defaults]')), 'a member draws the card');
+    assert.equal(card.getAttribute('data-scoped-list-extra-card'), 'enabled');
+    assert.ok(card.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'as a rule-density tile');
+    assert.equal(card.querySelector('strong').textContent.trim(), '1 of 2 systems have it enabled');
+    assert.match(card.querySelector('small').textContent, /run nothing on craft/);
+    pageHarness.remount();
+  });
 });
 
-describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
+describe('criterion 4— the essence catalogue renders NO source-item affordance', () => {
   it('renders the identity as a GLYPH, with no image and no source badge anywhere', async () => {
     const root = await pageHarness.mount(pageProps());
 
@@ -423,6 +435,14 @@ describe('the catalogue owns no create affordance; the page header does', () => 
       root.querySelector('[data-scoped-list-row]'),
       'the page rendered its list, so the absences above are measured against a real screen'
     );
+    pageHarness.remount();
+  });
+
+  it('pins Open definition as the rail’s one full-width primary (issue 1521)', async () => {
+    const root = await pageHarness.mount(pageProps());
+    assertInspectorVerbs(root.querySelector('[data-scoped-list-inspector]'), [
+      ['[data-scoped-essence-open-entry]', 'primary'],
+    ]);
     pageHarness.remount();
   });
 });

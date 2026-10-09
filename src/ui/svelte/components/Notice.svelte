@@ -8,9 +8,14 @@
   | --- | --- | --- | --- |
   | `tone` | `'danger'` \| `'warning'` \| `'info'` \| `'success'` \| `'accent'` | `'danger'` | Changes the edge, the fill, the glyph's ink and the title's ink, NEVER the geometry or type scale. An unknown tone falls back to `danger`, the unmodified specimen. |
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
-  | `action` | `{ label, onClick }` | `null` | Rendered as one button; the handler is called with the click event. |
+  | `action` | `{ label, onClick, description? }` | `null` | Rendered as one button; the handler is called with the click event, and an already-localized `description` becomes the button's accessible description. |
   | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
-  | `dataAttr` / `dataValue` / `stateDataAttr` / `stateDataValue` | strings | `''` | TWO hook pairs on the same root, because one shipped caller carries two — its own name and the state it is reporting — and a wrapper invented to hold the second would be layout minted for a hook. Both are spread, so an unset hook is ABSENT, and both values pass through as written per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
+
+  Rest spread:
+  - `{...rest}` lands on the root, written after `class`, and exists for test and screenshot hooks.
+    One shipped caller carries two — its own name and the state it is reporting — and a wrapper
+    invented to hold the second would be layout minted for a hook. A value is written as passed,
+    per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`.
 
   Invariants:
   - `dismissLabel` IS REQUIRED OF ANY CALLER THAT PASSES `dismissable`, because the control's only
@@ -22,14 +27,16 @@
     component together with its text — again the same spec's rule. The PAGE-LEVEL arbitration the
     design system requires belongs to a shared region that has not shipped; this prop does not claim
     it.
-  - IT TAKES NO `class`, NO `style` AND NO REST SPREAD; a caller that needs LAYOUT keeps its own
-    wrapper. `align-items: flex-start` is declared explicitly, because the specimen declares no
+  - It takes no `class` and no `style`; a caller that needs layout keeps its own wrapper, and a
+    hook is not layout. `align-items: flex-start` is declared explicitly, because the specimen declares no
     `align-items` and renders top-aligned only through its glyph's fixed box and top margin.
 
-  Four recorded deviations from the specimen's stated API: the `accent` tone, whose title and glyph
+  Six recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
-  resolve to the SAME tone; and the hook props, which carry no behaviour.
+  resolve to the same tone; the rest spread, whose hooks carry no behaviour; and the body's 12rem
+  basis capped at its text, which wraps the action beneath it in a narrow host (issue 1773).
 -->
 <script>
   let {
@@ -41,11 +48,8 @@
     dismissable = false,
     dismissLabel = '',
     blocking = false,
-    dataAttr = '',
-    dataValue = '',
-    stateDataAttr = '',
-    stateDataValue = '',
     evidence = null,
+    ...rest
   } = $props();
 
   const TONES = new Set(['danger', 'warning', 'info', 'success', 'accent']);
@@ -63,10 +67,8 @@
 
   let dismissed = $state(false);
 
-  const hookAttributes = $derived({
-    ...(dataAttr ? { [dataAttr]: dataValue } : {}),
-    ...(stateDataAttr ? { [stateDataAttr]: stateDataValue } : {}),
-  });
+  const uid = $props.id();
+  const descriptionId = `${uid}-action-description`;
 </script>
 
 {#if !dismissed}
@@ -75,7 +77,7 @@
     role={blocking ? 'alert' : 'status'}
     aria-live={blocking ? undefined : 'polite'}
     data-notice-tone={resolvedTone}
-    {...hookAttributes}
+    {...rest}
   >
     <i class={resolvedIcon} aria-hidden="true"></i>
     <div class="fab-notice-body">
@@ -88,8 +90,12 @@
         class="fab-notice-button"
         data-keyboard-focus="true"
         data-notice-action
+        aria-describedby={action.description ? descriptionId : undefined}
         onclick={(event) => action.onClick?.(event)}>{action.label}</button
       >
+      {#if action.description}<span class="visually-hidden" id={descriptionId}
+          >{action.description}</span
+        >{/if}
     {/if}
     {#if dismissable}
       <button
@@ -112,9 +118,9 @@
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
-    /* Wrapping carries the evidence band only: the glyph is `flex: none`, the body is
-       `flex: 1` (basis 0) and the controls are `flex: none`, so line breaking sees a row
-       that fits until it genuinely cannot (issue 1648). */
+    /* Wrapping carries the evidence band, and the action once the body would fall under its
+       12rem basis: the glyph and the controls are `flex: none`, so a wide notice keeps one
+       row while a narrow one drops its action beneath the body (issues 1648, 1773). */
     flex-wrap: wrap;
     gap: var(--fab-space-3);
     /* The specimen's gap is BETWEEN THE COLUMNS, so the band keeps the space-2 it
@@ -153,9 +159,17 @@
     color: var(--fab-text-secondary);
   }
 
+  /* The basis wraps the action once the body would fall under 12rem, or under its own text when
+     that is shorter, so a short title in a shrink-wrapped notice keeps its one row; the action's
+     auto margin keeps it at the trailing edge the growing body used to push it to. */
   .fab-notice-body {
-    flex: 1;
+    flex: 1 1 12rem;
     min-width: 0;
+    max-width: max-content;
+  }
+
+  .fab-notice-body + .fab-notice-button {
+    margin-left: auto;
   }
 
   .fab-notice-title {

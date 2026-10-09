@@ -65,7 +65,7 @@ const row = createMountedComponentHarness({
     ESSENCE_CHIP_PATH,
     MEDALLION_PATH,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     ROW_PATH,
   ],
   componentPath: ROW_PATH,
@@ -78,8 +78,8 @@ const inspector = createComponentScopeHarness({
   componentPath: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
   rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
   compiledExtras: [
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   ],
 });
 

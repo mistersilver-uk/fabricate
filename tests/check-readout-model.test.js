@@ -104,7 +104,7 @@ describe('the target line', () => {
       outcome: 'High',
     });
     assert.equal(inBand.targetLine, 'in the 10–14 band');
-    assert.equal(inBand.card.detail, 'Counts as a success · result group bound to this tier');
+    assert.equal(inBand.card.detail, 'Counts as a success · result set bound to this tier');
     const stepped = readout(routedPlan, {
       ...result(true, {
         total: 11,
@@ -121,6 +121,11 @@ describe('the target line', () => {
       outcome: null,
     });
     assert.equal(outside.targetLine, 'outside every band');
+    const fractional = readout(routedPlan, {
+      ...result(true, { total: 14.5, outcomeId: 'high', diceGroups: d20(12) }),
+      outcome: 'High',
+    });
+    assert.equal(fractional.targetLine, 'in the 10–14 band', 'a fractional total floors, as routing does (issue 2059)');
     assert.deepEqual([outside.card.title, outside.card.detail, outside.card.tone], [
       'Failure',
       'Nothing is produced',
@@ -275,7 +280,7 @@ describe('the result card', () => {
       tone: 'success',
       icon: 'fas fa-circle-check',
       title: 'Success',
-      detail: 'The component’s result group is produced',
+      detail: 'The component’s result set is produced',
     });
     const failure = readout(plan(OVER), result(false, { total: 5, diceGroups: d20(2) }));
     assert.deepEqual(failure.card, {
@@ -333,7 +338,7 @@ describe('the result card', () => {
       text: 'The pool was reduced to zero, so the check fails automatically.',
     });
     assert.deepEqual([model.card.title, model.card.tone], ['Failure', 'danger']);
-    assert.deepEqual(model.count, { faces: [], zeroPool: true, botch: false });
+    assert.deepEqual(model.count, { dice: { tiles: [], more: 0 }, zeroPool: true, botch: false });
   });
 });
 
@@ -401,7 +406,7 @@ describe('what happens', () => {
     );
     const success = readout(plan(OVER), result(true, { total: 15, diceGroups: d20(12) }));
     assert.deepEqual(success.rows.map((row) => [row.label, row.meta]), [
-      ['Result group produced', 'full'],
+      ['Result set produced', 'full'],
       ['Ingredients consumed', 'as listed'],
     ]);
   });
@@ -498,5 +503,111 @@ describe('the readout’s state', () => {
     });
     assert.equal(model.abstain.reason, 'needs-preview-actor');
     assert.deepEqual([model.medallion, model.card, model.targetLine], [null, null, '']);
+  });
+});
+
+describe('the Preview’s additional dice (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+  const paid = (rule = {}, product = 'count') => ({
+    ...COUNT,
+    product,
+    pool: {
+      die: 10,
+      additionalDice: {
+        enabled: true,
+        source: 'path',
+        path: PATH,
+        readMacroUuid: '',
+        spendMacroUuid: '',
+        max: 3,
+        label: 'Momentum',
+        ...rule,
+      },
+    },
+  });
+  const stored = (value) => ({
+    name: 'Sera Vane',
+    readStored: (path) => ({ value: path === PATH ? value : undefined, overridden: false }),
+  });
+  const bounds = (evaluation, character = stored(2)) =>
+    readout(plan(evaluation), null, { character }).additionalDice;
+
+  it('offers no stepper unless a counting check allows additional dice', () => {
+    assert.equal(readout(plan(COUNT), null).additionalDice, null);
+    assert.equal(bounds(paid({ enabled: false })), null);
+    assert.equal(bounds(paid({}, 'sum')), null);
+  });
+
+  it('bounds a path source by the Preview-as actor’s stored balance and the per-roll most', () => {
+    assert.deepEqual(bounds(paid()), {
+      limit: 2,
+      note: { kind: 'path', text: 'Up to 2 for Sera Vane (Momentum 2, at most 3 per roll).' },
+    });
+    assert.deepEqual(bounds(paid({ max: 1, label: '' }), stored(2.7)), {
+      limit: 1,
+      note: { kind: 'path', text: 'Up to 1 for Sera Vane (2 available, at most 1 per roll).' },
+    });
+  });
+
+  it('adds nothing for an unreadable balance, no actor or no source, and says which', () => {
+    const unreadable = 'Sera Vane has no stored number at system.resources.momentum.value, so no dice can be added.';
+    for (const value of [undefined, '3', -1, NaN]) {
+      assert.deepEqual(bounds(paid(), stored(value)), {
+        limit: 0,
+        note: { kind: 'unreadable', text: unreadable },
+      });
+    }
+    assert.deepEqual(bounds(paid(), null), {
+      limit: 0,
+      note: { kind: 'no-actor', text: 'Choose a character to see how many they can add.' },
+    });
+    const noSource = {
+      limit: 0,
+      note: { kind: 'no-source', text: 'This check has no source to pay for additional dice.' },
+    };
+    assert.deepEqual(bounds(paid({ path: '  ' })), noSource);
+    assert.deepEqual(bounds(paid({ source: 'macro', readMacroUuid: 'Macro.read' })), noSource);
+  });
+
+  it('adds nothing for a balance an active effect sets, and says so (issue 2008)', () => {
+    const overridden = {
+      name: 'Sera Vane',
+      readStored: () => ({ value: 2, overridden: true }),
+    };
+    assert.deepEqual(bounds(paid(), overridden), {
+      limit: 0,
+      note: {
+        kind: 'overridden',
+        text: "An active effect changes Sera Vane's system.resources.momentum.value, so no dice can be added.",
+      },
+    });
+  });
+
+  it('bounds a macro source by its most per roll, reading nothing', () => {
+    const unread = {
+      name: 'Sera Vane',
+      readStored: () => assert.fail('a macro source reads no stored value'),
+    };
+    const macro = paid({ source: 'macro', readMacroUuid: 'Macro.read', spendMacroUuid: 'Macro.spend' });
+    const note = 'The preview never runs the read macro, so up to 3 can be added here.';
+    assert.deepEqual(bounds(macro, unread), { limit: 3, note: { kind: 'macro', text: note } });
+    assert.deepEqual(bounds(macro, null), { limit: 3, note: { kind: 'macro', text: note } });
+  });
+
+  it('marks the dice a simulated roll bought on its tiles, from the engine’s own projection', () => {
+    const results = [
+      { index: 0, face: 9, qualified: true },
+      { index: 1, face: 3 },
+      { index: 2, face: 8, qualified: true },
+    ];
+    const rolled = result(true, { total: 2, successes: 2, cancelled: 0, diceGroups: [] }, {
+      countDisplay: { results, bought: 1 },
+    });
+    const { dice } = readout(plan(paid()), rolled).count;
+    assert.deepEqual(
+      dice.tiles.map((tile) => tile.bought === true),
+      [false, false, true]
+    );
+    assert.equal(dice.bought, 1);
   });
 });

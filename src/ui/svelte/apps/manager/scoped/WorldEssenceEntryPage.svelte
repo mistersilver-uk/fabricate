@@ -18,11 +18,11 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Chip from '../../../components/Chip.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
@@ -525,12 +525,11 @@
         'FABRICATE.Admin.Manager.Scoped.Essence.EntryMissingHint',
         'This entry is open on an essence the world corpus no longer holds. Return to the catalogue and choose one.'
       )}
-      dataAttr="data-scoped-entry-state"
-      dataValue="missing"
+      data-scoped-entry-state="missing"
     >
-      <ManagerButton data-scoped-entry-back onclick={() => onBackToCatalogue()}>
+      <Button data-scoped-entry-back onclick={() => onBackToCatalogue()}>
         {text('FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogue', 'Back to the catalogue')}
-      </ManagerButton>
+      </Button>
     </EmptyState>
   {:else}
     <!--
@@ -546,8 +545,8 @@
         ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel"
         ariaLabel="Essence definition sections"
         idStem="scoped-essence-entry"
-        hookAttribute="data-scoped-entry-tab"
-        badgeAttribute="data-scoped-entry-tab-badge"
+        tabDataAttr="data-scoped-entry-tab"
+        badgeDataAttr="data-scoped-entry-tab-badge"
       />
 
       <div
@@ -560,16 +559,16 @@
         data-keyboard-focus="true"
       >
         {#if activeTab === 'definition'}
-          <!--
-            TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW (`essEntry.png`): the panel used
-            to stack the aside below the danger card, where the GM could not see it change.
-          -->
+          <!-- Two columns, and the right one is the player preview (`essEntry.png`). -->
           <div class="manager-scoped-entry-body">
             <div class="manager-scoped-entry-main">
-              <!-- THE SCOPE BANNER: everything under it is one record shared by every crafting
-            system, reached from a system-scoped rail. A heading rather than a `Callout`, because
-            it introduces a region rather than warning about one. -->
-              <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
+              <!-- The scope banner, the tab's heading block: one record shared by every system. A
+                   heading rather than a `Callout`, because it introduces a region. -->
+              <div
+                class="manager-scoped-entry-kicker is-world"
+                data-scoped-entry-world-banner
+                data-tab-heading
+              >
                 <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
                   <i class="fas fa-globe"></i>
                 </span>
@@ -595,6 +594,7 @@
                   <span class="manager-scoped-entry-label"
                     >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon')}</span
                   >
+                  <!-- ratchet-exempt(design-system): a 150px preview of the GM's colour and icon choice, not a record tile; the art ladder's 38 would shrink it to a speck -->
                   <Medallion
                     icon={normalizedIcon}
                     tint={identity.colorToken || ''}
@@ -603,7 +603,7 @@
                   />
                   <IconPicker
                     value={normalizedIcon}
-                    buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+                    ariaLabel={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
                     onChange={(iconClass) => patchIdentity('icon', iconClass)}
                   />
                   <!--
@@ -660,10 +660,10 @@
                     <span class="manager-scoped-entry-label"
                       >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
                     >
-                    <!-- `ManagerColorPopover` takes `layout="inline"` here exactly as
+                    <!-- `TintPicker` takes `layout="inline"` here exactly as
                   `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
                   which this lane may not open, and inline strips it and nothing else. -->
-                    <ManagerColorPopover
+                    <TintPicker
                       layout="inline"
                       allowNone
                       allowCustom={false}
@@ -743,7 +743,7 @@
                         title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
                         hint={sectionAddressLine(section, value)}
                         documentType={ui?.documentType ?? 'Item'}
-                        unlinkAttr="data-scoped-world-default-clear"
+                        unlinkDataAttr="data-scoped-world-default-clear"
                         unlinkLabel={format(
                           'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',
                           'Clear the world default for {section}',
@@ -979,7 +979,7 @@
   /* Below the threshold the rail stacks under the form rather than compressing to a column too
      narrow for an inventory tile — the same ruling `EntityListInspectorFrame` makes about its own
      inspector, at the width this page's own layout already breaks at. */
-  @container fabricate-manager (max-width: 1000px) {
+  @container fabricate-manager (max-width: 960px) {
     .manager-scoped-entry-body {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -1051,7 +1051,7 @@
     gap: var(--fab-space-4);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
        prototype draws every card in the content area on the pane's own surface and separates
        them with the border alone. */
@@ -1124,7 +1124,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
        prototype draws every card in the content area on the pane's own surface and separates
        them with the border alone. */
@@ -1183,7 +1183,7 @@
     gap: var(--fab-space-3);
     padding: var(--fab-space-3) var(--fab-space-4);
     border: 1px solid var(--fab-danger-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-danger-soft);
     min-width: 0;
   }

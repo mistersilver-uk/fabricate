@@ -1,4 +1,9 @@
-/** The roll prompt's target chip text, and a summed roll-under target's explanation line. */
+/**
+ * The roll prompt's target chip text, a summed roll-under target's explanation line, and a count
+ * check's settled pool line, rule note and zero-pool notice.
+ */
+import { planModifierPlacement } from '../../../../systems/checkModifierRouter.js';
+import { countFormulaValues, settledPoolDice } from '../../../../systems/countEvaluation.js';
 import {
   formatCheckAdjustment,
   formatSignedStep,
@@ -77,10 +82,12 @@ function basisParts(basis, labels, actorName) {
  * Any other chip keeps its prepared `chipText`. A summed roll-under chip names the target after
  * its flat modifiers, Tool bonus and typed flat bonus, which raise it, so it follows the player's
  * picks and typing; a rolled contribution is named as pending, never averaged in. The line names a
- * character-value basis always, and a fixed target only when something raised it.
+ * character-value basis always, and a fixed target only when something raised it. A count pool
+ * also settles the `additionalDice` the player chose (issue 2008).
  */
-export function rollPromptTarget(data, selectedIds, bonus = '') {
-  if (data.count || data.direction !== 'under') return { chipText: data.chipText, source: '' };
+export function rollPromptTarget(data, selectedIds, bonus = '', additionalDice = 0) {
+  if (data.count) return countTarget(data, selectedIds, bonus, additionalDice);
+  if (data.direction !== 'under') return { chipText: data.chipText, source: '' };
   const { labels } = data;
   const comparison = data.comparison === 'exceed' ? labels.exceed : labels.meet;
   const tools = Number.isFinite(data.toolBonus) ? data.toolBonus : 0;
@@ -102,4 +109,76 @@ export function rollPromptTarget(data, selectedIds, bonus = '') {
     chipText: `${target} · ${comparison}`,
     source: data.targetBasis || parts.length > 1 ? parts.join(' · ') : '',
   };
+}
+
+/**
+ * A count check's line as the player's picks and typed bonus settle onto its pool or threshold
+ * through the router, the pool floored after them (issue 2006): `{ chipText, source, formula, note,
+ * zeroPool }`, plus the pool before bought dice (`reachPool`) and the formulas still to roll into it
+ * (`pendingPool`). A rolled contribution is named as pending, and nothing is rolled or averaged.
+ */
+function countTarget(data, selectedIds, bonus, additionalDice) {
+  const { count, labels, direction, comparison } = data;
+  const unresolved = { chipText: data.chipText, source: '', formula: '', note: '', zeroPool: '' };
+  if (![count.pool, count.die, count.threshold].every(Number.isFinite)) return unresolved;
+  const { modifiers, situational, pending } = contributions(data, selectedIds, bonus);
+  const destination = count.destination === 'threshold' ? 'threshold' : 'pool';
+  const plan = planModifierPlacement({
+    evaluation: { product: 'count', direction, pool: { modifierDestination: destination } },
+    contributions: [modifiers, situational].map((value) => ({
+      source: 'situational',
+      label: '',
+      form: 'scalar',
+      value,
+    })),
+  });
+  const zeroPoolFails = count.zeroPoolFails !== false;
+  const settled = settledPoolDice(count.pool, plan.poolDelta + additionalDice, zeroPoolFails);
+  // A rolled Tool bonus settles at evaluation, so it is pending like a rolled pick (issue 2008).
+  const pendingPool = destination === 'pool' ? [...pending, ...(count.pendingTools ?? [])] : [];
+  const threshold = count.threshold + plan.thresholdDelta;
+  const values = countFormulaValues({
+    dice: settled.dice,
+    die: count.die,
+    direction,
+    comparison,
+    threshold,
+  });
+  const named = destination === 'pool' ? pendingPool : pending;
+  let template = labels.countFormula;
+  if (named.length > 0) {
+    template = destination === 'threshold' ? labels.countPendingThreshold : labels.countPendingDice;
+  }
+  return {
+    chipText: data.chipText,
+    source: '',
+    formula: fill(template, { ...values, formula: named.join(' + ') }),
+    note: `${countRule(count, values, { threshold, direction }, labels)}${labels.countFaces}`,
+    // A pending roll that adds dice may still lift the pool above zero.
+    zeroPool: settled.zeroPool && pendingPool.length === 0 ? labels.countZeroPool : '',
+    reachPool: {
+      base: count.pool,
+      poolDelta: plan.poolDelta,
+      zeroPoolFails,
+      dice: settledPoolDice(count.pool, plan.poolDelta, zeroPoolFails).dice,
+    },
+    pendingPool,
+  };
+}
+
+/**
+ * `Success on {sym} {threshold}`, the character value it read, and how far modifiers moved it,
+ * signed by the benefit: a +1 bonus reads `moved +1` whichever way the threshold travelled.
+ */
+function countRule(count, values, { threshold, direction }, labels) {
+  const character = count.thresholdSource === 'character' && Number.isFinite(count.thresholdAnchor);
+  const rule = character
+    ? fill(labels.countRuleCharacter, {
+        ...values,
+        value: countFormulaValues({ threshold: count.thresholdAnchor }).threshold,
+      })
+    : fill(labels.countRule, values);
+  const delta = Number.isFinite(count.thresholdAnchor) ? threshold - count.thresholdAnchor : 0;
+  const moved = Number((direction === 'over' ? -delta : delta).toFixed(2));
+  return moved === 0 ? rule : fill(labels.countRuleMoved, { rule, moved: formatSignedStep(moved) });
 }

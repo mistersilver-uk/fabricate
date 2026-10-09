@@ -4,6 +4,9 @@
  */
 
 import { isFixedSumOver } from '../../systems/checkTarget.js';
+import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
+import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
+import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
 
 import {
   buildEntityBrowserModel,
@@ -121,24 +124,132 @@ export const groupRecipesByCategory = (rows, totals) =>
 
 /** Pill kinds whose number is a Target, or which name a character value: never a DC (issue 2005). */
 const TARGET_CHECK_KINDS = new Set(['target', 'attribute', 'dynamicTarget']);
+/** Pill kinds of a counting check, which name its successes needed (issue 2006). */
+const COUNT_CHECK_KINDS = new Set(['successes', 'dynamicSuccesses']);
 
 /**
  * The `dc` sort key's label. Every row carries the system's one check, so any row's pill kind
- * says whether it grades a DC or a Target; with no rows the system's `evaluation` says, a summed
- * check other than roll-over fixed naming a Target. `text(key, fallback)` localizes.
+ * says whether it grades a DC, a Target or successes needed; with no rows the system's
+ * `evaluation` says, a summed check other than roll-over fixed naming a Target.
  */
 export function recipeCheckSortLabel(recipes, text, evaluation = null) {
   const rows = Array.isArray(recipes) ? recipes : [];
+  const kinds = new Set(rows.map((recipe) => recipe?.checkSummary?.kind));
+  const counts =
+    rows.length > 0
+      ? [...COUNT_CHECK_KINDS].some((kind) => kinds.has(kind))
+      : evaluation?.product === 'count';
+  if (counts) return text('FABRICATE.Admin.Manager.Recipe.Count.Sort', 'Successes needed');
   const target =
     rows.length > 0
-      ? rows.some((recipe) => TARGET_CHECK_KINDS.has(recipe?.checkSummary?.kind))
+      ? [...TARGET_CHECK_KINDS].some((kind) => kinds.has(kind))
       : (evaluation?.product ?? 'sum') === 'sum' && !isFixedSumOver(evaluation);
   return target
     ? text('FABRICATE.Admin.Manager.Recipe.SortTarget', 'Check target')
     : text('FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC');
 }
 
-/** The recipe editor subline's check part, from the row's pill: ` · DC 12`, ` · Target 12`, …. */
+/** `{n} successes`, or `1 success`, for a counting row's pill (issue 2006). */
+function successesPill(count, format) {
+  return count === 1
+    ? format('FABRICATE.Admin.Manager.Recipe.Count.PillOne', '1 success', {})
+    : format('FABRICATE.Admin.Manager.Recipe.Count.Pill', '{count} successes', { count });
+}
+
+// The check states. `none` is the one WARNING: a system that cannot roll for this recipe is a
+// thing the GM must be able to scan a library for. `ingredients` is its neutral sibling — a
+// routedByIngredients system resolves off the ingredient set that was used, so no check is a
+// working configuration, not a gap.
+const CHECK_PILLS = {
+  dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
+  // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
+  target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
+  attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
+  dynamicTarget: [
+    'FABRICATE.Admin.Manager.Recipe.CheckDynamicTarget',
+    'Dynamic target',
+    'fas fa-dice-d20',
+  ],
+  dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
+  // Issue 2006: a counting check names its successes needed, singular for one.
+  successes: ['FABRICATE.Admin.Manager.Recipe.Count.Pill', '{count} successes', 'fas fa-dice-d20'],
+  dynamicSuccesses: [
+    'FABRICATE.Admin.Manager.Recipe.Count.PillDynamic',
+    'Dynamic successes',
+    'fas fa-dice-d20',
+  ],
+  progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive', 'fas fa-list-ol'],
+  ingredients: [
+    'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
+    'By ingredients',
+    'fas fa-code-branch',
+  ],
+  // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
+  // treatment as `progressive` and `ingredients`: a working configuration, not a fault.
+  checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
+  none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
+};
+
+const CHECK_TOOLTIPS = {
+  ingredients: [
+    'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
+    'This system routes results by the ingredient set used, with no crafting check.',
+  ],
+  checkOff: [
+    'FABRICATE.Admin.Manager.Recipe.CheckOffTooltip',
+    'This system’s crafting check is switched off, so every matched attempt resolves as a success.',
+  ],
+  none: [
+    'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
+    'This system has no usable crafting check.',
+  ],
+};
+
+/** Pill kinds that carry a number, and so take the mono face with tabular figures. */
+const NUMERIC_CHECK_KINDS = new Set(['dc', 'target', 'successes']);
+
+/**
+ * The row's check pill from its projected `checkSummary`: `{ kind, icon, label, title, mono }`.
+ * `format(key, fallback, replacements)` localizes.
+ */
+export function recipeCheckPill(summary, format) {
+  const { kind = 'none', dc = null } = summary || {};
+  const [labelKey, fallback, icon] = CHECK_PILLS[kind] || CHECK_PILLS.none;
+  const tooltip = CHECK_TOOLTIPS[kind];
+  return {
+    kind,
+    icon,
+    label:
+      kind === 'successes'
+        ? successesPill(dc, format)
+        : format(labelKey, fallback, { dc: dc ?? '' }),
+    title: tooltip ? format(tooltip[0], tooltip[1], {}) : '',
+    mono: NUMERIC_CHECK_KINDS.has(kind),
+  };
+}
+
+const CHECK_FACTS = {
+  dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
+  target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}'],
+  attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value'],
+  dynamicTarget: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
+  dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
+  dynamicSuccesses: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
+  progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
+  ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
+  checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off'],
+  none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
+};
+
+/** The inspector's Crafting check fact: the pill's number or word, `Dynamic` for any macro. */
+export function recipeCheckFact(summary, format) {
+  const { kind = 'none', dc = null } = summary || {};
+  if (kind === 'successes') return successesPill(dc, format);
+  const [labelKey, fallback] = CHECK_FACTS[kind] || CHECK_FACTS.none;
+  return format(labelKey, fallback, { dc: dc ?? '' });
+}
+
+/** The recipe editor subline's check part, from the row's pill: ` · DC 12`, ` · 2 successes`, …. */
 export function recipeCheckSubtitleSuffix(summary, text) {
   const dcWord = () => text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC');
   if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
@@ -151,6 +262,10 @@ export function recipeCheckSubtitleSuffix(summary, text) {
   }
   if (summary?.kind === 'attribute') {
     return ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value')}`;
+  }
+  if (summary?.kind === 'successes' && Number.isFinite(Number(summary.dc))) {
+    const format = (key, fallback, { count = '' }) => text(key, fallback).replace('{count}', count);
+    return ` · ${successesPill(summary.dc, format)}`;
   }
   return '';
 }
@@ -331,10 +446,71 @@ function amountLabelOf(result) {
 }
 
 /**
- * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to.
+ * A non-component result's own fields (issue 1773): its kind, what names it and its glyph. A
+ * currency row states its amount with its unit's display name, never a generated unit id, and a
+ * knowledge row names the recipe it teaches from `recipeOptions` (the GM reads every name).
+ */
+function rewardProduceFields(result, rosters) {
+  if (result?.kind === 'currency') {
+    const unit = findCurrencyUnit(rosters.currencyUnits, result.unit);
+    const unitName = currencyUnitDisplayName(unit) || result.unit || '';
+    return {
+      kind: 'currency',
+      unit: result.unit || '',
+      name: result.label || '',
+      icon: RESULT_KIND_GLYPHS.currency,
+      amountLabel: `${amountLabelOf(result)} ${unitName}`.trim(),
+    };
+  }
+  const taught = findById(rosters.recipeOptions, result?.recipeId);
+  return {
+    kind: 'knowledge',
+    recipeId: result?.recipeId || '',
+    name: taught?.name || '',
+    icon: RESULT_KIND_GLYPHS.knowledge,
+  };
+}
+
+/** What one awarded result reads as: its component, or a reward's own fields. */
+function produceFields(result, rosters) {
+  const component = findById(rosters.componentOptions, result?.componentId);
+  return {
+    componentId: result?.componentId || '',
+    name: component?.name || '',
+    img: component?.img || '',
+    quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
+    amountLabel: amountLabelOf(result),
+    // The component's authored difficulty (its progressive "cost"/DC).
+    difficulty: Number.isFinite(Number(component?.difficulty))
+      ? Number(component.difficulty)
+      : null,
+    ...((result?.kind ?? 'component') !== 'component' && rewardProduceFields(result, rosters)),
+  };
+}
+
+/**
+ * A choice group's own fields (issue 1773): `kind: 'group'`, who chooses, how many it awards, and
+ * its alternatives as `members`, each a row of its own.
+ */
+function choiceProduceFields(result, rowId, rosters) {
+  return {
+    kind: 'group',
+    chooser: result.chooser === 'rolled' ? 'rolled' : 'playerChooses',
+    awardStrategy: result.awardStrategy === 'upTo' ? 'upTo' : 'anyOne',
+    count: result.awardCountFormula || result.awardCount || null,
+    members: result.alternatives.map((member, index) => ({
+      id: `${rowId}:${member?.id || index}`,
+      ...produceFields(member, rosters),
+    })),
+  };
+}
+
+/**
+ * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to;
+ * a currency or knowledge row adds its kind and names itself rather than a component, and a choice
+ * group is one row holding its alternatives.
  */
 export function buildRecipeProduceRows(recipe, rosters = {}) {
-  const components = rosters.componentOptions;
   const rows = [];
 
   for (const scope of executionScopes(recipe)) {
@@ -343,18 +519,12 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
       const results = Array.isArray(group?.results) ? group.results : [];
 
       for (const [resultIndex, result] of results.entries()) {
-        const component = findById(components, result?.componentId);
+        const id = `${groupId}:${result?.id || resultIndex}`;
         rows.push({
-          id: `${groupId}:${result?.id || resultIndex}`,
-          componentId: result?.componentId || '',
-          name: component?.name || '',
-          img: component?.img || '',
-          quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
-          amountLabel: amountLabelOf(result),
-          // The component's authored difficulty (its progressive "cost"/DC).
-          difficulty: Number.isFinite(Number(component?.difficulty))
-            ? Number(component.difficulty)
-            : null,
+          id,
+          ...(isChoiceGroup(result)
+            ? choiceProduceFields(result, id, rosters)
+            : produceFields(result, rosters)),
           groupId,
           groupName: group?.name || '',
           // The check-outcome tiers this result group is routed to (routed-by-check).

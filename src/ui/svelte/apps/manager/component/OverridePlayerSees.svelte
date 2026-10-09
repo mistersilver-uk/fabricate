@@ -8,8 +8,9 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `subject` | string | `''` | The line's lead: `Salvage check`, or the task's name. |
-  | `evaluation` / `thresholdMode` / `type` | normalized evaluation / `'meet'` \| `'exceed'` / the routed `type` \| `null` | — / `'meet'` / `null` | The check being overridden; a count or fixed-range check renders no line. |
-  | `dcOverride` / `adjustmentOverride` / `anchorDc` | number \| `null` / number \| `null` / number | `null` / `null` / `15` | The subject's overrides and the system DC a fixed target falls back to. |
+  | `evaluation` / `thresholdMode` / `type` | normalized evaluation / `'meet'` \| `'exceed'` / the routed `type` \| `null` | — / `'meet'` / `null` | The check being overridden; a fixed-range check renders no line. |
+  | `dcOverride` / `adjustmentOverride` / `successesOverride` / `anchorDc` | number \| `null` ×3 / number | `null` ×3 / `15` | The subject's overrides and the system DC a fixed target falls back to. |
+  | `poolDetail` | boolean | `false` | Whether a count line also names the die and the per-die test. |
   | `actors` / `resolveCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and the lookup for the chosen actor's roll data. |
 
   Invariants:
@@ -17,7 +18,7 @@
 -->
 <script>
   import Kicker from '../../../components/Kicker.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import PreviewAsPicker from '../checks/PreviewAsPicker.svelte';
   import { NO_ACTOR_ID } from '../checks/previewActorId.js';
   import { overridePlayerSees } from './overridePlayerSees.js';
@@ -29,15 +30,12 @@
     type = null,
     dcOverride = null,
     adjustmentOverride = null,
+    successesOverride = null,
+    poolDetail = false,
     anchorDc = 15,
     actors = [],
     resolveCharacter = () => null,
   } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   let actorId = $state(NO_ACTOR_ID);
   const character = $derived(actorId === NO_ACTOR_ID ? null : resolveCharacter(actorId));
@@ -49,9 +47,11 @@
       type,
       dcOverride,
       adjustmentOverride,
+      successesOverride,
+      poolDetail,
       anchorDc,
       character,
-      text,
+      text: localizeOr,
     })
   );
 </script>
@@ -60,7 +60,7 @@
   <div class="manager-override-player-sees" data-override-player-sees={seen.state}>
     <div class="manager-override-player-sees-head">
       <Kicker as="span">
-        {text('FABRICATE.Admin.Manager.Checks.PlayerSees.Title', 'Player sees')}
+        {localizeOr('FABRICATE.Admin.Manager.Checks.PlayerSees.Title', 'Player sees')}
       </Kicker>
       {#if seen.readsCharacter}
         <PreviewAsPicker

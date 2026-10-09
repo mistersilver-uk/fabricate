@@ -168,23 +168,23 @@ test('every entry\'s PREDICATE answers for its own id', () => {
   assertPredicatesMatchTheirIds(rootSource);
 });
 
-test('the gathering task editor releases its inspector track only for result-group modes', () => {
+test('the gathering task editor keeps its inspector track only on a d100 task`s Results tab', () => {
   const entry = REGISTRY.find(candidate => candidate.id === 'gathering-task-edit');
   assert.ok(entry, 'gathering-task-edit should have a mode-dependent full-width entry');
   assert.equal(entry.predicate, 'isGatheringTaskFullWidth');
   assert.match(
     rootSource,
-    /function isGatheringTaskFullWidth\(view, context\) \{\s*return view === 'gathering-task-edit' && context\.resultGroupTaskMode === true;/,
-    'the gathering-task predicate should require the editor route and result-group mode'
+    /function isGatheringTaskFullWidth\(view, context\) \{\s*return \(\s*view === 'gathering-task-edit' &&\s*\(context\.resultGroupTaskMode === true \|\| context\.gatheringTaskTab !== 'results'\)\s*\);/,
+    'the gathering-task predicate should require the editor route and a result-group mode or a non-Results tab'
   );
   assert.match(
     rootSource,
-    /resultGroupTaskMode:\s*isGatheringResultGroupMode\(gathering\.gatheringTaskResolutionMode\)/,
-    'the full-width derivation should receive the selected task mode'
+    /resultGroupTaskMode:\s*gathering\.gatheringTaskResultGroupMode,\s*gatheringTaskTab:\s*gathering\.gatheringTaskTab/,
+    'the full-width derivation should receive the selected task mode and the editor tab'
   );
   assert.match(
     rootSource,
-    /data-gathering-task-layout=\{fullWidthLayout\?\.id === 'gathering-task-edit'\s*\? 'results'/,
+    /data-gathering-task-layout=\{fullWidthLayout\?\.id === 'gathering-task-edit'\s*\? 'full'/,
     'the stylesheet selector should be driven by the same fullWidthLayout decision'
   );
 });

@@ -1,13 +1,10 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import {
-  createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 // The five converted controls are driven by open-then-click on a portaled panel (issue 1510).
 import {
@@ -17,6 +14,11 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -33,12 +35,15 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // The popover closure the shared picker composes (issue 1510); it spreads the Foundry bridge.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    // A counting check's pool group reads the normalized pool (issue 2006).
+    'src/systems/normalize/checkEvaluation.js',
     // The studio's converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/checks/checksSelectOptions.js'
   ],
@@ -51,7 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the `Add trigger` control is the prototype's full-width
     // dashed row under the list rather than a button in the card head (issue 1096).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -61,6 +66,9 @@ const harness = createMountedComponentHarness({
     // THE SHARED ONE-OF-N PICKER and its whole compiled graph (issue 1510); an omission HANGS this
     // suite (# cancelled) rather than failing it.
     ...SELECT_COMPILED_MODULES,
+    // Each trigger is a rule row restating itself as a rule sentence (issue 1782).
+    'src/ui/svelte/components/RuleSentence.svelte',
+    'src/ui/svelte/components/RuleRow.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
@@ -94,12 +102,12 @@ function chooseSegment(root, optionDataAttr, value) {
 
 // A trigger's controls live behind a disclosure (issue 1096).
 function expandTrigger(root, id) {
-  const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+  const disclosure = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-disclosure]`);
   assert.ok(Boolean(disclosure), `a disclosure renders for trigger ${id}`);
   assert.equal(disclosure.getAttribute('aria-expanded'), 'false', `trigger ${id} starts collapsed`);
   disclosure.click();
   flushSync();
-  const body = root.querySelector(`[data-trigger-body="${id}"]`);
+  const body = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-body]`);
   assert.ok(Boolean(body), `clicking the head of trigger ${id} reveals its body`);
   return body;
 }
@@ -328,6 +336,56 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     );
     // The outcomeTier pills still render so the trigger can break tools on a tier.
     assert.ok(root.querySelector('[data-trigger-tier="tier-a"]'), 'the tier pill renders');
+  });
+
+  it('CLICKING a tier pill toggles that tier in and out of the condition', async () => {
+    const emitted = [];
+    const condition = { type: 'outcomeTier', tierIds: ['tier-a'], outcomeKeys: [] };
+    const root = await harness.mount({
+      value: triggerBlock([routedTrigger({ mode: 'none', steps: 1, tierId: null }, { condition })]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false,
+      onChange: (next) => {
+        emitted.push(next);
+      }
+    });
+    expandTrigger(root, 'r1');
+    const pill = () => root.querySelector(':scope [data-trigger="r1"] [data-trigger-tier="tier-b"]');
+    assert.equal(pill().getAttribute('aria-pressed'), 'false');
+    pill().click();
+    assert.deepEqual(emitted.at(-1).triggers[0].condition.tierIds, ['tier-a', 'tier-b'], 'the tier joins');
+    await harness.setProps({ value: emitted.at(-1) });
+    assert.equal(pill().getAttribute('aria-pressed'), 'true', 'and reads as chosen');
+    assert.equal(
+      root.querySelector(':scope [data-trigger="r1"] [data-rule-row-title]').textContent.trim(),
+      'Outcome tier is Ruined, Masterwork'
+    );
+    pill().click();
+    assert.deepEqual(emitted.at(-1).triggers[0].condition.tierIds, ['tier-a'], 'and leaves again');
+  });
+
+  it('names a tier the GM left unnamed by its key, never by a blank', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([
+        routedTrigger(
+          { mode: 'target', steps: 1, tierId: 'tier-x' },
+          { condition: { type: 'outcomeTier', tierIds: ['tier-x'], outcomeKeys: [] } }
+        )
+      ]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: [{ id: 'tier-x', name: '' }],
+      showBreakTools: false
+    });
+    const card = root.querySelector('[data-trigger="r1"]');
+    assert.equal(card.querySelector('[data-rule-row-title]').textContent.trim(), 'Outcome tier is Unnamed tier');
+    assert.equal(
+      card.querySelector('.fabricate-rule-row-lead').textContent.trim(),
+      'When outcome tier is Unnamed tier, the result becomes Unnamed tier.',
+      'the sentence is whole rather than ending on a blank'
+    );
   });
 });
 
@@ -626,41 +684,48 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
   it('draws no card around the list: the triggers sit in the pane', async () => {
     const root = await mountPair();
     // The invented `Check triggers` wrapper is what the structural parity pass reported as an
-    // EXTRA CARD. Its class is the tell: a `manager-inspector-card` around the whole list.
+    // EXTRA CARD. Its class is the tell: a `fabricate-card` around the whole list.
     assert.ok(
-      !root.querySelector('.manager-inspector-card [data-trigger]'),
+      !root.querySelector('.fabricate-card [data-trigger]'),
       'no card wraps the trigger list'
     );
     assert.ok(
       Boolean(root.querySelector('[data-check-triggers] > .manager-checks-trigger-list')),
       'the list is a direct child of the route wrapper'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const host = root.ownerDocument.createElement('div');
+    host.innerHTML = '<section class="fabricate-card"></section>';
+    host.firstChild.append(root.querySelector('[data-trigger]').cloneNode(true));
+    assert.ok(Boolean(host.querySelector(':scope .fabricate-card [data-trigger]')), 'it can match');
   });
 
   it('states each trigger’s condition, effect, glyph and result chip while collapsed', async () => {
     const root = await mountPair();
     const up = root.querySelector('[data-trigger="u1"]');
     assert.equal(
-      up.querySelector('[data-trigger-summary="u1"]').textContent.trim(),
+      up.querySelector('[data-rule-row-title]').textContent.trim(),
       'Group total of 1d20 is exactly 20',
       'the title summarises the condition rather than repeating the word When'
     );
     assert.ok(
-      Boolean(up.querySelector('.manager-checks-trigger-glyph.is-info i.fa-arrow-up')),
+      Boolean(up.querySelector('.fabricate-rule-row-glyph.is-info i.fa-arrow-up')),
       'a step-up wears the up-arrow tile in the info family'
     );
     assert.equal(
-      up.querySelector('[data-trigger-chip="u1"]').textContent.trim(),
+      up.querySelector('[data-rule-row-chip]').textContent.trim(),
       'Step up 1',
       'and its chip states the effect'
     );
 
     const down = root.querySelector('[data-trigger="d1"]');
     assert.ok(
-      Boolean(down.querySelector('.manager-checks-trigger-glyph.is-warning i.fa-arrow-down')),
+      Boolean(down.querySelector('.fabricate-rule-row-glyph.is-warning i.fa-arrow-down')),
       'a step-down wears the down-arrow tile in the warning family'
     );
-    assert.equal(down.querySelector('[data-trigger-chip="d1"]').textContent.trim(), 'Step down 2');
+    assert.equal(down.querySelector('[data-rule-row-chip]').textContent.trim(), 'Step down 2');
 
     // Collapsed means collapsed: none of the authoring controls is in the document.
     assert.ok(!root.querySelector('[data-trigger-condition-type]'), 'no condition control renders');
@@ -670,22 +735,22 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
   it('opens ONE trigger at a time and closes the one it replaces', async () => {
     const root = await mountPair();
     expandTrigger(root, 'u1');
-    assert.ok(Boolean(root.querySelector('[data-trigger-body="u1"]')), 'the first trigger is open');
+    assert.ok(Boolean(root.querySelector(':scope [data-trigger="u1"] [data-rule-row-body]')), 'the first trigger is open');
 
-    root.querySelector('[data-trigger-disclosure="d1"]').click();
+    root.querySelector(':scope [data-trigger="d1"] [data-rule-row-disclosure]').click();
     flushSync();
-    assert.ok(Boolean(root.querySelector('[data-trigger-body="d1"]')), 'the second trigger opens');
+    assert.ok(Boolean(root.querySelector(':scope [data-trigger="d1"] [data-rule-row-body]')), 'the second trigger opens');
     assert.ok(
-      !root.querySelector('[data-trigger-body="u1"]'),
+      !root.querySelector(':scope [data-trigger="u1"] [data-rule-row-body]'),
       'and the first one closes rather than stacking'
     );
 
     // Clicking the open one again closes it.
-    root.querySelector('[data-trigger-disclosure="d1"]').click();
+    root.querySelector(':scope [data-trigger="d1"] [data-rule-row-disclosure]').click();
     flushSync();
-    assert.ok(!root.querySelector('[data-trigger-body="d1"]'), 'the head toggles rather than pins');
+    assert.ok(!root.querySelector(':scope [data-trigger="d1"] [data-rule-row-body]'), 'the head toggles rather than pins');
     assert.equal(
-      root.querySelector('[data-trigger-disclosure="d1"]').getAttribute('aria-expanded'),
+      root.querySelector(':scope [data-trigger="d1"] [data-rule-row-disclosure]').getAttribute('aria-expanded'),
       'false',
       'and says so on the control'
     );
@@ -707,7 +772,7 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
       await harness.setProps({ value: emitted.at(-1) });
       const added = emitted.at(-1).triggers.at(-1);
       assert.ok(
-        Boolean(root.querySelector(`[data-trigger-body="${added.id}"]`)),
+        Boolean(root.querySelector(`:scope [data-trigger="${added.id}"] [data-rule-row-body]`)),
         'the new trigger arrives open, ready to author'
       );
       assert.equal(scrolled.length, 1, 'exactly one scroll was requested');
@@ -721,9 +786,39 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
         { block: 'nearest' },
         'nearest, so an already-visible card does not move the pane'
       );
+      const field = root.querySelector(`:scope [data-trigger="${added.id}"] [data-trigger-value]`);
+      field.value = '7';
+      field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      await harness.setProps({ value: emitted.at(-1) });
+      assert.equal(scrolled.length, 1, 'an edit inside the open trigger does not pull the pane back');
     } finally {
       globalThis.Element.prototype.scrollIntoView = original;
     }
+  });
+
+  it('REMOVING a trigger hands focus to the next, else the previous, else the add control', async () => {
+    const emitted = [];
+    const third = { ...stepUp, id: 'x1' };
+    const root = await mountPair({
+      value: triggerBlock([stepUp, stepDown, third]),
+      onChange: (next) => {
+        emitted.push(next);
+      }
+    });
+    const focused = (selector) => root.ownerDocument.activeElement === root.querySelector(selector);
+    const remove = async (id) => {
+      const button = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-remove]`);
+      assert.equal(button.getAttribute('aria-label'), 'Remove trigger', 'the remove names itself');
+      button.focus();
+      button.click();
+      await harness.setProps({ value: emitted.at(-1) });
+    };
+    await remove('d1');
+    assert.ok(focused(':scope [data-trigger="x1"] [data-rule-row-disclosure]'), 'the next trigger takes focus');
+    await remove('x1');
+    assert.ok(focused(':scope [data-trigger="u1"] [data-rule-row-disclosure]'), 'the last falls back to the previous');
+    await remove('u1');
+    assert.ok(focused('[data-add-trigger]'), 'the only one hands focus to the add control');
   });
 
   it('reads the comparison in words, not in operator symbols', async () => {
@@ -853,10 +948,36 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
     assert.equal(emitted.at(-1).triggers[0].condition.value, 17, 'typing reaches the commit path');
   });
 
+  it('restates the condition through its mid-sentence key, so a tier name keeps its capital', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([
+        routedTrigger(
+          { mode: 'up', steps: 1, tierId: null },
+          { condition: { type: 'outcomeTier', tierIds: ['tier-b'], outcomeKeys: [] } }
+        )
+      ]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: true
+    });
+    const card = root.querySelector('[data-trigger="r1"]');
+    assert.equal(
+      card.querySelector('[data-rule-row-title]').textContent.trim(),
+      'Outcome tier is Masterwork',
+      'the title is the standalone key'
+    );
+    assert.equal(
+      card.querySelector('.fabricate-rule-row-lead').textContent.trim(),
+      'When outcome tier is Masterwork, the result steps up 1 tier(s).',
+      'the sentence takes the in-sentence key and never lowers the tier the GM named'
+    );
+  });
+
   it('closes the expanded body with a quotation restating the whole rule', async () => {
     const root = await mountPair();
     expandTrigger(root, 'd1');
-    const quote = root.querySelector('[data-trigger-quote="d1"]');
+    const quote = root.querySelector(':scope [data-trigger="d1"] [data-rule-row-quote]');
     assert.ok(Boolean(quote), 'the expanded trigger ends with its own summary line');
     assert.equal(
       quote.querySelector('span').textContent.trim(),
@@ -876,8 +997,8 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false
     });
-    const buttons = [...root.querySelectorAll('[data-add-trigger-preset]')];
-    assert.equal(buttons.length, 2, 'both presets render');
+    const buttons = [...root.querySelectorAll(':scope [data-check-trigger-presets] [data-rule-row-preset]')];
+    assert.equal(buttons.length, 2, 'both presets render, inside the presets card');
     assert.equal(buttons[0].tagName, 'BUTTON', 'the preset is a real button');
     assert.equal(buttons[0].disabled, false, 'and it is not disabled');
   });
@@ -893,7 +1014,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       onChange: (next) => emitted.push(next)
     });
 
-    root.querySelector('[data-add-trigger-preset="high"]').click();
+    root.querySelector('[data-rule-row-preset="high"]').click();
     assert.equal(emitted.length, 1, 'the click reached the handler');
     const trigger = emitted.at(-1).triggers.at(-1);
     assert.deepEqual(trigger.condition, {
@@ -917,7 +1038,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       showBreakTools: false,
       onChange: (next) => emitted.push(next)
     });
-    root.querySelector('[data-add-trigger-preset="low"]').click();
+    root.querySelector('[data-rule-row-preset="low"]').click();
     assert.deepEqual(
       emitted.at(-1).triggers.map((entry) => entry.id.slice(0, 2)),
       ['t1', emitted.at(-1).triggers.at(-1).id.slice(0, 2)],
@@ -960,18 +1081,18 @@ describe('the common-trigger presets follow the check direction', () => {
       evaluation: UNDER,
       onChange: (next) => emitted.push(next)
     });
-    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+    const labels = [...root.querySelectorAll('[data-rule-row-preset]')].map((button) =>
       button.textContent.trim()
     );
     assert.deepEqual(labels, [
       'Natural 1 on 1d20 → step up a tier',
       'Natural 20 on 1d20 → step down a tier'
     ]);
-    root.querySelector('[data-add-trigger-preset="high"]').click();
+    root.querySelector('[data-rule-row-preset="high"]').click();
     const best = emitted.at(-1).triggers.at(-1);
     assert.equal(best.condition.value, 1, 'the best face under is 1');
     assert.deepEqual(best.tierStep, { mode: 'up', steps: 1, tierId: null });
-    root.querySelector('[data-add-trigger-preset="low"]').click();
+    root.querySelector('[data-rule-row-preset="low"]').click();
     assert.equal(emitted.at(-1).triggers.at(-1).condition.value, 20, 'the worst face is 20');
   });
 
@@ -982,7 +1103,7 @@ describe('the common-trigger presets follow the check direction', () => {
       kind: 'simple',
       evaluation: OVER
     });
-    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+    const labels = [...root.querySelectorAll('[data-rule-row-preset]')].map((button) =>
       button.textContent.trim()
     );
     assert.deepEqual(labels, [
@@ -1005,15 +1126,142 @@ describe('the common-trigger presets follow the check direction', () => {
     assert.equal(emitted.length, 0, 'an evaluation change emits nothing');
     assert.equal(naturalOne.condition.value, 20, 'the authored face is untouched');
     assert.match(
-      root.querySelector('[data-add-trigger-preset="high"]').textContent,
+      root.querySelector('[data-rule-row-preset="high"]').textContent,
       /Natural 1 on 1d20/,
       'only the offered preset changes'
     );
-    root.querySelector('[data-add-trigger-preset="high"]').click();
+    root.querySelector('[data-rule-row-preset="high"]').click();
     assert.deepEqual(
       emitted.at(-1).triggers.map((trigger) => trigger.condition.value),
       [20, 1],
       'a new preset appends after the kept trigger'
+    );
+  });
+});
+
+// ── A counting check's triggers (issue 2006, N13 and N16) ──────────────────────────────────────
+describe('a counting check triggers on its pool and its net successes', () => {
+  const cancelling = (enabled) => ({
+    product: 'count',
+    direction: 'over',
+    pool: { die: 10, cancel: { enabled, faces: { kind: 'worst', value: null } } }
+  });
+  const COUNT = cancelling(true);
+  const presetLabels = (root) =>
+    [...root.querySelectorAll('[data-rule-row-preset]')].map((button) => button.textContent.trim());
+  const ROUTED_COUNT_LABELS = [
+    'Any die shows its best face (10) → step up a tier',
+    'Every die shows its worst face (1) → step down a tier',
+    'Botch (net below zero) → lowest tier'
+  ];
+
+  async function mountCount({ rollFormula = '', kind = 'routed', evaluation = COUNT, ...props } = {}) {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula,
+      kind,
+      outcomeOptions: ROUTED_TIERS,
+      lowestTierId: 'tier-a',
+      evaluation,
+      onChange: (next) => emitted.push(next),
+      ...props
+    });
+    const click = async (presetId) => {
+      root.querySelector(`[data-rule-row-preset="${presetId}"]`).click();
+      await harness.setProps({ value: emitted.at(-1) });
+      return emitted.at(-1).triggers.at(-1);
+    };
+    return { root, emitted, click };
+  }
+
+  it('offers the pool presets with no formula at all', async () => {
+    const { root } = await mountCount({ rollFormula: '' });
+    assert.deepEqual(presetLabels(root), ROUTED_COUNT_LABELS);
+  });
+
+  it('never offers a preset on the retained formula, whose d20 the pool does not roll', async () => {
+    const { root, click } = await mountCount({ rollFormula: '1d20 + 5' });
+    assert.deepEqual(presetLabels(root), ROUTED_COUNT_LABELS);
+    const best = await click('high');
+    assert.deepEqual(best.condition, {
+      type: 'diceGroup',
+      groupId: 0,
+      aggregate: 'anyDie',
+      operator: '==',
+      value: 10
+    });
+    assert.deepEqual(
+      selectOptionLabels(root, `[data-trigger="${best.id}"] ${DICE_GROUP}`),
+      ['d10'],
+      'the Dice group subject offers the pool alone'
+    );
+    assert.equal(
+      root.querySelector(`:scope [data-trigger="${best.id}"] [data-rule-row-title]`).textContent.trim(),
+      'Any die of d10 is exactly 10'
+    );
+  });
+
+  it('adds the Botch preset, which reads as net successes and sends the roll to the lowest tier', async () => {
+    const { root, emitted, click } = await mountCount({ rollFormula: '1d20 + 5' });
+    const botch = await click('botch');
+    assert.deepEqual(botch.condition, { type: 'rollTotal', operator: '<', value: 0 });
+    assert.deepEqual(botch.tierStep, { mode: 'target', steps: 1, tierId: 'tier-a' });
+    const when = `[data-trigger="${botch.id}"] ${CONDITION_TYPE}`;
+    assert.equal(selectTriggerText(root, when), 'Net successes');
+    assert.deepEqual(selectOptionLabels(root, when), ['Net successes', 'Dice group', 'Outcome tier']);
+    assert.equal(
+      root.querySelector(`:scope [data-trigger="${botch.id}"] [data-rule-row-title]`).textContent.trim(),
+      'Net successes is under 0'
+    );
+    assert.equal(
+      root.querySelector(`:scope [data-trigger="${botch.id}"] [data-rule-row-quote] span`).textContent.trim(),
+      'When net successes is under 0, the result becomes Ruined.'
+    );
+    chooseSelectOption(root, when, 'diceGroup');
+    assert.equal(emitted.at(-1).triggers.at(-1).condition.groupId, 0, 'the pool is group 0');
+  });
+
+  it('a simple count check fails on its worst face, with Botch only while cancelling', async () => {
+    const { root, click } = await mountCount({ kind: 'simple', evaluation: cancelling(false) });
+    assert.deepEqual(presetLabels(root), ['Every die shows its worst face (1) → automatic failure']);
+    const worst = await click('low');
+    assert.deepEqual(worst.condition, {
+      type: 'diceGroup',
+      groupId: 0,
+      aggregate: 'allDice',
+      operator: '==',
+      value: 1
+    });
+    assert.equal(worst.outcome, 'failure');
+    await harness.setProps({ evaluation: COUNT });
+    assert.deepEqual(presetLabels(root), [
+      'Every die shows its worst face (1) → automatic failure',
+      'Botch (net below zero) → automatic failure'
+    ]);
+    const botch = await click('botch');
+    assert.equal(botch.outcome, 'failure');
+    assert.equal(
+      root.querySelector(`:scope [data-trigger="${botch.id}"] [data-rule-row-title]`).textContent.trim(),
+      'Net successes is under 0'
+    );
+  });
+
+  it('a summing check keeps its roll total and formula presets', async () => {
+    const { root } = await mountCount({
+      rollFormula: '1d20 + 5',
+      evaluation: { product: 'sum', direction: 'over', pool: COUNT.pool },
+      value: triggerBlock([rollTotalTrigger])
+    });
+    assert.deepEqual(presetLabels(root), [
+      'Natural 20 on 1d20 → step up a tier',
+      'Natural 1 on 1d20 → step down a tier'
+    ]);
+    expandTrigger(root, 't1');
+    assert.equal(selectTriggerText(root, `[data-trigger="t1"] ${CONDITION_TYPE}`), 'Roll total');
+    assert.equal(
+      root.querySelector(':scope [data-trigger="t1"] [data-rule-row-title]').textContent.trim(),
+      'Roll total is at most 3'
     );
   });
 });

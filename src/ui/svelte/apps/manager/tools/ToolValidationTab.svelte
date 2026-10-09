@@ -1,8 +1,8 @@
 <!--
   The Tool editor's VALIDATION tab, rendering the shared `ScopedValidationTab`. It keeps its
   `manager-tool-tab-stack` class, its `data-tool-validation-tab` hook and its
-  `data-tool-validation-check` row hook, and keeps the save-failure alert below the surface as the
-  primitive's trailing snippet. UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue
+  `data-tool-validation-check` row hook; a failed save is the editor's notice, not this tab's
+  (issue 1522). Unlike an essence, a Tool refuses to save while a blocking issue
   stands, which is why its block row reads `BLOCKS ENABLE` — the one thing the two sites disagree
   about, and the only status label either passes.
 
@@ -20,7 +20,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import {
@@ -34,7 +34,6 @@
     tool = null,
     authority = 'toolSpecific',
     validation = { valid: false, errors: [] },
-    saveError = '',
     focusValidationNonce = 0,
     // Whether the world catalogue holds a record for this Tool, and the route to it: an unlifted
     // pre-migration Tool has no world half, so the notice states the defect and offers no route.
@@ -174,13 +173,13 @@
 <!-- Declared here rather than inline so the prop can be UNSET: an empty snippet is still truthy,
      and a `Callout` taking one draws an empty flex item and its gap. -->
 {#snippet worldToolAction()}
-  <ManagerButton
+  <Button
     data-tool-identity-route={String(tool?.id ?? '')}
     aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
     onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
     ><i class="fas fa-globe" aria-hidden="true"></i><span
       >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
-    ></ManagerButton
+    ></Button
   >
 {/snippet}
 
@@ -210,16 +209,8 @@
         'FABRICATE.Admin.Manager.Tools.Editor.IdentityMissing',
         'This Tool names no game-world Item. Its identity is set on the world Tool, not here, and it cannot be saved until that link is restored.'
       )}
-      dataAttr="data-tool-identity-notice"
+      data-tool-identity-notice
       actions={worldRecordExists ? worldToolAction : undefined}
     />
-  {/if}
-  {#if saveError && saveError !== 'invalid'}
-    <p class="manager-validation-error" role="alert" data-tool-save-error>
-      {text(
-        'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed',
-        'The Tool could not be saved. Try again.'
-      )}
-    </p>
   {/if}
 </ScopedValidationTab>

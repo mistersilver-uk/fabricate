@@ -3,14 +3,17 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-family-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     // The manager's ONE chip (issue 883).
     'src/ui/svelte/components/Chip.svelte',
@@ -28,6 +31,11 @@ const TABS = [
   { id: 'outcomes', icon: 'fas fa-list', labelKey: 'x.Outcomes', label: 'Outcomes' },
 ];
 
+/** The classes the strip authors on an element, in order, without Svelte's scoping class. */
+function authoredClasses(element) {
+  return [...element.classList].filter((name) => !name.startsWith('svelte-')).join(' ');
+}
+
 function tabButtons(root) {
   return [...root.querySelectorAll('[role="tab"]')];
 }
@@ -38,16 +46,16 @@ function buttonFor(root, id) {
 
 /** Every mark a tab button renders, in document order, as `{vehicle, text, name}`. */
 function marksOn(button) {
-  return [...button.querySelectorAll('.manager-chip, .manager-editor-tab-count, .manager-editor-tab-dot')].map(
-    (node) => ({
-      chip: node.classList.contains('manager-chip'),
-      count: node.classList.contains('manager-editor-tab-count'),
-      dot: node.classList.contains('manager-editor-tab-dot'),
-      text: node.textContent.trim(),
-      name: node.getAttribute('aria-label'),
-      role: node.getAttribute('role'),
-    })
-  );
+  return [
+    ...button.querySelectorAll('.manager-chip, .manager-editor-tab-count, .manager-editor-tab-dot'),
+  ].map((node) => ({
+    chip: node.classList.contains('manager-chip'),
+    count: node.classList.contains('manager-editor-tab-count'),
+    dot: node.classList.contains('manager-editor-tab-dot'),
+    text: node.textContent.trim(),
+    name: node.getAttribute('aria-label'),
+    role: node.getAttribute('role'),
+  }));
 }
 
 describe('EditorTabs emits the namespace root its rules are anchored on (issue 1509)', () => {
@@ -57,7 +65,7 @@ describe('EditorTabs emits the namespace root its rules are anchored on (issue 1
     const tablist = root.querySelector('[role="tablist"]');
     assert.ok(Boolean(tablist), 'the component must render a tablist at all');
     assert.equal(
-      tablist.className,
+      authoredClasses(tablist),
       'fabricate-tabs manager-editor-tabs',
       'the default render must carry the primitive`s own root and the family`s container class, ' +
         'in that order — the root FIRST, because every re-rooted rule in `styles/fabricate.css` ' +
@@ -73,7 +81,7 @@ describe('EditorTabs emits the namespace root its rules are anchored on (issue 1
       containerClass: 'manager-environment-tabs manager-checks-sections',
     });
     assert.equal(
-      root.querySelector('[role="tablist"]').className,
+      authoredClasses(root.querySelector('[role="tablist"]')),
       'fabricate-tabs manager-environment-tabs manager-checks-sections',
       'a caller`s container class replaces the family default and never the root'
     );
@@ -125,7 +133,10 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
       },
     });
     const issue = marksOn(buttonFor(root, 'roll'));
-    assert.deepEqual(issue.map((mark) => [mark.chip, mark.text]), [[true, '2']]);
+    assert.deepEqual(
+      issue.map((mark) => [mark.chip, mark.text]),
+      [[true, '2']]
+    );
     assert.ok(
       buttonFor(root, 'roll').querySelector('.manager-chip').classList.contains('is-warning'),
       'the issue vehicle carries its tone'
@@ -144,9 +155,10 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
       badges: { roll: { vehicle: 'dot', name: '1 issue' } },
     });
     const marks = marksOn(buttonFor(root, 'roll'));
-    assert.deepEqual(marks.map((mark) => [mark.dot, mark.text, mark.name, mark.role]), [
-      [true, '', '1 issue', 'img'],
-    ]);
+    assert.deepEqual(
+      marks.map((mark) => [mark.dot, mark.text, mark.name, mark.role]),
+      [[true, '', '1 issue', 'img']]
+    );
   });
 
   it('drops a dot that has no accessible name rather than drawing a colour-only mark', async () => {
@@ -200,9 +212,9 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
-      countAttribute: 'data-x-count',
-      dotAttribute: 'data-x-dot',
-      badgeAttribute: 'data-x-badge',
+      countDataAttr: 'data-x-count',
+      dotDataAttr: 'data-x-dot',
+      badgeDataAttr: 'data-x-badge',
       badges: {
         roll: [
           { vehicle: 'count', label: 2 },
@@ -213,7 +225,10 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     });
     assert.equal(root.querySelector('[data-x-count="roll"]').textContent.trim(), '2');
     assert.equal(root.querySelector('[data-x-dot="roll"]').getAttribute('aria-label'), '1 issue');
-    assert.equal(root.querySelector('[data-x-badge="outcomes"]').getAttribute('data-badge-tone'), 'danger');
+    assert.equal(
+      root.querySelector('[data-x-badge="outcomes"]').getAttribute('data-badge-tone'),
+      'danger'
+    );
   });
 
   it('emits aria-controls for every tab by default and only for the selected tab in single-panel mode', async () => {
@@ -262,7 +277,7 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
-      containerAttribute: 'data-checks-sections',
+      'data-checks-sections': '',
     });
     assert.ok(
       Boolean(root.querySelector('[role="tablist"][data-checks-sections]')),
@@ -341,6 +356,27 @@ describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
     );
   });
 
+  it('draws the premium padlock from `tierGated` alone, never as a mark (issue 1779)', async () => {
+    const root = await harness.mount({
+      tabs: [{ ...TABS[0], tierGated: true }, TABS[1]],
+      activeTab: 'roll',
+      badges: { outcomes: { vehicle: 'premium', label: 'PREMIUM' } },
+    });
+    assert.equal(buttonFor(root, 'roll').querySelectorAll('.manager-editor-tab-lock').length, 1);
+    assert.deepEqual(
+      marksOn(buttonFor(root, 'roll')),
+      [],
+      'the padlock is a tab state, not a mark'
+    );
+    const outcomes = buttonFor(root, 'outcomes');
+    assert.ok(!outcomes.querySelector('.manager-editor-tab-lock'), 'no vehicle draws the padlock');
+    assert.deepEqual(
+      marksOn(outcomes).map((mark) => [mark.chip, mark.text]),
+      [[true, 'PREMIUM']],
+      'an unknown vehicle stays the issue chip, so the family keeps its closed set'
+    );
+  });
+
   it('keeps the dot judged on its NAME, which is the only thing it renders', async () => {
     const root = await harness.mount({
       tabs: TABS,
@@ -352,5 +388,51 @@ describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
       ['1 issue'],
       'a named dot draws; a nameless one is dropped by the rule above it'
     );
+  });
+});
+
+describe('EditorTabs names the Validation tab`s toned counts (issue 1522)', () => {
+  const VALIDATION = [
+    ...TABS,
+    {
+      id: 'validation',
+      icon: 'fas fa-clipboard-check',
+      labelKey: 'x.Validation',
+      label: 'Validation',
+    },
+  ];
+  const nameFor = async (badges, tabs = VALIDATION) => {
+    const root = await harness.mount({ tabs, activeTab: 'roll', badges });
+    return buttonFor(root, 'validation').getAttribute('aria-label');
+  };
+
+  it('states severity and counts, with singular and plural forms', async () => {
+    assert.equal(
+      await nameFor({
+        validation: [
+          { label: '2', tone: 'danger' },
+          { label: '1', tone: 'warning' },
+        ],
+      }),
+      'Validation, 2 blocking, 1 warning'
+    );
+    assert.equal(
+      await nameFor({ validation: { label: '3', tone: 'warning' } }),
+      'Validation, 3 warnings'
+    );
+  });
+
+  it('leaves a clean tab, another tab and a self-naming mark as they were', async () => {
+    assert.equal(await nameFor({}), null, 'no marks, no name');
+    const root = await harness.mount({
+      tabs: VALIDATION,
+      activeTab: 'roll',
+      badges: {
+        outcomes: { label: '2', tone: 'danger' },
+        validation: { label: '2', tone: 'danger', name: 'Two issues' },
+      },
+    });
+    assert.equal(buttonFor(root, 'outcomes').getAttribute('aria-label'), null);
+    assert.equal(buttonFor(root, 'validation').getAttribute('aria-label'), null);
   });
 });

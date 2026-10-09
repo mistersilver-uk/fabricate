@@ -1,8 +1,8 @@
 /**
  * THE manager's labelled push-button, mounted (issues 1096 and 1118).
  * `is-warning-action` is the sharpest of them. Five of the six roles emit `is-${role}` and
- * `warning` does not: the sheet declares `.manager-button.is-warning-action` and declares
- * `.manager-button.is-warning` NOWHERE. That asymmetry is the entire reason `ROLE_CLASSES`
+ * `warning` does not: the sheet declares `.fabricate-button.is-warning-action` and declares
+ * `.fabricate-button.is-warning` NOWHERE. That asymmetry is the entire reason `ROLE_CLASSES`
  * is a named constant instead of a template, and it is exactly the shape a future tidy-up
  * removes in good faith — collapsing five entries plus an exception back into one
  * interpolation reads like cleaning up an inconsistency rather than deleting a fact. It
@@ -20,12 +20,12 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const componentPath = 'src/ui/svelte/components/ManagerButton.svelte';
+const componentPath = 'src/ui/svelte/components/Button.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-manager-button-',
-  compiledModules: ['src/ui/svelte/components/ManagerButton.svelte'],
+  compiledModules: ['src/ui/svelte/components/Button.svelte'],
   componentPath,
 });
 
@@ -33,9 +33,9 @@ before(async () => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 
-const button = () => document.body.querySelector('.manager-button');
+const button = () => document.body.querySelector('.fabricate-button');
 
-describe('ManagerButton emits the element and classes its call sites are styled against', () => {
+describe('Button emits the element and classes its call sites are styled against', () => {
   it('renders a real <button type="button"> with no role modifier by default', async () => {
     await harness.mount({});
     const node = button();
@@ -43,13 +43,13 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     assert.equal(node.tagName, 'BUTTON');
     assert.equal(node.getAttribute('type'), 'button');
     // A manager button inside a `<form>`-adjacent card must never submit by accident.
-    assert.equal(node.className, 'fabricate-button manager-button fab-manager-button');
+    assert.equal(node.className, 'fabricate-button fab-manager-button');
   });
 
   it('emits is-warning-action for the warning role, and never is-warning', async () => {
     await harness.mount({ role: 'warning' });
     const node = button();
-    // The sheet declares `.manager-button.is-warning-action` and no `.manager-button.is-warning`.
+    // The sheet declares `.fabricate-button.is-warning-action` and no `.fabricate-button.is-warning`.
     assert.ok(node.classList.contains('is-warning-action'), node.className);
     assert.ok(!node.classList.contains('is-warning'), node.className);
   });
@@ -59,7 +59,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       await harness.mount({ role });
       assert.equal(
         button().className,
-        `fabricate-button manager-button fab-manager-button is-${role}`,
+        `fabricate-button fab-manager-button is-${role}`,
         `the ${role} role`
       );
       harness.remount();
@@ -69,7 +69,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   it('renders neutral for an unrecognised role rather than an unstyled is-* class', async () => {
     await harness.mount({ role: 'nonsense' });
     // A typo must show up as the default button, never as a class the sheet does not declare.
-    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button');
+    assert.equal(button().className, 'fabricate-button fab-manager-button');
   });
 
   it('renders neutral for a role that names an inherited member of the mapping', async () => {
@@ -78,7 +78,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       await harness.mount({ role });
       assert.equal(
         button().className,
-        'fabricate-button manager-button fab-manager-button',
+        'fabricate-button fab-manager-button',
         `role="${role}"`
       );
       harness.remount();
@@ -89,7 +89,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     await harness.mount({ role: 'dashed', fullWidth: true });
     assert.equal(
       button().className,
-      'fabricate-button manager-button fab-manager-button is-dashed is-full-width'
+      'fabricate-button fab-manager-button is-dashed is-full-width'
     );
     harness.remount();
     await harness.mount({ role: 'dashed' });
@@ -100,21 +100,21 @@ describe('ManagerButton emits the element and classes its call sites are styled 
   // ── THE 38px RUNG (issue 1371) ────────────────────────────────────────────────────────
   it('emits NO size class by default, so every shipped button keeps its 34px control', async () => {
     await harness.mount({ role: 'primary' });
-    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button is-primary');
+    assert.equal(button().className, 'fabricate-button fab-manager-button is-primary');
   });
 
   it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
     await harness.mount({ role: 'primary', size: '38', fullWidth: true, class: 'manager-thing' });
-    // The documented order, and the same one `ManagerSearchField` states for the same token:
+    // The documented order, and the same one `SearchField` states for the same token:
     assert.equal(
       button().className,
-      'fabricate-button manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
+      'fabricate-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
     );
   });
 
   it('takes the rung as a number too, since a caller will write size={38}', async () => {
     await harness.mount({ size: 38 });
-    assert.equal(button().className, 'fabricate-button manager-button fab-manager-button is-size-38');
+    assert.equal(button().className, 'fabricate-button fab-manager-button is-size-38');
   });
 
   it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
@@ -123,7 +123,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       await harness.mount({ size });
       assert.equal(
         button().className,
-        'fabricate-button manager-button fab-manager-button',
+        'fabricate-button fab-manager-button',
         `size="${String(size)}" is not a rung this button offers`
       );
       harness.remount();
@@ -136,7 +136,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
     // silently unstyle the button while every `data-*` selector kept resolving.
     assert.equal(
       button().className,
-      'fabricate-button manager-button fab-manager-button is-ghost is-subtle manager-thing'
+      'fabricate-button fab-manager-button is-ghost is-subtle manager-thing'
     );
   });
 
@@ -189,7 +189,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       assert.ok(!button().hasAttribute('disabled'), 'an anchor must not carry disabled');
       // Silently dropping it would leave a call site believing it had disabled the control.
       assert.ok(
-        warnings.some((warning) => warning.includes('ManagerButton')),
+        warnings.some((warning) => warning.includes('Fabricate | Button:')),
         `expected a named warning, got ${JSON.stringify(warnings)}`
       );
     } finally {

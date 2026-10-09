@@ -89,13 +89,13 @@ export async function deleteSystem(io, systemId) {
 
   io.notifySystemsChanged();
 
-  const componentCount = Array.isArray(system.components)
-    ? system.components.length
+  const componentCount = Array.isArray(system.components) // ratchet-exempt(world-scope): writer
+    ? system.components.length // ratchet-exempt(world-scope): writer
     : Array.isArray(system.items)
       ? system.items.length
       : 0;
-  const essenceCount = Array.isArray(system.essenceDefinitions)
-    ? system.essenceDefinitions.length
+  const essenceCount = Array.isArray(system.essenceDefinitions) // ratchet-exempt(world-scope): writer
+    ? system.essenceDefinitions.length // ratchet-exempt(world-scope): writer
     : 0;
   const recipeItemCount = Array.isArray(system.recipeItemDefinitions)
     ? system.recipeItemDefinitions.length
@@ -346,7 +346,7 @@ export async function deleteComponentSet(io, systemId, componentIds) {
   const system = io.getSystem(systemId);
   if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-  const components = Array.isArray(system.components) ? system.components : [];
+  const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
   const requested = new Set(normalizeSelectionIds(componentIds));
   const removed = components.filter((component) => requested.has(String(component?.id ?? '')));
   if (removed.length === 0) {
@@ -362,11 +362,13 @@ export async function deleteComponentSet(io, systemId, componentIds) {
 
   const removedIds = removed.map((component) => String(component.id));
   const removedIdSet = new Set(removedIds);
+  // ratchet-exempt(world-scope): writer
   system.components = components.filter(
     (component) => !removedIdSet.has(String(component?.id ?? ''))
   );
 
   // Clear essence source-item links that pointed to any deleted component.
+  // ratchet-exempt(world-scope): writer
   const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({
     ...def,
     originItemUuid: removedIdSet.has(def.originItemUuid) ? null : def.originItemUuid,
@@ -374,7 +376,7 @@ export async function deleteComponentSet(io, systemId, componentIds) {
       ? null
       : def.associatedSystemItemId,
   }));
-  system.essenceDefinitions = essenceDefinitions;
+  system.essenceDefinitions = essenceDefinitions; // ratchet-exempt(world-scope): writer
   system.essences = essenceDefinitions.map((def) => def.id);
 
   const { recipesUpdated, recipesDisabled } = await io.stripComponentsFromRecipes(
@@ -479,8 +481,9 @@ async function overrideInheritedEssencesBeforeStrip(
   if (!resolved) return { overridden: [], unreachable: [] };
 
   // One pass holding each affected row beside its resolved map;
-  // `tests/world-scope-reader-ledger.test.js` counts every raw `system.components` read.
+  // `tests/world-scope-reader-ratchet.test.js` counts every raw `system.components` read.
   const affected = new Map();
+  // ratchet-exempt(world-scope): writer
   for (const component of system.components || []) {
     const id = String(component?.id ?? '');
     const map = resolved.get(id);
@@ -520,17 +523,18 @@ export async function deleteEssence(io, systemId, essenceId, { overrideInherited
   const system = io.getSystem(systemId);
   if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : []; // ratchet-exempt(world-scope): writer
   const removed = definitions.find((def) => def.id === essenceId);
   if (!removed) return false;
 
   // Before the definitions move: the seam reads what the pair resolves.
   await overrideInheritedEssencesBeforeStrip(io, system, [essenceId], overrideInheritedEssences);
 
-  system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
-  system.essences = system.essenceDefinitions.map((def) => def.id);
+  system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId); // ratchet-exempt(world-scope): writer
+  system.essences = system.essenceDefinitions.map((def) => def.id); // ratchet-exempt(world-scope): writer
 
   // Strip the essence from components still carrying it, so references do not dangle.
+  // ratchet-exempt(world-scope): writer
   for (const component of system.components || []) {
     if (component.essences && essenceId in component.essences) {
       delete component.essences[essenceId];
@@ -587,7 +591,7 @@ export async function deleteEssences(io, systemId, essenceIds, { overrideInherit
   const system = io.getSystem(systemId);
   if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : []; // ratchet-exempt(world-scope): writer
   const requested = new Set(normalizeSelectionIds(essenceIds));
   const removed = definitions.filter((def) => requested.has(String(def?.id ?? '')));
   if (removed.length === 0) {
@@ -601,10 +605,11 @@ export async function deleteEssences(io, systemId, essenceIds, { overrideInherit
   // deleted essences is flipped once.
   await overrideInheritedEssencesBeforeStrip(io, system, removedIds, overrideInheritedEssences);
 
-  system.essenceDefinitions = definitions.filter((def) => !removedIdSet.has(String(def?.id ?? '')));
-  system.essences = system.essenceDefinitions.map((def) => def.id);
+  system.essenceDefinitions = definitions.filter((def) => !removedIdSet.has(String(def?.id ?? ''))); // ratchet-exempt(world-scope): writer
+  system.essences = system.essenceDefinitions.map((def) => def.id); // ratchet-exempt(world-scope): writer
 
   // Strip every deleted essence from components still carrying it.
+  // ratchet-exempt(world-scope): writer
   for (const component of system.components || []) {
     if (!component.essences) continue;
     for (const essenceId of removedIds) {

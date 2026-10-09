@@ -16,8 +16,11 @@
   import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
+  import { recipeResultKinds } from './resultRows.js';
 
   let {
+    // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
+    modeCallout = undefined,
     recipe = null,
     // Alchemy Simple two-slot result editor (issue 554); forwarded to each section.
     alchemySimple = false,
@@ -29,6 +32,12 @@
     // only the explanatory note; the surface is the normal single-step one.
     collapsed = false,
     componentOptions = [],
+    // What a result row may name besides a component (issue 1773): the world's currency units
+    // while the system takes part in currency, and the system's recipes while learning is observable.
+    currencyUnits = [],
+    currencyEnabled = false,
+    recipeOptions = [],
+    knowledgeObservable = false,
     // Result routing: the provider and the system's outcome tiers feed the per-result-set
     // assignment controls.
     routingProvider = null,
@@ -60,10 +69,19 @@
     Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
   );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+  const resultKinds = $derived(
+    recipeResultKinds({
+      componentOptions,
+      currencyUnits,
+      currencyEnabled,
+      recipeOptions,
+      knowledgeObservable,
+    })
+  );
 
   // Per-mode heading and intro, OUTSIDE any card. The progressive heading is "Results", matching
   // the progressive SALVAGE editor: the two are the same surface and must not drift, and the
-  // strip below is the one place the roll-budget explanation belongs.
+  // strip above the list is the one place the roll-budget explanation belongs.
   const heading = $derived(
     progressive
       ? {
@@ -115,42 +133,23 @@
   data-recipe-tab="results"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Results', 'Results')}
 >
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{heading.title}</h2>
-    <p class="manager-muted">{heading.intro}</p>
+  <div class="fab-stack" data-gap="3" data-tab-heading>
+    <div class="manager-recipe-tab-intro">
+      <h2 class="manager-recipe-tab-title">{heading.title}</h2>
+      <p class="manager-muted">{heading.intro}</p>
+      {#if collapsed}
+        <p class="manager-muted" data-recipe-collapsed-results-note>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
+            'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
+          )}
+        </p>
+      {/if}
+    </div>
+    {@render modeCallout?.()}
   </div>
 
-  {#if collapsed}
-    <Callout
-      tone="info"
-      icon="fas fa-layer-group"
-      text={text(
-        'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
-        'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
-      )}
-      dataAttr="data-recipe-collapsed-results-note"
-    />
-  {/if}
-
   {#if progressive}
-    <!-- The strip and the reorder policy sit ABOVE the list, matching the progressive salvage
-         editor: both describe what the ORDER MEANS, and the order is what is authored below.
-
-         The strip's copy is NOT folded into the card's sub-line, because the strip states an
-         INVARIANT — the award mechanic holds whatever the toggle says — while the card states a
-         CONDITIONAL, so a merged sub-line would caveat itself. NEUTRAL rather than info on the
-         same reading: the info tint is reserved for a note about LIVE state, and this strip sits
-         directly above an info-tinted ToggleCard, so tinting it would spend the colour twice. -->
-    <Callout
-      tone="neutral"
-      icon="fas fa-dice-d20"
-      text={text(
-        'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
-        'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
-      )}
-      dataAttr="data-recipe-info-strip"
-    />
-
     <ToggleCard
       variant="is-info"
       icon="fas fa-arrow-down-a-z"
@@ -171,6 +170,19 @@
       on={allowPlayerResultReorder}
       onToggle={(next) => onToggleAllowPlayerResultReorder(next)}
     />
+
+    <!-- The strip sits directly above the list it describes, as an info strip precedes its cards:
+         it states an invariant — the award mechanic holds whatever the toggle says — where the card
+         above states a conditional. Neutral, because the info tint is reserved for live state. -->
+    <Callout
+      tone="neutral"
+      icon="fas fa-dice-d20"
+      text={text(
+        'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
+        'Roll budget flows down the list · each stage consumes its difficulty before the next is produced, so no stage offers a choice of reward'
+      )}
+      data-recipe-info-strip
+    />
   {/if}
 
   {#if isMultiStep}
@@ -189,6 +201,8 @@
             resultGroups={stepResultGroups(step)}
             {alchemySimple}
             {componentOptions}
+            surface="recipe"
+            {resultKinds}
             {routingProvider}
             {progressive}
             isTerminalStep={index === steps.length - 1}
@@ -209,6 +223,8 @@
       {resultGroups}
       alchemySimple={alchemySimple || simpleFailureSlot}
       {componentOptions}
+      surface="recipe"
+      {resultKinds}
       {routingProvider}
       {progressive}
       {onOpenComponent}

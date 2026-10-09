@@ -15,6 +15,10 @@
     is the query field element, two-way because the parent's `inlineSearchTrigger` branch writes the
     same cell; `query` is the query value. `optionsList` is private — every reader of it moved here.
   - The compact presentation's rules root on this panel, so they live in this file's scoped block.
+  - The parent computes the one `status` (issue 1782): an error renders an alert and a wait with no
+    row a loading line, either replacing the list, while a refinement keeps the rows under
+    `aria-busy`. The header, query row and footer stay, so a footer commit is reachable in every
+    state, and the polite live region is mounted for the panel's whole life, changing only its text.
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
@@ -42,9 +46,10 @@
     showSearch = true,
     inlineSearchTrigger = false,
     searchClass = '',
-    searchFieldAttributes = {},
+    searchProps = {},
     filteredOptions = [],
     totalCount = 0,
+    status = null,
     groupedOptions = [],
     isGrouped = false,
     renderedOptions = [],
@@ -65,14 +70,22 @@
     chooseOption,
     optionIsSelected,
     close,
-    stop,
-    keepFocusOnHolder,
     popover = $bindable(null),
     search = $bindable(null),
     query = $bindable(''),
   } = $props();
 
   let optionsList = $state(null);
+
+  const FOCUSABLE_PANEL_CHROME = 'input, button, textarea, select, [href]';
+
+  function stop(event) {
+    event.stopPropagation();
+  }
+
+  function keepFocusOnHolder(event) {
+    if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
+  }
 </script>
 
 <div
@@ -170,7 +183,7 @@
           class="manager-travel-popover-count"
           data-popover-filtered-count
           role="status"
-          aria-live="polite">{filteredCount}</span
+          aria-live="polite">{status?.replacesList ? '' : filteredCount}</span
         >
       {/if}
     </div>
@@ -182,13 +195,21 @@
       class:is-compact={compactOptionRows}
     >
       {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
-      <input bind:this={search} bind:value={query} {...searchFieldAttributes} />
+      <input bind:this={search} bind:value={query} {...searchProps} />
     </div>
   {/if}
 
   {#if header}{@render header(filteredOptions.length, totalCount)}{/if}
 
-  {#if filteredOptions.length > 0}
+  {#if status?.replacesList}
+    <div
+      class="manager-travel-popover-empty"
+      role={status.kind === 'error' ? 'alert' : undefined}
+      data-popover-status={status.kind}
+    >
+      <EmptyState note title={status.text} />
+    </div>
+  {:else if filteredOptions.length > 0}
     <div
       bind:this={optionsList}
       class={`manager-travel-popover-options ${listClass}`}
@@ -197,6 +218,7 @@
       aria-label={dialogNameAttribute}
       aria-labelledby={dialogNamedBy}
       aria-multiselectable={multiple ? 'true' : undefined}
+      aria-busy={status?.kind === 'refining' ? 'true' : undefined}
       data-picker-as={as}
       data-picker-columns={isGrid ? String(gridColumns) : undefined}
     >
@@ -230,7 +252,11 @@
     </div>
   {/if}
 
-  {#if footer}{@render footer()}{/if}
+  {#if footer}{@render footer({ close, failed: status?.kind === 'error' })}{/if}
+
+  <span class="visually-hidden" aria-live="polite" data-popover-live
+    >{status?.kind === 'loading' ? status.text : ''}</span
+  >
 </div>
 
 <style>
@@ -239,7 +265,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
-    padding: 4px 7px 6px;
+    padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-chip);
   }
 
   .manager-travel-popover-title {
@@ -264,7 +290,7 @@
   }
 
   .manager-travel-popover.is-compact-option-rows {
-    padding: 5px;
+    padding: var(--fab-space-1);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-header {
@@ -273,7 +299,7 @@
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option[aria-selected='true'] {
     border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {
@@ -284,7 +310,7 @@
   .manager-travel-popover.is-compact-option-rows
     .manager-travel-option[aria-selected='true']:hover {
     border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-travel-popover
@@ -301,15 +327,15 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     min-width: 0;
     box-sizing: border-box;
     height: 30px;
-    margin: 2px 7px 6px;
-    padding: 0 8px;
+    margin: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-chip);
+    padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-accent-border);
     border-bottom: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-bg-0);
   }
 
@@ -348,24 +374,25 @@
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 7px 0 7px 7px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2) 0 var(--fab-space-2) var(--fab-space-2);
     scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option {
-    min-height: 40px;
-    padding: 7px;
-    gap: 7px;
+    min-height: 38px;
+    padding: var(--fab-space-2);
+    gap: var(--fab-space-chip);
     border: 1px solid var(--fab-border);
-    border-radius: 7px;
+    border-radius: 9px;
     background: var(--fab-bg-3);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-portrait {
     width: 24px;
     height: 24px;
+    border-radius: 6px;
   }
 
   .manager-travel-popover.is-compact-option-rows

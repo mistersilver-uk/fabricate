@@ -214,7 +214,7 @@
             'FABRICATE.Admin.Manager.World.Parties.TravelActor.UnlinkedNote',
             'Pick the actor that represents this party on the map.'
           )}
-          dataAttr="data-manager-party-travel-actor-empty"
+          data-manager-party-travel-actor-empty
         />
       {/if}
     </button>
@@ -233,16 +233,16 @@
         triggerLabel={hasTravelActor
           ? text('FABRICATE.Admin.Manager.World.Parties.TravelActor.Change', 'Change actor')
           : text('FABRICATE.Admin.Manager.World.Parties.TravelActor.Link', 'Link an actor')}
-        triggerData={{ 'data-manager-party-actor-trigger': party.id }}
+        triggerProps={{ 'data-manager-party-actor-trigger': party.id }}
         showChevron={false}
         minWidth={268}
         maxWidth={268}
         maxHeight={280}
-        triggerAriaLabel={text(
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerLabel',
           'Choose a travel actor'
         )}
-        dialogAriaLabel={text(
+        panelLabel={text(
           'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerLabel',
           'Choose a travel actor'
         )}
@@ -250,7 +250,7 @@
           'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerSearchPlaceholder',
           'Search actors…'
         )}
-        searchAriaLabel={text(
+        searchLabel={text(
           'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerSearchLabel',
           'Search actors'
         )}
@@ -271,7 +271,7 @@
         emptyHint={pickerEmptyHint}
         emptyDetail={pickerEmptyDetail}
         noMatchesHint={pickerNoMatchesHint}
-        onChoose={(uuid) => onSet(party.id, uuid)}
+        onSelect={(uuid) => onSet(party.id, uuid)}
       />
 
       {#if hasTravelActor}
@@ -300,7 +300,7 @@
   .manager-party-actor-panel {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -333,7 +333,7 @@
     min-height: 96px;
     padding: 0;
     border: 0;
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
     text-align: inherit;
   }
@@ -357,6 +357,7 @@
     align-items: center;
     justify-content: center;
     width: 32px;
+    /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
     height: 32px;
     border-radius: 9px;
     color: var(--fab-text-subtle);
@@ -413,7 +414,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-danger-text);
     background: var(--fab-surface-soft);
     font-size: 10px;

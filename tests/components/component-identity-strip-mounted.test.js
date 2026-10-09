@@ -30,7 +30,7 @@ const harness = createMountedComponentHarness({
     // HANGS the suite rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
@@ -114,6 +114,22 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
       'and the card has exactly one exit'
     );
     harness.remount();
+  });
+
+  it('states no sharing for a component one system holds, and counts one other for two', async () => {
+    // Issue 2218: an imported component starts held by its system alone.
+    const noteFor = async (memberCount) => {
+      const target = await harness.mount(track({ memberCount }).props);
+      const note = target.querySelector('[data-component-identity-note]').textContent.trim();
+      harness.remount();
+      return note;
+    };
+
+    assert.equal(
+      await noteFor(1),
+      'Name, image and description are authored in the world catalogue. Everything below belongs to Mythwright Forge alone.'
+    );
+    assert.match(await noteFor(2), /shared with 1 other system\. Everything below/);
   });
 
   it('and that pill is the reference MICRO scale, taken from the primitive', async () => {

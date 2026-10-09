@@ -201,11 +201,16 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
       + 'only pointer path to the value, so it stays',
     spinnerSuppressed: false,
   }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+    register: 'R4',
+    reason:
+      'a rolled choice group member\'s two range bounds (issue 1773): roll values are typed, and '
+      + 'two steppers would more than double the cell in a row already carrying the amount '
+      + 'stepper; with no adjuncts the native spinner is their only pointer path, so it stays',
+    spinnerSuppressed: false,
+  }),
 ]);
-
-/** The shared component rendering the character-modifier Min / Max pair for BOTH scopes. */
-export const CHARACTER_MODIFIER_BOUNDS_PATH =
-  'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
 
 /** The shared panel that renders the bounds row, once, for both scopes (issue 1707). */
 export const CHARACTER_MODIFIER_PANEL_PATH =
@@ -244,36 +249,36 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
   [
     {
       id: 'gathering task dcOverride',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte',
       anchor: ['data-gathering-task-dc-override'],
       kind: 'genuine-absence',
       evidence: 'data-models spec: dcOverride is `number | null`; blank inherits the system DC',
     },
     {
       id: 'gathering task nodes.max',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte',
       anchor: ['data-gathering-task-node-count'],
       kind: 'genuine-absence',
       evidence: 'setNodeCount nulls the whole `nodes` object; normalizeNodeConfig(null) short-circuits',
     },
     {
       id: 'stamina cost modifier min',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskStaminaCard.svelte',
       anchor: ['{ min: next }'],
       kind: 'genuine-absence',
       evidence: 'an unbounded lower bound persists as literal null',
     },
     {
       id: 'stamina cost modifier max',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskStaminaCard.svelte',
       anchor: ['{ max: next }'],
       kind: 'genuine-absence',
       evidence: 'an unbounded upper bound persists as literal null',
     },
     {
       id: 'character modifier bounds',
-      path: CHARACTER_MODIFIER_BOUNDS_PATH,
-      anchor: ['bound.patch(next)'],
+      path: CHARACTER_MODIFIER_PANEL_PATH,
+      anchor: ['{ [bound.key]: next }'],
       kind: 'genuine-absence',
       evidence:
         'an unbounded modifier bound persists as literal null, and 0 is itself a legitimate '
@@ -302,28 +307,42 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
     },
     {
       id: 'gathering task adjustmentOverride',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte',
       anchor: ['data-gathering-task-adjustment-override'],
       kind: 'genuine-absence',
       evidence: 'data-models spec: adjustmentOverride is `number | null`; empty reads the base',
     },
     {
+      id: 'salvage successesOverride',
+      path: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+      anchor: ['data-salvage-successes-custom'],
+      kind: 'genuine-absence',
+      evidence: 'successesOverride is `integer 0–20 | null`; empty reads the check\'s own count',
+    },
+    {
+      id: 'gathering task successesOverride',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte',
+      anchor: ['data-gathering-task-successes-override'],
+      kind: 'genuine-absence',
+      evidence: 'successesOverride is `integer 0–20 | null`; empty reads the check\'s own count',
+    },
+    {
       id: 'gathering task staminaCost',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskStaminaCard.svelte',
       anchor: ['data-gathering-task-stamina-cost'],
       kind: 'cosmetic-zero',
       evidence: 'canonical `staminaCost?: number`; updateStaminaCost clears to 0, never to null',
     },
     {
       id: 'node respawn intervalAmount',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte',
       anchor: ['data-gathering-task-node-interval'],
       kind: 'cosmetic-zero',
       evidence: 'canonical `intervalAmount: number`',
     },
     {
       id: 'node respawn chance',
-      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte',
       anchor: ['data-gathering-task-node-chance'],
       kind: 'cosmetic-zero',
       evidence: 'nodeRespawnMath reads `respawn.chance || 0`',

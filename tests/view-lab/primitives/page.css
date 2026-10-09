@@ -1,0 +1,67 @@
+/*
+ * The Primitive Lab parent page's own rules: the two sizing states `mount.js` moves each specimen
+ * `<iframe>` through. Everything else on the page is `library.html`'s own stylesheet.
+ */
+
+/* Unsized: out of flow and off-screen at a generous width, so the document inside can shrink-wrap. */
+.pl-live {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0;
+  border: 0;
+  position: absolute;
+  visibility: hidden;
+  left: -99999px;
+  top: 0;
+  width: 2000px;
+  height: 10px;
+}
+
+/* Sized: back in flow at the size the specimen reported, where the drawing stood. */
+.pl-live.pl-specimen-sized {
+  position: static;
+  visibility: visible;
+  left: auto;
+}
+
+/*
+ * Filling: a block specimen standing where a block drawing stood takes that slot's inline size, as
+ * the drawing did, and only its height comes from the report; `mount.js` carries over the
+ * drawing's own `max-width`.
+ */
+.pl-live.pl-specimen-sized.pl-specimen-fill {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Beside: the `live` chip `liveness.js` puts between a kept drawing and its live specimen. */
+.pl-live-label {
+  align-self: center;
+  width: max-content;
+}
+
+/* In place: a partial specimen's caption, heading it. */
+.pl-live-caption {
+  align-self: flex-start;
+  width: max-content;
+}
+
+.pl-live-label > .pl-live-partial::before {
+  content: '·';
+  margin-inline: 0.5em;
+}
+
+/* In a grid, the chip and its specimen take a row each beneath the drawing, not a cell each. */
+.pl-live-row {
+  grid-column: 1 / -1;
+}
+
+/*
+ * A filling specimen beside its drawing takes the width the drawing gives its region, and adds none:
+ * in a unit sized by its content, `width: 100%` would otherwise resolve against the iframe's own
+ * 300px default and widen the unit past the drawing.
+ */
+.pl-live-label + .pl-live.pl-specimen-sized.pl-specimen-fill {
+  contain: inline-size;
+}

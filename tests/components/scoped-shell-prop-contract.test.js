@@ -96,7 +96,6 @@ const CATALOGUE_PROPS = [
   // Every one is OPT-IN and defaults to what the essence and tool catalogues already render, and
   // every one exists because a page composes THIS shell and never the component underneath it.
   'rosterRecessed',
-  'rosterSearchWell',
   'rowMedallion',
   'rowMeta',
   'rowNameTrailing',
@@ -122,7 +121,6 @@ const CATALOGUE_PROPS = [
   'systemRowAction',
   'systems',
   'title',
-  'toolbarLeadSize',
 ];
 
 const RULES_PROPS = [
@@ -215,7 +213,6 @@ describe('the shells declare the pinned prop sets', () => {
       'rosterEmptyNote',
       // AND THE FOUR issue 1371 r9-cat PRIMITIVE SEAMS.
       'rosterRecessed',
-      'rosterSearchWell',
       'rowMedallion',
       'rowNameTrailing',
       'rowSecondLine',
@@ -231,7 +228,6 @@ describe('the shells declare the pinned prop sets', () => {
       'showWorldDefaults',
       'splitToolbar',
       'systemRowAction',
-      'toolbarLeadSize',
     ]);
   });
 });
@@ -749,12 +745,13 @@ actions.copyMembership(entry.id, row.systemId);`),
 });
 
 /**
- * THE ROSTER'S TWO SURFACE DECISIONS ARE OPT-IN (issue 1371, parity round 5, reviewer finding 7).
+ * THE ROSTER'S SURFACE DECISION IS OPT-IN (issue 1371, parity round 5, reviewer finding 7). It has
+ * one: the search field draws its own box everywhere, so the roster states none for it.
  */
 describe('the system-rules roster states its surfaces as opt-in props', () => {
-  const SURFACE_PROPS = ['recessed', 'searchWell'];
+  const SURFACE_PROPS = ['recessed'];
 
-  it('declares both, and defaults both to OFF', () => {
+  it('declares it, and defaults it to OFF', () => {
     const source = sourceOf(ROSTER);
     const declared = declaredProps(source);
     for (const prop of SURFACE_PROPS) {
@@ -790,29 +787,18 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
     );
   });
 
-  it('gates the search well on a SECOND class, not on the one every caller passes', () => {
+  it('states no surface on the search field, which draws its own box (issue 1782)', () => {
     const source = sourceOf(ROSTER);
-    assert.match(
-      source,
-      /manager-scoped-roster-search manager-scoped-roster-search-well/,
-      'the well is a second class appended beside the shared one'
-    );
-    assert.match(
-      source,
-      /:global\(\.manager-search\.manager-scoped-roster-search-well input\)/,
-      'and the surface rule is selected on it'
-    );
-    // Round 4's exact spelling, as a negative: a `background`.
     const shared = [
       ...source.matchAll(
-        /:global\(\.manager-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
+        /:global\(\.fabricate-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
       ),
     ].map(([, body]) => body);
-    assert.ok(shared.length >= 2, 'NON-VACUITY: the shared class still has rules of its own');
+    assert.ok(shared.length > 0, 'NON-VACUITY: the roster still sizes the field’s row');
     for (const body of shared) {
       assert.ok(
-        !/(?:^|;|\n)\s*(?:background|border|border-radius)\s*:/.test(body),
-        `a rule on the shared class states a surface, which reaches all six screens: ${body.trim()}`
+        !/(?:^|;|\n)\s*(?:height|min-height|background|border|border-radius)\s*:/.test(body),
+        `a roster rule re-sizes or re-boxes the search field: ${body.trim()}`
       );
     }
   });
@@ -820,9 +806,9 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
 
 /**
  * THE SEAM BETWEEN THE SHELL AND THE PRIMITIVES BELOW IT (issue 1371 r9-cat).
- * Three opt-ins the world Component catalogue turns on live on components a PAGE never composes:
- * `SystemRulesRoster`'s two surface props are reached only through the shell's own inspector
- * snippet, and the frame's row medallion and lead-row rung are reached only through the shell's
+ * Two opt-ins the world Component catalogue turns on live on components a PAGE never composes:
+ * `SystemRulesRoster`'s surface prop is reached only through the shell's own inspector
+ * snippet, and the frame's row medallion is reached only through the shell's
  * own frame tag. So the shell declaring the prop and the shell FORWARDING it are two different
  * facts, and a declared-but-unforwarded prop is the exact failure that reads as green: the page
  * passes it, nothing throws, and the screen renders the default it always did.
@@ -830,17 +816,17 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
 describe('the catalogue shell FORWARDS what it declares', () => {
   const shell = () => sourceOf(CATALOGUE);
 
-  it('hands the roster its two surface props, renamed at the boundary', () => {
+  it('hands the roster its surface prop, renamed at the boundary', () => {
     const source = shell();
-    // Renamed on the way in — `rosterRecessed` / `rosterSearchWell`.
+    // Renamed on the way in — `rosterRecessed`. The search field draws its own box at every site,
+    // so no search well is threaded.
     assert.match(source, /\n\s*rosterRecessed = false,/, 'declared, and OFF by default');
-    assert.match(source, /\n\s*rosterSearchWell = false,/, 'declared, and OFF by default');
     assert.match(
       source,
       /recessed=\{rosterRecessed\}/,
       'and the roster tag is handed the value rather than a literal'
     );
-    assert.match(source, /searchWell=\{rosterSearchWell\}/, 'likewise for the search well');
+    assert.ok(!/searchWell/.test(source), 'and no search well is threaded to the roster');
   });
 
   it('hands the frame the first-row auto-selection, OFF by default (M14)', () => {
@@ -908,12 +894,10 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     );
   });
 
-  it('hands the frame the row medallion and the lead-row rung', () => {
+  it('hands the frame the row medallion', () => {
     const source = shell();
-    assert.match(source, /\n\s*toolbarLeadSize = '',/, 'declared, and the shipped rung by default');
     assert.match(source, /\n\s*rowMedallion = null,/, 'declared, and the shipped tile by default');
     // Shorthand `{name}`, which is how every other pass-through on this tag is written.
-    assert.match(source, /\{toolbarLeadSize\}/, 'and forwarded to the frame');
     assert.match(source, /\{rowMedallion\}/, 'and forwarded to the frame');
   });
 
@@ -930,54 +914,31 @@ describe('the catalogue shell FORWARDS what it declares', () => {
 
   it('and the FRAME spends them on the two elements they name', () => {
     const source = sourceOf(FRAME);
-    assert.match(
-      source,
-      /<ManagerSearchField\b[\s\S]{0,200}?size=\{toolbarLeadSize\}/,
-      'the search field takes the rung as its own `size` prop'
-    );
-    assert.match(
-      source,
-      /class=\{leadSelectSizeClass\(filter\)\}/,
-      'a lane-filter select takes the rung as a class, because the manager has no select component'
-    );
-    assert.match(
-      source,
-      /variant=\{rowMedallionSpec\.variant\}[\s\S]{0,120}?size=\{rowMedallionSpec\.size\}[\s\S]{0,120}?glyph=\{rowMedallionSpec\.glyph\}/,
-      'and the ROW medallion takes all three of the descriptor’s arguments'
-    );
-  });
-
-  it('the select rung is UNDEFINED when unset, never an empty class attribute', () => {
-    const source = sourceOf(FRAME);
-    // The whole reason `leadSelectSizeClass` is a function and not a `class:` directive. A
-    // directive writes the attribute whatever the value is, so every other catalogue's three
-    // selects would go from no `class` at all to `class=""` — a real DOM change on five screens
-    // shipped as an opt-in that "defaults to off".
-    assert.match(
-      source,
-      /return toolbarLeadSize === '38' && onLeadRow \? 'is-size-38' : undefined;/,
-      'the unset branch answers undefined, which Svelte drops'
-    );
+    // The search field takes no rung (issue 1782): it is 38 at every non-compact site.
     assert.ok(
-      !/class:is-size-38=/.test(source),
-      'and no `class:` directive writes the token, which would emit class="" when off'
+      !/<SearchField\b(?:(?!\/>)[\s\S])*?\bsize=/.test(source),
+      'the search field is handed no `size`, a prop it retired'
+    );
+    assert.match(
+      source,
+      /size=\{row === 'filters' \? 'toolbar' : 'form'\}/,
+      'a lane-filter select on the search’s row takes the `form` rung, and the second row `toolbar`'
+    );
+    assert.match(
+      source,
+      /variant=\{rowMedallionSpec\.variant\}[\s\S]{0,120}?size=\{38\}[\s\S]{0,120}?glyph=\{rowMedallionSpec\.glyph\}/,
+      'and the ROW medallion takes both of the descriptor’s arguments at the art ladder’s 38'
     );
   });
 
-  it('the rung reaches the LEAD row only, so the retired 32px row keeps the ladder’s 34', () => {
+  it('the sort select takes `form` only on a one-row toolbar, where it shares the search’s row', () => {
     const source = sourceOf(FRAME);
-    // `proto:582`-`585` draws the membership select.
-    assert.match(
-      source,
-      /const onLeadRow = \(filter\?\.toolbarRow \?\? 'lead'\) === 'lead';/,
-      'the helper decides on the descriptor’s ROW'
-    );
     // The sort control is written by the frame itself, outside the lane-filter snippet.
     const hook = source.indexOf("'data-scoped-list-sort'");
     assert.ok(hook > 0, 'NON-VACUITY: the sort control is still written by this frame');
     const sortSelect = source.slice(source.lastIndexOf('<Select', hook), hook);
     assert.match(sortSelect, /value=\{sortKey\}/, 'and the slice is that element');
-    assert.ok(!/is-size-38/.test(sortSelect), 'and it carries no 38px token');
+    assert.match(sortSelect, /size=\{splitToolbar \? 'toolbar' : 'form'\}/);
     assert.ok(!/\bclass=/.test(sortSelect), 'and it takes no call-site class at all');
   });
 });
@@ -1315,12 +1276,8 @@ describe('the world Component entry header wires the borderless medallion', () =
   it('passes `variant="glyph-chip"` on the entry heading, keeping its own size and glyph', () => {
     const call = medallionUnder(sourceOf(ROOT), 'data-world-component-entry-heading');
     assert.match(call, /variant="glyph-chip"/, `the header chip asks for the borderless face`);
-    assert.match(
-      call,
-      /size=\{42\}/,
-      'and keeps `proto:5375`’s 42px, which the variant does not own'
-    );
-    assert.match(call, /glyph=\{22\}/);
+    assert.match(call, /size=\{38\}/, 'and takes the art ladder’s 38, which the variant does not own');
+    assert.match(call, /glyph=\{15\}/);
     assert.match(
       call,
       /art=\{worldComponentEntryImage\}/,

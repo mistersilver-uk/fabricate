@@ -39,6 +39,11 @@ export function formatSignedStep(value) {
   return Number(value) === 0 ? '+0' : formatCheckAdjustment('add', value);
 }
 
+/** A count's net (`2`, `0`, `−1`): unsigned, with the true minus below zero. */
+export function formatNet(value) {
+  return Number(value) < 0 ? formatCheckAdjustment('add', value) : String(value);
+}
+
 function readMagnitude(text) {
   const glyph = FRACTIONS.find(([, symbol]) => symbol === text);
   if (glyph) return glyph[0];

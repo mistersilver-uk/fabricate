@@ -131,9 +131,10 @@ const DECOUNTED_COUNT = 4;
 
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
- * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934).
+ * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
+ * #2118, #2119). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -295,10 +296,365 @@ const SUPERSEDED_POLICY = [
       '`applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.',
     survivesIn: '.agents/docs/foundry-and-architecture.md',
   },
+  {
+    issue: '#2119',
+    before:
+      'A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.',
+    after:
+      "A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2119',
+    before:
+      "The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    after:
+      "The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    // The registry counts stopped being generated into scripts/README.md (issue 2116).
+    issue: '#2119',
+    before:
+      'How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.',
+    after:
+      'How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    // All four ledgers became merge-base comparisons with no rows to share.
+    before:
+      'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+    after:
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    // Source pins and bare reads lost their rows, so neither has `SLACK` or a tighten mode.
+    before:
+      '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
+    after: [
+      'The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.',
+      "A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.",
+    ],
+    survivesIn: 'AGENTS.md',
+  },
+  // The ESLint and Prettier debt lists became a comparison with the base commit.
+  {
+    issue: '#2118',
+    before:
+      '`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .` — the whole repository, as of issue #1660.',
+    after:
+      '`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.` — the whole repository, as of issue #1660.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "The not-yet-clean files are carried by `eslint.debt.js`, which switches off **per file** only the rules that file fails and leaves every other rule armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.",
+    after:
+      "The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Formatting debt is the marked section of `.prettierignore`.',
+    after:
+      'Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`npm run lint:debt` reports what is left in a baselined file and fails on an entry that reports nothing any more; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.',
+    after:
+      '`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because it lints the whole tree.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "`tests/lint-coverage.test.js` pins each debt group's size exactly (not as a ceiling — a ceiling banks a free slot on every payment), asserts the glob still reaches everything the old enumeration did, and asserts `no-undef` is never baselined.",
+    after:
+      '`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'When you bring a file to green, delete its entry and lower the pinned count in the same commit; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.',
+    after:
+      'When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'The gate is a glob, and the debt is a list',
+    after:
+      'The gate is a glob, and the debt is the base commit',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.',
+    after:
+      '`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.`, the whole repository, as of issue #1660.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.',
+    after:
+      'The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are held at their base findings instead.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.',
+    after:
+      '`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Every other rule stays armed on it.',
+    after:
+      'Every rule stays armed on every file.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.',
+    after:
+      'So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.',
+    after:
+      "`npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.',
+    after:
+      'It is a step of the `lint` CI job rather than a unit test because it lints the whole tree, and more than a minute of CPU-bound work does not belong in the unit-test job.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "`tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.",
+    after:
+      '`tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.',
+    after:
+      'Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'When you bring a file to green, delete its entry and lower the pinned count in the same commit.',
+    after:
+      'When you bring a file to green, commit it; there is no entry to delete and no count to lower.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.',
+    after:
+      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):',
+    after:
+      'Carried as debt rather than gated away (held at their base findings; `npx eslint <file>` shows what is left):',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.',
+    after:
+      'the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.',
+    after:
+      'Every rule is now enforced there, `no-undef` at any count.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.',
+    after:
+      '`scripts/**` is worth understanding before you add a script, because the reason part of it still carries debt is a measurement rather than an oversight.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    // The design-system, spacing and control-height ledgers, and the View Lab registry totals, are gone.
+    before:
+      '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
+    after:
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  // No ratchet keeps a ledger, so no ceiling is raised, lowered or tightened.
+  {
+    issue: '#2118',
+    before:
+      "Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.",
+    after: [
+      'The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.',
+      'A ratchet computes that baseline at test time, from `RATCHET_BASE` when it is set and otherwise from the merge base with `origin/main`, so no ledger, baseline or pinned total is checked in, and a shrink needs no edit: it passes and is reported as a `shrank` line.',
+      "A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.",
+    ],
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.',
+    after:
+      'A PR whose stated purpose is condensation, extraction or pin conversion shows its reduction as `shrank` lines, and a reviewer treats one that reports none as `NEEDS_CHANGES`.',
+    survivesIn: 'AGENTS.md',
+  },
+  // Siblings share no rows to re-derive, so neither the batching rule nor its cost survives.
+  {
+    issue: '#2118',
+    before:
+      "Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.",
+    after:
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "**Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's pinned ledgers, shared stylesheet regions, or registry-total prose; changes that share any of those run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution and pin re-derivation at the tip, and that restack has cost more than the parallelism saved.",
+    after:
+      "**Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's shared stylesheet regions; changes that share one run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution at the tip, and that restack has cost more than the parallelism saved.",
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, batch issues that share an exact-count ledger into one delta, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.',
+    after:
+      'Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  // Issue 1660 retired the staged scope, and lint and format now compare with the base commit.
+  {
+    issue: '#2118',
+    before:
+      'ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.',
+    after:
+      'ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` names `src/**/*.svelte`, so an unformatted component fails CI.',
+    after:
+      'Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.",
+    after:
+      "`npm run lint:svelte` runs the same base comparison over every `*.svelte` file under `src/` alone, so a component's script and markup are held to their base findings exactly as the `.js` around them under `src/ui/**` is, and a `ratchet-exempt(lint)` marker counts in both.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.',
+    after:
+      'The base comparison counts warnings as it counts errors, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a new `{@debug}` tag or `$inspect()` call left in a component is a CI failure.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  // Debt counts are computed now, so the prose names where the debt sits and not how much.
+  {
+    issue: '#2118',
+    before:
+      'The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.',
+    after:
+      'The `scripts/**` debt stays for a measured reason: the Foundry smoke harness alone accounted for 844 of the roughly one thousand ESLint findings there when the glob landed, and it pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them',
+    after:
+      'the plain `.js` files under `src/ui/**` that are not yet clean; the rest are gated outright, as are the `.svelte` components beside them',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '15 of the 33 files under `scripts/**`',
+    after:
+      'part of `scripts/**`, for the reason below',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  // PR #2287: a supplied forward-port resolution turns the initial merge conflict into an
+  // expected intermediate state. Keep genuine failures annotated as errors.
+  {
+    issue: '#2287',
+    before:
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.",
+    after: [
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` and names each path that could not be combined.",
+      'When `resolution_ref` is supplied these are `::notice::` annotations: the initial conflict is expected, and only the following content gate may accept the resolution.',
+      'Without a resolution they are `::error::` annotations, followed by an actionable refusal; an invalid or unverifiable supplied resolution also produces a real error at its failure point.',
+    ],
+    survivesIn: '.github/workflows/README.md',
+  },
+  {
+    issue: '#2287',
+    before:
+      'Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    after:
+      'Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    survivesIn: '.github/workflows/README.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 18;
+const SUPERSEDED_POLICY_COUNT = 60;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -506,10 +862,71 @@ const RENAMED = [
       'Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/config/`, and related `src/` modules.',
     identifiers: [['`src/utils/`, `src/config/`', '`src/utils/`, `src/integrations/`, `src/config/`']],
   },
+  {
+    // Issue 2118 replaced the comment-share ledger with a gate computed against the base commit.
+    before:
+      'Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ledger.txt`.',
+    after:
+      'Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ratchet.test.js`.',
+    identifiers: [['`tests/comment-share-ratchet.test.js`', '`tests/comment-share-ledger.txt`']],
+  },
+  // Issue 2118 replaced the file-size ledger with a merge-base ratchet test.
+  {
+    before:
+      'Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ledger.txt`.',
+    after:
+      'Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.',
+    identifiers: [['`tests/file-size-ratchet.test.js`', '`tests/file-size-ledger.txt`']],
+  },
+  // Issue 2118 replaced the source-pin ledger with a merge-base ratchet test.
+  {
+    before:
+      'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.',
+    after:
+      'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.',
+    identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
+  },
+  // Issue 1507 renamed the shared modal component's file.
+  {
+    before:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `ManagerModal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    after:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `Modal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    identifiers: [['`Modal.svelte`', '`ManagerModal.svelte`']],
+  },
+  // Issue 1521 folded `ExplainerCard.svelte` onto the callout, so the fenced-separator example
+  // names a component that still carries one.
+  {
+    before:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    after:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
+  {
+    before:
+      "The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    after:
+      "The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
+  // Issue 1721 moved the embedded-uuid gate out of the manager root.
+  {
+    before:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    after:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/dropUuidClassification.js` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    identifiers: [
+      [
+        '`src/ui/svelte/apps/manager/dropUuidClassification.js`',
+        '`src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`',
+      ],
+    ],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 27;
+const RENAMED_COUNT = 34;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
@@ -579,10 +996,10 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       before.length === count,
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
-    // A verified rename excuses its sentence here too; `every rename claim` checks each one.
-    const renamed = new Set(RENAMED.map(({ before: was }) => was));
+    // A verified rename or superseded policy excuses its sentence here too; each is checked below.
+    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
-      ({ sentence }) => !renamed.has(sentence)
+      ({ sentence }) => !excused.has(sentence)
     );
     assert.deepEqual(
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
@@ -622,7 +1039,7 @@ test('every superseded policy mapping names its frozen source and current replac
   );
 
   const frozen = multiset(
-    SOURCES.flatMap(({ fixture }) =>
+    [...SOURCES, PRE_1936].flatMap(({ fixture }) =>
       sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, fixture), 'utf8'))
     )
   );
@@ -631,7 +1048,9 @@ test('every superseded policy mapping names its frozen source and current replac
     assert.ok((frozen.get(before) ?? 0) > 0, `superseded sentence is absent from the frozen corpus:\n  ${before}`);
     assert.ok(DESTINATIONS.includes(survivesIn), `${survivesIn} is not in DESTINATIONS`);
     const current = sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, survivesIn), 'utf8'));
-    assert.ok(current.includes(after), `replacement is absent from ${survivesIn}:\n  ${after}`);
+    for (const sentence of [after].flat()) {
+      assert.ok(current.includes(sentence), `replacement is absent from ${survivesIn}:\n  ${sentence}`);
+    }
     assert.equal(
       survivingSentences().get(before) ?? 0,
       0,

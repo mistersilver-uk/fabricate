@@ -2,8 +2,8 @@
  * System scope: knowledge, progressive components, the import report and the remaining settings routes.
  */
 
-import { BULK_EDIT_CHROME_PATTERN } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { BULK_EDIT_CHROME_PATTERN, COMPONENT_EDITOR_MATCHES } from './caseConstants.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -56,9 +56,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
-      // The snapshot projection this frame renders moved out of the shell (issue 1674). Inert
-      // until `mapChangedFilesToCases` stops pre-filtering the changed set through `isUiFile`,
-      // which drops a `src/systems/` path before `sourceMatches` is consulted (issue 1896).
+      // The snapshot projection this frame renders moved out of the shell (issue 1674).
       /^src\/systems\/knowledgeSnapshot\.js$/,
     ],
   }),
@@ -129,7 +127,9 @@ export const CASES = Object.freeze([
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
-      { selector: '[data-manager-scope-select]', select: 'lab-alchemy' },
+      ...chooseSelectOption('[data-manager-scope-select]', 'lab-alchemy', '.fabricate-manager'),
+      // Parks the pointer on the rail's label, off the row the closed option list sat over.
+      { selector: '[data-manager-rail-section]' },
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
@@ -233,7 +233,29 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The DC card at its own placement, after the salvage card (issue 1522). The frame above's system
+  // reads no DC, so this one borrows a check state that resolves Smithing's recipes progressively.
+  managerCase({
+    id: 'manager-component-edit-difficulty-card',
+    label: 'Manager — Component edit difficulty, the DC card after the salvage card',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-extended' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="sm-ruby"] [data-component-edit]',
+      },
+      { selector: '[data-component-edit-section="difficulty"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-component-edit-panel="rules"] > [data-component-edit-section="difficulty"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'components'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-import-report',
@@ -289,7 +311,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-import-report-group]',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
       // The prompt, run and report sequence this frame drives (issue 1674).
@@ -308,7 +330,7 @@ export const CASES = Object.freeze([
     expectView: 'components',
     kinds: ['manager', 'components'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
@@ -335,7 +357,7 @@ export const CASES = Object.freeze([
     expectView: 'systems',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
   }),

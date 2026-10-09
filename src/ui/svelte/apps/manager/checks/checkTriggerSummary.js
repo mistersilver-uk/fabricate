@@ -21,16 +21,25 @@ const OPERATOR_WORDS = Object.freeze({
 
 /** Aggregate words, keyed by the aggregate a `diceGroup` condition stores. */
 const AGGREGATE_WORDS = Object.freeze({
-  total: ['SummaryGroupTotal', 'Group total'],
-  anyDie: ['SummaryAnyDie', 'Any die'],
-  allDice: ['SummaryAllDice', 'All dice'],
-  lowestDie: ['SummaryLowestDie', 'Lowest die'],
-  highestDie: ['SummaryHighestDie', 'Highest die'],
+  total: ['SummaryGroupTotal', 'Group total', 'group total'],
+  anyDie: ['SummaryAnyDie', 'Any die', 'any die'],
+  allDice: ['SummaryAllDice', 'All dice', 'all dice'],
+  lowestDie: ['SummaryLowestDie', 'Lowest die', 'lowest die'],
+  highestDie: ['SummaryHighestDie', 'Highest die', 'highest die'],
 });
 
-function copy(pair) {
-  return { key: `${NAMESPACE}${pair[0]}`, fallback: pair[1] };
+/** The key mid-sentence copy takes: casing is the translator's, never `toLowerCase()`. */
+const IN_SENTENCE = 'InSentence';
+
+/** A `[suffix, fallback, inSentenceFallback?]` entry as a fragment, standalone or mid-sentence. */
+function copy(entry, inSentence = false) {
+  return inSentence
+    ? { key: `${NAMESPACE}${entry[0]}${IN_SENTENCE}`, fallback: entry[2] }
+    : { key: `${NAMESPACE}${entry[0]}`, fallback: entry[1] };
 }
+
+/** The join between the tier names an outcome-tier condition lists, resolved by the caller. */
+export const TIER_LIST_JOIN = Object.freeze(copy(['SummaryTierListJoin', ', ']));
 
 /**
  * The comparison word for an operator, defaulting to `exactly` rather than the raw symbol: a
@@ -42,9 +51,10 @@ export function operatorWord(operator) {
 
 /** The aggregate word for a dice-group condition.
  *  @param {string} aggregate The stored aggregate.
+ *  @param {boolean} [inSentence] Whether the word sits mid-sentence.
  *  @returns {{key: string, fallback: string}} */
-export function aggregateWord(aggregate) {
-  return copy(AGGREGATE_WORDS[aggregate] ?? AGGREGATE_WORDS.total);
+export function aggregateWord(aggregate, inSentence = false) {
+  return copy(AGGREGATE_WORDS[aggregate] ?? AGGREGATE_WORDS.total, inSentence);
 }
 
 /**
@@ -54,20 +64,29 @@ export function aggregateWord(aggregate) {
  * @param {Array<{groupId: number, label: string}>} [context.diceGroups] Groups parsed from the
  *   roll formula, so a `diceGroup` condition names the die rather than an index a GM never sees.
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
+ * @param {boolean} [context.counting] Whether the check counts successes, so its total is the net.
+ * @param {string} [context.tierJoin] `TIER_LIST_JOIN` translated, joining the tiers listed.
+ * @param {boolean} [context.inSentence] Whether the fragment sits mid-sentence, keyed accordingly.
  * @returns {{key: string, fallback: string, data: object}}
  */
 export function summariseCondition(condition = {}, context = {}) {
-  const { diceGroups = [], tierNames = {} } = context;
+  const { diceGroups = [], tierNames = {}, counting = false, inSentence = false } = context;
+  const tierJoin = context.tierJoin ?? TIER_LIST_JOIN.fallback;
   const type = condition?.type ?? 'rollTotal';
   const comparison = operatorWord(condition?.operator);
   const value = String(condition?.value ?? 0);
+  const phrase = (entry) => copy(entry, inSentence);
 
   if (type === 'diceGroup') {
     const group = diceGroups.find((entry) => entry.groupId === condition.groupId);
     return {
-      ...copy(['SummaryDiceGroup', '{aggregate} of {die} is {comparison} {value}']),
+      ...phrase([
+        'SummaryDiceGroup',
+        '{aggregate} of {die} is {comparison} {value}',
+        '{aggregate} of {die} is {comparison} {value}',
+      ]),
       data: {
-        aggregate: aggregateWord(condition?.aggregate),
+        aggregate: aggregateWord(condition?.aggregate, inSentence),
         die: group?.label ?? String(condition?.groupId ?? 0),
         comparison,
         value,
@@ -76,7 +95,11 @@ export function summariseCondition(condition = {}, context = {}) {
   }
   if (type === 'progressiveValue') {
     return {
-      ...copy(['SummaryProgressiveValue', 'Rolled value is {comparison} {value}']),
+      ...phrase([
+        'SummaryProgressiveValue',
+        'Rolled value is {comparison} {value}',
+        'rolled value is {comparison} {value}',
+      ]),
       data: { comparison, value },
     };
   }
@@ -86,14 +109,34 @@ export function summariseCondition(condition = {}, context = {}) {
     // A trigger whose tier list is empty matches NOTHING, and saying so is the whole value of
     // a summary; readiness raises `danglingTierStepTarget` for the same state.
     return named.length === 0
-      ? { ...copy(['SummaryOutcomeTierNone', 'No outcome tier chosen']), data: {} }
+      ? {
+          ...phrase(['SummaryOutcomeTierNone', 'No outcome tier chosen', 'no outcome tier chosen']),
+          data: {},
+        }
       : {
-          ...copy(['SummaryOutcomeTier', 'Outcome tier is {tiers}']),
-          data: { tiers: named.join(', ') },
+          ...phrase(['SummaryOutcomeTier', 'Outcome tier is {tiers}', 'outcome tier is {tiers}']),
+          data: { tiers: named.join(tierJoin) },
+        };
+  }
+  if (counting) {
+    return inSentence
+      ? {
+          key: 'FABRICATE.Admin.Manager.Checks.Count.Triggers.SummaryNetSuccessesInSentence',
+          fallback: 'net successes is {comparison} {value}',
+          data: { comparison, value },
+        }
+      : {
+          key: 'FABRICATE.Admin.Manager.Checks.Count.Triggers.SummaryNetSuccesses',
+          fallback: 'Net successes is {comparison} {value}',
+          data: { comparison, value },
         };
   }
   return {
-    ...copy(['SummaryRollTotal', 'Roll total is {comparison} {value}']),
+    ...phrase([
+      'SummaryRollTotal',
+      'Roll total is {comparison} {value}',
+      'roll total is {comparison} {value}',
+    ]),
     data: { comparison, value },
   };
 }
@@ -147,9 +190,7 @@ export function summariseEffect(trigger = {}, context = {}) {
     clauses.push({
       ...copy(['SummaryStepTarget', 'the result becomes {tier}']),
       data: {
-        tier:
-          tierNames[step.tierId] ??
-          copy(['SummaryStepTargetUnset', 'a tier that is not set']).fallback,
+        tier: tierNames[step.tierId] ?? copy(['SummaryStepTargetUnset', 'a tier that is not set']),
       },
     });
   }
@@ -161,6 +202,37 @@ export function summariseEffect(trigger = {}, context = {}) {
   }
 
   return clauses.length === 0 ? [{ ...copy(['SummaryNoEffect', 'nothing changes']), data: {} }] : clauses;
+}
+
+/** A fragment as `RuleSentence` reads it, `{ key, params }`, its nested fragments converted too. */
+function sentenceFragment(fragment) {
+  const params = Object.entries(fragment.data ?? {}).map(([name, entry]) => [
+    name,
+    entry && typeof entry === 'object' ? sentenceFragment(entry) : entry,
+  ]);
+  return { key: fragment.key, params: Object.fromEntries(params) };
+}
+
+/**
+ * The whole trigger as one `RuleSentence` sentence: "When {condition}, {clauses}." over the
+ * mid-sentence condition and every effect clause in force.
+ * @param {object} trigger The whole trigger.
+ * @param {object} [context] `summariseCondition`'s context and `summariseEffect`'s, merged.
+ * @returns {{frameKey: string, clauseKeys: string[], joinKey: string, params: object}}
+ */
+export function summariseRule(trigger = {}, context = {}) {
+  const frameKey = `${NAMESPACE}SummarySentence`;
+  const condition = summariseCondition(trigger?.condition ?? {}, { ...context, inSentence: true });
+  const clauses = summariseEffect(trigger, context).map(sentenceFragment);
+  return {
+    frameKey,
+    clauseKeys: clauses.map((clause) => clause.key),
+    joinKey: `${NAMESPACE}SummaryJoin`,
+    params: {
+      [frameKey]: { condition: sentenceFragment(condition) },
+      ...Object.fromEntries(clauses.map((clause) => [clause.key, clause.params])),
+    },
+  };
 }
 
 /**

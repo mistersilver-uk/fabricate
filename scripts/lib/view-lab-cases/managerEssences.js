@@ -2,7 +2,11 @@
  * System scope: the essence browser, its bulk sets and the essence editor.
  */
 
-import { ANCHORED_POPOVER_SOURCES, BULK_DELETE_CARD_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  BULK_DELETE_CARD_PATTERN,
+  WORLD_SCOPE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -23,9 +27,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -44,7 +48,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
@@ -68,9 +71,43 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-inspector-verbs',
+    label: 'Manager — Essences inspector verbs',
+    // Beyond the smoke: no smoke step scrolls an essence inspector to its verbs.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The rail's four verbs, which sit below its fold on every other essence frame (issue 1521).
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="earth"] .manager-essence-identity' },
+      {
+        selector: '[data-essence-section="source"] [data-essence-action="unlink-source"]',
+        scroll: true,
+      },
+    ],
+    expectView: 'essences',
+    expectSelector: '[data-essence-section="source"] [data-essence-action="unlink-source"]',
+    expectContained: [
+      { container: 'aside.manager-inspector', target: '[data-essence-action="edit"]' },
+      { container: 'aside.manager-inspector', target: '[data-essence-action="unlink-source"]' },
+    ],
+    // Each verb on the manager button's rung, and the one primary in the success family.
+    expectLayout: {
+      controls: ['edit', 'delete', 'copy-source', 'unlink-source'].map((action) => ({
+        selector: `[data-essence-action="${action}"]`,
+        styles: `min-height: 34px; border-radius: 9px; font-size: 0.72rem${action === 'edit' ? '; background-color: var(--fab-success)' : ''}`,
+      })),
+    },
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -124,7 +161,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       // The card is claimed here alone: this is the one frame that renders a grid of them.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryCard\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
@@ -144,7 +180,7 @@ export const CASES = Object.freeze([
     expectView: 'essences',
     // The frame must show the live action, not the inert one.
     expectSelector:
-      '.fabricate-manager [data-essence-bulk-delete-card] .manager-button.is-danger:not([disabled])',
+      '.fabricate-manager [data-essence-bulk-delete-card] .fabricate-button.is-danger:not([disabled])',
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
@@ -188,7 +224,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -204,6 +240,26 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, first in the form above the tab panel.
+  managerCase({
+    id: 'manager-essence-edit-save-failed',
+    label: 'Manager — Essence edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '[data-recipe-field="essence-enabled"]' },
+      { selector: '[data-essence-edit-save]' },
+    ],
+    expectView: 'essence-edit',
+    expectSelector:
+      '.fabricate-manager #manager-essence-edit-form > [data-notice-position][role="alert"]',
+    expectCenterHit: '#manager-essence-edit-form > [data-notice-position]',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/],
+  }),
   managerCase({
     id: 'manager-essence-edit-on-craft',
     label: 'Manager — Essence edit On craft',
@@ -213,7 +269,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
       { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
@@ -231,6 +287,39 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-essence-edit-unscoped-on-craft',
+    label: 'Manager — Essence edit On craft, unscoped',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // With no world scope the editor is the unscoped one, whose On craft tab opens on the primer.
+    query: { noEssenceScope: '1' },
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '[data-essence-tab="oncraft"]' },
+    ],
+    expectView: 'essence-edit',
+    expectSelector: '[data-essence-on-craft-explainer]',
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-essence-on-craft-explainer] .manager-callout-items',
+          styles: 'margin-top: var(--fab-space-2)',
+        },
+        {
+          selector:
+            '[data-essence-on-craft-explainer] .manager-callout-item:first-child .manager-callout-item-lead',
+          styles: 'color: var(--fab-text); font-weight: 600',
+        },
+      ],
+    },
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceOnCraftTab\.svelte$/,
+      // `Callout.svelte` is a broad signal, so its route here is its BROAD_SIGNAL_CASE_OVERRIDES entry.
+    ],
+  }),
+  managerCase({
     id: 'manager-essence-edit-validation',
     label: 'Manager — Essence edit Validation',
     reaches: 'beyond',
@@ -239,7 +328,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
       { selector: '[data-essence-tab="validation"]' },
     ],
     expectView: 'essence-edit',

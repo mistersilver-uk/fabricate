@@ -24,7 +24,7 @@
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
 
@@ -449,11 +449,11 @@
       </div>
       {#if !currencyUnitsReadOnly}
         <div class="manager-character-modifier-card-header-actions">
-          <ManagerButton role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
+          <Button role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-          </ManagerButton>
-          <ManagerButton
+          </Button>
+          <Button
             data-seed-currency-presets
             disabled={!currencyPresetsSupported}
             data-tooltip={!currencyPresetsSupported
@@ -466,7 +466,7 @@
           >
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
     </header>
@@ -490,7 +490,7 @@
             showTick={false}
             ariaLabelledBy={strategyCaptionId}
             ariaDescribedBy={strategyHintId}
-            triggerData={{ 'data-world-currency-strategy-select': '' }}
+            triggerProps={{ 'data-world-currency-strategy-select': '' }}
             onChange={(next) => onSetCurrencySpendStrategy(next)}
           />
           <!-- THE PRIMITIVE'S OWN NOTE, MARKUP AND ALL (issue 1510). The provider below renders
@@ -500,7 +500,7 @@
                read alike.
 
                A `<span>` RATHER THAN THE `<small>` THIS WAS, and the element is the whole
-               mechanism. `.fabricate-field.manager-field small` (`styles/fabricate.css:9859`)
+               mechanism. `.fabricate-field.fabricate-field small` (`styles/fabricate.css:9859`)
                is ELEMENT-TYPED at (0,2,1) and `.fabricate-select-note` is (0,1,0), so on a
                `<small>` the class is out-ranked and adding it changes nothing at all — measured
                in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
@@ -534,7 +534,7 @@
               'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
               'A preconfigured adapter that reads and spends coins from the actor inventory.'
             )}
-            triggerData={{ 'data-world-currency-provider-select': '' }}
+            triggerProps={{ 'data-world-currency-provider-select': '' }}
             onChange={(next) => onSetCurrencyProvider(next)}
           />
         {:else if currencySpendStrategy === 'actorInventory'}
@@ -847,7 +847,7 @@
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
                       <IconPicker
                         value={unit.icon || 'fa-solid fa-coins'}
-                        buttonTitle={text(
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.CurrencyUnits.ChangeIcon',
                           'Change icon'
                         )}
@@ -1019,19 +1019,17 @@
                   {/if}
 
                   <div class="manager-character-modifier-actions">
-                    <ManagerButton
-                      data-currency-unit-done
-                      onclick={() => (currencyExpandedUnitId = '')}
-                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
+                    <Button data-currency-unit-done onclick={() => (currencyExpandedUnitId = '')}
+                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</Button
                     >
-                    <ManagerButton
+                    <Button
                       role="danger"
                       data-currency-unit-delete
                       onclick={() => handleDeleteCurrencyUnit(unit.id)}
                       >{text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                         'Delete currency unit'
-                      )}</ManagerButton
+                      )}</Button
                     >
                   </div>
                 </div>
@@ -1126,7 +1124,7 @@
   }
 
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for EVERY converted
-     control in this component. `.fabricate-field.manager-field select { width: 100% }`
+     control in this component. `.fabricate-field.fabricate-field select { width: 100% }`
      (`styles/fabricate.css:8065`) painted them until they became `<button>`s, and
      `.fabricate-select-trigger` declares no width at all — a trigger's box belongs to the row it
      sits in. Without this rule the spend strategy measured 68.73px on "Macro" and 118.78px on
@@ -1138,7 +1136,7 @@
 
      ONE RULE FOR THREE CONTROLS. The strategy field is the caller's own demoted `Field as="div"`
      column; the provider and the add-sub-unit control are the primitive's own labelled form,
-     whose `<Field>` emits `.fabricate-select-field`. All three are `.manager-field` columns, so
+     whose `<Field>` emits `.fabricate-select-field`. All three are `.fabricate-field` columns, so
      the descendant selector reaches them without naming either shape. Two anchors are needed
      because they sit in two blocks this component writes: `.manager-currency-strategy` holds the
      first two, and `.manager-currency-subunit-builder` — a `minmax(0, 1fr) auto` grid
@@ -1148,8 +1146,8 @@
 
      The shape is the shipped one: the three interactables roots state exactly this rule for the
      labelled form's trigger, and the player pagers state their own fills the same way. */
-  .manager-currency-strategy :global(.manager-field .fabricate-select-trigger),
-  .manager-currency-subunit-builder :global(.manager-field .fabricate-select-trigger) {
+  .manager-currency-strategy :global(.fabricate-field .fabricate-select-trigger),
+  .manager-currency-subunit-builder :global(.fabricate-field .fabricate-select-trigger) {
     width: 100%;
   }
 </style>

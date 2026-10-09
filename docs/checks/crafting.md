@@ -28,17 +28,23 @@ A one-call craft that resolves immediately — a macro or API `craft()`, with no
 ## Dynamic DC macros
 
 A GM can have a Macro calculate the difficulty for each crafting attempt.
-On **Checks › Crafting**, open **The roll** section, find the **Difficulty** card and choose **Dynamic** under **DC source**.
+On **Checks › Crafting**, open **The roll** section, find the **Difficulty** card and choose **Dynamic** under **How the number is set**.
 Then drag the Script Macro you want to use into the **DC macro** area below it.
 The macro calculates only the DC.
 It does not roll the check or choose the crafting result.
 If no Macro is linked, the Macro fails, or it cannot provide a usable number, Fabricate falls back to the recipe's chosen difficulty tier when it has one, and to the configured static DC when it does not.
 See the [Dynamic DC Macro API example]({% link api/crafting-engine.md %}#dynamic-dc-macro) for the supported inputs and a working Script Macro.
 
+This section covers a **Fixed difficulty** target.
+Under a **Character value** target the same control is labelled **How the adjustment is set** instead, and choosing **Dynamic** there hands the macro the character value already adjusted by the recipe's tier, asking it to return the number to reach or roll under, rather than a DC.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
+
 ## Named difficulty tiers
 
 Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
 You author the tiers themselves on the **Crafting** page of the **Checks** screen, where each one carries a name and the DC it puts in place of the base DC.
+Under a **Character value** target, a tier instead carries a **Difficulty adjustment** in place of the base adjustment, and a tier left without one falls back to the base adjustment and is flagged on **Validation**.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
 Each tier row has a drag handle and up and down buttons beside it, so you can reorder your named tiers by dragging a row's handle or by focusing it and using the arrow keys.
 
 {% include screenshot.html case="manager-checks-crafting-recipe-tiers" caption="Two named recipe difficulty tiers on a crafting check, each with the DC a recipe picking it is measured against." %}
@@ -47,10 +53,10 @@ Where a dynamic DC macro is also in play, the recipe's chosen tier resolves firs
 If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
 The two features compose rather than compete.
 
-On a simple pass/fail check, the per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while that check's **DC source** is **Static**.
+On a simple pass/fail check, the per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while that check's difficulty is set to **Static**.
 Switching a simple check to **Dynamic** removes that control from every recipe's **Overview** tab.
 Fabricate still honours a tier a recipe already had chosen, so the composition above is real, not only theoretical.
-On a simple check, choose the recipe's difficulty tier while the **DC source** is **Static**.
+On a simple check, choose the recipe's difficulty tier while the check's difficulty is **Static**.
 A tier you already chose keeps setting the starting point the macro adjusts, even after you switch that check to **Dynamic**.
 See [Dynamic DC macros](#dynamic-dc-macros).
 
@@ -67,6 +73,7 @@ An entry that is not a valid modifier is ignored, and the check rolls with its b
 
 Clicking **Roll** evaluates the check and posts the result to chat as a normal roll card.
 The roll uses your current chat roll mode, so a private or blind roll stays hidden from other players in the usual way.
+The result card states the roll total only for a public roll; a private, blind, self or secret check's card states its outcome alone.
 If the [Dice So Nice](https://foundryvtt.com/packages/dice-so-nice) module is installed, it animates the 3D dice for that roll.
 Dice So Nice is optional.
 Without it the roll still posts to chat as a normal roll card, just with no 3D animation.
@@ -141,6 +148,10 @@ On a relative check the handles read the difficulty numbers the offsets resolve 
 It offers the check's own DC, which is the default, and each named difficulty tier the check carries, each labelled with its DC.
 It appears only once the check has at least one tier to offer, and it is a reading aid alone.
 Choosing one re-labels the strip and changes nothing you have authored.
+
+This draggable strip is a **Higher is better** check measured against a **Fixed difficulty** only.
+A **Lower is better** check, or one measured against a **Character value**, draws the same tiers as a read-only picture with no handles, and you edit the thresholds in the tier rows instead.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
 
 Fixed tiers must not overlap, and must leave no value between the lowest and the highest belonging to no tier.
 Either fault makes the tiers impossible to draw as one strip, so the strip steps aside with a note and leaves the rows to edit.
@@ -305,35 +316,354 @@ The dice groups in a trigger come from the formula.
 When the same shape appears twice (for example two separate d20 rolls), Fabricate numbers them so you can tell them apart.
 Editing the formula can renumber the groups, so check your dice-group triggers after you change a check formula.
 
+## Roll-under and character-value checks
+
+Every pass-or-fail or routed crafting, salvage, or gathering check carries a **Which way is better** setting on **The roll** section, beside **What the roll produces**.
+**Higher is better** is the classic check that rolls over a difficulty.
+**Lower is better** instead requires the total to stay at or under it.
+A progressive check shows the setting too, but only **Higher is better** can drive it: a progressive check spends its roll as a budget, so **Lower is better** raises a blocking issue on **Validation**.
+Switching between the two keeps everything you authored on both sides: the difficulty, the recipe tiers, the triggers, and every override survive a switch in either direction, so trying **Lower is better** and switching back costs you nothing.
+
+### What the roll is measured against
+
+Below **Which way is better**, **What the roll is measured against** picks where the difficulty itself comes from.
+
+- **Fixed difficulty** is the same number for every character, set here and per recipe difficulty tier, exactly as difficulty has always worked.
+- **Character value** reads a value from the crafting, salvage, or gathering character instead.
+Write a character-data path such as `@skills.craft.value`, the same way a modifier's expression is written.
+See [Defining modifiers]({% link checks/index.md %}#defining-modifiers).
+
+A **Character value** target then takes a **Difficulty adjustment**.
+**Add a number** adds a flat amount to the character value.
+**Multiply, rounded down** scales it instead, and rounds the result down.
+A recipe difficulty tier, a salvage component's own override, or a gathering task's own override supplies that number when one is authored.
+Otherwise the check's own base adjustment does.
+
+A routed check under **Character value** and **Multiply, rounded down** leaves exactly one outcome tier with no adjustment of its own.
+That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached; **Validation** flags a check with none.
+It always sorts to the worst end of the tier list, whatever the tier is named.
+See [Outcome bands](#outcome-bands) for how a routed check's tiers are edited once the target is a character value.
+
+On the **Triggers** section, **Add a common trigger** offers the same natural-1 and natural-20 presets whichever way the check reads.
+Under **Lower is better** the low face is the best one, so the preset that used to name the highest face now names the lowest, and the one that used to force a failure on the lowest face now forces it on the highest.
+Nothing about a trigger you already authored changes when you switch **Which way is better**.
+Only the presets offered for a new one follow the switch.
+
+### How a bonus reaches a Lower is better check
+
+A **Lower is better** check reads differently at the table.
+The roll prompt shows a **Target** chip instead of a **DC** chip.
+The chip reads "stay at or under," or, on a strict comparison, "stay under."
+A flat or rolled situational bonus, and any Tool bonus or eligible named modifier, raise that target rather than joining the roll, and the prompt says so beneath the formula.
+The check's own rule sentence, under the resolved formula, states the same thing: the dice are compared raw, and every modifier that applies raises the target instead of being added to the roll.
+Where a character-value target's tier supplies its own adjustment, the rule sentence names that tier and the adjustment it applied first.
+
+### Offering a situational bonus in the prompt
+
+Every roll-graded check's roll prompt carries a **Situational bonus** field by default.
+On the check's Formula card, an **Offer a situational bonus** switch turns that field off for this check alone.
+Turned off, the roll prompt for this check shows no bonus field, caption, or help text, and the player rolls straight from the **Roll** button.
+Turning the offer off does not stop a Tool bonus, an eligible named modifier, or a bonus a Macro or companion module supplies programmatically.
+Those still apply exactly as configured.
+The switch decides only what the interactive prompt shows.
+
+### Salvage and gathering task overrides
+
+A salvage component's own check override, on the component's Salvage section, replaces the check's difficulty for that component alone.
+
+- Under **Fixed difficulty** it is a **Target override** (labelled **Salvage DC override** under **Higher is better**), offering **System default**, one option per outcome tier you have authored naming the tier and its number, and **Custom** for a number of your own.
+- Under **Character value** it is a **Difficulty adjustment override**, offering the same choices read as adjustments instead.
+
+Switching a component between **Fixed difficulty** and **Character value** keeps whichever override you had authored on the field the old target source used.
+Fabricate never rewrites it, and it stops showing that field for editing while the active target source does not read it.
+It shows a plain note in its place instead, naming the kept value and explaining that this target source does not read it, so it is not offered for editing.
+So a value you authored under one target source is exactly what comes back when you switch back to it.
+
+A **Routed** gathering task carries the equivalent single override field, labelled **DC** under **Higher is better**, or **Target** or **Adjustment** under **Lower is better** or a **Character value** target, with a **System default** placeholder and no presets to choose from, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets here.
+See [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection) for where that field sits on the task editor.
+
+### What players see
+
+An executed roll-under check, or one measured against a character value in either direction, states a **Target** row and, once the roll settles, a **Margin** row on the roll's chat card and on the crafter's own result box.
+A **Higher is better** check against a **Fixed difficulty** keeps its familiar **Needed** and **Margin** rows instead, unchanged.
+
+The Target row names the source: the character and the typed formula for a character value, for example "Sera Vane `@skills.smith.level` 12," or "fixed" for a fixed difficulty, followed by the difficulty tier's own adjustment where one applied, and any Tool bonus, named modifier, or situational bonus that raised it.
+A bonus that is itself rolled, such as a `1d4` situational bonus, states its own **Pre-rolled** row naming the formula and what it rolled, because raising the target is still something that happened during the roll.
+The Margin row reads "under the target" for a **Lower is better** check, so a positive margin always means the roll did better, whichever way the check reads.
+
+The chat card states these rows only for a public roll, the same rule its roll total follows: a private, blind, self, or secret roll's card states neither the rows nor the total.
+The result box, and a salvage's own result summary, are more forgiving: both still state the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
+
+A pass-or-fail check's chat message also names the settled target in its flavor line outside a **Higher is better** check against a **Fixed difficulty**, reading, for example, "Crafting check (Target 14)" once every benefit has raised or adjusted it.
+A routed check, which grades each outcome tier against its own threshold rather than one final number, names no target this way, whichever way it reads or what it is measured against.
+
+## Advantage and disadvantage
+
+Every pass-or-fail, routed, or progressive crafting, salvage, or gathering check that adds the dice can offer the player Advantage and Disadvantage.
+You author this on the check's Formula card, in the **In the roll prompt** group, beside [Offering a situational bonus in the prompt](#offering-a-situational-bonus-in-the-prompt).
+An **Advantage and disadvantage** control offers three modes.
+
+- **Off** gives the player a single **Roll** button, with no Advantage or Disadvantage offered.
+- **Roll extra, keep one** rolls extra dice and keeps the best of them, and is the default.
+- **Bonus die** adds a separate dice expression instead of extra dice.
+
+A success-counting check carries its own **Offer advantage and disadvantage** switch in place of this control, covered in [Advantage and disadvantage on a counting check](#advantage-and-disadvantage-on-a-counting-check).
+
+### Roll extra, keep one
+
+This mode changes only the formula's first dice group, the first block of dice your formula rolls, reading left to right.
+That group must be a plain die with no keep, explode, or other suffix of its own, such as `1d20`, `2d6`, or `1d12`.
+
+A **Dice rolled for {die}** stepper sets how many dice Advantage rolls, from the group's own count up to four more.
+On a **Higher is better** check, Advantage rolls that many dice and keeps the highest, and Disadvantage rolls the same dice and keeps the lowest.
+On a **Lower is better** check the keep flips, because the low roll is the good one there: Advantage keeps the lowest and Disadvantage keeps the highest.
+
+For example, a check whose formula begins `1d12 + @mod` rolls `2d12kh1 + @mod` on Advantage.
+A check whose formula begins `2d6` rolls `3d6kh2` with two extra dice set on the stepper.
+A check whose formula begins `1d6 + 1d20` rolls extra d6s on Advantage, never extra d20s, because the d6 comes first.
+
+When the formula's first dice group is not a plain die, such as `(1d20 + 2) * 2`, there is nothing for this mode to keep from.
+The Formula card says so directly: "The formula's first dice group is not a plain die, so the prompt has a single Roll button."
+It adds: "Choose Bonus die, or start the formula with a plain die."
+Fabricate gives the player a single Roll button and raises a Validation warning, without changing the check's other readings, so the formula's ordinary average still shows on the Formula card.
+Choose **Bonus die** instead, or move a plain die to the front of your formula.
+
+### Bonus die
+
+This mode leaves the check's own dice alone and instead adds a separate dice expression you write in the **Bonus expression** field, such as `1d6`, `2d4`, or `1d8 + 1`.
+Use it when your formula has more than one dice group, or when the game system's own advantage rule grants a fixed die rather than extra dice from the formula.
+
+On a **Higher is better** check, Advantage adds the bonus expression to the total and Disadvantage subtracts it.
+On a **Lower is better** check, Advantage raises the target the roll must stay under, making the check easier, and Disadvantage lowers it.
+
+The **Bonus expression** field takes dice and numbers joined by plus or minus, such as `1d6`, `2d4 + 1`, or `+3`.
+Its help line reads "Any dice expression: 1d6, 2d4, 1d8 + 1." while the expression is valid.
+It reads "Enter a dice expression, such as 1d6, 2d4 or 1d8 + 1." while the field is empty.
+While the expression does not parse, it reads "Not a dice expression."
+It adds: "Use dice and numbers joined by + or −, such as 1d8 + 1."
+The offer is withdrawn until the expression is fixed.
+
+### Also offer disadvantage
+
+Both summing modes carry an **Also offer disadvantage** switch, on by default.
+Turn it off, and the Formula card says "The prompt offers advantage only," dropping the Disadvantage button from the roll prompt.
+
+### The roll prompt and chat card
+
+When a check offers Advantage, its roll prompt shows three buttons: **Disadvantage**, **Roll**, and **Advantage**, each captioned with what choosing it does, for example "keep the better" and "keep the worse" under **Roll extra, keep one**, or "+1d6 to the total" and "−1d6 to the total" under **Bonus die**.
+Turning off **Also offer disadvantage** drops the Disadvantage button, leaving Roll and Advantage.
+When Advantage has nothing to offer, such as a check set to **Off**, or a **Roll extra, keep one** check with no qualifying first dice group, the prompt shows a single Roll button.
+
+The chat card and the crafter's own result box always show the formula exactly as it was rolled, extra dice included, so a `1d12 + @mod` check rolled on Advantage reads `2d12kh1 + <resolved bonus>`.
+
+### Advantage and disadvantage on a counting check
+
+A success-counting check has its own **Offer advantage and disadvantage** switch, off by default, in place of the mode control above.
+Turn it on, and a **Dice added or removed** stepper sets how many dice change the pool, from one to five.
+Advantage adds that many dice to the pool and Disadvantage removes them, always the pool, whatever **Modifiers and bonuses** sends a situational bonus to.
+The Formula card explains it directly: "Advantage adds 1 die to the pool; disadvantage removes 1," or, with more than one die set, "Advantage adds {n} dice to the pool; disadvantage removes {n}."
+
+A pool Disadvantage reduces to zero or fewer dice follows the check's own **Zero pool** setting, exactly as a shrunk pool from any other cause does.
+See [Where a bonus lands, and a pool that runs dry](#where-a-bonus-lands-and-a-pool-that-runs-dry).
+
+### Advantage warnings on Validation
+
+- **Advantage cannot keep from this formula**: the check is set to **Roll extra, keep one**, but its first dice group is not a plain die, so the prompt offers a single Roll button.
+Choose **Bonus die**, or start the formula with a plain die.
+- **A character value precedes the kept dice**: a character value such as `@skill` comes before the formula's first dice group.
+If that value itself rolls dice, Advantage still applies only to the formula's own first dice group, never to the character value's dice.
+- **The advantage bonus is not a dice expression**: the **Bonus expression** field under **Bonus die** is empty or does not parse as dice and numbers joined by plus or minus.
+
 ## Success-counting checks
 
 Some games measure a check by rolling several dice and counting how many of them individually clear a threshold, rather than adding the dice together into one total.
-Fabricate supports this as its own check type, alongside the roll-over and roll-under checks described above.
+Fabricate supports this as its own way of measuring the roll, right beside the roll-over and roll-under checks described above, and you author it on the same **Checks** page.
 
-This screen has no control yet to turn an ordinary check into a success-counting one.
-A check that already has one configured, for example one imported from a shared crafting system, still validates, previews, and rolls correctly wherever checks appear, and everything below describes what you and your players see when it does.
+### What the roll produces
 
-### How a success-counting check rolls
+**The roll** section of a crafting, salvage, or gathering check carries a **What the roll produces** control, next to **Which way is better**.
+**Add the dice** is the classic check this whole page otherwise describes, and **Count successes** turns the formula field into a set of pool controls instead.
+Switching between the two keeps everything you authored on both sides: the pool, the difficulty, the recipe tiers, the triggers, and every override survive a switch in either direction, so trying **Count successes** and switching back costs you nothing.
+**What the roll produces** is offered on every check that rolls, with two exceptions: gathering's immediate d100 mode and an Alchemy check switched off both resolve with no roll at all, so neither offers a way to measure one.
 
-A success-counting check rolls a pool of same-sized dice, such as `6d10`, and tests each die on its own against a threshold, such as `8`.
-A die that meets or beats the threshold (or, on a check set to roll low, meets or comes under it) qualifies as a success.
-Some checks also name a face that cancels a success instead of adding one, so a very unlucky die can take a success away even from a roll that otherwise qualified.
+### The structured pool
+
+Choosing **Count successes** replaces the formula field with a row of pool controls, each with its own label and a short line explaining what it does.
+
+- **Die** picks the die every dice in the pool shares, from d4 up to d100, or a larger die size Fabricate carries over from an imported check.
+- **Base pool** sets how many dice are rolled.
+Above the field, a **Number** / **Character value** choice decides whether you type a plain count or a character-data path such as `@skills.smith.rank`, the same way a roll-under target does.
+A character value can also be arithmetic on more than one value, for example `@abilities.int.value + @skills.repair.value`, so a pool sized from two character values no longer needs an Active Effect to compute it first.
+
+### Success on
+
+**Success on** sets the threshold each die is tested against, with the same **Number** / **Character value** choice **Base pool** offers.
+Beside it, a per-die test reads **At or above** or **Above** on a check set to **Higher is better**, and **At or under** or **Under** on one set to **Lower is better**, matching [Which way is better]({% link checks/index.md %}#which-way-is-better) exactly.
+This is the only place that comparison is edited for a counting check: the Difficulty card's own comparison control does not apply here, because there is no single roll total left to compare.
+A progressive counting check offers the same per-die test, **At or above** by default, and can qualify dice by **Above** as a pass-or-fail or routed check can.
+Each resolution mode keeps its own per-die test, so check it after switching a check to progressive.
+
+### Explode and cancel
+
+**Explode** and **Cancel** each offer the same three choices: **Off**, the pool's best or worst face by default, or **From a face** you name yourself with its own stepper.
+A die showing the explode face is rolled again, and both dice count.
+**Keeps exploding** lets that chain continue for as long as the new face keeps qualifying, and **Once** stops it after one extra die.
+A die showing the cancel face removes one success instead of adding one, so a very unlucky die can take a success away even from a roll that otherwise qualified.
 A die that both qualifies and cancels on the same roll contributes nothing, and Fabricate marks it both ways rather than hiding the cancellation.
-The check passes once the dice qualify at least as many successes as the check needs.
 
-The roll prompt and the chat card both show the pool and threshold as a line such as "6d10 · each ≥ 8", a chip stating how many successes are needed (for example "2 successes needed", or "1 success needed" for a single success), and, where the check explodes or cancels on a face, a short rule such as "best face explodes" or "worst face cancels" (or naming the exact face when the check names one instead of the highest or lowest).
-The pool and the threshold can each be a plain number, a single character-data path such as `@skills.smith.rank`, or arithmetic on them, for example `@abilities.int.value + @skills.repair.value`, so a threshold that combines two character values no longer needs an Active Effect to compute it first.
+Choosing **From a face** and leaving its stepper empty is a blocking issue: Fabricate cannot roll a check that explodes or cancels from no face at all, and the **Validation** page says so under [Warnings you may see on Validation](#warnings-you-may-see-on-validation).
 
-If a Tool bonus, an eligible check modifier, or the roll prompt's **Situational bonus** applies to a success-counting check, it either adds more dice to the pool or moves the threshold, and the prompt tells you which with "Each adds dice." or "Each moves the threshold."
-A rolled bonus, such as `1d4`, is rolled on its own before the pool or threshold settles, and its result is what adds the dice or moves the threshold.
-It posts to chat as its own roll alongside the main one, rather than adding free successes the way an un-noticed bonus used to.
+### Where a bonus lands, and a pool that runs dry
 
-If the acting character is missing a value the pool or the threshold needs, or that value is not a number, Fabricate refuses to roll rather than guessing zero, and says so before any dice are cast.
-Depending on how the check is set up, a pool that works out to zero dice or fewer either fails the check outright with no roll at all, or is rolled as a single die regardless.
-Either way, Fabricate never quietly treats a missing or zero pool as an ordinary-sized roll.
+**Modifiers and bonuses** decides what an eligible Tool bonus, check modifier, or the roll prompt's **Situational bonus** does to a counting check: **Add dice to the pool** rolls more dice, and **Move the threshold** shifts what every die is tested against instead.
+A rolled bonus, such as `1d4`, is rolled on its own before the pool or threshold settles, posts to chat as its own roll alongside the main one, and its result is what adds the dice or moves the threshold, never a free success added straight to the count.
 
-On a **Routed by check** system, more net successes (successes minus cancellations) always wins a better outcome tier, whichever direction the individual dice compare in.
-On a **Progressive** check, the net successes become the budget it spends down your ordered results, never less than zero even when cancellations outweigh successes on an unlucky roll.
+**Zero pool** decides what happens when the settled pool works out to zero dice or fewer.
+Switched on, the check fails automatically with no dice rolled at all.
+Switched off, Fabricate still rolls at least one die rather than treating a shrunk pool as an ordinary-sized roll.
+
+### What actually gets rolled
+
+Under the pool controls, **What actually gets rolled** shows the composed roll exactly as Fabricate will roll it, the same way the ordinary formula card shows its resolved expression.
+It reads as a short line such as "2d6, each ≥ 4", with any applied modifier shown as its own labelled chip on the term it moves, and, where the check explodes or cancels, a trailing note such as "explodes on 6" or "1 cancels a success".
+Beside the kicker sits **expected successes**, the average number of successes the pool produces for the character chosen in **Preview as**, shown to two decimal places and marked "nearly exact" once the dice explode often enough to leave a very small chance unaccounted for.
+
+Under the composed line, an actor line resolves the pool and threshold against the character chosen in **Preview as**: "For Sera Vane: 3d6, each ≥ 5", noting when a benefit grew the pool or moved the threshold.
+With no character chosen, it invites you to choose one in **Preview as** instead.
+If the chosen character is missing a value the pool or the threshold reads, or that value is not a number, the line names the missing value rather than guessing zero.
+
+### How many successes the check needs
+
+The **Difficulty** card reads **Successes needed** for a counting check, edited with a stepper from 0 to 20.
+**How the successes needed are set** offers the same **Static** / **Dynamic** choice a difficulty DC does.
+**Static** sets the number here and per recipe tier, and is the intended route for a counting check.
+**Dynamic** hands the number to a Script Macro instead, the same way [Dynamic DC macros](#dynamic-dc-macros) works, except the macro returns the successes needed rather than a DC.
+Use **Dynamic** only when no recipe tier can express the rule you need.
+
+Recipe tiers carry their own **Successes** column in place of DC, so a recipe's chosen difficulty tier can ask for more or fewer successes than the check's own number.
+A tier with no successes of its own reads "Set successes needed" and falls back to the check's number in the meantime, exactly as a DC tier falls back today.
+Adding a new tier seeds it at the check's own successes needed, the same way a new DC tier seeds from the check's own DC.
+
+On a routed check, each outcome tier's relative threshold is edited as **Extra successes** instead of a DC delta, so a tier reads as some number of successes over what the check needs rather than over a DC.
+The **Outcome bands** strip becomes a read-only picture of those thresholds in successes for a counting check, because a count has no single roll total for a drag handle to move.
+While **Cancel** is switched on, the strip shows a **Botch** band below zero net successes, naming the automatic failure a heavily cancelled roll produces.
+
+### Successes-needed overrides
+
+A salvage component's own **Successes needed override**, on the component's Salvage section, replaces the check's successes needed for that component alone, the same way its dormant DC override does for a roll-over check.
+It offers the same named presets a DC override does, each read as a plain number of successes instead of a DC, a **Custom** entry for a number of your own, and **System default** to fall back to the check's own successes needed.
+Where you already had a DC override recorded, it is kept but has no effect on a counting check, so switching back to **Add the dice** later restores it exactly as you left it.
+See [Salvage]({% link components/salvage.md %}) for the component editor these controls live on.
+
+A **Routed** gathering task carries the equivalent single **Successes needed override** field, edited with one stepper and a **System default** placeholder, and no presets to choose from.
+See [Gathering Checks]({% link checks/gathering.md %}) and [Progressive Checks]({% link gathering/tasks.md %}#progressive-checks) for where that field sits on the task editor.
+
+### Botch and other count triggers
+
+A counting check's triggers read net successes, successes minus cancellations, rather than a roll total, and [Tier stepping](#tier-stepping) and [Tool breakage triggers](#tool-breakage-triggers) work exactly as described above once a trigger's condition is authored that way.
+Adding a trigger to a counting check offers presets built for the pool's own die: the worst face forces an automatic failure, and, on a routed check, the best face steps up a tier while the worst face steps down one.
+While **Cancel** is switched on, a **Botch** preset is offered too: an automatic failure, or the lowest tier on a routed check, whenever the net successes fall below zero.
+You can still author a trigger by hand against **Net successes** directly, for any comparison the preset list does not cover.
+
+### What players see
+
+An executed success-counting check states its dice tiles, one per die, and its count rows, **Success on**, **Count**, and **Needed**, on the roll's chat card and on the crafter's own result box.
+
+The chat card states them only for a public roll, the same rule its roll total follows: a private, blind, self, or secret roll's card states neither the tiles, the rows, nor the net.
+The result box, and a salvage's own result summary, are more forgiving: both still state the tiles and the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
+
+### Additional dice
+
+Turn on **Allow players to roll additional dice**, under the pool controls, to let a player spend a resource to roll more dice than the pool's **Base pool** alone would give them.
+Bought dice always add straight to the pool itself, even on a check where **Modifiers and bonuses** sends other bonuses to the threshold instead.
+Set **Most additional dice per roll** to cap how many dice one roll can ever buy, from one up to twenty.
+
+Choose what pays for them with **Paid for by**.
+
+- **Value on the crafting character** spends a number stored on the character, such as a resource your game system tracks on the character sheet.
+Type its path under **Path on the crafting character**.
+Fabricate reads and writes that value directly, so a player can only spend from a character they themselves can edit, and the roll prompt tells them so when they cannot.
+An Active Effect currently changing that value also makes it unavailable to spend from, because spending would not actually lower a value the effect is holding in place.
+- **Read and spend macros** hand the whole question to two Script Macros you write and drop into the **Read macro** and **Spend macro** areas: one that reports how many units the character, or whatever the resource represents, can currently afford, and one that deducts the cost once dice are bought.
+A macro is not limited to reading and writing the rolling character, so this is also how you offer a resource no single player owns outright, such as a shared pool of points a whole party spends together and you track wherever you choose.
+
+Either way, give the resource a name under **Resource name** so the prompt names what is being spent, for example "Momentum 2 available · Spends 1 Momentum."
+Leave it blank and the prompt names only the amount, with no resource name attached.
+
+#### Writing the macros
+
+Both the read macro and the spend macro must be Script Macros.
+Fabricate hands each one everything it needs as its one argument, so write the macro to read from that argument rather than from the rolling character, the token, or the active speaker: Fabricate does not set any of those up as separate values the way Foundry's own macro execution does.
+The read macro returns how many units can currently be spent.
+The spend macro deducts the cost and returns a truthy value once it has done so.
+A spend macro that deducts the resource and then returns a falsy value, or throws, tells Fabricate the spend failed, so the roll is aborted even though the macro already took the cost.
+Fabricate never undoes or refunds whatever a macro already changed, so write a spend macro that only reports failure when you are sure nothing was taken.
+On a check the Game Master resolves from the Journal, both macros must finish within fifteen seconds.
+The read macro also runs often on its own: Fabricate asks it how much is available every time a prepared counting check with additional dice turned on is described in the Journal, so write it with no side effects of its own, reporting a number and changing nothing else.
+
+#### Where the macros run, and as whom
+
+A salvage roll, single or in a batch, always reads, spends, and rolls on the spot, on the salvager's own computer.
+An immediately-resolved crafting, alchemy, or gathering check works the same way.
+A check the Game Master instead resolves later from the Journal, because the activity is timed, reads and spends on the Game Master's own computer once the Game Master resolves it, acting on behalf of whichever player started the attempt.
+
+#### No refunds
+
+Fabricate never refunds additional dice, for any reason.
+If the main roll cannot complete after the resource has already been spent, for example because the dice exploded past what Foundry allows, the spend still stands and the player is told so.
+The same is true when a Game Master-resolved crafting stage or gathering step refuses or fails after the check has already settled: whatever was spent to buy dice for that roll is gone, even though the stage or step itself did not complete.
+A cancelled run that would normally hand back its ingredients never hands back a spent resource.
+
+#### Spending from more than one computer at once
+
+On one computer, every spend that uses the same macro pair happens one at a time, whichever character it is spending for, because Fabricate queues by the macro pair itself rather than by the character.
+Buying for two different characters through the same macros on one computer therefore never collides, but the second spend always waits for the first to finish.
+Across different computers there is no such queue.
+Foundry has no way to check and update a stored value as one atomic step across computers, so a character value, in particular, can occasionally lose a decrement when two players buy from it at nearly the same moment.
+If your macro pair represents a shared, heavily contested resource, write the spend macro to protect itself against that, since Fabricate cannot protect it for you across computers.
+
+#### The roll prompt
+
+When additional dice are available, the roll prompt adds a stepper for choosing how many to buy, up to the limit the resource and **Most additional dice per roll** allow together, and states what buying that many would spend.
+
+Each button in the prompt, Roll, Advantage, and Disadvantage, is judged on its own.
+A button a player could never succeed with, even after buying the most dice they can afford, is disabled with a note explaining why, but a sibling button that still has a path to success is never blocked along with it.
+Advantage, for example, can stay enabled and offer a real chance of success even while Roll and Disadvantage are both disabled.
+
+When modifiers have already reduced the pool all the way to zero, and even the most dice the player could afford still could not lift it back above zero, Fabricate blocks the roll outright and says so, because no amount of buying would help.
+
+On a secret check, the prompt never states how many successes are needed and never blocks a button on that basis.
+The player may always buy dice and roll, exactly as before additional dice existed.
+
+A batch of salvage rolls offers one shared control for the whole batch, when every row in it draws on the same character and the same resource.
+Buying a number of dice there spends that many for every roll the batch covers, and a button is disabled only when every roll in the batch would be disabled under it on its own.
+
+#### The Preview simulator
+
+On a counting check with additional dice turned on, the **Outcome preview** panel gains its own stepper for trying out different numbers of bought dice.
+Rolling from the preview never spends anything and never runs either macro: it is a what-if tool, not a real purchase.
+
+#### Readiness
+
+The **Validation** page flags additional dice left half set up.
+Turning the toggle on with no resource chosen yet raises a blocking issue telling you to finish setting one up, or to turn additional dice off.
+A **Path on the crafting character** that is not a plain stored value, such as one written as an expression or naming a list entry, raises a second blocking issue.
+A **Read macro** or **Spend macro** that cannot be resolved as a Script Macro raises a third.
+Choosing a character under **Preview as** can also surface a note that the chosen character has no number there to spend, without that note counting toward **Validation**.
+Turning additional dice on also raises how many successes the check could ever reach for the purposes of [Warnings you may see on Validation](#warnings-you-may-see-on-validation), since bought dice are now part of what the pool could produce.
+
+### Converting a free-text formula that counts successes
+
+A check you import, or one you typed a formula into before switching to **Count successes**, can carry a formula that already uses a success-counting die suffix while **What the roll produces** is still set to **Add the dice**.
+Fabricate raises a warning for that formula, because a counting formula left in **Add the dice** still adds every bonus to its count: a Tool bonus, an eligible check modifier, or a situational bonus lands on the formula's total the ordinary way, and that total is what the die suffix then measures, so the bonus corrupts the very count it was meant to help.
+
+Where the formula is simple enough, the warning's row offers a **Convert to count successes** action.
+Converting rebuilds the check with the structured pool controls above: the die, the pool, the per-die test, and any explode or cancel face all come from the formula, and the check's DC and every recipe tier's DC become their successes needed.
+A check graded on passing above its DC gets one extra success added on top, so the converted check still passes on exactly the rolls the old one did.
+The formula and every DC stay on the check after converting, kept for reference, and nothing about them is used to grade the roll any more.
+
+A formula built a different way, for example one that counts failures instead of successes, keeps the warning with no Convert action, and you rebuild it by hand with the pool controls instead.
+Converting never rewrites a component's or a task's own DC override, so where one of those was relying on the check's DC alone, it now relies on the check's successes needed instead, and the row names anything affected that way.
 
 ### What the previews will tell you
 
@@ -349,7 +679,7 @@ If an authored outcome lets a below-zero result still succeed, there is no separ
 The **Outcome preview** panel rolls a real test check and announces the whole result together.
 A medallion at the top carries the net successes, captioned "net", above a breakdown line reading the qualifying and cancelling dice and the character rolled for, for example "3 qualified − 1 cancelled = 2 net · Sera Vane".
 Beside the net sits a line stating how many successes the check needs and the margin by which the roll cleared or missed that, for example "needs 2 · margin +1".
-Under that sit the dice themselves, one tile per die, marked qualified, cancelled, or exploded with its own glyph, over the legend "✓ qualified · ✕ cancelled · ↻ exploded".
+Under that sit the dice themselves, one tile per die, marked qualified, cancelled, or exploded with its own glyph, over a legend that repeats each of those glyphs beside its word: qualified, cancelled, exploded.
 A card below states the outcome, tinted for success or failure, titled "Success", "Failure", the outcome tier's name, or, only when the net fell below zero and the roll still failed, "Botch", each naming what it does.
 Most results carry a note under the card explaining that the margin is shown so that higher is always better, counting successes over what was needed.
 A trigger that forced or rerouted the result explains that in the note instead, and an unrescued botch shows no note at all.
@@ -363,10 +693,17 @@ The **Validation** page reports a success-counting check's own set of issues, ea
 - **The base pool cannot be worked out** or **The success threshold cannot be worked out**: the pool or the threshold uses dice, or cannot be read as arithmetic.
 - **A face is not on the die**: an explode or cancel face is higher than the die can roll.
 - **The dice would explode forever**: every face on the die explodes, so the roll could never stop.
-- **A recipe tier sets no successes needed**: until this screen gains its own control for it, a recipe tier with no successes needed falls back to the check's own number and is no harder than the default.
-- **Successes needed above the most dice that can be rolled**, and **Successes needed above the base pool**: the check asks for more successes than the dice it allows could ever produce without exploding, or without adding more dice than the base pool has.
+- **A face to explode or cancel from is not chosen**: **From a face** is picked for **Explode** or **Cancel** with no face set on its stepper, so the check cannot roll until you choose one.
+This is a blocking issue.
+- **A recipe tier sets no successes needed**: a recipe tier with no successes needed of its own falls back to the check's own number and is no harder than the default.
+This is a blocking issue: set successes needed on every tier before enabling the system.
+- **Successes needed above the most dice that can be rolled**: the check asks for more successes than the dice it allows could ever produce, even once exploding and every added die are counted.
+This is a blocking issue.
+- **Successes needed above the base pool**: the check asks for more successes than the base pool alone has, though exploding or an added die could still reach it.
 - **The base pool is too large to roll**: the pool is larger than the 999 dice Foundry can roll in one go, so the check cannot roll at all.
 While this is raised, the two issues above are not evaluated.
+- **This formula counts successes, but the check adds the dice**: see [Converting a free-text formula that counts successes](#converting-a-free-text-formula-that-counts-successes).
+- **A trigger reads dice the pool never rolls**: a trigger built for a formula this check no longer rolls is kept, but cannot fire while the check counts successes, and fires again if you switch back to **Add the dice**.
 
 With a **Preview as** character chosen, the same panel may also warn that the character is missing a value the check reads, or that the value it read is not a number.
 Both warnings name the character and disappear the moment you choose one that has what the check needs.

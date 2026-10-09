@@ -205,3 +205,34 @@ test('fallback: a result with sourceFallbacks also warns with the fallback summa
     )
   );
 });
+
+test('a result whose world registrations could not be written warns once, after the summary', async () => {
+  const deps = collaborators({
+    importPack: spy({
+      added: 2,
+      updated: 0,
+      skipped: 0,
+      total: 2,
+      sourceFallbacks: [],
+      worldRegistrationError: new Error('the scope write was refused')
+    })
+  });
+  const option = buildCompendiumImportContextOption(deps);
+
+  await option.onClick({}, packTarget('world.items'));
+
+  assert.deepEqual(
+    deps.notify.warn.calls.map(([message]) => message),
+    ['FABRICATE.Admin.Items.WorldCatalogueNotUpdated']
+  );
+  assert.equal(deps.notify.info.calls.length, 1, 'the import summary still posts');
+});
+
+test('a result with no registration failure posts no such warning', async () => {
+  const deps = collaborators();
+  const option = buildCompendiumImportContextOption(deps);
+
+  await option.onClick({}, packTarget('world.items'));
+
+  assert.deepEqual(deps.notify.warn.calls, []);
+});

@@ -31,11 +31,11 @@ const mountPicker = (props) =>
   harness.mount({
     options: OPTIONS,
     triggerLabel: 'Register item',
-    triggerAriaLabel: 'Register item',
-    dialogAriaLabel: 'Register item',
+    ariaLabel: 'Register item',
+    panelLabel: 'Register item',
     searchPlaceholder: 'Search world items…',
     emptyHint: 'Nothing to register',
-    onChoose: () => {},
+    onSelect: () => {},
     ...props,
   });
 
@@ -46,7 +46,7 @@ function triggerClasses() {
   return [...trigger.classList].filter((name) => !name.startsWith('svelte-'));
 }
 
-describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
+describe('1371 SearchablePopover — the Button trigger form', () => {
   before(harness.setup);
   after(harness.teardown);
 
@@ -61,7 +61,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     harness.remount();
   });
 
-  it('renders the real ManagerButton when asked, appending the caller`s class', async () => {
+  it('renders the real Button when asked, appending the caller`s class', async () => {
     await mountPicker({
       triggerButton: { size: '38' },
       triggerClass: 'manager-world-component-register-action',
@@ -70,12 +70,11 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
       triggerClasses(),
       [
         'fabricate-button',
-        'manager-button',
         'fab-manager-button',
         'is-size-38',
         'manager-world-component-register-action',
       ],
-      '`triggerClass` reaches `ManagerButton`s `class` prop, which APPENDS — a caller class ' +
+      '`triggerClass` reaches `Button`s `class` prop, which APPENDS — a caller class ' +
         'that REPLACED the primitive`s own would unstyle the button while every data-* ' +
         'selector kept resolving'
     );
@@ -86,7 +85,6 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     await mountPicker({ triggerButton: { role: 'danger', fullWidth: true } });
     assert.deepEqual(triggerClasses(), [
       'fabricate-button',
-      'manager-button',
       'fab-manager-button',
       'is-danger',
       'is-full-width',
@@ -97,14 +95,14 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   it('drops an unrecognised role and rung rather than emitting a dead class', async () => {
     // The primitive's own closed-set contract, read through this form.
     await mountPicker({ triggerButton: { role: 'lavender', size: '37' } });
-    assert.deepEqual(triggerClasses(), ['fabricate-button', 'manager-button', 'fab-manager-button']);
+    assert.deepEqual(triggerClasses(), ['fabricate-button', 'fab-manager-button']);
     harness.remount();
   });
 
   it('hands the popover`s OWN contract through, rather than replacing it', async () => {
     await mountPicker({
       triggerButton: { size: '38' },
-      triggerData: { 'data-scoped-list-register-item': '' },
+      triggerProps: { 'data-scoped-list-register-item': '' },
       triggerTitle: 'Register an Item',
     });
     const trigger = harness.target.querySelector('button');
@@ -114,7 +112,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     assert.equal(trigger.getAttribute('title'), 'Register an Item');
     assert.ok(
       trigger.hasAttribute('data-scoped-list-register-item'),
-      '`triggerData` still lands on the control itself, not on a wrapper around it'
+      '`triggerProps` still lands on the control itself, not on a wrapper around it'
     );
     harness.remount();
   });
@@ -171,13 +169,13 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
       'utf8'
     );
     const button = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/components/ManagerButton.svelte'),
+      resolve(repoRoot, 'src/ui/svelte/components/Button.svelte'),
       'utf8'
     );
     assert.match(
       popover,
-      /<ManagerButton\s+bind:element=\{triggerElement\}/,
-      'the ManagerButton trigger must bind its node, or the panel anchors on the picker root'
+      /<Button\s+bind:element=\{triggerElement\}/,
+      'the Button trigger must bind its node, or the panel anchors on the picker root'
     );
     assert.match(
       popover,
@@ -191,7 +189,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     assert.match(
       button,
       /element = \$bindable\(null\)/,
-      '`ManagerButton` must PUBLISH that binding: `bind:this` on a component yields the instance'
+      '`Button` must PUBLISH that binding: `bind:this` on a component yields the instance'
     );
     assert.match(
       button,

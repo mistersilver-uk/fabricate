@@ -7,11 +7,6 @@ import {
 import { getMatchHandler } from '../models/match/matchTypes.js';
 import { Tool } from '../models/Tool.js';
 import {
-  TOOL_IMAGE_SENTINEL,
-  resolveToolDisplayImage,
-  resolveToolDisplayName,
-} from '../models/toolDisplay.js';
-import {
   applyToolUsageAndBreakage,
   createToolReplacementCreator,
   evaluateCheckBreakage,
@@ -25,9 +20,9 @@ import {
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
-import { planComplications, publicComplications } from '../utils/complicationPlan.js';
+import { planComplications } from '../utils/complicationPlan.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
-import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateSubmissionEssences,
@@ -41,7 +36,10 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import { automaticStageBlocker, stageIngredientSet } from './automaticStageBlocker.js';
+import { AWARD_CHOICE_PENDING, AwardChoiceSettler } from './awardChoiceSettle.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
@@ -68,9 +66,9 @@ import {
   actorRollData,
   attributeTargetBasis,
   checkTargetRefusal,
-  progressiveTargetRefusal,
   refusalMessage,
 } from './checkTarget.js';
+import { awardRoutedResults, memberResultRow } from './choiceGroupAward.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
 import {
@@ -79,12 +77,25 @@ import {
   progressiveCheckRefusal,
   resolveActivityCheck,
 } from './countCheck.js';
+import { checkRequest, checkRequestOptions } from './countCheckRoll.js';
 import {
   checkDisplayForCard,
   rollTotalForCard,
   tierStepForCard,
   VERSIONED_EXECUTION_CONTEXT,
 } from './craftCardFields.js';
+import {
+  brokenToolChatEntries,
+  complicationChatEntries,
+  rolledAwardChatParts,
+  toolChatEntries,
+} from './craftChatEntries.js';
+import {
+  craftingCheckAnchorDc,
+  resolveActiveCheckTarget,
+  resolveCraftingCheckTarget,
+  selectedCheckTier,
+} from './craftingCheckRefusal.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
   CraftingLifecycleExecutionError,
@@ -92,6 +103,7 @@ import {
 } from './CraftingLifecycleExecutor.js';
 import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
+  cancelledCraftResult,
   commitCraft,
   continueCollapsedChain,
   misconfiguredCheckResult,
@@ -124,9 +136,30 @@ import {
   itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { pairPlannedTools } from './plannedToolPairs.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
-import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
+import { postResultCard } from './resultCardPost.js';
+import {
+  attachRewardPlan,
+  awardHistory,
+  craftRewardSeams,
+  hydrateRewardState,
+  isRewardResult,
+  planReward,
+  rewardHistory,
+  rewardRefusals,
+  settleRewardPlan,
+  stageAwardHistory,
+  versionedAwardEffects,
+} from './resultKindAward.js';
+import {
+  resolveRolledAmount,
+  rolledAwardRecord,
+  stageResultRefusal,
+  validateCraft,
+  validateSalvage,
+} from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
@@ -138,6 +171,7 @@ import {
   sourceItemQuantity,
   receiptQuantity,
   requireDocumentAcknowledgment,
+  splitHistoryReceipts,
   unconfirmedHistoryError,
   linkResultGroups,
   assertNativeEffectsUninvoked,
@@ -152,16 +186,17 @@ import {
   openSalvageRun,
   publishSalvageFailure,
   publishSalvageSuccess,
+  refuseSalvage,
   resolveSalvageFailure,
   resolveSalvageRunRecord,
   runSalvageCheck,
   salvageRefusal,
+  settleSalvageRoll,
   validateSalvageTools,
 } from './salvagePipeline.js';
 import {
   resolvedComponentsFor,
   resolvedEssencesFor,
-  resolvedToolsFor,
   salvageToolsFor,
 } from './scopedEntityReads.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
@@ -179,18 +214,28 @@ import {
   evaluateToolCheckContribution,
   ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
+import {
+  authorityUnavailableResult,
+  versionedFailure,
+  versionedTransitionResult,
+} from './versionedCommandResults.js';
 
 /** The contributions and the evaluation that placed them come from one prepared collection; the
- * check config supplies the prompt's situational-bonus offer, and the executed roll mode is
- * reported for the result card. */
+ * check config supplies its situational-bonus offer and advantage rule, and the executed roll mode
+ * is reported for the result card. */
 function checkRollOptions(options, { contributions, evaluation }, config) {
   return {
     ...options,
     toolContributions: contributions,
     evaluation,
-    offerSituationalBonus: config?.offerSituationalBonus !== false,
+    ...authoredOfferOptions(config),
     reportVisibility: true,
   };
+}
+
+/** The prompt options `input` builds, with its `interactive` request's own roll options. */
+function requestRollOptions(input) {
+  return { ...buildInteractiveRollOptions(input), ...checkRequestOptions(input.interactive) };
 }
 
 /** The executed target's opening terms: the resolution's, unless a dynamic macro replaced its
@@ -252,16 +297,6 @@ function toolDisplayReference(tool, recipe = null, recipeManager = null) {
   const resolved = recipeManager?.resolveComponentName?.(recipe, componentId);
   if (resolved) return resolved;
   return componentId || tool?.id || 'unknown';
-}
-
-/** What a card states about the rolled amounts an awarded array carries (issue 1645): the live
- * rolls the message rides on, and the empty awards that created no item and so are their own row. */
-function rolledAwardChatParts(awarded) {
-  const awards = awarded?.rolledAwards ?? [];
-  return {
-    rolls: awards.map((award) => award.roll).filter(Boolean),
-    emptyAwards: awards.filter((award) => award.quantity === 0),
-  };
 }
 
 /** One award's rolled-amount evidence (issue 1645): the persistable record, plus the live `Roll` and
@@ -355,7 +390,8 @@ export class CraftingEngine {
   async processVersionedWorldTime({ worldTime = Number(game.time?.worldTime || 0) } = {}) {
     const requestExecute = this.versionedRunAuthority?.requestExecute;
     if (typeof requestExecute !== 'function') return [];
-    const candidates = this._craftingRunManager()?.listDueVersionedRuns?.(worldTime) ?? [];
+    const owes = (run, actor) => this._awardChoices().blocks(run, actor);
+    const candidates = this._craftingRunManager()?.listDueVersionedRuns?.(worldTime, owes) ?? [];
     const results = [];
     for (const candidate of candidates) {
       let expectedRevision = candidate.expectedRevision;
@@ -451,7 +487,7 @@ export class CraftingEngine {
     const { evaluation } = checkTarget;
     const preparedTools = await this._prepareToolCheckBonuses(
       activeCheck.rollFormula,
-      prepared.toolValidation.tools,
+      prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       evaluation
     );
     const rollFormula = preparedTools.formula;
@@ -520,21 +556,12 @@ export class CraftingEngine {
    * roll; a refusal throws before any mutation. A progressive slot has no target: it refuses
    * summed roll-under, and a count pool that cannot resolve. */
   _versionedCheckTarget(activeCheck, recipe, actor) {
-    const evaluation = activeCheckEvaluation(activeCheck.config);
-    const progressive = activeCheck.slot === 'progressive';
-    let resolved = { ok: true, target: null, source: null };
-    if (progressive && evaluation.product !== 'count') {
-      const reason = progressiveTargetRefusal(evaluation);
-      if (reason) resolved = { ok: false, reason };
-    } else if (activeCheck.slot) {
-      resolved = this._resolveCheckTarget(activeCheck.config, recipe, actor);
-    }
-    if (!resolved.ok) {
-      if (!(activeCheck.checkUsable || activeCheck.requiresCheck)) {
-        return { evaluation, target: null, source: null };
-      }
+    const decision = resolveActiveCheckTarget(activeCheck, recipe, actor);
+    const { evaluation, progressive, resolved } = decision;
+    if (decision.refuses) {
       throw new CraftingLifecycleExecutionError(refusalMessage(resolved), 'CHECK_TARGET_INVALID');
     }
+    if (!resolved.ok) return { evaluation, target: null, source: null };
     return {
       evaluation,
       target: progressive ? null : resolved.target,
@@ -840,9 +867,8 @@ export class CraftingEngine {
     return versionedFailure(error?.message || 'The crafting stage could not be started.');
   }
 
-  /** Why a versioned run may not start: a missing recipe or actor, a viewer the recipe is not
-   * craftable for, or an invalid recipe. A grant-attested alchemy match bypasses the visibility
-   * guard. `null` when the run may start. */
+  /** Why a versioned run may not start, `null` when it may: no recipe or actor, a viewer it is not
+   * craftable for (unless a grant attests an alchemy match), or `validateCraft`'s refusal. */
   _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted, runManager }) {
     if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
     if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
@@ -865,7 +891,7 @@ export class CraftingEngine {
           : null;
       if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
-    const validation = recipe.validate?.({ Roll: diceEngine() }) ?? { valid: true, errors: [] };
+    const validation = validateCraft(recipe, actor, this.resolutionModeService, this._refusals());
     if (validation.valid) return null;
     return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
   }
@@ -957,7 +983,7 @@ export class CraftingEngine {
       trusted,
       requestId,
     });
-    if (!committed.success) return versionedFailure(committed.message);
+    if (!committed.success) return versionedFailure(committed.message, committed.blocker);
     return {
       ...versionedTransitionResult(committed.run, { success: true, disposition: 'started' }),
       started: true,
@@ -1002,7 +1028,7 @@ export class CraftingEngine {
       trusted,
       requestId,
     });
-    if (!committed.success) return versionedFailure(committed.message);
+    if (!committed.success) return versionedFailure(committed.message, committed.blocker);
     return {
       ...versionedTransitionResult(committed.run, { success: true, disposition: 'time-armed' }),
       started: true,
@@ -1139,7 +1165,7 @@ export class CraftingEngine {
       selectionPlan: persistedSelection,
       journal,
     });
-    if (!prepared.valid) return versionedFailure(prepared.message);
+    if (!prepared.valid) return versionedFailure(prepared.message, prepared.blocker);
     const executor = new CraftingLifecycleExecutor({
       runManager,
       consumeExecutionGrant: (...args) =>
@@ -1334,7 +1360,14 @@ export class CraftingEngine {
       error.receipts?.length > 0
         ? error.receipts
         : run.steps?.[saved.currentStepIndex]?.[receiptKey];
-    if (Array.isArray(prefix)) stage[receiptKey] = prefix.map(itemReceipt);
+    if (Array.isArray(prefix)) {
+      // A retained credit or grant keeps its own field; only Item receipts are Item rows.
+      const { items, ...rewards } = splitHistoryReceipts(prefix);
+      stage[receiptKey] = items.map(itemReceipt);
+      for (const [key, records] of Object.entries(rewards)) {
+        if (records.length > 0) stage[key] = records;
+      }
+    }
     await runManager.updateRun(actor, saved);
   }
 
@@ -1400,9 +1433,7 @@ export class CraftingEngine {
   }
 
   _selectedIngredientSet(step, selectedId) {
-    const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
-    if (selectedId == null || selectedId === '') return sets[0] ?? null;
-    return sets.find((set) => String(set?.id) === String(selectedId)) ?? null;
+    return stageIngredientSet(step, selectedId);
   }
 
   _versionedGateReady(run) {
@@ -1520,8 +1551,19 @@ export class CraftingEngine {
    * journal, a started stage from its START snapshot, an unstarted one from live inventory. */
   _versionedStagePreparation({ resuming = false, started = false, journal = null, ...stage }) {
     if (resuming) return this._reconstructVersionedStagePreparation({ ...stage, journal });
-    if (started) return this._reconstructStartedVersionedStage(stage);
-    return this._prepareVersionedStage(stage);
+    if (!started) return this._prepareFreshVersionedStage(stage);
+    // A started stage has spent its inputs; it re-runs only the formula and chooser refusals.
+    const refusals = { ...this._refusals(), refuseRewards: null };
+    const refused = stageResultRefusal(stage, this.resolutionModeService, refusals);
+    return refused ?? this._reconstructStartedVersionedStage(stage);
+  }
+
+  /** An unstarted stage's preparation, refused while an earlier stage's claimable choice is owed
+   *  or by its own result pre-flight. */
+  async _prepareFreshVersionedStage(stage) {
+    if (this._awardChoices().blocks(stage.run, stage.actor)) return AWARD_CHOICE_PENDING;
+    const refused = stageResultRefusal(stage, this.resolutionModeService, this._refusals());
+    return refused ?? this._prepareVersionedStage(stage);
   }
 
   /** Prepare a stage and, in one journalled operation, consume its inputs, lock its selection and
@@ -1540,7 +1582,7 @@ export class CraftingEngine {
     trusted,
     requestId,
   }) {
-    const prepared = await this._prepareVersionedStage({
+    const prepared = await this._prepareFreshVersionedStage({
       run,
       actor,
       componentSourceActors,
@@ -1549,7 +1591,7 @@ export class CraftingEngine {
       selectedSet,
       selectionPlan,
     });
-    if (!prepared.valid) return { success: false, message: prepared.message };
+    if (!prepared.valid) return { ...prepared, success: false };
     const executor = new CraftingLifecycleExecutor({
       runManager: this._craftingRunManager(),
       consumeExecutionGrant: () => trusted,
@@ -1702,26 +1744,8 @@ export class CraftingEngine {
   }
 
   _automaticStageBlocker(run, recipe, step, selectedSet) {
-    if (run.completionMode !== 'worldTime') {
-      return { code: 'manualPreference', message: 'This crafting run requires manual completion.' };
-    }
-    if (Array.isArray(selectedSet?.ingredients) && selectedSet.ingredients.length > 0) {
-      return { code: 'materials', message: 'Automatic completion requires a no-input stage.' };
-    }
-    if (
-      (Array.isArray(step?.toolIds) && step.toolIds.length > 0) ||
-      (Array.isArray(recipe?.toolIds) && recipe.toolIds.length > 0)
-    ) {
-      return { code: 'tools', message: 'Automatic completion cannot use crafting tools.' };
-    }
-    const activeCheck = resolveActiveCraftingCheckFormula(this._getRecipeSystem(recipe));
-    if (activeCheck.requiresCheck || activeCheck.checkUsable) {
-      return {
-        code: 'playerCheck',
-        message: 'Automatic completion cannot resolve a player check.',
-      };
-    }
-    return null;
+    const system = this._getRecipeSystem(recipe);
+    return automaticStageBlocker({ run, recipe, step, selectedSet, system });
   }
 
   async _canExecuteVersionedStageImmediately({
@@ -1905,19 +1929,14 @@ export class CraftingEngine {
         : undefined;
     const effects = new Map(journal.effects.map((effect) => [effect.effectId, effect]));
     const toolEffect = effects.get('apply-tools');
-    const toolDefinitions = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
-    const toolPairs = (toolEffect?.planned || []).map((itemUuid, index) => {
+    const applied = toolEffect?.phase === 'applied';
+    const toolItems = (toolEffect?.planned || []).map((itemUuid) => {
       const item = findItemByUuid([actor, ...(componentSourceActors || [])], itemUuid);
-      if (!item && toolEffect.phase !== 'applied') {
-        throw new CraftingLifecycleExecutionError(
-          'A planned crafting tool is no longer available',
-          'STAGE_RECONSTRUCTION_FAILED'
-        );
-      }
-      return {
-        item: item ?? rehydrateVersionedItem({ itemUuid }),
-        tool: toolDefinitions[index] ?? null,
-      };
+      return item ?? (applied ? rehydrateVersionedItem({ itemUuid }) : null);
+    });
+    const toolPairs = pairPlannedTools(this.recipeManager, executionRecipe, selectedSet, {
+      items: toolItems,
+      applied,
     });
     const currencySpends = cloneJsonValue(effects.get('spend-currency')?.planned) ?? [];
     return {
@@ -1930,7 +1949,7 @@ export class CraftingEngine {
         currencySpends,
         toolItemUuids: cloneJsonValue(toolEffect?.planned) ?? [],
       },
-      toolItems: toolPairs.map((entry) => entry.item),
+      toolItems,
       executionRecipe,
       craftSelection: { plan: [] },
       toolValidation: { valid: true, tools: toolPairs },
@@ -1968,8 +1987,7 @@ export class CraftingEngine {
         'CHECK_RESULT_INVALID'
       );
     }
-    // The executed product/direction ride the snapshot as claimed; `checkResolutionEvidence`
-    // alone decides whether they persist.
+    // Product and direction ride the snapshot; `checkResolutionEvidence` decides if they persist.
     const executedHistorySnapshots =
       historySnapshots.resolutionSnapshot?.kind === 'check'
         ? {
@@ -2016,7 +2034,7 @@ export class CraftingEngine {
       essenceSpend: executedHistorySnapshots.resolutionSnapshot
         ? { labels: {}, carriers: [] }
         : undefined,
-      toolPairs: [...prepared.toolValidation.tools],
+      toolPairs: [...prepared.toolValidation.tools], // ratchet-exempt(world-scope): not-a-system
     };
     // A stage that already spent its inputs at START never re-consumes or re-spends here: it
     // resolves against the snapshot the start commit persisted.
@@ -2033,6 +2051,7 @@ export class CraftingEngine {
       alchemySubmittedItems: isAlchemy ? alchemySubmittedItems : null,
     });
 
+    // ratchet-exempt(world-scope): not-a-system
     if (shouldUseTools && prepared.toolValidation.tools.length > 0) {
       effects.push({
         effectId: 'apply-tools',
@@ -2046,7 +2065,7 @@ export class CraftingEngine {
           );
           state.usedTools = await this._applyToolBreakage(
             prepared.executionRecipe,
-            prepared.toolValidation.tools,
+            prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
             {
               forceBreak: decision.forceBreak,
               authority: decision.authority,
@@ -2066,35 +2085,26 @@ export class CraftingEngine {
       succeeded ||
       this._versionedFailureAwardAllowed(prepared, checkResult, alchemySimpleFailure)
     ) {
-      effects.push({
-        effectId: 'award-results',
-        kind: 'awardResults',
-        planned: this._versionedResultPlan(prepared, checkResult),
-        apply: async () => {
-          const created = await this._createResultItems(
-            actor,
-            prepared.executionRecipe,
-            step,
-            selectedSet,
-            state.consumedItems,
-            state.toolPairs,
-            checkResult,
-            null,
-            {
-              precomputedEssences: state.resolvedEssences,
-              essenceEnabled: state.essenceEnabled,
-              resolveComponent: prepared.resolveComponent,
-            }
-          );
-          state.resultItems = created.items;
-          state.resolutionMeta = created.resolutionMeta;
-          state.resultRecords = awardReceipts(state.resultItems);
-          return {
-            results: state.resultRecords,
-            resolutionMeta: cloneJsonValue(state.resolutionMeta) ?? null,
-          };
-        },
-      });
+      const createItems = () =>
+        this._createResultItems(
+          actor,
+          prepared.executionRecipe,
+          step,
+          selectedSet,
+          state.consumedItems,
+          state.toolPairs,
+          checkResult,
+          null,
+          {
+            precomputedEssences: state.resolvedEssences,
+            essenceEnabled: state.essenceEnabled,
+            resolveComponent: prepared.resolveComponent,
+            deferRewards: true,
+          }
+        );
+      const groups = this._versionedAwardGroups(prepared, checkResult);
+      const award = { groups, createItems, actor, recipe: prepared.executionRecipe, runId };
+      effects.push(...versionedAwardEffects(state, { ...award, seams: this._rewardSeams() }));
     }
 
     effects.push({
@@ -2114,7 +2124,7 @@ export class CraftingEngine {
           },
           consumedIngredients: state.consumedItems.map(mapConsumedIngredientRef),
           usedTools: state.usedTools,
-          createdResults: state.resultRecords,
+          ...stageAwardHistory(state),
           ...craftingStepHistoryEvidence(
             {
               ...executedHistorySnapshots,
@@ -2178,6 +2188,7 @@ export class CraftingEngine {
         success: succeeded,
         disposition: succeeded ? 'succeeded' : 'failed',
         createdResultUuids: state.resultRecords.map((record) => record.itemUuid).filter(Boolean),
+        ...(succeeded && checkResult.data?.outcomeId && { outcomeId: checkResult.data.outcomeId }),
       }),
     };
   }
@@ -2319,7 +2330,7 @@ export class CraftingEngine {
     }
     const toolReceipt = receipts['apply-tools'];
     if (toolReceipt) {
-      state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];
+      state.usedTools = cloneJsonValue(toolReceipt.tools) ?? []; // ratchet-exempt(world-scope): not-a-system
       if (Array.isArray(toolReceipt.resolvedTools)) {
         state.toolPairs = toolReceipt.resolvedTools.map(rehydrateVersionedToolPair);
       }
@@ -2336,6 +2347,7 @@ export class CraftingEngine {
       );
       state.resolutionMeta = cloneJsonValue(awardReceipt.resolutionMeta) ?? null;
     }
+    hydrateRewardState(state, receipts);
     if (receipts['fire-complications']) {
       state.firedComplications = {
         fired: cloneJsonValue(receipts['fire-complications'].fired) ?? [],
@@ -2475,7 +2487,8 @@ export class CraftingEngine {
     return this._isFailureAwardDisposition(resolved?.meta?.disposition);
   }
 
-  _versionedResultPlan(prepared, checkResult) {
+  /** The groups a versioned stage's award routes to; both award effects plan from them. */
+  _versionedAwardGroups(prepared, checkResult) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const resolved = resolutionService?.resolveResultGroups?.({
@@ -2485,14 +2498,7 @@ export class CraftingEngine {
       checkResult,
       selectedResultGroupId: null,
     });
-    return (resolved?.groups || prepared.executionRecipe.resultGroups || []).flatMap((group) =>
-      (group?.results || []).map((result) => ({
-        resultId: result?.id ?? null,
-        componentId: result?.componentId ?? null,
-        itemUuid: result?.itemUuid ?? null,
-        quantity: Number(result?.quantity) || 1,
-      }))
-    );
+    return resolved?.groups || prepared.executionRecipe.resultGroups || [];
   }
 
   _freshVersionedRun(actor, runId) {
@@ -2646,6 +2652,11 @@ export class CraftingEngine {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
     if (contract !== 'current' && options?.lifecycleVersion !== 1) return null;
+    const selectionPlan = {
+      selectedIngredientSetId: ingredientSetId,
+      ingredientOptionOverrides: options?.ingredientOptionOverrides,
+      ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+    };
 
     if (existing) {
       const requestExecute = this.versionedRunAuthority?.requestExecute;
@@ -2655,11 +2666,8 @@ export class CraftingEngine {
         componentSourceActors: sourceActors,
         runId: existing.id,
         expectedRevision: existing.runRevision,
-        selectionPlan: {
-          selectedIngredientSetId: ingredientSetId,
-          ingredientOptionOverrides: options?.ingredientOptionOverrides,
-          ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-        },
+        selectionPlan,
+        presentTools: options?.presentTools,
       });
     }
 
@@ -2669,12 +2677,9 @@ export class CraftingEngine {
       actor,
       sourceActors,
       recipeId: recipe?.id,
-      selectionPlan: {
-        selectedIngredientSetId: ingredientSetId,
-        ingredientOptionOverrides: options?.ingredientOptionOverrides,
-        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-      },
+      selectionPlan,
       completionMode: options?.completionMode || 'manual',
+      presentTools: options?.presentTools,
     });
   }
 
@@ -2780,6 +2785,43 @@ export class CraftingEngine {
     };
   }
 
+  _rewardSeams() {
+    return craftRewardSeams({
+      currencySeams: this._currencySeams(),
+      recipeManager: this.recipeManager,
+    });
+  }
+
+  /** The reward pre-flight every craft entrance runs (issue 1773). */
+  _refusals() {
+    return { refuseRewards: rewardRefusals(this._rewardSeams()) };
+  }
+
+  /** Settle a pending award choice on an active or terminal run under a `chooseAward` grant. */
+  settleAwardChoice(request) {
+    return this._awardChoices().settle(request);
+  }
+
+  /** Why `actor` cannot claim each alternative `run` owes now, or `null`: the settle's own rule. */
+  awardChoiceClaimability(run, actor) {
+    return this._awardChoices().unclaimable(run, actor);
+  }
+
+  _awardChoices() {
+    return new AwardChoiceSettler({
+      runManager: this._craftingRunManager(),
+      consumeExecutionGrant: (...args) =>
+        this.versionedRunAuthority?.consumeExecutionGrant?.(...args),
+      getRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
+      seams: this._rewardSeams(),
+      resolveComponent: (recipe, id) =>
+        findById(getDefinitionIndex(resolvedComponentsFor(this._getRecipeSystem(recipe))), id),
+      awardComponent: (actor, row, recipe, options) =>
+        this._createSingleResult(actor, row, [], [], recipe, null, options),
+      postChat: (card) => this._postCraftChatMessage(card),
+    });
+  }
+
   /** This craft's component resolver (issue 578): only an alchemy attempt supplies the tier-4-aware
    * {@link resolveAlchemySubmissionComponent}, so standard crafting never gains tier 4. */
   _alchemyComponentResolver(options) {
@@ -2858,7 +2900,8 @@ export class CraftingEngine {
       };
       return ctx;
     }
-    const validation = recipe.validate({ Roll: diceEngine() });
+    const refusals = { ...this._refusals(), refusePlayerChoices: true };
+    const validation = validateCraft(recipe, craftingActor, ctx.resolutionService, refusals);
     if (!validation.valid) {
       ctx.refusal = {
         success: false,
@@ -3249,7 +3292,7 @@ export class CraftingEngine {
       craftingActor,
       { excludedItems: consumedLiveItems }
     );
-    const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
+    const toolItems = toolValidation.valid ? toolValidation.tools || [] : []; // ratchet-exempt(world-scope): not-a-system
 
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -3261,7 +3304,7 @@ export class CraftingEngine {
       ingredientSet,
       step,
       {
-        interactive: options?.interactive === true,
+        interactive: checkRequest(options),
         toolItems,
       }
     );
@@ -3270,13 +3313,8 @@ export class CraftingEngine {
       // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
       return { resolved: true, result: misconfiguredCheckResult(checkResult) };
     }
-    if (checkResult.cancelled) {
-      // A dismissed roll is retryable: inputs stay consumed and the run stays active.
-      return {
-        resolved: true,
-        result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
-      };
-    }
+    // A dismissed roll is retryable: inputs stay consumed and the run stays active.
+    if (checkResult.cancelled) return { resolved: true, result: cancelledCraftResult(checkResult) };
 
     await this._beginNativeStage({
       craftingActor,
@@ -3312,8 +3350,7 @@ export class CraftingEngine {
       } catch (breakageError) {
         console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
-      // The failure award, timed twin (issue 1098): the delay is scheduling, so a timed failure
-      // produces what an immediate one would, from the START snapshot.
+      // The timed failure award awards what an immediate one would, from the START (issue 1098).
       const failureResults = await this._produceCraftingFailureResults({
         craftingActor,
         executionRecipe,
@@ -3323,6 +3360,7 @@ export class CraftingEngine {
         toolItems,
         checkResult,
         precomputedEssences: resolvedEssences,
+        runId: run?.id ?? null,
       });
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
@@ -3335,7 +3373,7 @@ export class CraftingEngine {
         },
         consumedIngredients: consumedRunRefs,
         usedTools,
-        createdResults: awardReceipts(failureResults),
+        ...awardHistory(failureResults),
       });
       await this._postCraftChatMessage({
         success: false,
@@ -3415,7 +3453,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       options?.resultGroupId || null,
-      { precomputedEssences: resolvedEssences, essenceEnabled }
+      { precomputedEssences: resolvedEssences, essenceEnabled, runId: run?.id ?? null }
     );
 
     // Timed misconfiguration (issue 85): inputs went at START, so this records a failure with no
@@ -3468,7 +3506,7 @@ export class CraftingEngine {
       },
       consumedIngredients: consumedRunRefs,
       usedTools,
-      createdResults: awardReceipts(resultItems),
+      ...awardHistory(resultItems),
     });
 
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
@@ -3540,6 +3578,7 @@ export class CraftingEngine {
     resultGroupId = null,
     precomputedEssences = null,
     essenceEnabled = null,
+    runId = null,
   }) {
     if (!activityPermitsFailureResults(this._getRecipeSystem(executionRecipe), 'crafting')) {
       return [];
@@ -3568,7 +3607,7 @@ export class CraftingEngine {
         toolItems,
         checkResult,
         resultGroupId,
-        { precomputedEssences, essenceEnabled }
+        { precomputedEssences, essenceEnabled, runId }
       );
       return Array.isArray(items) ? items : [];
     } catch (error) {
@@ -3625,8 +3664,7 @@ export class CraftingEngine {
       }
     }
 
-    // Route to + produce the reserved failure group (the failed checkResult routes
-    // `_resolveAlchemyResultGroups` there); empty/absent yields no items.
+    // The failed check routes to the reserved failure group, and an empty one yields nothing.
     const { items: resultItems } = await this._createResultItems(
       craftingActor,
       executionRecipe,
@@ -3636,7 +3674,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       resultGroupId,
-      { precomputedEssences: resolvedEssences }
+      { precomputedEssences: resolvedEssences, runId: run?.id ?? null }
     );
 
     if (runManager && run) {
@@ -3656,6 +3694,7 @@ export class CraftingEngine {
           },
           consumedIngredients: consumedRunRefs,
           usedTools: appliedTools,
+          ...rewardHistory(resultItems),
         },
         mutationOptions
       );
@@ -3789,6 +3828,7 @@ export class CraftingEngine {
           executionRecipe,
           checkResult
         );
+        // ratchet-exempt(world-scope): not-a-system
         usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
           forceBreak: breakDecision.forceBreak,
           authority: breakDecision.authority,
@@ -3825,7 +3865,7 @@ export class CraftingEngine {
       ingredientSet,
       consumedItems,
       consumedRunRefs,
-      toolItems: toolValidation.tools,
+      toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       usedTools,
       resolvedEssences,
       resultGroupId: options?.resultGroupId || null,
@@ -4918,6 +4958,8 @@ export class CraftingEngine {
       precomputedEssences = null,
       essenceEnabled = null,
       resolveComponent = findMatchingComponent,
+      deferRewards = false,
+      runId = null,
     } = {}
   ) {
     const step = { ...sourceStep, resultGroups: linkResultGroups(sourceStep?.resultGroups) };
@@ -4941,45 +4983,57 @@ export class CraftingEngine {
 
     const createdItems = [];
     const rolledAwards = [];
+    const rewards = [];
+    const seams = this._rewardSeams();
     const receiptCollector = createItemReceiptCollector();
-    try {
-      for (const group of groupsToCreate) {
-        for (const result of group.results || []) {
-          const resultItem = await this._createSingleResult(
-            craftingActor,
-            result,
-            consumedItems,
-            toolItems,
-            recipe,
-            {
-              ...checkResult,
-              resolutionMeta: resolved?.meta || {},
-            },
-            {
-              step,
-              precomputedEssences,
-              essenceEnabled,
-              resolveComponent,
-              receiptCollector,
-              rolledAwards,
-            }
-          );
-
-          // Return each physical Item once; the collector retains every row's delta.
-          if (resultItem && !createdItems.includes(resultItem)) {
-            createdItems.push(resultItem);
-          }
-        }
+    // A choice group's member awards through its own kind's path, keyed to its carrier.
+    const awardOne = async (result, carrier) => {
+      if (isRewardResult(result)) {
+        const Roll = diceEngine();
+        rewards.push(await planReward(result, craftingActor, recipe, { Roll, seams, carrier }));
+        return;
       }
+      const row = carrier ? memberResultRow(result, carrier) : result;
+      const resultItem = await this._createSingleResult(
+        craftingActor,
+        row,
+        consumedItems,
+        toolItems,
+        recipe,
+        { ...checkResult, resolutionMeta: resolved?.meta || {} },
+        {
+          step,
+          precomputedEssences,
+          essenceEnabled,
+          resolveComponent,
+          receiptCollector,
+          rolledAwards,
+        }
+      );
+      // Return each physical Item once; the collector retains every row's delta.
+      if (resultItem && !createdItems.includes(resultItem)) createdItems.push(resultItem);
+    };
+    const award = { actor: craftingActor, Roll: diceEngine(), awardOne };
+    let groups;
+    try {
+      groups = await awardRoutedResults(groupsToCreate, award);
     } catch (error) {
       throw receiptCollector.failure(error);
     }
 
-    return {
-      items: attachRolledAwards(
+    const items = attachRewardPlan(
+      attachRolledAwards(
         attachAwardReceipts(createdItems, receiptCollector.snapshot()),
         rolledAwards
       ),
+      rewards.map((reward) => reward.entry),
+      [...rewards.map((reward) => reward.roll), ...groups.rolls],
+      groups
+    );
+    return {
+      items: deferRewards
+        ? items
+        : await settleRewardPlan(items, { actor: craftingActor, recipe, seams, runId }),
       resolutionMeta: resolved?.meta || null,
     };
   }
@@ -5396,7 +5450,7 @@ export class CraftingEngine {
       definition.sourceComponentId || definition.associatedSystemItemId || '';
     if (sourceComponentId) {
       // The legacy `items` alias is not a scoped corpus and keeps its raw read.
-      const components = Array.isArray(system?.components)
+      const components = Array.isArray(system?.components) // ratchet-exempt(world-scope): guard
         ? resolvedComponentsFor(system)
         : Array.isArray(system?.items)
           ? system.items
@@ -5442,19 +5496,16 @@ export class CraftingEngine {
     // Routing is a property of the system mode; the param keeps the positional signature.
     _step = null,
     // `interactive` opts a UI-triggered craft into the confirm-roll dialog and chat post.
-    { interactive = false, toolItems = [] } = {}
+    { interactive: requested = false, toolItems = [] } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
+    if (!systemId) return { success: true, outcome: null, value: null, data: {} };
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
-    if (!system) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
+    if (!system) return { success: true, outcome: null, value: null, data: {} };
+    const interactive = checkRequest(requested, { craftingSystem: system, recipe });
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
 
@@ -5607,7 +5658,7 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const checkConfig = config || {};
-    const target = this._resolveCheckTarget(checkConfig, recipe, craftingActor);
+    const target = resolveCraftingCheckTarget(checkConfig, recipe, craftingActor);
     if (!target.ok) return checkTargetRefusal(target.reason, 'Crafting', target);
     const evaluation = activeCheckEvaluation(checkConfig);
     const preparedTools = await this._prepareToolCheckBonuses(
@@ -5635,7 +5686,7 @@ export class CraftingEngine {
       label: 'Crafting',
       craftingModifier,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -5674,7 +5725,7 @@ export class CraftingEngine {
     { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
-    const target = this._resolveCheckTarget(routed, recipe, craftingActor);
+    const target = resolveCraftingCheckTarget(routed, recipe, craftingActor);
     if (!target.ok) return checkTargetRefusal(target.reason, 'Crafting', target);
     const evaluation = activeCheckEvaluation(routed);
     const preparedTools = await this._prepareToolCheckBonuses(
@@ -5711,7 +5762,7 @@ export class CraftingEngine {
       // null for alchemy tiered.
       minOutcomeId: applyMinSuccessOutcome ? (recipe?.minSuccessOutcomeId ?? null) : null,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -5755,7 +5806,7 @@ export class CraftingEngine {
     interactive,
     evaluation = SUM_OVER_EVALUATION
   ) {
-    if (interactive !== true) return null;
+    if (checkRequest(interactive).interactive !== true) return null;
     // No usable formula means no check to modify, unless the check counts successes.
     const counts = evaluation?.product === 'count';
     if (!counts && stripRetiredModifierPlaceholder(String(formula ?? '')).trim() === '') {
@@ -5803,7 +5854,7 @@ export class CraftingEngine {
       label: 'Crafting',
       craftingModifier,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -5961,7 +6012,7 @@ export class CraftingEngine {
     recipe,
     ingredientSet,
     craftingActor,
-    anchor = this._resolveCheckAnchorDc(simple, recipe)
+    anchor = craftingCheckAnchorDc(simple, recipe)
   ) {
     if (simple.dcMode !== 'dynamic') return anchor;
     if (!simple.macroUuid) return anchor;
@@ -5987,59 +6038,12 @@ export class CraftingEngine {
     }
   }
 
-  /** The crafting target before any macro: the fixed anchor DC, or the actor's character value
-   * adjusted by the selected recipe tier's adjustment, else the base. A count check validates its
-   * pool and answers its required count instead. */
-  _resolveCheckTarget(config, recipe, actor) {
-    return resolveActivityCheck(config, {
-      anchor: this._resolveCheckAnchorDc(config, recipe),
-      override: selectedCheckTier(config, recipe)?.adjustment,
-      label: selectedCheckTier(config, recipe)?.name ?? '',
-      required: this._resolveCountRequired(config, recipe),
-      readRollData: () => actorRollData(actor),
-    });
-  }
-
-  /** A count check's required count before any macro: the selected recipe tier's non-null
-   * `successes`, else the pool's; the tier's DC is never read. */
-  _resolveCountRequired(config, recipe) {
-    return countRequired(
-      activeCheckEvaluation(config),
-      selectedCheckTier(config, recipe)?.successes
-    );
-  }
-
-  /** The fixed DC before any macro: the selected difficulty tier, else the static default; one
-   * definition for the target adapter and {@link _resolveSimpleCheckDc}'s default anchor. */
-  _resolveCheckAnchorDc(config, recipe) {
-    const fallback = Number.isFinite(Number(config?.dc)) ? Math.trunc(Number(config.dc)) : 15;
-    const tier = selectedCheckTier(config, recipe);
-    const tierDc = Number(tier?.dc);
-    return tier && Number.isFinite(tierDc) ? Math.trunc(tierDc) : fallback;
-  }
-
-  /**
-   * The player-safe chat rows for fired complications (issue 1286). `publicComplications`
-   * filters on the way in, so a `gmOnly` complication has no row on any client, a GM's included.
-   * One row per firing, never collapsed, told apart by `position`.
-   */
-  _complicationChatEntries(fired, system) {
-    const componentIndex = getDefinitionIndex(resolvedComponentsFor(system));
-    return publicComplications(fired).map((entry) => ({
-      name: entry.name,
-      description: entry.description,
-      severity: entry.severity,
-      componentName: findById(componentIndex, entry.componentId)?.name || '',
-      position: entry.position,
-    }));
-  }
-
   /**
    * Post the crafting summary chat message when `features.chatOutput` is on;
    * `ChatMessage.create` errors never propagate into `craft()`.
    *
    * @param {Array|null} [params.firedComplications] The unredacted fired list (issue 1286),
-   *   redacted via {@link _complicationChatEntries}.
+   *   redacted via `complicationChatEntries`.
    */
   async _postCraftChatMessage({
     success,
@@ -6060,8 +6064,8 @@ export class CraftingEngine {
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
-    const toolEntries = this._resolveToolChatEntries(tools, system);
-    const { rolls, emptyAwards } = rolledAwardChatParts(createdResults);
+    const toolEntries = toolChatEntries(tools, system);
+    const { rolls, extraRows } = rolledAwardChatParts(createdResults);
 
     // A plain, Foundry-free model: names and images resolve here, formatting happens there.
     const content = buildCraftingChatContent(
@@ -6069,7 +6073,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: craftingActor?.name || '',
         recipeName: recipe?.name || '',
-        results: [...awardReceipts(createdResults), ...emptyAwards],
+        results: [...awardReceipts(createdResults), ...extraRows],
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
           img: item?.img || '',
@@ -6080,81 +6084,14 @@ export class CraftingEngine {
         tierStep,
         check,
         failureReason: failureReason || '',
-        complications: this._complicationChatEntries(firedComplications, system),
+        complications: complicationChatEntries(firedComplications, system),
       },
       localize
     );
 
     // The rolls sound the dice and animate Dice So Nice; the custom `content` survives them
     // because the card has child elements, and a result card is never whispered.
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post crafting chat message:', error);
-    }
-  }
-
-  /** `[{ tool, item }]` matches as `{ name, img }` chat entries by the tool's authored name, since
-   * one item can fill several slots; de-duped by component id, shared by crafting and salvage. */
-  _resolveToolChatEntries(tools, system) {
-    const componentById = new Map(
-      resolvedComponentsFor(system).map((component) => [component?.id, component])
-    );
-    const entries = [];
-    const seen = new Set();
-    for (const pair of tools || []) {
-      // Skip virtual-present canvas tools (no owned item) — no chip to render.
-      if (!pair?.item) continue;
-      const componentId = pair.tool?.componentId || null;
-      const component = componentId ? componentById.get(componentId) : null;
-      const key = componentId || pair.item?.uuid || pair.item?.name || null;
-      if (key && seen.has(key)) continue;
-      if (key) seen.add(key);
-      // `data-models` requirement 13: the authored label and the registration snapshot both
-      // outrank the linked component, and the matched item is the last resort (issue 1119).
-      entries.push({
-        name: resolveToolDisplayName(pair.tool, component, '') || pair.item?.name || '',
-        img: this._toolChatImage(pair.tool, component) || pair.item?.img || '',
-      });
-    }
-    return entries;
-  }
-
-  /** The requirement-13 image for a chat chip, with the generic item-bag sentinel mapped back to
-   * empty so the caller's own last-resort fallback still applies. */
-  _toolChatImage(tool, component) {
-    const img = resolveToolDisplayImage(tool, component);
-    return img === TOOL_IMAGE_SENTINEL ? '' : img;
-  }
-
-  /** Chat entries for the tools that broke in this salvage, de-duped by `componentId`. */
-  _resolveBrokenToolChatEntries(usedTools, system) {
-    const componentById = new Map(
-      resolvedComponentsFor(system).map((component) => [component?.id, component])
-    );
-    // The evidence carries `toolId` (issue 1119) so an item-sourced Tool, with no component,
-    // still resolves.
-    const toolById = new Map(resolvedToolsFor(system).map((tool) => [tool?.id, tool]));
-    const entries = [];
-    const seen = new Set();
-    for (const record of usedTools || []) {
-      if (record?.broken !== true) continue;
-      const componentId = record.componentId || null;
-      const component = componentId ? componentById.get(componentId) : null;
-      const tool = record.toolId ? (toolById.get(record.toolId) ?? null) : null;
-      const key = record.toolId || componentId || record.itemUuid || null;
-      if (key && seen.has(key)) continue;
-      if (key) seen.add(key);
-      entries.push({
-        name: resolveToolDisplayName(tool, component, ''),
-        img: this._toolChatImage(tool, component),
-      });
-    }
-    return entries;
+    await postResultCard({ actor: craftingActor, content, rolls, check, label: 'crafting' });
   }
 
   /**
@@ -6183,7 +6120,7 @@ export class CraftingEngine {
     if (suppressed || !system || system.features?.chatOutput !== true) return;
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
-    const { rolls, emptyAwards } = rolledAwardChatParts(results);
+    const { rolls, extraRows } = rolledAwardChatParts(results);
     const consumed =
       Number(consumedQuantity) > 0
         ? [
@@ -6200,27 +6137,19 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: actor?.name || '',
         componentName: component?.name || '',
-        results: [...awardReceipts(results), ...emptyAwards],
+        results: [...awardReceipts(results), ...extraRows],
         consumed,
-        tools: this._resolveBrokenToolChatEntries(usedTools, system),
+        tools: brokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
         tierStep,
         check,
         failureReason: failureReason || '',
-        complications: this._complicationChatEntries(firedComplications, system),
+        complications: complicationChatEntries(firedComplications, system),
       },
       localize
     );
 
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post salvage chat message:', error);
-    }
+    await postResultCard({ actor, content, rolls, check, label: 'salvage' });
   }
 
   async _runPropertyMacro(
@@ -6418,6 +6347,7 @@ export class CraftingEngine {
       lines.push(`${type} essence: have ${have}, need ${need}`);
     }
 
+    // ratchet-exempt(world-scope): not-a-system
     for (const tool of missing.tools || []) {
       lines.push(`Tool (${toolDisplayReference(tool, recipe, this.recipeManager)}): missing`);
     }
@@ -6458,11 +6388,9 @@ export class CraftingEngine {
 
   /**
    * The salvage pipeline for a component: validate, tool check, salvage check, failure policy,
-   * consume, create results, record the run.
-   *
-   * It performs no ownership check (issue 675): it resolves `actorUuid` through `fromUuid` and
-   * mutates that actor's Items. The only gate is `Fabricate#salvageComponent`, which takes an
-   * actor id, so no UI may plumb a uuid here.
+   * consume, create results, record the run. It performs no ownership check (issue 675): it
+   * resolves `actorUuid` through `fromUuid` and mutates that actor's Items. The only gate is
+   * `Fabricate#salvageComponent`, which takes an actor id, so no UI may plumb a uuid here.
    *
    * @param {object|null} [options.rollDecision] A pre-resolved roll decision so one prompt drives
    *   every roll of a bulk run (issue 859).
@@ -6473,18 +6401,27 @@ export class CraftingEngine {
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const ctx = await this._openSalvageContext(actorUuid, craftingSystemId, componentId, options);
-    if (ctx.refusal) return ctx.refusal;
+    if (ctx.refusal) return refuseSalvage(this, ctx);
     const record = await resolveSalvageRunRecord(this, ctx);
     if (record) return record.result;
     const tools = await validateSalvageTools(this, ctx);
     if (tools) return tools.result;
     const opened = await openSalvageRun(this, ctx);
     if (opened) return opened.result;
-    const checked = await runSalvageCheck(this, ctx);
-    if (checked) return checked.result;
-    // The settlement write stays outside the bracket: its rejection must escape uncaught, since
-    // inside it `_recordSalvageUncertainty` would answer with a second write to the same flag.
-    await beginSalvageSettlement(this, ctx);
+    try {
+      const checked = await runSalvageCheck(this, ctx);
+      if (checked) return checked.result;
+      // The settlement write stays outside the inner bracket: its rejection must escape uncaught,
+      // since inside it `_recordSalvageUncertainty` would answer with a second write to the flag.
+      await beginSalvageSettlement(this, ctx);
+      return await this._settleSalvage(ctx);
+    } finally {
+      await settleSalvageRoll(ctx);
+    }
+  }
+
+  /** The award bracket: a failure inside it is recorded as uncertain before it escapes. */
+  async _settleSalvage(ctx) {
     try {
       await resolveSalvageFailure(this, ctx);
       const failed = await publishSalvageFailure(this, ctx);
@@ -6500,7 +6437,7 @@ export class CraftingEngine {
   }
 
   /** The Foundry edge, call inputs and component for this salvage; every `refusal` is reached
-   * before any salvage run exists. */
+   * before this call creates or advances a salvage run. */
   async _openSalvageContext(actorUuid, craftingSystemId, componentId, options) {
     const ctx = {
       actorUuid,
@@ -6553,18 +6490,13 @@ export class CraftingEngine {
       return ctx;
     }
 
-    const resolutionService =
-      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
-    if (resolutionService) {
-      const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
-      if (!validation.valid) {
-        // The same discriminator the misconfigured-check abort carries (issue 859), so a caller
-        // does not read a config error as a rolled failure.
-        ctx.refusal = salvageRefusal(
-          `Invalid salvage configuration: ${validation.errors.join(', ')}`,
-          { misconfigured: true }
-        );
-      }
+    const validation = validateSalvage(ctx, this.resolutionModeService);
+    if (!validation.valid) {
+      // Issue 859's discriminator, so a caller does not read a config error as a rolled failure.
+      ctx.refusal = salvageRefusal(
+        `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+        { misconfigured: true }
+      );
     }
     return ctx;
   }
@@ -6945,7 +6877,7 @@ export class CraftingEngine {
     formula = '',
     craftingModifier = null,
   }) {
-    const rollOptions = buildInteractiveRollOptions({
+    const rollOptions = requestRollOptions({
       interactive,
       actor,
       name: component?.name,
@@ -7171,7 +7103,7 @@ function rehydrateVersionedItem(snapshot = {}) {
 /** The tool half of a stage plan: the uuids the plan records and the live documents it holds. One
  * reader, so the live-resolution and start-snapshot paths cannot describe tools differently. */
 function versionedToolPlan(toolValidation) {
-  const tools = toolValidation.tools;
+  const tools = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
   return {
     plan: {
       toolItemUuids: tools
@@ -7267,31 +7199,6 @@ function findItemByUuid(actors, itemUuid) {
   return null;
 }
 
-function versionedTransitionResult(run, outcome = {}) {
-  return {
-    success: outcome?.success === true,
-    runId: run?.id ?? null,
-    status: run?.status ?? null,
-    runRevision: Number(run?.runRevision) || 0,
-    waiting: run?.status === 'waitingTime',
-    terminal: run?.currentStepIndex === null,
-    disposition: outcome?.disposition ?? null,
-    createdResultUuids: Array.isArray(outcome?.createdResultUuids)
-      ? [...outcome.createdResultUuids]
-      : [],
-    ...(Object.hasOwn(outcome || {}, 'consumed') && { consumed: outcome.consumed === true }),
-  };
-}
-
-function authorityUnavailableResult() {
-  return {
-    success: false,
-    authorityUnavailable: true,
-    results: null,
-    message: 'Versioned crafting authority is unavailable.',
-  };
-}
-
 /**
  * The prepared check's private routing policy. `dc` stays fixed-only and `target` is the resolved
  * pre-modifier target after any macro, so a later actor or config edit cannot move either; a
@@ -7327,18 +7234,6 @@ function promptTargetBasis(config, recipe, actor, target, dc) {
     label: tier?.name ?? '',
     readRollData: () => actorRollData(actor),
   });
-}
-
-/** The recipe's selected difficulty tier on a check config, while it still exists. */
-function selectedCheckTier(config, recipe) {
-  const tierId = recipe?.checkTierId;
-  if (!tierId) return null;
-  const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
-  return tiers.find((entry) => entry.id === tierId) ?? null;
-}
-
-function versionedFailure(message) {
-  return { success: false, results: null, message };
 }
 
 function capturePreparedModifierContext(context, actor) {
@@ -7407,12 +7302,11 @@ function versionedCheckPrompt({
     mode: activeCheck.mode,
     allowsSituationalModifier: activeCheck.checkUsable,
     offerSituationalBonus: activeCheck.config?.offerSituationalBonus !== false,
-    // A count check offers no advantage until it is mode-aware (issue 2007).
-    allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
+    ...advantageOfferFields(activeCheck.config, evaluation, activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
-    // The pool resolved before any Tool roll, and the required count the macro settled, which
-    // fixed ranges never read.
-    ...(counts && countPromptFields(evaluation, countPolicy, routedFixed ? null : dc)),
+    // The pool with any Tool bonus folded in, and the macro's required count; fixed ranges read none.
+    ...(counts &&
+      countPromptFields(evaluation, countPolicy, routedFixed ? null : dc, toolContributions)),
   };
 }
 

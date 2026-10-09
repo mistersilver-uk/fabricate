@@ -2,7 +2,11 @@
  * World scope: the tool catalogue's list, its paging, its bulk set and its filter states.
  */
 
-import { WORLD_TOOL_SEARCH_MISS_TERM, WORLD_TOOL_SEARCH_TERM } from './caseConstants.js';
+import {
+  WORLD_SCOPE_MODEL_PATTERN,
+  WORLD_TOOL_SEARCH_MISS_TERM,
+  WORLD_TOOL_SEARCH_TERM,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 /** The resting catalogue's walk, shared by its wide frame and its stacked twin. */
@@ -82,10 +86,20 @@ export const CASES = Object.freeze([
       },
       // The fifth inspector card is gone, and nothing replaces it here.
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-tool-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone, and dropping it is not optional bookkeeping.
-    sourceMatches: CATALOGUE_SOURCES,
+    sourceMatches: [...CATALOGUE_SOURCES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'world-tool-catalogue-stacked',

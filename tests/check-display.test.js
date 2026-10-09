@@ -12,6 +12,8 @@ import {
 } from '../src/ui/presenters/checkDisplay.js';
 import { pathBreakSegments } from '../src/ui/presenters/checkEvidenceRows.js';
 
+import { NOT_PUBLIC } from './helpers/checkEvidenceFixtures.js';
+
 const PRIVATE = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY|@skills/;
 
 /** An authored evaluation carrying every private field a projection must never repeat. */
@@ -249,4 +251,172 @@ test('pathBreakSegments splits only after an @path inner dot (item 7 ruling)', (
   assert.equal(segments.join(''), text, 'joined, the pieces are the text');
   assert.deepEqual(pathBreakSegments('ends at @path.'), ['ends at @path.'], 'no break after a final dot');
   assert.deepEqual(pathBreakSegments(''), ['']);
+});
+
+/** An engine `countDisplay` salted with every private field a projection must never repeat. */
+const COUNT_DISPLAY = Object.freeze({
+  die: 10,
+  expression: '@skills.SECRET_PATH.value',
+  policy: 'SECRET_POLICY',
+  results: [
+    { index: 0, face: 10, active: true, exploded: true, explodedFrom: null, qualified: true, cancelled: false, label: 'SECRET_LABEL' },
+    { index: 1, face: 1, active: true, exploded: false, explodedFrom: null, qualified: false, cancelled: true },
+    { index: 2, face: 4, active: false, exploded: false, explodedFrom: null, qualified: false, cancelled: false },
+    { index: 3, face: 8, active: true, exploded: false, explodedFrom: 0, qualified: true, cancelled: false },
+  ],
+  qualified: 2,
+  cancelled: 1,
+  net: 1,
+  required: 2,
+  margin: -1,
+  zeroPool: false,
+  pool: { base: 3, terms: [{ source: 'library', value: 1, label: 'SECRET_LABEL' }], rolled: 4, path: '@x' },
+  threshold: {
+    anchor: 8,
+    source: 'character',
+    expression: '@skills.SECRET_PATH.value',
+    terms: [{ source: 'situational', value: -1 }, { source: '@skills.SECRET_PATH', value: 2 }],
+    effective: 7,
+  },
+});
+const COUNT_DATA = Object.freeze({
+  product: 'count',
+  direction: 'over',
+  comparison: 'meet',
+  dc: null,
+  target: 7,
+  total: 1,
+  successes: 2,
+  cancelled: 1,
+  margin: -1,
+});
+
+describe('the count projection (issue 2006)', () => {
+  it('folds the engine countDisplay into numbers and enumerated words only (N35)', () => {
+    const display = executedCheckDisplay({
+      data: COUNT_DATA,
+      visibility: { rollMode: 'publicroll', secret: false },
+      countDisplay: COUNT_DISPLAY,
+    });
+    assert.doesNotMatch(JSON.stringify(display), PRIVATE);
+    assert.deepEqual(display.count, {
+      die: 10,
+      tiles: {
+        tiles: [
+          { face: 10, marks: ['qualified', 'exploded'], generated: false },
+          { face: 8, marks: ['qualified'], generated: true },
+          { face: 1, marks: ['cancelled'], generated: false },
+        ],
+        more: 0,
+      },
+      qualified: 2,
+      cancelled: 1,
+      net: 1,
+      required: 2,
+      margin: -1,
+      zeroPool: false,
+      pool: { base: 3, terms: [{ source: 'library', value: 1 }], rolled: 4 },
+      threshold: {
+        anchor: 8,
+        source: 'character',
+        terms: [{ source: 'situational', value: -1 }],
+        effective: 7,
+      },
+    });
+    assert.ok(Object.isFrozen(display.count.tiles.tiles[0].marks));
+  });
+
+  it('is null without a countDisplay, and a summed projection never gains the key', () => {
+    assert.equal(executedCheckDisplay({ data: COUNT_DATA }).count, null);
+    const summed = executedCheckDisplay({ data: EXECUTED, countDisplay: COUNT_DISPLAY });
+    assert.ok(!Object.hasOwn(summed, 'count'));
+  });
+
+  it('keeps a zero pool that rolled nothing as evidence with no total', () => {
+    const zero = { ...COUNT_DATA, total: null, successes: null, cancelled: null, zeroPool: true };
+    assert.equal(executedCheckEvidence(zero).total, null);
+    assert.equal(executedCheckEvidence({ ...zero, product: 'sum' }), null, 'only a count pool');
+    assert.equal(executedCheckEvidence({ ...zero, zeroPool: false }), null);
+  });
+});
+
+/** The dice a public count bought, salted with every private field a projection must drop. */
+const BOUGHT_DICE = Object.freeze({
+  count: 2,
+  source: 'path',
+  path: 'system.resources.SECRET_PATH.value',
+  readMacroUuid: 'Macro.SECRET_UUID',
+  spendMacroUuid: 'Macro.SECRET_UUID',
+  label: 'SECRET_LABEL',
+  amount: 7,
+});
+
+function boughtDisplay({ visibility = { rollMode: 'publicroll', secret: false }, ...display } = {}) {
+  return executedCheckDisplay({
+    data: { ...COUNT_DATA, boughtDice: BOUGHT_DICE },
+    visibility,
+    countDisplay: { ...COUNT_DISPLAY, bought: 2, resourceLabel: 'Momentum', ...display },
+  });
+}
+
+describe('the bought dice of a count (issue 2008)', () => {
+  it('admits the count, the marked dice and the Resource name alone, marking the last original', () => {
+    const display = boughtDisplay();
+    assert.deepEqual(display.count.boughtDice, { count: 2, marked: 2, resourceLabel: 'Momentum' });
+    assert.doesNotMatch(JSON.stringify(display), /SECRET|"path"|amount|Macro|"source":"path"/);
+    assert.deepEqual(
+      display.count.tiles.tiles.map((tile) => [tile.face, tile.bought === true]),
+      [
+        [10, false],
+        [8, false],
+        [1, true],
+      ],
+      'the last two originals, the 1 and the inactive 4 that draws no tile; never the 10’s explosion'
+    );
+    assert.equal(display.count.tiles.bought, 2);
+    assert.ok(Object.isFrozen(display.count.boughtDice));
+  });
+
+  it('breaks every enricher shape in the Resource name and trims it', () => {
+    const display = boughtDisplay({ resourceLabel: '  [[/r 1d20]] @UUID[Actor.x]{y} &Reference[z] ' });
+    assert.equal(
+      display.count.boughtDice.resourceLabel,
+      '[\u{2060}[/r 1d20]] @\u{2060}UUID[Actor.x]{y} &\u{2060}Reference[z]'
+    );
+    assert.equal(boughtDisplay({ resourceLabel: undefined }).count.boughtDice.resourceLabel, '');
+    assert.equal(boughtDisplay({ resourceLabel: 42 }).count.boughtDice.resourceLabel, '');
+  });
+
+  it('bounds the marked dice by the dice bought, and reads none for a missing count', () => {
+    assert.equal(boughtDisplay({ bought: 5 }).count.boughtDice.marked, 2);
+    assert.equal(boughtDisplay({ bought: 1 }).count.boughtDice.marked, 1);
+    assert.equal(boughtDisplay({ bought: undefined }).count.boughtDice.marked, 0);
+    assert.ok(!Object.hasOwn(boughtDisplay({ bought: undefined }).count.tiles, 'bought'));
+  });
+
+  it('states nothing bought for a secret or non-public check, its tiles unmarked', () => {
+    for (const visibility of NOT_PUBLIC) {
+      const display = boughtDisplay({ visibility });
+      const label = JSON.stringify(visibility);
+      assert.ok(!Object.hasOwn(display.count, 'boughtDice'), label);
+      assert.ok(!Object.hasOwn(display.count.tiles, 'bought'), label);
+      assert.ok(display.count.tiles.tiles.every((tile) => !Object.hasOwn(tile, 'bought')), label);
+    }
+  });
+
+  it('carries no key for a count that bought nothing, so its projection is unchanged', () => {
+    const plain = executedCheckDisplay({
+      data: COUNT_DATA,
+      visibility: { rollMode: 'publicroll', secret: false },
+      countDisplay: COUNT_DISPLAY,
+    });
+    for (const boughtDice of [undefined, null, { count: 0 }, { count: 1.5 }, { count: '1' }]) {
+      const display = executedCheckDisplay({
+        data: { ...COUNT_DATA, boughtDice },
+        visibility: { rollMode: 'publicroll', secret: false },
+        countDisplay: { ...COUNT_DISPLAY, bought: 1, resourceLabel: 'Momentum' },
+      });
+      assert.deepEqual(display, plain, JSON.stringify(boughtDice));
+    }
+  });
 });

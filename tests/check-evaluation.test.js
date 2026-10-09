@@ -8,6 +8,22 @@ import {
   effectiveMargin,
   resolveDeterministicExpression,
 } from '../src/systems/checkEvaluation.js';
+import { normalizeCheckAdvantage } from '../src/systems/normalize/checkAdvantage.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import {
+  normalizeProgressiveCraftingCheck,
+  normalizeRoutedCraftingCheck,
+  normalizeSimpleCraftingCheck,
+} from '../src/systems/normalize/craftingCheck.js';
+
+const DEFAULT_ADVANTAGE = Object.freeze({
+  mode: 'keep',
+  extraDice: 1,
+  bonusExpression: '1d6',
+  offerDisadvantage: true,
+  countEnabled: true,
+  countDice: 1,
+});
 
 test('comparison and benefit ordering support both directions and strict thresholds', () => {
   assert.equal(compareToTarget(12, 12, 'meet', 'over'), true);
@@ -229,4 +245,104 @@ test('the strict reader stays the default and ignores an unknown path mode', () 
     });
     assert.equal(resolveDeterministicExpression('@inherited.v', data, options).ok, false);
   }
+});
+
+test('the advantage record defaults to keep one extra die with disadvantage and a count of one', () => {
+  for (const input of [undefined, null, 'keep', 7, [], {}]) {
+    assert.deepEqual(normalizeCheckAdvantage(input), DEFAULT_ADVANTAGE, String(input));
+  }
+});
+
+test('the advantage record keeps every authored key whatever the mode (issue 2007)', () => {
+  const authored = {
+    mode: 'bonus',
+    extraDice: 3,
+    bonusExpression: '1d8 + 1',
+    offerDisadvantage: false,
+    countEnabled: false,
+    countDice: 4,
+  };
+  assert.deepEqual(normalizeCheckAdvantage(authored), authored);
+  assert.deepEqual(normalizeCheckAdvantage({ ...authored, mode: 'off' }), {
+    ...authored,
+    mode: 'off',
+  });
+  for (const mode of ['KEEP', 'advantage', '', null, 1]) {
+    assert.equal(normalizeCheckAdvantage({ mode }).mode, 'keep', String(mode));
+  }
+});
+
+test('the advantage record clamps its dice counts and defaults a non-integer', () => {
+  const read = (extraDice, countDice) => {
+    const { extraDice: extra, countDice: count } = normalizeCheckAdvantage({ extraDice, countDice });
+    return [extra, count];
+  };
+  assert.deepEqual(read(0, 0), [1, 1], 'below the range clamps up');
+  assert.deepEqual(read(5, 6), [4, 5], 'above the range clamps down');
+  assert.deepEqual(read(-3, 99), [1, 5]);
+  assert.deepEqual(read(4, 5), [4, 5], 'the upper bounds are kept');
+  assert.deepEqual(read('2', '3'), [2, 3], 'an integer string is read');
+  for (const invalid of [1.5, 'two', NaN, Infinity, null, '']) {
+    assert.deepEqual(read(invalid, invalid), [1, 1], String(invalid));
+  }
+});
+
+test('the advantage bonus expression is kept verbatim and defaults only when not a string', () => {
+  for (const text of ['', '  ', '1d6x', 'not dice']) {
+    assert.equal(normalizeCheckAdvantage({ bonusExpression: text }).bonusExpression, text);
+  }
+  for (const value of [undefined, null, 6, { d: 6 }]) {
+    assert.equal(normalizeCheckAdvantage({ bonusExpression: value }).bonusExpression, '1d6');
+  }
+  for (const flag of [undefined, null, 0, 'false', true]) {
+    const record = normalizeCheckAdvantage({ offerDisadvantage: flag, countEnabled: flag });
+    assert.equal(record.offerDisadvantage, true, `offerDisadvantage ${String(flag)}`);
+    assert.equal(record.countEnabled, true, `countEnabled ${String(flag)}`);
+  }
+});
+
+test('every check sub-object carries the normalized advantage record beside its evaluation', () => {
+  const advantage = { mode: 'off', extraDice: 9, countDice: 0, bonusExpression: '2d4' };
+  const expected = { ...DEFAULT_ADVANTAGE, mode: 'off', extraDice: 4, bonusExpression: '2d4' };
+  for (const [name, normalize] of [
+    ['simple', normalizeSimpleCraftingCheck],
+    ['routed', normalizeRoutedCraftingCheck],
+    ['progressive', normalizeProgressiveCraftingCheck],
+  ]) {
+    assert.deepEqual(normalize({ advantage }).advantage, expected, `${name} authored`);
+    assert.deepEqual(normalize({}).advantage, DEFAULT_ADVANTAGE, `${name} absent`);
+    const again = normalize(normalize({ advantage }));
+    assert.deepEqual(again.advantage, expected, `${name} is idempotent`);
+  }
+});
+
+test('the additional-dice resource name is trimmed text kept whatever the toggle or source', () => {
+  const read = (additionalDice) =>
+    normalizeCheckEvaluation({ pool: { additionalDice } }).pool.additionalDice.label;
+  assert.equal(normalizeCheckEvaluation().pool.additionalDice.label, '');
+  assert.equal(read({ label: '  Momentum  ' }), 'Momentum');
+  assert.equal(read({ enabled: false, source: 'macro', label: 'Focus' }), 'Focus');
+  assert.equal(read({ enabled: true, source: 'path', label: 'Focus' }), 'Focus');
+  const blank = ' '.repeat(3);
+  for (const value of [undefined, null, 3, true, ['Momentum'], { name: 'Momentum' }, blank]) {
+    assert.equal(read({ label: value }), '', String(value));
+  }
+  const authored = normalizeCheckEvaluation({ pool: { additionalDice: { label: 'Momentum' } } });
+  for (const normalize of [
+    normalizeSimpleCraftingCheck,
+    normalizeRoutedCraftingCheck,
+    normalizeProgressiveCraftingCheck,
+  ]) {
+    const once = normalize({ evaluation: authored });
+    assert.equal(once.evaluation.pool.additionalDice.label, 'Momentum');
+    assert.deepEqual(normalize(once).evaluation, once.evaluation, 'idempotent');
+  }
+});
+
+test('the progressive slot keeps a per-die comparison, meet unless exceed (issue 2067)', () => {
+  assert.equal(normalizeProgressiveCraftingCheck({}).thresholdMode, 'meet');
+  assert.equal(normalizeProgressiveCraftingCheck({ thresholdMode: 'exceed' }).thresholdMode, 'exceed');
+  assert.equal(normalizeProgressiveCraftingCheck({ thresholdMode: 'sideways' }).thresholdMode, 'meet');
+  const again = normalizeProgressiveCraftingCheck(normalizeProgressiveCraftingCheck({ thresholdMode: 'exceed' }));
+  assert.equal(again.thresholdMode, 'exceed', 'idempotent');
 });

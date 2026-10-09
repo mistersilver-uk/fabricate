@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `header` | the `headerModel` instance | — | `actionsLabel` names the group and `actionsFamily` selects the family unit |
+  | `header` | the `headerModel` instance | — | `actionsLabel` names the group, `actionsFamily` selects the family unit and `premiumIconsAdVisible` draws the advert |
   | `currentView` | the active route token | `''` | selects one branch of the world half |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
@@ -14,18 +14,19 @@
 
   Invariants:
   - The group renders its labelled `<div>` whenever the gate holds, including on the four routes
-    whose branch draws nothing.
+    whose branch draws nothing; the Premium advert leads it, and holds the world Component
+    catalogue's group alone.
   - Branch order and the family dispatch are pinned by `tests/manager-header-families.test.js`.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import ManagerHeaderCraftingActions from './ManagerHeaderCraftingActions.svelte';
   import ManagerHeaderGatheringActions from './ManagerHeaderGatheringActions.svelte';
+  import ManagerPremiumIconsAd from './ManagerPremiumIconsAd.svelte';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
   import { managerHeaderActionClass } from '../../../managerExtensions.js';
-
-  const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
+  import { PREMIUM_PATREON_URL } from './premiumIconsAdModel.js';
 
   let {
     header,
@@ -75,7 +76,6 @@
     recipeItemDraft = null,
     recipeItemEditDirty = false,
     recipeItemEditSaving = false,
-    recipeItemSaveFailed = false,
     canSaveRecipeItemEdit = false,
     backToBooksScrolls = () => {},
     deleteRecipeItemFromEdit = () => {},
@@ -126,10 +126,14 @@
 
 <!--
   World > Currency and the world scoped-entity routes draw no page-header actions; the four
-  world routes the gate names on its right are back in as a seam (issues 1278, 1362, 1372).
+  world routes the gate names next are back in as a seam (issues 1278, 1362, 1372), and the world
+  Component catalogue only while it carries the Premium advert.
 -->
-{#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
+{#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry' || (currentView === 'world-components' && header.premiumIconsAdVisible)}
   <div class="manager-header-actions" aria-label={header.actionsLabel}>
+    {#if header.premiumIconsAdVisible}
+      <ManagerPremiumIconsAd {text} onDismiss={header.dismissPremiumIconsAd} />
+    {/if}
     {#if currentView === 'world-essence-entry'}
       <!-- The editor action pair, through the shared component (issue 1372). -->
       <ScopedEntryHeaderActions
@@ -176,25 +180,25 @@
       />
     {:else if currentView === 'world-essences'}
       <!-- Create takes no name field. -->
-      <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
+      <Button role="primary" data-world-essence-create onclick={createWorldEssence}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-      </ManagerButton>
+      </Button>
     {:else if currentView === 'world-downtime'}
       {#if downtimeCoreFallback}
         <!-- The promotional pill sits at the top of every Downtime screen. -->
-        <ManagerButton
+        <Button
           tag="a"
           class="manager-downtime-unlock"
           data-downtime-unlock
-          href={PATREON_URL}
+          href={PREMIUM_PATREON_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
           <i class="fas fa-crown" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.World.Downtime.Unlock', 'Unlock with Premium')}</span
           >
-        </ManagerButton>
+        </Button>
       {:else}
         <!-- The status chip leads the group, where every core editor puts its own chip. -->
         {#if downtimeHeaderStatus}
@@ -253,7 +257,6 @@
         {recipeItemDraft}
         {recipeItemEditDirty}
         {recipeItemEditSaving}
-        {recipeItemSaveFailed}
         {canSaveRecipeItemEdit}
         {backToBooksScrolls}
         {deleteRecipeItemFromEdit}
@@ -306,38 +309,40 @@
         {saveGatheringEventDraft}
       />
     {:else if currentView === 'world'}
-      <ManagerButton role="primary" onclick={createParty} disabled={travelSaving}>
+      <Button role="primary" onclick={createParty} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
-      </ManagerButton>
+      </Button>
     {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-      <ManagerButton role="primary" onclick={createTravelRealm} disabled={travelSaving}>
+      <Button role="primary" onclick={createTravelRealm} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-      </ManagerButton>
+      </Button>
     {:else if isWorldTravelRoute}
       <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
+    {:else if currentView === 'world-components'}
+      <!-- The advert above is the group's only content; the systems browser's actions stay out. -->
     {:else if currentView === 'system-edit'}
       <!-- `ghost` here rests on the verb, not on a neighbour. -->
-      <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
+      <Button role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
         <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
-      </ManagerButton>
+      </Button>
     {:else}
       <!-- `data-manager-import-system` is a zero-behaviour hook: the only other handle on this
-           button is `manager-button`, which a dozen header controls share. -->
-      <ManagerButton data-manager-import-system onclick={importSystem}>
+           button is `fabricate-button`, which a dozen header controls share. -->
+      <Button data-manager-import-system onclick={importSystem}>
         <i class="fas fa-file-import" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-      </ManagerButton>
-      <ManagerButton onclick={exportSelectedSystem} disabled={!selectedSystemId}>
+      </Button>
+      <Button onclick={exportSelectedSystem} disabled={!selectedSystemId}>
         <i class="fas fa-file-export" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-      </ManagerButton>
-      <ManagerButton role="primary" onclick={createSystem}>
+      </Button>
+      <Button role="primary" onclick={createSystem}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   </div>
 {/if}

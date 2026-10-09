@@ -21,7 +21,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../../../components/Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
@@ -322,7 +322,7 @@
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
         </h3>
         {#if onEditLibrary}
-          <ManagerButton
+          <Button
             class="manager-checks-card-head-link"
             data-crafting-modifier-edit-link
             onclick={() => onEditLibrary()}
@@ -332,7 +332,7 @@
               'Edit in system settings'
             )}
             <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          </ManagerButton>
+          </Button>
         {/if}
       </div>
       <!-- The RULE'S OWN SENTENCE, above the rows that do the marking rather than under the grid
@@ -518,7 +518,7 @@
       selectedValue={selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
-      dataAttr="data-crafting-modifier-policy"
+      data-crafting-modifier-policy
       optionDataAttr={MODIFIER_POLICY_OPTION_ATTR}
       onChange={selectPolicy}
     />
@@ -568,21 +568,20 @@
 </InspectorCard>
 
 <style>
-  /* The card is its OWN container-query context. The shipped `@container (max-width: 620px)` rule
-       that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolved against the NEAREST
-       container — the whole `fabricate-manager` shell — and fired only when the entire manager was
-       narrow.
+  /* The card is the host the sheet's `.is-config-cards` radio reflow answers. That rule queries
+       `fabricate-option-host`, which the manager shell also carries, so without this the grid
+       reflowed only when the entire manager was narrow.
 
        `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
-       `manager-inspector-card` is written by that primitive and a scoped rule stopped matching —
+       `fabricate-card` is written by that primitive and a scoped rule stopped matching —
        SILENTLY, because an `<i class={…}>` here makes every class selector in the block
        possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
        reported nothing. Anchored on the two `data-` hooks rather than the `.manager-checks-card`
        modifier the cards share, because that has eleven other sites and `container-type` creates a
        containment context rather than painting. Each half stays at (0,2,0). */
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
-  :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
-    container-type: inline-size;
+  :global(.fabricate-card[data-crafting-modifier-catalogue]),
+  :global(.fabricate-card[data-crafting-modifier-policy-card]) {
+    container: fabricate-option-host / inline-size;
   }
 
   /* THE ROW'S CHIPS ARE `Chip` AT `density="row"`, NOT STYLED HERE. Restating the row scale's
@@ -595,8 +594,8 @@
        What stays here is layout CONTEXT rather than the chip's geometry. RE-ANCHORED ON THE CARD
        for the reason the rule above records: the row moved into `ModifierLibraryRow`, so its class
        carries THAT component's hash. Each half stays at the (0,3,0) the scoped form had. */
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
   }
 
@@ -606,17 +605,13 @@
      second scale to adopt. So this states the measured value where it is measured and leaves
      the primitive alone, by the same unlayered `:global()` route the chips above take, anchored
      per card for the reason the container rule states. Each half stays at (0,3,0). */
-  :global(
-    .manager-inspector-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options
-  ),
-  :global(
-    .manager-inspector-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options
-  ) {
-    gap: 10px;
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options),
+  :global(.fabricate-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options) {
+    gap: var(--fab-space-3);
   }
 
   .manager-modifier-bounds-error {
-    margin-block: 0 0.15rem;
+    margin-block: 0 var(--fab-space-2xs);
     color: var(--fab-danger-text);
     font-size: 0.68rem;
     line-height: 1.4;
@@ -635,7 +630,7 @@
     margin-block: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-warning-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-warning-text);
     background: var(--fab-warning-soft);
     font-size: 0.7rem;
@@ -650,7 +645,7 @@
 
   .manager-modifier-inert strong {
     /* The heading and its sentence share one line box, so the note stays a paragraph. */
-    margin-right: 0.25rem;
+    margin-right: var(--fab-space-1);
   }
 
   /* The cap is a one-to-three-digit field in a full-width inspector panel, so `fill` alone
@@ -659,10 +654,10 @@
      dropping `fill`, an unfilled `.fab-stepper` still being a stretched flex item. 160px is
      the width the other four such call sites use.
 
-     `:global(...)` chained with `.manager-field`, because this class sits on a `<Field>` and a
+     `:global(...)` chained with `.fabricate-field`, because this class sits on a `<Field>` and a
      scoped rule cannot reach a class a component hands to a child. The compound is not
      decoration: it restores the (0,2,0) the scoped form had. */
-  :global(.manager-field.manager-modifier-max-picks-field) {
+  :global(.fabricate-field.manager-modifier-max-picks-field) {
     flex: 0 0 auto;
     width: 160px;
     max-width: 160px;

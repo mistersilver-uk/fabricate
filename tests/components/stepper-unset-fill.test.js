@@ -204,7 +204,7 @@ describe('Stepper fill variant (issue 1050)', () => {
     // CONTENT height and the control stands 42px outside the manager.
     assert.match(body, /box-sizing: border-box;/);
     // A custom property, not a constant.
-    assert.match(body, /height: var\(--fab-stepper-fill-height, 36px\);/);
+    assert.match(body, /height: var\(--fab-stepper-fill-height, 38px\);/);
   });
 
   it('keeps min-width: 0 on the filled input, which is what stops it overflowing', () => {
@@ -230,7 +230,7 @@ describe('Stepper fill variant (issue 1050)', () => {
     assert.equal(classColumn(FILL_COMFORTABLE_INPUT), 5, 'guarded, it is genuinely (0,5,0)');
     assert.ok(
       classColumn(FILL_COMFORTABLE_INPUT) > classColumn(COMFORTABLE_INPUT),
-      'so the input takes the wrapper height rather than being pinned to 24px inside a 36px box'
+      'so the input takes the wrapper height rather than being pinned to 24px inside a 38px box'
     );
     const body = bodyOf(FILL_COMFORTABLE_INPUT);
     assert.match(body, /height: 100%;/);

@@ -7,14 +7,14 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import * as componentCategories from '../src/utils/componentCategories.js';
 import * as categoryNormalization from '../src/utils/categoryNormalization.js';
+import * as componentCategories from '../src/utils/componentCategories.js';
 import * as recipeCategories from '../src/utils/recipeCategories.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { parseModule, walkNodes } from './helpers/moduleAst.js';
-import { parseComponent } from './helpers/svelteStructureContract.js';
-import { byCodePoint } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { parseComponent } from './helpers/svelteStructureContract.js';
 
 const SHARED = 'src/utils/categoryNormalization.js';
 const SHARED_SPECIFIER = './categoryNormalization.js';

@@ -280,7 +280,7 @@
   // echoing the field back through it REWRITES what was typed. It therefore keeps its raw
   // text and reseeds from upstream only when the two describe DIFFERENT ORDERS, so an order
   // from a route change, a discarded draft or a reload still lands. Seeded through `untrack`
-  // and resynced by the effect, the shipped `PartyNameField` idiom — but the guard is needed
+  // and resynced by the effect, the shipped `InlineRenameField` idiom — but the guard is needed
   // here and is not there, this field committing on every keystroke rather than on blur.
   let sandboxText = $state(untrack(() => previewDifficultiesText));
   $effect(() => {
@@ -334,7 +334,7 @@
   <span class="manager-checks-rail-row-body">
     <span class="manager-checks-rail-row-text">{row.title}</span>
     {#if row.detail}
-      <span class="manager-checks-rail-row-detail">{row.detail}</span>
+      <span class="manager-checks-rail-row-detail" title={row.detail}>{row.detail}</span>
     {/if}
   </span>
 {/snippet}
@@ -483,7 +483,7 @@
               'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
               'Preview against record'
             )}
-            triggerData={{ 'data-checks-preview-record': '' }}
+            triggerProps={{ 'data-checks-preview-record': '' }}
             onChange={onSelectPreviewRecord}
           />
         {/if}

@@ -1,11 +1,26 @@
 /** A real `Roll` constructor for the View Lab (issue 855). */
 import { evaluateNumericExpression } from '../../../src/systems/checkModifierResolver.js';
 
+import { parseLabTerms } from './labRollParse.js';
+import {
+  DiceTerm,
+  formulaOfTerms,
+  LAB_TERM_CLASSES,
+  labTermFromData,
+  labTermsFromParsed,
+} from './labRollTerms.js';
+
 /**
  * `NdS` with an optional keep-highest / keep-lowest modifier, or the native explosion a count Roll
  * writes: `x`/`xo`, bare or with a comparison and face (issue 2004).
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*)|(xo?)(?:(<=|>=|<|>|=)(\d+))?)?/gi;
+
+/** `NdS` with any modifier suffix, which core's synchronous evaluation ignores. */
+const SYNC_DIE_TERM = /(\d*)d(\d+)(?:[a-z]+(?:<=|>=|<|>|=)?\d*)*/gi;
+
+/** The most dice one term may hold before core's synchronous evaluation throws. */
+const MAX_SYNC_DICE = 999;
 
 /** Core's `Die#explode` recursion limit, and the message a count Roll recognizes. */
 const MAX_EXPLOSIONS = 1000;
@@ -83,6 +98,39 @@ function rollDieTerm({ number, sides }, [keep, keepCount, explode, comparison, t
   return { results, total };
 }
 
+/** Whether a top-level term is itself one lab die: an `NdS` the evaluation pass rolls whole. */
+function isSelfDie(term) {
+  if (!(term instanceof DiceTerm)) return false;
+  if (!Number.isInteger(term._number) || !Number.isInteger(term._faces)) return false;
+  const matches = [...term.expression.matchAll(DIE_TERM)];
+  return (
+    matches.length === 1 &&
+    matches[0][0] === term.expression &&
+    dieShape(matches[0][1], matches[0][2]) !== null
+  );
+}
+
+/** The unevaluated die shapes the evaluation pass will find inside a term's formula. */
+function nestedDiceShapes(term) {
+  return [...term.formula.replaceAll(FLAVOUR_SPAN, '').matchAll(DIE_TERM)]
+    .map(([, count, faces]) => dieShape(count, faces))
+    .filter(Boolean)
+    .map(({ number, sides }) => ({ number, faces: sides, results: [], total: undefined }));
+}
+
+/** Give each term that is not itself a die the nested die shapes it holds, as core's `dice`. */
+function attachNestedDice(terms) {
+  for (const term of terms) {
+    if (isSelfDie(term)) continue;
+    const shapes = nestedDiceShapes(term);
+    if (shapes.length > 0) term.dice = shapes;
+  }
+  return terms;
+}
+
+/** Plain JSON for one entry of `roll.dice`. */
+const dieJson = (die) => (typeof die?.toJSON === 'function' ? die.toJSON() : die);
+
 /**
  * Build the lab's `Roll` class over an injected entropy source.
  *
@@ -98,6 +146,9 @@ function rollDieTerm({ number, sides }, [keep, keepCount, explode, comparison, t
  */
 export function createLabRoll({ random, replaceFormulaData, validate }) {
   return class LabRoll {
+    /** The term classes `fromData` revives serialized terms through. */
+    static TERM_CLASSES = LAB_TERM_CLASSES;
+
     /**
      * @param {string} formula The roll expression.
      * @param {object} [data] Roll data for `@path` substitution.
@@ -107,17 +158,41 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       this.data = data;
       this._total = undefined;
       this.options = options;
-      // Core substitutes data while constructing terms; serialized rolls carry the resolved
-      // formula, not the actor's data. Resolve here so restoration needs no live actor lookup.
-      this.formula = replaceFormulaData(String(formula ?? ''), data, { missing: '0' });
-      // Core parses its terms at construction, so a Roll's dice exist, unevaluated, before it rolls.
-      this.dice = [...this.formula.replaceAll(FLAVOUR_SPAN, '').matchAll(DIE_TERM)]
-        .map(([, count, faces]) => dieShape(count, faces))
-        .filter(Boolean)
-        .map(({ number, sides }) => ({ number, faces: sides, results: [], total: undefined }));
-      this.terms = [...this.dice];
+      // Core parses its terms at construction, substituting data first, so a Roll's dice exist,
+      // unevaluated, before it rolls and a serialized roll carries the resolved formula.
+      this.terms = attachNestedDice(this.constructor.constructTerms(String(formula ?? ''), data));
+      this._formula = this.resetFormula();
       this.result = '';
       this._evaluated = false;
+    }
+
+    /**
+     * The terms `new Roll(formula, data)` starts with. A static seam, so the shared test double
+     * can replay terms recorded from real Foundry instead.
+     *
+     * @param {string} formula The roll expression.
+     * @param {object} data Roll data.
+     * @returns {Array<object>} Term instances.
+     */
+    static constructTerms(formula, data) {
+      const substituted = replaceFormulaData(formula, data, { missing: '0' });
+      return substituted.trim() ? labTermsFromParsed(parseLabTerms(substituted)) : [];
+    }
+
+    /** Core's live formula, re-rendered from the terms. */
+    get formula() {
+      return formulaOfTerms(this.terms);
+    }
+
+    /** Core's `resetFormula`: re-cache `_formula` after a term is mutated in place. */
+    resetFormula() {
+      this._formula = this.formula;
+      return this._formula;
+    }
+
+    /** Core's `dice`: each top-level die, and the dice nested inside every other term. */
+    get dice() {
+      return this.terms.flatMap((term) => (isSelfDie(term) ? [term] : (term.dice ?? [])));
     }
 
     /** Core's `total` reads `_total`, which a count Roll sets to its net after evaluating. */
@@ -129,29 +204,22 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       this._total = value;
     }
 
-    /** Core's formula field, which a count Roll compares against the policy it replays. */
-    get _formula() {
-      return this.formula;
-    }
-
     /**
-     * Evaluate the formula, populating `total` and `dice`.
+     * Evaluate the terms, populating `total` and `dice`.
      *
      * @param {object} [_options] Ignored; accepted for signature parity with Foundry.
      * @returns {Promise<LabRoll>} This roll.
      */
     async evaluate(_options = {}) {
       if (this._evaluated) return this;
-      // `missing: '0'` is Foundry's behaviour for a Roll constructed WITH data — an unresolved key
-      // contributes nothing rather than poisoning the expression.
-      const substituted = replaceFormulaData(this.formula, this.data, { missing: '0' });
-      // Strip flavour spans before the die pass.
-      const masked = substituted.replaceAll(FLAVOUR_SPAN, '');
+      // The live formula, so a term mutated in place rolls as mutated, as core's would.
+      const masked = this.formula.replaceAll(FLAVOUR_SPAN, '');
+      const dice = this.dice;
       let next = 0;
       const rolledOut = masked.replaceAll(DIE_TERM, (match, count, faces, ...modifiers) => {
         const shape = dieShape(count, faces);
         if (!shape) return match;
-        const die = this.dice[next++];
+        const die = dice[next++];
         Object.assign(die, rollDieTerm(shape, modifiers, random));
         return String(die.total);
       });
@@ -163,11 +231,44 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
             'DIE_TERM in tests/view-lab/foundry/labRoll.js rather than letting it score partially.'
         );
       }
-      const value = evaluateNumericExpression(rolledOut);
-      this.total = Number.isFinite(value) ? value : 0;
+      // Left as computed: core's async evaluation never checks that its total is finite.
+      this.total = evaluateNumericExpression(rolledOut);
       this.result = rolledOut;
       this._evaluated = true;
       return this;
+    }
+
+    /**
+     * Core's `evaluateSync`: `maximize` or `minimize` reads every die at a face extreme and runs no
+     * modifier, so `4d6kh3` maximises to 24; dice under neither option, or more than 999 in one
+     * term, throw, as core's do. The total is left as computed, so a non-finite one reaches the
+     * caller.
+     *
+     * @param {{ maximize?: boolean, minimize?: boolean }} [options] Options.
+     * @returns {LabRoll} This roll.
+     */
+    evaluateSync({ maximize = false, minimize = false } = {}) {
+      const masked = this.formula.replaceAll(FLAVOUR_SPAN, '');
+      const extreme = masked.replaceAll(SYNC_DIE_TERM, (match, count, faces) => {
+        const shape = dieShape(count, faces);
+        if (!shape) return match;
+        if (!maximize && !minimize) {
+          throw new Error(`View Lab Roll cannot evaluate "${this.formula}" synchronously`);
+        }
+        if (shape.number > MAX_SYNC_DICE) {
+          throw new Error(`View Lab Roll cannot roll more than ${MAX_SYNC_DICE} dice in one term`);
+        }
+        return String(shape.number * (maximize ? shape.sides : 1));
+      });
+      this.total = evaluateNumericExpression(extreme);
+      this.result = extreme;
+      this._evaluated = true;
+      return this;
+    }
+
+    /** Core's `clone`: a fresh, unevaluated Roll of the cached `_formula`. */
+    clone() {
+      return new this.constructor(this._formula, this.data, this.options);
     }
 
     /**
@@ -179,9 +280,9 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       return structuredClone({
         class: this.constructor.name,
         options: this.options,
-        dice: this.dice,
-        formula: this.formula,
-        terms: this.terms,
+        dice: this.dice.map(dieJson),
+        formula: this._formula,
+        terms: this.terms.map((term) => term.toJSON()),
         total: this.total,
         evaluated: this._evaluated,
       });
@@ -196,22 +297,28 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
      */
     static fromData(data) {
       if (data.class && data.class !== this.name) {
+        // Core resolves a snapshot's class through `CONFIG.Dice.rolls`, as the count Roll needs.
+        const registered = globalThis.CONFIG?.Dice?.rolls?.find((cls) => cls.name === data.class);
+        if (registered && registered !== this) return registered.fromData(data);
         throw new Error(`View Lab Roll cannot reconstruct ${data.class}`);
       }
       const snapshot = structuredClone(data);
+      // Core constructs from the cached formula, then overwrites the terms with the snapshot's.
       const roll = new this(snapshot.formula, snapshot.data, snapshot.options);
+      const revived = (snapshot.terms ?? []).map((term) =>
+        labTermFromData(term, this.TERM_CLASSES)
+      );
+      if (revived.length > 0 && revived.every(Boolean)) roll.terms = revived;
       if (snapshot.evaluated ?? true) {
         roll.total = snapshot.total;
-        roll.dice = snapshot.dice ?? [];
-        // The lab's terms are its dice, the same objects, as a count Roll's replay requires.
-        roll.terms = [...roll.dice];
         roll._evaluated = true;
         // Rebuild only the lab's diagnostic expression, using saved group totals. Never
         // reduce the expression or evaluate the dice again: the stored total is authoritative.
+        const dice = roll.dice;
         let dieIndex = 0;
         roll.result = roll.formula
           .replaceAll(FLAVOUR_SPAN, '')
-          .replaceAll(DIE_TERM, () => String(roll.dice[dieIndex++].total));
+          .replaceAll(DIE_TERM, () => String(dice[dieIndex++]?.total));
       }
       return roll;
     }
@@ -265,244 +372,4 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       return parseLabTerms(replaceFormulaData(formula, data, { missing: '0' }));
     }
   };
-}
-
-/**
- * A die term, in the shape RECORDED from Foundry 14.365 rather than invented.
- *
- * @param {object} params Params.
- * @param {number|undefined} params.number Dice count, or undefined for a sub-roll.
- * @param {string} params.denominationSource The raw denomination text (`20`, `f`, `c`).
- * @param {string} params.modifiers The raw modifier text.
- * @returns {object} The term.
- */
-function labDieTerm({ number, denominationSource, modifiers }) {
-  const numericFaces = /^\d+$/.test(denominationSource) ? Number(denominationSource) : null;
-  const fixedFaces = { f: 3, c: 2 }[denominationSource.toLowerCase()];
-  const faces = numericFaces ?? fixedFaces;
-  const denomination = numericFaces === null ? denominationSource.toLowerCase() : `d${faces}`;
-  const classes = { f: 'FateDie', c: 'Coin' };
-  return {
-    class: numericFaces === null ? (classes[denominationSource.toLowerCase()] ?? 'Die') : 'Die',
-    number,
-    faces,
-    denomination,
-    modifiers: modifiers ? (modifiers.match(/[a-z]+(?:[<>=]{1,2})?-?\d*/gi) ?? []) : [],
-    isDeterministic: false,
-  };
-}
-
-/** A die whose faces are a parenthetical sub-roll: `number`/`faces` read `undefined`. */
-const SUB_ROLL_DIE = /^(\d*)d\(/i;
-
-/** `NdS` with an optional trailing modifier run. */
-const LAB_DIE = /^(\d*)d(\d+|[fc])((?:[a-z]+(?:[<>=]{1,2})?-?\d*)*)/i;
-
-/** A math function opening, e.g. `max(`. */
-const LAB_FUNCTION = /^([a-z][a-z0-9]*)\(/i;
-
-/** A bare word the grammar leaves as an unmatched `StringTerm`, e.g. `prof`. */
-const LAB_WORD = /^[a-z_][\w.]*/i;
-
-/** A decimal number. */
-const LAB_NUMBER = /^\d+(?:\.\d+)?/;
-
-/** A flavour annotation, which Foundry attaches to the preceding term as inert text. */
-const LAB_FLAVOUR = /^\[[^\]]*]/;
-
-/**
- * Read the balanced parenthetical starting at `source[start]` (which must be `(`).
- *
- * @param {string} source The formula.
- * @param {number} start Index of the opening parenthesis.
- * @returns {{inner: string, end: number}} The contents and the index after the `)`.
- * @throws {SyntaxError} When the parenthesis is never closed — which is what a GM's
- *   half-typed `1d20 + (` is, and what the real grammar raises for it.
- */
-function readBalanced(source, start) {
-  let depth = 0;
-  for (let index = start; index < source.length; index += 1) {
-    if (source[index] === '(') depth += 1;
-    else if (source[index] === ')') {
-      depth -= 1;
-      if (depth === 0) return { inner: source.slice(start + 1, index), end: index + 1 };
-    }
-  }
-  throw new SyntaxError(`Unbalanced parenthesis in "${source}"`);
-}
-
-/**
- * Parse a substituted formula into lab roll terms.
- *
- * @param {string} source The `@`-substituted formula.
- * @returns {Array<object>} Roll terms in infix order.
- * @throws {SyntaxError} On a malformed or half-typed formula.
- */
-/**
- * Split an argument list on its TOP-LEVEL commas only.
- *
- * @param {string} inner The text between the brackets.
- * @returns {string[]} One entry per top-level argument.
- */
-function splitArguments(inner) {
-  const parts = [];
-  let depth = 0;
-  let start = 0;
-  for (let index = 0; index < inner.length; index += 1) {
-    const character = inner[index];
-    if (character === '(' || character === '{') depth += 1;
-    else if (character === ')' || character === '}') depth -= 1;
-    else if (character === ',' && depth === 0) {
-      parts.push(inner.slice(start, index));
-      start = index + 1;
-    }
-  }
-  parts.push(inner.slice(start));
-  return parts;
-}
-
-function parseLabTerms(source) {
-  const terms = [];
-  let cursor = 0;
-  // `true` while the parser is waiting for a VALUE and `false` while it is waiting for an operator.
-  let expectOperand = true;
-
-  while (cursor < source.length) {
-    const rest = source.slice(cursor);
-    if (/^\s/.test(rest)) {
-      cursor += 1;
-      continue;
-    }
-    const flavour = LAB_FLAVOUR.exec(rest);
-    if (flavour) {
-      cursor += flavour[0].length;
-      continue;
-    }
-    if (!expectOperand) {
-      if (!/^[+\-*/%]/.test(rest)) throw new SyntaxError(`Expected an operator in "${source}"`);
-      terms.push({ class: 'OperatorTerm', operator: rest[0], isDeterministic: true });
-      cursor += 1;
-      expectOperand = true;
-      continue;
-    }
-    cursor += readOperand(source, cursor, rest, terms);
-    expectOperand = false;
-  }
-
-  if (expectOperand) throw new SyntaxError(`Incomplete expression "${source}"`);
-  return terms;
-}
-
-/**
- * Push the one operand starting at `cursor` and report how many characters it spanned.
- *
- * @param {string} source The whole formula.
- * @param {number} cursor The operand's start index.
- * @param {string} rest `source` from `cursor`.
- * @param {Array<object>} terms The output list, appended to in place.
- * @returns {number} The operand's length in characters.
- * @throws {SyntaxError} When nothing the grammar accepts starts here.
- */
-function readOperand(source, cursor, rest, terms) {
-  const subRoll = SUB_ROLL_DIE.exec(rest);
-  if (subRoll) {
-    const { end } = readBalanced(source, cursor + subRoll[0].length - 1);
-    // `DiceTerm#faces` returns undefined while the faces are an unevaluated sub-Roll, and
-    // `Die#denomination` is `` `d${this.faces}` `` — so the recorded 14.365 output really is the
-    // literal string `"dundefined"`.
-    terms.push({
-      class: 'Die',
-      number: subRoll[1] === '' ? 1 : Number(subRoll[1]),
-      faces: undefined,
-      denomination: 'dundefined',
-      modifiers: [],
-      isDeterministic: false,
-    });
-    return end - cursor;
-  }
-
-  if (rest.startsWith('{')) {
-    const closing = source.indexOf('}', cursor);
-    if (closing === -1) throw new SyntaxError(`Unbalanced pool brace in "${source}"`);
-    const inner = source.slice(cursor + 1, closing);
-    const trailing = /^[a-z]+[<>=]?-?\d*/i.exec(source.slice(closing + 1));
-    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
-    // `PoolTerm#isDeterministic` is `terms.every(...)`, and — unlike a parenthetical or a
-    // function term — the recorded shape reports `isIntermediate: false`.
-    terms.push({
-      class: 'PoolTerm',
-      modifiers: trailing ? [trailing[0]] : [],
-      isIntermediate: false,
-      isDeterministic: parts.every((part) => part.isDeterministic === true),
-    });
-    return closing + 1 - cursor + (trailing ? trailing[0].length : 0);
-  }
-
-  const die = LAB_DIE.exec(rest);
-  if (die) {
-    terms.push(
-      labDieTerm({
-        number: die[1] === '' ? 1 : Number(die[1]),
-        denominationSource: die[2],
-        modifiers: die[3],
-      })
-    );
-    return die[0].length;
-  }
-
-  const number = LAB_NUMBER.exec(rest);
-  if (number) {
-    terms.push({ class: 'NumericTerm', number: Number(number[0]), isDeterministic: true });
-    return number[0].length;
-  }
-
-  // A UNARY SIGN, which the grammar allows in front of any operand and which a bounded rolling
-  // check modifier always produces: `min(max((1d8), -1), 6)` opens its second argument with one.
-  if ((rest.startsWith('-') || rest.startsWith('+')) && rest.length > 1) {
-    const consumed = readOperand(source, cursor + 1, rest.slice(1), terms);
-    const operand = terms.at(-1);
-    if (rest.startsWith('-') && operand?.class === 'NumericTerm') operand.number = -operand.number;
-    return consumed + 1;
-  }
-
-  const fn = LAB_FUNCTION.exec(rest);
-  if (fn) {
-    const { inner, end } = readBalanced(source, cursor + fn[0].length - 1);
-    // `FunctionTerm#isDeterministic` is `this.terms.every(t => Roll.create(t).isDeterministic)`,
-    // so it recurses; a comma-separated argument list is parsed argument by argument.
-    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
-    terms.push({
-      class: 'FunctionTerm',
-      fn: fn[1],
-      terms: parts,
-      isIntermediate: true,
-      isDeterministic: parts.every((part) => part.isDeterministic === true),
-    });
-    return end - cursor;
-  }
-
-  if (rest.startsWith('(')) {
-    const { inner, end } = readBalanced(source, cursor);
-    const parts = parseLabTerms(inner);
-    // `ParentheticalTerm` carries BOTH a string `term` and an own `roll` slot, and `isIntermediate
-    // = true`.
-    terms.push({
-      class: 'ParentheticalTerm',
-      term: inner,
-      roll: undefined,
-      isIntermediate: true,
-      isDeterministic: parts.every((part) => part.isDeterministic === true),
-    });
-    return end - cursor;
-  }
-
-  const word = LAB_WORD.exec(rest);
-  if (word) {
-    // `StringTerm#isDeterministic` returns TRUE for a string the classifier cannot resolve — and
-    // evaluating it then throws.
-    terms.push({ class: 'StringTerm', term: word[0], isDeterministic: true });
-    return word[0].length;
-  }
-
-  throw new SyntaxError(`Unexpected "${rest[0]}" in "${source}"`);
 }

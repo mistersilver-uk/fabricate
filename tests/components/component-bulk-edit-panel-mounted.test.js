@@ -9,7 +9,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createComponentBulkDraft } from '../../src/ui/model/componentBulkEditModel.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -18,6 +18,7 @@ const panel = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The remove leg's focus/announce ordering rule (issue 1157), ported from `BulkDeleteCard`.
     'src/ui/svelte/util/announceAfterFocus.js',
@@ -38,8 +39,9 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25).
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     // The three insets (issue 1371 r16-list) and the dock's danger control. Both are STATIC
     // imports of the component under test; omitting either HANGS this suite as `# cancelled`.

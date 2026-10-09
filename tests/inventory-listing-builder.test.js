@@ -1,7 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
+import { simpleYieldRows } from '../src/ui/svelte/util/salvageYieldRows.js';
 import { fill } from '../src/utils/fillPlaceholders.js';
 
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
@@ -784,6 +785,27 @@ describe('InventoryListingBuilder — tools + produced-by', () => {
     const { builder } = makeBuilder({ recipes: [recipe] });
     const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
     assert.equal(rowByComponent(listing, 'c1').producedBy[0].recipeId, 'r1');
+  });
+
+  it('lists a recipe offering the component only as a choice group alternative (issue 1773)', () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'c2' },
+        { id: 'b', componentId: 'c1' },
+      ],
+    };
+    const recipe = {
+      id: 'r1',
+      name: 'Smelt Either',
+      img: 'icons/smelt.webp',
+      craftingSystemId: 'sys-1',
+      ingredientSets: [],
+      steps: [{ id: 's1', resultGroups: [{ id: 'g1', results: [choice] }] }],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.equal(rowByComponent(listing, 'c1').producedBy[0]?.recipeId, 'r1');
   });
 
   it('lists salvage producers (kind: salvage) from a component whose salvage yields it', () => {
@@ -1716,6 +1738,12 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         ['Crit', 20, 30, null],
       ]
     );
+    // Issue 2152: the panel's threshold reads the presenter's `band`, through the same
+    // `netRange` formatter the Journal ladder uses, never a raw `start–end` interpolation.
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => o.band),
+      ['1–9', '10–19', '20–30']
+    );
 
     // The load-bearing half: an override must move NOTHING here.
     const overridden = salvageOf(
@@ -1730,6 +1758,23 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         [20, 30],
       ],
       'dcOverride shifts the simple DC and routed RELATIVE thresholds ONLY'
+    );
+  });
+
+  // Issue 2152: a negative-ended fixed tier bands with the true minus, spaced apart from the
+  // dash, exactly as the Journal's own `netRange` formatter states it.
+  it('routed + FIXED bands a negative-ended range with the true minus, spaced from the dash', () => {
+    const check = {
+      routed: {
+        type: 'fixed',
+        rollFormula: '1d20 - 6',
+        fixedOutcomes: [{ id: 'o1', name: 'Fumble', success: false, start: -2, end: -1 }],
+      },
+    };
+    const salvage = salvageOf(salvageSystem({ mode: 'routed', check }));
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => o.band),
+      ['−2 – −1']
     );
   });
 
@@ -2295,5 +2340,73 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
     const salvage = salvageFor('simple', { simple: { rollFormula: '1d20', dc: 12 } });
     assert.equal(salvage.dc, 12);
     assert.equal(salvage.target, null);
+  });
+
+  it("states a count check's successes needed at the salvager's threshold (issue 2006)", () => {
+    const evaluation = {
+      product: 'count',
+      direction: 'over',
+      pool: { die: 10, base: '4', threshold: '@skills.craft.value', required: 2 },
+    };
+    const salvage = salvageFor('simple', { simple: { rollFormula: '', dc: 12, evaluation } }, {
+      salvage: { dcOverride: 9, successesOverride: 3 },
+      skills: { craft: { value: 8 } },
+    });
+    assert.equal(salvage.dc, null, 'a count check grades successes, never a DC');
+    assert.deepEqual(salvage.target, {
+      rule: 'Roll to break this down. The count must reach the successes needed to recover the materials below.',
+      direction: 'over',
+      text: 'Salvage check · 3 successes needed · d10s, success on ≥ 8',
+    });
+  });
+
+  it('reads a count check with no retained formula as a roll, so nothing is guaranteed', () => {
+    const evaluation = { product: 'count', pool: { base: '2', threshold: '5', required: 1 } };
+    const salvage = salvageFor('simple', { simple: { rollFormula: '', evaluation } }, {
+      salvage: { resultGroups: [{ results: [{ componentId: 'c2', quantity: 2 }] }] },
+    });
+    assert.equal(salvage.checkUsable, true, 'a count rolls its pool, never the empty formula');
+    assert.deepEqual(
+      simpleYieldRows(salvage).map((row) => row.guaranteedQuantity),
+      salvage.results.map(() => 0),
+      'the bulk yield never counts a rolled count salvage as guaranteed'
+    );
+    assert.ok(salvage.results.length > 0);
+  });
+
+  // Issue 2137: a routed counting salvage states the Journal's net-success bands, never no band.
+  it("bands a routed count salvage's tiers in net successes from its own successes needed", () => {
+    const routed = (cancel) => ({
+      routed: {
+        type: 'relative',
+        rollFormula: '',
+        dc: 15,
+        relativeOutcomes: [
+          { id: 'o3', name: 'Crit', success: true, dc: 5 },
+          { id: 'o2', name: 'Pass', success: true, dc: 0 },
+          { id: 'o1', name: 'Fail', success: false, dc: -5 },
+        ],
+        evaluation: { product: 'count', pool: { base: '4', threshold: '8', required: 2, cancel: { enabled: cancel } } },
+      },
+    });
+    const bands = (cancel, salvage = {}) =>
+      salvageFor('routed', routed(cancel), { salvage }).routedOutcomes.map((o) => [o.id, o.band, o.threshold]);
+    assert.deepEqual(bands(false), [
+      ['o3', '7+', null],
+      ['o2', '2–6', null],
+      ['o1', '0–1', null],
+    ]);
+    // The component's successes override moves every band; cancelling adds the Journal's Botch row.
+    assert.deepEqual(bands(true, { successesOverride: 4 }), [
+      ['o3', '9+', null],
+      ['o2', '4–8', null],
+      ['o1', '−1 – 3', null],
+      ['count-botch', '<−1', null],
+    ]);
+    const botch = salvageFor('routed', routed(true), { salvage: { successesOverride: 4 } }).routedOutcomes.at(-1);
+    assert.equal(botch.below, -1, 'the Botch row carries its floor, so the panel can mark a roll below it');
+    const summed = salvageFor('routed', { routed: { ...routed(false).routed, rollFormula: '1d20', evaluation: undefined } });
+    assert.ok(summed.routedOutcomes.every((o) => o.band === undefined), 'a summed DC keeps its thresholds');
+    assert.deepEqual(summed.routedOutcomes.map((o) => o.threshold), [20, 15, 10]);
   });
 });

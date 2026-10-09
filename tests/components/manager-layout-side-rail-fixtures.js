@@ -55,6 +55,21 @@ function worldLibrary(pageClass, announcement) {
   return `<main class="manager-main">${live}<div class="${pageClass}">${TALL}</div></main>`;
 }
 
+/**
+ * The gathering task editor (issue 1522): a fixed tab bar over its scrolling tab panel and, on a
+ * d100 task's Results tab, the drop rail's aside after it.
+ */
+export function gatheringTaskEditor({ results = false } = {}) {
+  const aside = results
+    ? `<aside class="manager-inspector"><div class="manager-drop-inspector-stack">${TALL}</div></aside>`
+    : '';
+  return (
+    '<main class="manager-main manager-gathering-task-edit-view" data-gathering-task-editor>' +
+    '<div class="fabricate-tabs manager-editor-tabs" role="tablist"><button class="manager-editor-tab-button" role="tab">Overview</button><button class="manager-editor-tab-button" role="tab">Requirements</button><button class="manager-editor-tab-button" role="tab">Results</button></div>' +
+    `<div class="manager-editor-tab-panel" role="tabpanel">${TALL}</div></main>${aside}`
+  );
+}
+
 function vocabularyShell(mainAttributes) {
   return hashed(
     `<main ${mainAttributes}><div class="manager-vocabulary-shell">` +
@@ -151,12 +166,9 @@ export const SIDE_RAIL_ROUTES = Object.freeze([
   },
   {
     id: 'gathering-task-edit',
-    rootAttributes: 'data-manager-view="gathering-task-edit" data-gathering-task-layout="results"',
-    main:
-      '<main class="manager-main manager-gathering-task-edit-view" data-gathering-task-editor>' +
-      `<section class="manager-task-core-card">${TALL}</section>` +
-      '<section class="manager-task-core-card">Results</section></main>',
-    owner: { wide: 'main.manager-gathering-task-edit-view' },
+    rootAttributes: 'data-manager-view="gathering-task-edit" data-gathering-task-layout="full"',
+    main: gatheringTaskEditor(),
+    owner: { wide: '.manager-editor-tab-panel' },
   },
   {
     id: 'world-currency',
@@ -257,7 +269,7 @@ function sideRailMarkup(route, { width, height, collapsed }) {
     `<style>@layer modules { ${css} }</style>${SCOPED_CSS}` +
     `<div class="fabricate" style="width:${width}px;height:${height}px">` +
     `<div class="fabricate-manager" ${route.rootAttributes}>` +
-    '<div class="manager-titlebar">titlebar</div><div class="manager-header">header</div>' +
+    '<div class="manager-titlebar">titlebar</div><div class="fabricate-page-header manager-header">header</div>' +
     `<div class="${bodyClass}">${RAIL}${route.main}</div></div></div>`
   );
 }
@@ -266,64 +278,84 @@ function sideRailMarkup(route, { width, height, collapsed }) {
  * Render one side-rail route inside a real Manager root and read its geometry.
  *
  * @param {object} route One {@link SIDE_RAIL_ROUTES} entry.
- * @param {{ width: number, height?: number, collapsed?: boolean }} options `height` is the
- * Manager's own, so a 720px window is 686.
+ * @param {{ width: number, height?: number, collapsed?: boolean, boxes?: string[] }} options
+ * `height` is the Manager's own, so a 720px window is 686; `boxes` are further selectors to measure.
  * @returns {Promise<object>} boxes, scroll state and rail borders, and the catalogue list's state
  */
-export async function readSideRailGeometry(route, { width, height = 686, collapsed = false }) {
-  const context = await openLayoutContext({
-    viewport: { width: width + 40, height: Math.max(720, height + 34) },
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
-  try {
-    await page.setContent(sideRailMarkup(route, { width, height, collapsed }));
-    return await page.evaluate(
-      ({ owner, catalogue }) => {
-        const at = (selector) => document.querySelector(selector);
-        const box = (selector) => {
-          const value = at(selector)?.getBoundingClientRect();
-          return value
-            ? { top: value.top, bottom: value.bottom, width: value.width, height: value.height }
-            : null;
-        };
-        const scroll = (selector) => {
-          const node = at(selector);
-          return {
-            scrollHeight: node.scrollHeight,
-            clientHeight: node.clientHeight,
-            overflowY: getComputedStyle(node).overflowY,
-          };
-        };
-        const tracks = (selector) =>
-          getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
-        const stacked = Boolean(owner.stackSubject) && tracks(owner.stackSubject) === 1;
-        const ownerSelector = stacked ? owner.stacked : owner.wide;
-        const railStyle = getComputedStyle(at('.manager-rail'));
+export async function readSideRailGeometry(
+  route,
+  { width, height = 686, collapsed = false, boxes = [] }
+) {
+  const page = await sideRailPage({ width: width + 40, height: Math.max(720, height + 34) });
+  await page.setContent(sideRailMarkup(route, { width, height, collapsed }));
+  return page.evaluate(
+    ({ owner, catalogue, extra }) => {
+      const at = (selector) => document.querySelector(selector);
+      const box = (selector) => {
+        const value = at(selector)?.getBoundingClientRect();
+        return value
+          ? {
+              top: value.top,
+              bottom: value.bottom,
+              left: value.left,
+              width: value.width,
+              height: value.height,
+            }
+          : null;
+      };
+      const scroll = (selector) => {
+        const node = at(selector);
         return {
-          stacked,
-          ownerSelector,
-          bodyTracks: tracks('.manager-body'),
-          rail: box('.manager-rail'),
-          body: box('.manager-body'),
-          main: box('.manager-body > main'),
-          owner: box(ownerSelector),
-          bodyScroll: scroll('.manager-body'),
-          ownerScroll: scroll(ownerSelector),
-          railScroll: scroll('.manager-rail'),
-          railBorder: { right: railStyle.borderRightWidth, bottom: railStyle.borderBottomWidth },
-          list: catalogue
-            ? {
-                layout: box('.manager-scoped-list-layout'),
-                layoutScroll: scroll('.manager-scoped-list-layout'),
-                rowsScroll: scroll('.manager-scoped-list-rows'),
-              }
-            : null,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+          overflowY: getComputedStyle(node).overflowY,
         };
-      },
-      { owner: route.owner, catalogue: Boolean(route.catalogue) }
+      };
+      const tracks = (selector) =>
+        getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
+      const stacked = Boolean(owner.stackSubject) && tracks(owner.stackSubject) === 1;
+      const ownerSelector = stacked ? owner.stacked : owner.wide;
+      const railStyle = getComputedStyle(at('.manager-rail'));
+      return {
+        boxes: Object.fromEntries(extra.map((selector) => [selector, box(selector)])),
+        stacked,
+        ownerSelector,
+        bodyTracks: tracks('.manager-body'),
+        rail: box('.manager-rail'),
+        body: box('.manager-body'),
+        main: box('.manager-body > main'),
+        owner: box(ownerSelector),
+        bodyScroll: scroll('.manager-body'),
+        ownerScroll: scroll(ownerSelector),
+        railScroll: scroll('.manager-rail'),
+        railBorder: { right: railStyle.borderRightWidth, bottom: railStyle.borderBottomWidth },
+        list: catalogue
+          ? {
+              layout: box('.manager-scoped-list-layout'),
+              layoutScroll: scroll('.manager-scoped-list-layout'),
+              rowsScroll: scroll('.manager-scoped-list-rows'),
+            }
+          : null,
+      };
+    },
+    { owner: route.owner, catalogue: Boolean(route.catalogue), extra: boxes }
+  );
+}
+
+let pagePromise;
+
+/** The one page every reading lays out on: `setContent` replaces its document, and none hovers. */
+async function sideRailPage(viewport) {
+  if (!pagePromise) {
+    pagePromise = openLayoutContext({ viewport, deviceScaleFactor: 1 }).then((context) =>
+      context.newPage()
     );
-  } finally {
-    await context.close();
+    // A failed open is not kept, so the next reading tries again rather than inheriting it.
+    pagePromise.catch(() => {
+      pagePromise = undefined;
+    });
   }
+  const page = await pagePromise;
+  await page.setViewportSize(viewport);
+  return page;
 }

@@ -1,0 +1,37 @@
+import { holdsUnsettledAwardChoice } from './choiceGroupAward.js';
+
+/** The answers a versioned crafting command returns: a transition, an authority outage, a refusal. */
+
+export function versionedTransitionResult(run, outcome = {}) {
+  return {
+    success: outcome?.success === true,
+    runId: run?.id ?? null,
+    status: run?.status ?? null,
+    runRevision: Number(run?.runRevision) || 0,
+    waiting: run?.status === 'waitingTime',
+    terminal: run?.currentStepIndex === null,
+    disposition: outcome?.disposition ?? null,
+    createdResultUuids: Array.isArray(outcome?.createdResultUuids)
+      ? [...outcome.createdResultUuids]
+      : [],
+    ...(Object.hasOwn(outcome || {}, 'consumed') && { consumed: outcome.consumed === true }),
+    // The tier a successful routed roll went through, in the run record's shape (issue 1644).
+    ...(outcome?.outcomeId && { checkResult: { data: { outcomeId: outcome.outcomeId } } }),
+    // A stage that left the player a reward to pick says so (issue 1773).
+    ...(holdsUnsettledAwardChoice(run) && { awardChoicePending: true }),
+  };
+}
+
+export function authorityUnavailableResult() {
+  return {
+    success: false,
+    authorityUnavailable: true,
+    results: null,
+    message: 'Versioned crafting authority is unavailable.',
+  };
+}
+
+/** A refusal; `blocker` is the machine-readable code a stage preparation names, if any. */
+export function versionedFailure(message, blocker = null) {
+  return { success: false, results: null, message, ...(blocker && { blocker }) };
+}

@@ -103,11 +103,63 @@ Canonical mapping: `Result.chooser`, `Result.selectionFormula`, `Result.selectio
 
 Spec reference: openspec/specs/design-system/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Selection Roll
+
+A roll expression authored only where the ROLL is the **Chooser**, and validated as a rolled amount is: it must roll, and it must be able to total more than 0.
+Each alternative awarded takes one Selection Roll.
+Without repeats an alternative drawn once leaves the ladder for the rest of that award, so `up to N` stops rolling once every alternative is drawn.
+
+Canonical mapping: `Result.selectionFormula`; `drawRolledAwards` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/design-system/spec.md
+
+## Selection Range
+
+The alternatives' ranges form a ladder ordered by where each range starts.
+A gap is legal and never leaves a roll unanswered: a roll selects the alternative whose range starts highest at or below it, and a roll below every range selects the lowest.
+A setting lives only in the cell that reads it, so ranges persist only on the alternatives of a rolled group; the editor keeps them while the GM switches to the player and drops them on save.
+
+Canonical mapping: `Result.alternatives[].selectionRange`; `selectionLadder` and `selectFromLadder` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-entity-editors/spec.md
+
+## Pending Award Choice
+
+A choice group whose chooser is the player that has been awarded but awaits settlement, persisted in `pendingAwardChoices`.
+The player must pick one or more alternatives according to the **Award Strategy** to settle the choice exactly once.
+An unsettled choice blocks later stage execution with the `awardChoicePending` blocker.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Claimable
+
+An alternative in a pending award choice that can be awarded at settle time.
+Claimability is determined at settle time: an alternative is claimable if its component or source item exists, its world credit writer would accept it, or (for knowledge results) its recipe is available, observable, and not already known to the actor.
+
+Canonical mapping: settlement-time evaluation of `CraftingRunStepState.pendingAwardChoices[].alternatives`
+
+Spec reference: openspec/specs/data-models/spec.md
+
+## Forfeited
+
+A pending award choice that settles because no alternative remains claimable.
+A forfeited choice persists in the step's `pendingAwardChoices` with `outcome: "forfeited"` and no selections recorded.
+When a run is cleaned up while owing an unsettled choice, the choice settles forfeited instead of being deleted.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices[].outcome`, `CraftingRunStepState.groupAwards`
+
+Spec reference: openspec/specs/data-models/spec.md
+
 ## Rolled Amount
 
 Presence of `quantityFormula` IS the mode: absent or empty leaves the amount fixed at `quantity`, which stays the AUTHORED amount, is never omitted from disk, and is what a cleared formula returns to.
 The RESOLVED amount is a different value from the authored one and only it may be zero — an **empty award**, which creates no item, is still stated on the chat card with the roll that produced nothing, and writes no award receipt, because there was no Item write to acknowledge.
 Validation is rollability and never parsability: `Roll.validate` passes expressions that cannot evaluate, so the floor is a maximised evaluation of the formula AS AUTHORED, applied by the authoring surface and by the gathering data boundary alike.
+A craft is also refused before anything is consumed when a non-progressive result's formula cannot total finitely against the crafting character's roll data, maximised and minimised (`validateCraft`, `src/systems/rolledAmountResolver.js`).
+A progressive system skips that check, because its award drops every formula.
+A non-progressive salvage is refused the same way before anything is consumed, and saving an enabled salvage with a non-rollable formula is refused (`validateSalvage`, `assertSalvageAmounts`); a progressive salvage skips both.
 Result-only — a requirement amount and a gathering drop row's quantity are always fixed, and a progressive or salvage-progressive award strips the formula and awards 1.
 
 Canonical mapping: `Result.quantityFormula`, `Result.quantity`, `quantityFormulaErrors` (`src/models/Result.js`); `resolveRolledAmount` (`src/systems/rolledAmountResolver.js`); `maximisedTotal` (`src/utils/rollFormulaRollability.js`)
@@ -140,8 +192,12 @@ Spec reference: openspec/specs/recipes-and-steps/spec.md
 A slot IS an `IngredientGroup` — the same record, named for how the player meets it — so "slot" and "ingredient group" are never two different things.
 A slot is **fixed** when its group authors exactly one option, a **choice** when it authors more than one, and an **essence** slot when the option resolved for it is an essence alternative.
 Slot state is `met` / `partial` / `short`, and the rail keeps at most one slot's chooser open at a time.
+An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open; a chosen choice that falls short is `short`; a partly delivered essence is `partial` and paints the slot tile's own partial face, on the warning ground rather than the danger one, in the crafting rail and the Journal alike.
+A short alternative is dimmed but still offered, and its shortfall is stated in words beside it.
+A candidate is **claimed elsewhere** when it is held in full but the stock the stage's other fundable requirements claim leaves its **spare** (held less claimed) below the need; it is the only reason a candidate is disabled, apart from a pending selection command.
+The shared requirement chooser draws every slot as a slot tile, and the crafting rail is its adopter.
 
-Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementRail.svelte`
+Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `SlotRow.svelte`, `RequirementRail.svelte`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
@@ -201,13 +257,13 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 ## Section Inheritance
 
-The `1.30.0` migration writes every membership record fully OVERRIDING, so on a migrated world nothing resolves through the world layer until a GM clears an override — but once cleared it really does resolve: the **Read Union** applies each inheriting section from the **World Defaults** AFTER the in-system re-spread, on the shipped field names, so the answer changes when the world default moves.
+The `1.30.0` migration writes its membership records so that no resolved value moves, while a record written by add-from-catalogue or by a component import (issue 2218) inherits every section from the start — and an inheriting section really does resolve: the **Read Union** applies each inheriting section from the **World Defaults** AFTER the in-system re-spread, on the shipped field names, so the answer changes when the world default moves.
 **THE COMPONENT `tags` CLAUSE BELOW IS THE EXCEPTION AND STAYS INERT**: `tags` is not a section, carries no writer in the union's inherited-section table, and the in-system record emits it unconditionally, so the additive merge is the RESOLVER's contract and the union's trailing in-system re-spread discards it.
 **AND THE MUTE HALF OF THAT CLAUSE HAS NO AUTHORING SURFACE AT ALL as of issue 1371's prototype-parity rebuild**: `mutedTags` is persisted, normalized, read back and displayed, and the `setMutedTags` leg that writes it is published on the component family alone and called from nowhere in `src/` — so a mute reaches the corpus only through the `1.30.0` migration, an import or a hand edit, and a GM can see one and neither make nor clear it.
 `dormant` keeps its meaning HERE, for the retained local override a re-inherited section leaves on disk, which is why the world identity copy the migration writes is called a **World Identity Snapshot** and never a dormant one.
 An overriding switch over an ABSENT section is not an override and still resolves to the WORLD value, because absence is not a partial block and no field inside a stored block ever falls back; the switch is still reported AS AUTHORED rather than repaired.
 Turning a switch OFF SEEDS the local block from the current world value; turning it back ON flips the switch ONLY and **RETAINS the dormant override**, which re-overriding RESTORES rather than re-seeding — nothing is lost, so the copy stays "fall back" and no confirmation is required.
-An `inherit` map that OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
+An `inherit` map that OMITS a section reads as inheriting it, because that is the state a record created by "add to system" or by a component import is in.
 Three fields depart from the plain pattern, each with its own named helper: the component `category` (the world value wins IF AUTHORED, otherwise the local value falls through), the component `tags` (ADDITIVE — world minus muted plus system-only, with no switch at all), and the tool `repairRequirements` (named for the shipped `Tool.repairRequirements` it seeds; a SEED copied once on add, never a live parent).
 **A SYSTEM-SCOPE WRITE OF AN INHERITABLE SECTION IS AN OVERRIDE, NOT A SHADOWED WRITE** (issue 1371 r19, first stated at component `essences`): every system-scope writer flips that pair's switch to `false` BEFORE the values land, on the same flag-before-values order the editors' own inherit controls use, so what a GM stages is what that system resolves — and **A DELETE IS ONE OF THOSE WRITERS** (issue 1371 r21), which is the least obvious of them: deleting an essence from a system strips it from that system's own rows, which an inheriting pair does not resolve, so the strip changed nothing the GM had just been told it would.
 The delete's flip carries an addition the other writers do not need: the row is SEEDED from what the pair RESOLVED before the flip, because an inheriting pair's own row is dormant and EMPTY for anything adopted after the migration, so flipping onto it and stripping would have answered `{}` and taken every other essence with the one deleted.
@@ -247,6 +303,18 @@ Legacy per-die `DiceCrit` rows migrate ON READ into triggers (`diceGroup`+`total
 Canonical mapping: `check.checkBreakage`, `resolveForcedOutcome`/`rolledDiceGroups` in `src/systems/checkRoll.js`, `evaluateCheckBreakage`/`evaluateCheckBreakageCondition`/`createToolBreakageRuntime` in `src/toolBreakageRuntime.js`, `CraftingSystemManager._normalizeUnifiedTriggers`/`_convertDiceCritsToTriggers`/`_normalizeUnifiedTrigger`/`_normalizeTierStep`/`_convertNatSteppingToTriggers`, `normalizeUnifiedTriggers`/`convertDiceCritsToTriggers`/`normalizeUnifiedTrigger`/`normalizeTierStep`/`convertNatSteppingToTriggers` in `src/systems/normalize/craftingCheck.js`, `CheckTriggers.svelte`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-system-studio/spec.md
+
+## Preset Polarity
+
+`presetPolarity(evaluation)` answers `'low'` when `evaluation.direction === 'under'`, else `'high'`: which end of a die the **Add a common trigger** row's two presets treat as best.
+The `high`-id preset always fires on the best face and `low` on the worst, so under a roll-under evaluation `high` names the LOWEST face on the die and `low` the highest, while a roll-over evaluation keeps the familiar natural-20/natural-1 pairing.
+`presetFace(presetId, sides, evaluation)` resolves the actual face number from the polarity, and `EFFECT_COPY` then names what the fired preset does per check `kind`: force success/failure on a simple check, step a routed tier up/down, or award all/nothing on a progressive check.
+A count check's own direction qualifies which face of its pool's die is best the same way, but never reverses the net-successes ranking a trigger's `Net successes` condition reads.
+A preset produces an ordinary trigger, with no marker field surviving it, so the polarity affects only which face a NEWLY authored preset names, never a trigger already on the check.
+
+Canonical mapping: `presetPolarity`/`presetFace`/`EFFECT_COPY` in `src/ui/svelte/apps/manager/checks/checkTriggerPresets.js`; consumed by `CheckTriggers.svelte`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
 
 ## Provider (vocabulary boundary)
 
@@ -378,19 +446,23 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 The depleted state is read from the shared `environment.nodeRuntime[taskId]` (linked) or the behaviour's `system.node.current` (unlinked, issue 302).
 
-Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
+Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
 ## Active Canvas Tool
 
 Activating a Tool interactable opens the **Crafting** tab (`describeGrant` returns `{ tab: 'crafting' }`; the Crafting tab is a shipped player surface — recipe browse/detail/shopping list/craft/run summary — and the injected tool feeds tool-availability checks, with the active-tool chip in the header as the visible marker).
-The payload is **system-scoped** (`presentTools = { systemId, componentIds }`) so a system-A station tool cannot satisfy a system-B prerequisite sharing a `componentId`.
-Set on the `SvelteFabricateApp` instance via `show('crafting', { activeCanvasTool })` and cleared on close; never persisted to a run record.
+The payload is **system-scoped** (`presentTools = { systemId, componentIds, toolIds }`, keyed by the station's library `toolId` and any linked `componentId`) so a system-A station tool cannot satisfy a system-B prerequisite sharing a `componentId` or `toolId`.
+Set on the `SvelteFabricateApp` instance by `show('crafting', { activeCanvasTool })`, replaced on every show, and cleared by a plain `show(tab)` and by close.
+It is carried per call — to recipe detail, selected-set evaluation, craft submission, the step advance and the Journal listing — and per Journal run command as that crafting command's own `payload.presentTools`, which the active GM applies to that command alone through a per-command presence view.
+It is never persisted to a run record, a stage's `selectionPlan` or the run authority's ledger.
+It does not reach salvage, companion pooled holdings, alchemy submission or the shopping-list aggregate.
+The chip names the Tool by the Tool display-name precedence (Display label, then name snapshot, then linked component name), falling back to the generic localized label.
 **UI placement:** the active station tool is surfaced as an accent-pill status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/realm), implemented in `ActorSelectTopBar` (`.actor-bar-tool-chip`); the chip appears on whatever tab is active (gathering next to the conditions; crafting/alchemy in the otherwise-empty right).
 When the Crafting and (conditional, feature-gated) Alchemy tabs gain their own header/context bars, the chip should move into that bar's right side next to the tab's own context info.
 
-Canonical mapping: `activeCanvasTool`, `presentTools`, `SvelteFabricateApp.svelte.js`, `gatheringToolRuntime.resolvePresentComponentIds`, `ActorSelectTopBar.svelte`
+Canonical mapping: `activeCanvasTool`, `presentTools`, `SvelteFabricateApp.svelte.js`, `src/systems/stationPresence.js` (`withStationPresence`/`engineWithStationPresence`), `gatheringToolRuntime.resolvePresentComponentIds`, `ActorSelectTopBar.svelte`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -426,6 +498,7 @@ Spec reference: openspec/specs/data-models/spec.md
 ## Result Group
 
 In routed and alchemy flows, it is the routing target.
+The interface names it a **result set** throughout `lang/en.json`; engine-authored validation messages and the persisted default name `Result Group N` still say result group.
 
 Canonical mapping: Plain object `{ id, name, results[] }`
 
@@ -908,13 +981,13 @@ The prompt's own cap is a UI affordance re-imposed by `evaluateCheckRoll`, never
 The pre-roll prompt itemises resolved contributions as chips beside a formula that omits their terms; a deferred `playerPicks` choice and any entered situational bonus join the posted roll only after submission.
 On a direct runner the formula ends in a neutral `+ (modifier)[Modifiers]` slot for that deferred choice; a versioned Journal prompt shows its prepared formula without the slot or any flavour label and offers the choice beneath it.
 The posted roll, chat flavor and run journal then carry the chosen contribution and labels.
-The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), mounted by `rollPromptHost.js` over the Fabricate window the roll was started from (holding focus, or under the pointer when focus is nowhere), or otherwise on a themed standalone layer, and unmounted on every exit, including its host window closing.
+The prompt renders in Fabricate's shared modal chrome, the `Modal` component, mounted by `rollPromptHost.js` over the Fabricate window the roll was started from (the one its starting control recorded, else the one holding focus or, when focus is nowhere, the one under the pointer), or otherwise on a themed standalone layer, and unmounted on every exit, including its host window closing.
 For a versioned Journal check, the issuing GM captures the JSON-safe modifier context and permitted choice with the private prepared evaluation before showing the prompt.
 The entitled prompt displays applied entries from that snapshot, or offers the deferred choice; later library or actor-data edits cannot change the prepared contribution.
 The world authority ledger carries only safe token coordination, while the prepared evaluation and cached recipient-specific reply stay in the issuing authority instance and disappear on consume, release or expiry.
 Placement keeps **source** (`tool`, `library`, `situational`, or `advantage`) separate from **form** (scalar or rolling expression): eligibility, selection, actor resolution and bounds happen first, then the same plan sends benefits to the formula, target, threshold or pool according to the evaluation.
 For sum/under, a positive benefit raises the target; for count, a positive pool benefit raises the pool while a threshold benefit changes the threshold in the direction that helps the check, retaining signed and fractional totals until the count-mode integer policy is defined by its behavior child.
-An authored advantage rewrites only the check prefix under sum, keeping the lowest d20 under sum/under, while count advantage changes the pool; an average can rank a library entry but never supplies its benefit.
+An authored Advantage Rule decides how Advantage and Disadvantage reach the roll: `keep` mutates the constructed `Roll`'s own first dice-group `Die` term rather than any string, `bonus` appends or pre-rolls a separate expression, and a count check moves `poolDelta` by `±countDice` whatever `modifierDestination` says; an average can rank a library entry but never supplies its benefit.
 Outside sum/over, unresolved rolling contributions evaluate once after confirmation; evaluated dice-bearing Tool bonuses retain their actual roll and are not rerolled.
 Under sum/over a dice-bearing Tool bonus appends only its numeric result, as before, and adds no roll evidence.
 An invalid situational contribution or ordinary Tool evaluation failure contributes zero, while a valid library pre-roll failure aborts before the main check roll or message.
@@ -970,8 +1043,9 @@ Distinct from an **Outcome Tier**, which bands a routed check's roll RESULT: the
 The axis exists only where the system's check has recipe-level tiers to offer, and where it does not the surface names WHICH of four reasons applies instead of hiding the control: a progressive system puts difficulty on each result component, a dynamic simple DC is resolved at craft time, a fixed-type routed check takes per-recipe difficulty from the recipe's minimum success tier instead, and a check that authors no tiers leaves every recipe on the default DC.
 None of those four is the same fact as the system having no usable crafting check at all, which the recipe row's own check pill reports, and the two are never conflated.
 A bulk write REJECTS a tier id this system does not author, before it mutates anything; the single-recipe editor write tolerates a dangling id and falls back to the default DC at resolution time, because one recipe is a smaller blast radius than a whole selection.
+Under a counting check (issue 2006), a tier names no `dc` at all: the same tier instead names `successes` (0 to 20), and a recipe's picked tier then supplies the successes needed in place of the check's own, exactly as a DC tier replaces the check's own DC (see **Count Check**, **Extra Successes**).
 
-Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`
+Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`/`tiers[].successes`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`; `CheckRecipeTiers.svelte`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-entity-editors/spec.md
 
@@ -992,7 +1066,7 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 ## Crafting Browse Status
 
 `discovery` is the Discovery-Mode teaser-redacted state (player copy "Undiscovered"); `incomplete` is deliberately NOT a player status, because an unfinished recipe is either visible-and-projected or filtered out upstream.
-Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, materials missing → `missingMaterials`, else `available`.
+Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, a check that would refuse the acting character before any roll → `checkUnrollable` (issue 2139), materials missing → `missingMaterials`, else `available`.
 The `exhausted` status reads `RecipeVisibilityService.isKnowledgeItemExhausted` (item-limited knowledge owned but every matching item capped); owning no matching item is `unknown`, not `exhausted`.
 Since issue 1091 the vocabulary AND the precedence rule live in ONE import-free leaf, `src/ui/presenters/craftingBrowseStatus.js`, so the detail model and the **Summary Projection** the page rows are built from cannot label the same recipe differently; `CraftingListingBuilder` re-exports the vocabulary and delegates the rule.
 `materialsAvailable` is a TRISTATE there — `false` is a material check that ran and came back short, `null`/absent is no check at all, and only `false` yields `missingMaterials` — so a surface holding no inventory (the GM browser projects definitions, not one actor’s view of them) does not paint every row short of materials.
@@ -1380,7 +1454,9 @@ Spec reference: issue #119
 ## Source UUID
 
 `getCompendiumSourceUuid()` resolves only the **compendium source** (`_stats.compendiumSource`, with the legacy `flags.core.sourceId` fallback).
-It is distinct from the **world-duplicate source** (`_stats.duplicateSource`), which Foundry stamps when a world Item is duplicated or dragged into an actor.
+It is distinct from the **world-duplicate source** (`_stats.duplicateSource`), which Foundry stamps when a world Item is duplicated from the sidebar.
+Whether a drag into an actor also stamps it depends on the core build: core 14.365 does not, so an owned copy there carries no back-reference to the world Item it was dragged from, and resolves through the durable `roles[systemId]` leaf it inherits or through its **Source UUID**.
+A shared **Source UUID** proves descent from one compendium entry, not that two Items are the same thing; see **Derivative Source**.
 
 Canonical mapping: `getCompendiumSourceUuid()` in `src/utils/sourceUuid.js`
 
@@ -1392,20 +1468,44 @@ An owned item is resolved to the single component it IS through the shared, list
 `systemId` is threaded because component ids are not globally unique (copy-import preserves them), so identity is scoped per system.
 The resolver serves every source-reference consumer — crafting ingredients, crafting/gathering Tool presence, essence/used-by resolution, owned-item repair, gathering award-stacking, alchemy signature matching, and canvas Item→Tool drop — so a drag/duplicate copy of a component's source world item is recognized everywhere, while a copy carrying a distinct durable identity is NOT mis-attributed via a transitive `duplicateSource`.
 The separate **name fallback** some callers apply after the resolver returns null is not part of this matcher and is deferred to issue #557.
-**Identity decisions use a narrower chain:** import de-duplication (`addItemFromUuid`) and source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) use `getItemIdentityReferences()` — `item.uuid` + compendium **Source UUID** only, **excluding** `_stats.duplicateSource`.
-This keeps a world Item cloned from another world Item (Foundry stamps `duplicateSource` on the copy) as a distinct component instead of merging it with — or rewriting — the original.
+**Identity decisions use narrower sets, and never `_stats.duplicateSource`.**
+Import de-duplication (`addItemFromUuid`) keys on the source's own uuid plus its compendium **Source UUID** (`getItemIdentityReferences()`), and drops the **Source UUID** too when the source is a clone or a **Derivative Source**.
+Source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) keys on the edited Item's own uuid alone (`getOwnSourceUuids()`): the edited Item's compendium and duplicate sources name sibling Items, so a sidebar duplicate, a derivative, an unregistered world copy and an actor-owned copy never rewrite a component they are not registered to.
+A pack Item's own uuid is read in both spellings, with and without the document-type segment.
+This keeps a world Item duplicated from another world Item (the sidebar Duplicate stamps `duplicateSource` on the copy) as a distinct component instead of merging it with — or rewriting — the original.
 `flags.fabricate.mythwrightId` and similar importer/pack bookkeeping ids are never matching keys.
 
-Canonical mapping: `getItemSourceReferences()` / `getItemIdentityReferences()` / `getDuplicateSourceUuid()` / `resolveComponentForItem()` / `itemResolvesToComponent()` in `src/utils/sourceUuid.js`; `RecipeManager.toolMatchesItem`
+Canonical mapping: `getItemSourceReferences()` / `getItemIdentityReferences()` / `getOwnSourceUuids()` / `getDuplicateSourceUuid()` / `resolveComponentForItem()` / `itemResolvesToComponent()` in `src/utils/sourceUuid.js`; `RecipeManager.toolMatchesItem`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipe-visibility/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
+## Derivative Source
+
+Whether a source is a derivative is decided by a name comparison, trimmed, whitespace-collapsed and case-insensitive.
+The source's stored name (`_source.name`, else `name`) is compared against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
+The source's own `flags.babele.originalName` is never read, because an Item built from a translated entry inherits that entry's flags and would always match it.
+A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative, so components and recipe items sharing an unresolvable entry still merge until it is restored.
+The motivating case is the dnd5e spell scroll (issue 2217): dnd5e builds every scroll of one level from that level's template entry, so scrolls registered from freshly built Items shared one **Source UUID** and each overwrote the component the last one registered.
+The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference; the GM hands out copies of the registered Item instead.
+It is told apart from a clone by the absence of `_stats.duplicateSource`, and from a double import (two world copies of one entry that keep its name, which still de-duplicate to one definition) by its name.
+Unlike a clone's stripped provenance, a derivative's `_stats.compendiumSource` stays on the Item.
+The gate decides only what a new definition claims.
+Find-existing prefers the definition claiming the source's own uuid, and re-registering such a source neither adds nor releases a compendium-source claim: a registered derivative renamed back to its entry's name stays on its own uuid, and one registered before the gate moves its `originItemUuid` to its own uuid on its next import and keeps the entry's uuid in `aliasItemUuids`.
+For a recipe item and a tool, a durable `roles[systemId]` leaf a derivative inherited from a stamped entry is an inherited marker, passed over and (on a world source) overwritten, when the definition it names claims none of the source's own uuids and does not carry its stored name; a component's find-existing reads no durable leaf.
+The gate never un-merges: a component that absorbed several derivatives before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
+It is a registration and source-replacement rule only: the runtime matchers have no derivative gate, and Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
+
+Canonical mapping: `isDerivativeOf` / `resolveImportedComponentSourceData` in `src/systems/manager/itemSources.js`; `storedMatchName()` / `normalizeMatchName()` / `getOwnSourceUuids()` / `findRegisteredDefinition()` / `settleCompendiumClaim()` in `src/utils/sourceUuid.js`; `resolveSourceRepairOwner` in `src/systems/SourceIdentityService.js`
+
+Spec reference: openspec/specs/data-models/spec.md (Registration Source Identity; Component requirement 9), openspec/specs/recipe-visibility/spec.md, issue #2217
 
 ## Recipe Item Match Tiers
 
 Definition ids are NOT globally unique (generated per system), so `systemId` scopes the identity tier exactly like components; a dotted/unsafe id degrades to the legacy-scalar + source-uuid tiers (warn once), never throws.
-There is **no clone-gate** at match time (tier 3 is always trusted).
-The clone-gate is a **registration/source-repair** rule: a world source Item carrying `_stats.duplicateSource` at registration is a duplicate and keys on its own uuid only (excluding the inherited compendium source), so a registered duplicate becomes a NEW definition instead of overwriting the original.
-Registration stamps the durable flag and strips a clone's stale `_stats`.
+There is **no clone-gate** and no derivative gate at match time (tier 3 is always trusted).
+The clone-gate is a **registration, source-replacement and source-repair** rule: a world source Item carrying `_stats.duplicateSource` at registration is a duplicate and keys on its own uuid only (excluding the inherited compendium source), so a registered duplicate becomes a NEW definition instead of overwriting the original.
+The derivative gate is a **registration and source-replacement** rule that keys a **Derivative Source** on its own uuid in the same way; source repair applies the clone-gate and own-uuid precedence only.
+Registration stamps the durable flag and strips a clone's stale `_stats`, and leaves a derivative's `_stats.compendiumSource` on the Item.
 A primary-GM one-shot auto-stamp backfills the flag on existing sources; its recipe-item arm reads `originItemUuid` alone, with NO `registeredItemUuid` fallback, unlike the component and tool arms which read `originItemUuid || registeredItemUuid` (`autoStampRecipeItemSources` vs `autoStampComponentSources` and `autoStampToolSources` in `SourceIdentityService.js`) — a recipe item's `registeredItemUuid` is set once at registration and never refreshed on re-registration, unlike a component's (`CraftingSystemManager.js:1288-1291` vs `:2552`), so falling back to it here would risk stamping a document the flag no longer names; the GM **Repair Item Data** action reconciles both kinds across world items, packs, and actor inventories, with a guardrailed name-assisted re-point.
 Within that reconciliation, the tools kind alone filters out any tool with neither `originItemUuid` nor `registeredItemUuid` (`buildRepairKinds`, `SourceIdentityService.js`); an alias-only tool is genuinely representable (`normalizeTool` preserves `aliasItemUuids` whether or not a primary ref is present, `src/systems/normalize/tools.js:46-59`) and matchable by the same resolver the component and recipe-item kinds use, so the exclusion is a deliberate narrowing rather than a no-op, pinned as intended behaviour by issue #1699's revision — no comment, spec or issue history states why a tool must clear that bar before the component and recipe-item kinds are asked to.
 Its remit is every PROJECTION of a definition’s resolved source document, not identity alone: the same action also refreshes each component’s and recipe-item’s stored **description** by resolving that definition’s own source reference through Foundry’s enricher (issue 800), which — unlike the identity walk — reaches sources in LOCKED packs.
@@ -1557,6 +1657,63 @@ Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`nor
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Situational Bonus Offer
+
+`offerSituationalBonus` normalizes to `true` unless the stored value is exactly `false` (`normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`), and is carried beside `evaluation` on all eight normalized check sub-objects.
+It survives `checkDraftClone.js`'s clone functions, the Studio's save wiring, schema-6 export/import, and `CraftingSystemManager._copyPassFailCheckFields`'s crossing of the routed-by-ingredients boundary.
+It is a display flag only: the Studio's `CheckPromptOptions.svelte` toggle writes it, and the roll prompt (`RollPrompt.svelte`, `rollPrompt.js`) reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so the shared `Modal`'s initial focus falls through to the Roll button.
+`allowsSituationalModifier` (threaded from each activity's own usability check, read at `checkRoll.js:501`) is the SEPARATE authority gate a decision's typed bonus is checked against, and it is never derived from the offer: a Tool bonus, an eligible named modifier, and a programmatic bonus a Macro or companion module supplies all keep applying while the offer is off.
+A bulk prompt hides its bonus field only when every usable subject's check has the offer off, and a companion call through `rollActorCheck`/`resolveBulkCheckDecision` always offers the field regardless of any system's own offer.
+
+Canonical mapping: `normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`; `CheckPromptOptions.svelte` (writes); `RollPrompt.svelte` and `rollPrompt.js` (read); `allowsSituationalModifier` in `src/systems/checkRoll.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Advantage Rule
+
+The `advantage` record (issue 2007): `mode: 'off' | 'keep' | 'bonus'` for summing (default `keep`, an unknown token reads `keep`), integer `extraDice` 1-4 (default 1), string `bonusExpression` (default `'1d6'` when absent or not a string, any string including `''` kept verbatim), `offerDisadvantage` (true unless explicitly `false`), `countEnabled` (true unless explicitly `false`), and integer `countDice` 1-5 (default 1).
+It is normalized once by `normalizeCheckAdvantage` and carried beside `evaluation`, NEVER inside it, on all eight normalized check sub-objects; an out-of-range integer clamps and a non-integer takes its default, and all six keys are retained whatever the evaluation, though summing reads only the first four and counting only the last two.
+It survives `checkDraftClone.js`'s clone functions, schema-6 export/import with no migration, and the prepared descriptor's `checkConfig` snapshot.
+A **Standalone Check Roll** authors no rule of its own and rolls under the untouched default record (`mode: 'keep'`, one extra die, disadvantage offered), by maintainer ruling R2.
+
+Canonical mapping: `normalizeCheckAdvantage` in `src/systems/normalize/checkAdvantage.js`; spread in `src/systems/normalize/craftingCheck.js`, `checkDraftClone.js` and `CraftingSystemManager._copyPassFailCheckFields`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/companion-api/spec.md
+
+## Keep (Roll Extra, Keep One)
+
+Under an **Advantage Rule**'s `mode: 'keep'`, the offer and the roll both key off `findKeepGroup`, the one eligibility predicate reading the post-shim AUTHORED formula alone: it never reads Tool terms, library fragments, the deferred `playerPicks` slot, a situational bonus, or a bonus-die expression, and it never searches past the formula's first top-level dice group.
+That group qualifies only as a literal plain `NdS` with no modifier of its own, in an additive position; a modified group (`1d6x`, `2d20kh1`), a nested group (`(1d20+2)*2`, `max(1d20,10)`), a dynamic count or face, or a non-additive position (`10 - 1d20`, `1d20 * -1`) all refuse, and refusal offers no keep at all.
+When it qualifies, `checkKeepTransform.js` mutates the CONSTRUCTED `Roll`'s own `Die` term rather than rewriting any string: it sets `term.number` to the group's count plus `extraDice`, pushes a `kh{n}`/`kl{n}` keep modifier where `n` is the group's original count, and calls `roll.resetFormula()`, because the chat context, `toJSON`, `Roll.fromData` and `clone`/`reroll` all read the cached `_formula`.
+Advantage keeps the highest dice on `sum/over` and the lowest on `sum/under`; Disadvantage keeps the opposite.
+Refusing a modified group is deliberate: Foundry applies modifiers in array order and ranks a keep by raw face, never by success or `count`, so the better keep on a `cs`/`cf`/`x` group would follow the comparator rather than the check's own direction.
+
+Canonical mapping: `findKeepGroup` in `src/utils/craftingCheckExpression.js`; `src/systems/checkKeepTransform.js` (`locateKeepTerm`, `applyKeepTransform`, `evaluateKeptRoll`)
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
+
+## Bonus Die
+
+Under an **Advantage Rule**'s `mode: 'bonus'`, the check's own dice never change; instead `bonusExpression` (grammar: dice and numbers joined by ASCII `+`/`-`, proved rollable by a maximized evaluation, NEVER `Roll.validate`) contributes a separate dice expression.
+A `sum/over` check appends `+ (E)`/`- (E)` to the working formula after the situational bonus, joining the main roll under the next free dice-group id, so no authored group moves.
+A `sum/under` check pre-rolls `E` once, UNSIGNED, and lets Disadvantage's `negate` flag lower the target by its total rather than posting a negated roll, so the card and Dice So Nice show the unsigned expression.
+A count check ignores `bonusExpression` entirely: its own **Advantage Offer** always answers `kind: 'count'`.
+
+Canonical mapping: `isBonusExpression`, `bonusOffer` in `src/systems/checkAdvantage.js`; `advantageContribution`, `appendAdvantageBonus` in `src/systems/checkRollDecision.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md
+
+## Advantage Offer
+
+`resolveAdvantageOffer` is the one derivation every prompt producer, descriptor transport and the engine's authority gate read, answering `{ advantage, disadvantage, kind: 'keep'|'bonus'|'count'|null, detail }` from an **Advantage Rule**, the check's evaluation, and its authored formula.
+A count check offers both buttons whenever `countEnabled`, whatever its formula; a summing check offers a keep only when `findKeepGroup` proves the first dice group, and a bonus only when `bonusExpression` passes the grammar and, with a `Roll` injected, proves rollable.
+`intersectAdvantageOffers` answers one offer for a batch: a button is offered only when every usable subject's own offer includes it, and `kind`/`detail` are kept only when every subject agrees, else `kind: 'mixed'` with no detail so no sub-label renders.
+Every transport — the versioned descriptors, `publicPrompt`, the Journal adapter, the token `decisionPolicy`, and `safePrepareRecord` — carries the allowlisted `advantageOffer` `publicAdvantageOffer` produces, NEVER the raw rule, and the engine's authority gate enforces both directions from that same offer: a decision naming a choice the offer excludes rolls normally, whatever its transport.
+
+Canonical mapping: `resolveAdvantageOffer`, `intersectAdvantageOffers`, `publicAdvantageOffer`, `offeredDecision` in `src/systems/checkAdvantage.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/companion-api/spec.md
+
 ## Count Check
 
 `evaluation.product === 'count'` rolls a dice pool of `pool.die`-sided dice sized by `pool.base`, counts how many individually qualify against `pool.threshold` in the check's `direction`, subtracts any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
@@ -1569,6 +1726,155 @@ Canonical mapping: `resolvePool`/`countFacePredicates`/`projectCountResults`/`de
 
 Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
 
+## Evaluation Product
+
+`evaluation.product` (`'sum'` default, or `'count'`) is the "What the roll produces" axis: which of the two grading engines — a summed total against a **Target Source**, or a **Structured Pool** against `pool.required` — a record's authored formula, target, pool, tiers and triggers feed.
+A switch is lossless: `normalizeCheckEvaluation` retains every field of the inactive side, so `rollFormula`, `dc`, tier `dc`/`successes`, adjustments, `target`, `pool`, `thresholdMode` and every override survive both ways, and an authored `pool` survives a switch to `sum` and back.
+It is offered on every check editor route except gathering's immediate d100 mode and an inactive Alchemy check, because neither reads an evaluation at all.
+
+Canonical mapping: `evaluation.product` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`); the axis control in `CheckFormulaFields.svelte` (`data-checks-evaluation-product`); `FABRICATE.Admin.Manager.Checks.Count.Product*` in `lang/en.json`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
+
+## Structured Pool
+
+`evaluation.pool` is the record a **Count Check** grades in place of a formula and target: `die` (an integer at least 2), `base` and `threshold` (each a number literal or a character-value expression resolved the same way a **Target Source** is), `required` (0-20, the successes needed), `modifierDestination` (`'pool'` default or `'threshold'`), `zeroPoolFails`, and the `explode`/`cancel` face rules, each `{ enabled, faces: { kind: 'best'|'worst'|'from', value }, once? }`.
+Every field is retained while `product` is `sum` and survives an **Evaluation Product** switch in both directions.
+Stepper bounds constrain editing only: a stored value outside them (a fractional pool, a face beyond the die, a non-standard die) is read and rolled exactly as stored, never clamped on load, convert or save.
+Choosing a `from` face seeds the pool's current best (explode) or worst (cancel) face, so the UI itself never writes a null face; an imported or API record can still carry one, which the **`countFaceMissing`** readiness issue then blocks on.
+
+Canonical mapping: `evaluation.pool` in `normalizeCheckEvaluation`/`normalizeFaces` (`src/systems/normalize/checkEvaluation.js`); `resolvePool`/`countFacePredicates` in `src/systems/countEvaluation.js`; authored by `CheckCountPoolFields.svelte`, `CheckCountInputField.svelte` and `CheckCharacterValueField.svelte`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
+
+## Free-Text Counting Formula
+
+The `freeTextCountingFormula` readiness warning: raised while `product` is `sum` and the trimmed `rollFormula` has a die term whose modifier run carries `cs`, `cf`, `even` or `odd`, case-insensitively, with a roll-data path neutralised to `0` first so a path is never misread as a modifier run.
+It never fires while `product` is `count`, and is never counted by the enable gate.
+It is the one Checks warning whose row can carry an `action` (a **Counting Formula Conversion**) instead of View alone.
+
+Canonical mapping: raised by `checksReadiness.js` (`pushIssue(result.issues, 'freeTextCountingFormula', 'warning', data)`); the lexer `formulaCountsSuccesses` in `src/ui/svelte/apps/manager/checks/countFormulaConversion.js` (shares `src/utils/rollExpressionAverage.js`'s path neutralisation); `FABRICATE.Admin.Manager.Checks.Validation.IssueFreeTextCountingFormula*` in `lang/en.json`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
+
+## Counting Formula Conversion
+
+The staged `Convert to count successes` row action a **Free-Text Counting Formula** warning offers only for a sum/over, fixed-target check (simple or routed, the only summed grading that measures its count against a DC) whose formula matches exactly: one die term, a directional `cs`, an optional same-side explosion, and an optional worst-side `df` that never overlaps a qualifying face (Foundry's own `_applyDeduct` scores an overlapping face −1 where a **Structured Pool**'s cancel scores it 0), with every copied required count an integer fitting 0-20.
+Converting stages `product: 'count'` with the pool, direction and per-die test parsed from the formula, and copies the check's `dc` and every tier `dc` that has no authored `successes` into `pool.required`/`tiers[].successes`, each plus 1 where the check graded `exceed` (ruling: the converted check must pass on exactly the same rolls as the summed one did).
+`rollFormula`, every `dc`, and every component or task override are retained verbatim; only `thresholdMode` is rewritten, to the per-die test.
+`cf` is never mapped to `cancel`, because it is a positive count of failures, never a deduction (see **Die Qualification Marks**).
+Nothing is written until the draft is saved, and Discard restores the summing check.
+
+Canonical mapping: `planCountConversion`/`convertCountingFormula`/`parseCountingFormula` in `src/ui/svelte/apps/manager/checks/countFormulaConversion.js`; grammar verified against Foundry V13.351 and V14.367 dice sources (`.agents/docs/foundry-and-architecture.md`)
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
+
+## Extra Successes
+
+On a counting check's relative outcome tiers, the column labelled `Extra successes` edits the same `outcome.dc` field a summing check calls its DC delta, now read as successes above the check's required count rather than roll total above a DC.
+The read-only count band strip draws each relative tier's threshold at `required + outcome.dc`, the best-met tier winning exactly as the runtime routes, and, while `cancel` is enabled, a `Botch` band below zero net successes stands first, ahead of every other tier.
+
+Canonical mapping: `outcomeThresholdLabels(type, 'successes', text)` in `src/ui/svelte/apps/manager/checks/checksCopy.js`; `countGradedBands`/`countTierAt`/`countBandsFor` in `src/ui/svelte/apps/manager/checks/checkBandModel.js`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-visual-style/spec.md
+
+## Die Qualification Marks
+
+The marks one rolled die in a **Count Check**'s projection can carry, combined on a single tile rather than one tile per mark: `qualified` (met the threshold), `cancelled` (matched the cancel face), and `exploded` (matched the explode face and rolled again, its explosion die its own tile immediately after).
+Foundry's `df` deducts a failing face as −1, including one that also qualifies, where a **Structured Pool**'s own cancel rule nets that overlap to 0; `cf` counts failing dice as a positive addition to `DiceTerm#total` and never becomes a mark at all, and neither is ever produced by Fabricate's own count projection.
+Rendered by the one shared `DiceTiles` primitive — a pure tile model plus the Svelte component and an escaped-HTML chat renderer share it — glyphed with `aria-hidden` Font Awesome Free icons, capped at 40 tiles with a `+{n} more` overflow, and never a core Foundry dice CSS class.
+
+Canonical mapping: `DICE_TILE_MARKS`/`tileModel`/`tileOf`/`tileLabel` in `src/ui/presenters/countDiceTiles.js`; `DiceTiles.svelte`; `countResult` in `src/ui/presenters/checkDisplay.js`; Foundry `DiceTerm._applyDeduct`/`Die.countFailures` (`client/dice/terms/{dice,die}.mjs`, V13.351 and V14.367)
+
+Spec reference: openspec/specs/design-system/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Count Display Evidence
+
+The allowlisted `count` projection `buildCheckDisplay` folds onto every non-secret executed **Count Check**'s `checkDisplay`, from the engine's own unpersisted `countDisplay` and never re-derived from the live check or actor: `die`, `tiles` (a **Die Qualification Marks** tile model), `qualified`, `cancelled`, `net`, `required`, `margin`, `zeroPool`, and the settled `pool`/`threshold` each as `{ base/anchor, terms, rolled/effective }`, `threshold` also carrying the enumerated `source` (`'fixed'`/`'character'`).
+It holds literal numbers and those two enumerated words only, never an expression, path, label or policy, so a card that renders it can never leak a hidden formula or DC.
+The one exception is a public roll's `boughtDice: { count, marked, resourceLabel }` (issue 2008): the persisted **Bought Dice** count, the original dice the roll marked, and the **Resource Name**, made inert by breaking `[[` and `@` exactly as a check label is; a non-public roll folds no `boughtDice` at all.
+Folding it onto the projection is not the same gate as showing it: a chat card states it only for `isPublicCheckDisplay` (a public, non-secret roll), while a result box and a salvage summary withhold it only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
+It is handed to the card builders at post time beside **Executed Check Evidence**'s own visibility gate, and, like that evidence, is never written into `data`, run history, `rollHandoff`, or ChatMessage flags.
+
+Canonical mapping: `countProjection`/`boughtProjection`/`inertLabel`/`countResult`/`countTerms`/`buildCheckDisplay` in `src/ui/presenters/checkDisplay.js`; `reportedCountDisplay`/`countRollReport` in `src/systems/countDisplayEvidence.js`
+
+Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
+
+## Additional Dice
+
+`evaluation.pool.additionalDice` is `{ enabled, source: 'path'|'macro', path, readMacroUuid, spendMacroUuid, max, label }`, with `max` an integer 1–20 (default 1) and `label` the **Resource Name**; every field is retained while the policy is off or the source switches, so turning it off or changing the source loses nothing.
+It applies only to an enabled `count` evaluation: while it is off, or on a `sum` check, no nested field renders, validates or is read at roll time.
+The roller may buy 0 up to `limit = min(max, floor(available / rolls))` dice, where `available` is the integer the resource reads, `rolls` is 1 or the number of rolls one bulk choice covers, and each die costs one unit; any other exchange rate is the spend macro's to apply.
+A **path** source reads a finite, non-negative number at a stored document path such as `system.resources.momentum.value` in the acting actor's `_source`, never prepared data and never a roll-data `@path`, and writes it back with `Actor#update`; a module flag scope such as `flags.my-module.momentum` is a stored path.
+A **macro** source names a read macro and a spend macro under the data-models Additional Dice Macro Contract: both must be `script` macros, they read the payload rather than the globals, and a read macro must be free of side effects because the GM authority runs it whenever it describes a prepared count check.
+The budget is read only for an interactive decision or for a decision naming a non-zero count, so a call that buys nothing runs no read macro.
+Additional dice are **unavailable**, with a stated reason, when the source is missing (`sourceMissing`), the stored value is absent, not a number or negative (`resourceUnreadable`), an active effect overrides the path (`resourceOverridden`), the acting user cannot update the actor (`resourceNotWritable`), the read macro fails (`resourceMacroFailed`), or a companion request arrived on a `broadcast` call site (`broadcastCallSite`); the check still rolls without them, and only a non-zero choice refuses.
+They are **unaffordable** when readable and writable but `limit` is 0.
+A choice refuses `notOffered`, `choiceInvalid`, its unavailable reason or `choiceAboveLimit`, and a spend refuses `resourceChanged`, `spendRefused` or `spendUnconfirmed`; a value is never clamped, and those twelve reasons are the one closed list `ADDITIONAL_DICE_REFUSALS`.
+The cost is spent once per roll on the client that executes it — the acting player's for an immediate roll and bulk salvage, the claim-holding GM authority for a prepared check, and the executing GM for a **Standalone Check Roll** — after every refusal decidable without the main dice and immediately before them.
+A path spend re-reads the stored value inside a per-client queue keyed by actor and path, and succeeds only when the update is acknowledged and the value fell by exactly the cost; a macro spend is queued by its spend-macro UUID alone.
+A refused choice or spend aborts that roll with the dismissed-prompt zero-mutation result plus `additionalDiceRefusal`, never a thrown failure.
+Spent resource is never refunded: not on a failed or botched check, a later run cancel, a main Roll that throws after the spend, or a stage that refuses after a GM-evaluated check.
+Across clients a path spend is not atomic, because Foundry has no compare-and-set, so two clients spending one resource at once can lose a decrement; a macro source can serialize itself.
+There is no actor relay for a GM-owned actor: a party resource the player cannot update is reached through the macro pair.
+
+Canonical mapping: `pool.additionalDice` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`); `ADDITIONAL_DICE_REFUSALS`/`boundAdditionalDice`/`readStoredResource`/`publicAdditionalDiceOffer` in `src/systems/additionalDiceReach.js`; `resolveAdditionalDiceBudget`/`spendAdditionalDice`/`withAdditionalDiceRefusal` in `src/systems/additionalDice.js`; authored by `CheckAdditionalDiceFields.svelte`; `FABRICATE.Check.AdditionalDiceRefusal.*` and `FABRICATE.Admin.Manager.Checks.AdditionalDice.*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/companion-api/spec.md
+
+## Bought Dice
+
+The dice one roll bought under **Additional Dice** are one count-only scalar contribution, `{ source: 'additionalDice', form: 'scalar', value: n }`, placed after advantage and always sent to the pool, whatever `pool.modifierDestination` says.
+They are not modifiers: the pool's modifier terms never count them, so they never read as "pool grown by modifiers".
+They settle through the same `resolvePool` as every other pool change, so the one-die floor, `zeroPoolFails` and the 999-die limit apply to the total, dice bought below the floor add nothing, and one count Roll carries them, so explosion, cancellation and Dice So Nice treat them like base dice.
+A pool still at zero after them fails as a zero pool and spends nothing.
+The **marked** dice are the last original dice in roll order that the purchase added to the settled pool; an explosion a bought die rolls is a generated die, not a bought one.
+An executed result records `data.boughtDice = { count, source }` — the integer dice paid for, at least 1, and `'path'|'macro'` — omitted when none were bought and never naming the path, a macro UUID, the **Resource Name** or an amount; a main Roll that throws after the spend, Foundry's explosion limit included, keeps it on its refusal because the spend stands.
+A non-success Journal reply after a non-zero spend carries a top-level `boughtDice`, and a companion executed answer carries `boughtDice` (`0` when none), so each caller can state what was spent.
+Under the public, non-secret gate the chat card's summary reads `{pool}d{die} ({unbought} + {bought} bought)`, the chat cards, the crafting result box and the salvage roll summary add an `Additional dice` row, `{count} bought · spent {count} {resource}`, and the tiles dash the border of each marked die, marked `bought`; a legend, where one is drawn, ends `dashed = bought`.
+
+Canonical mapping: the `additionalDice` source in `src/systems/checkModifierRouter.js`; `boughtEvidence`/`mainRollRefusal` in `src/systems/countCheckRoll.js`; the replay `bought` in `countReplayPolicy` (`src/systems/countRoll.js`); `reportedCountDisplay` in `src/systems/countDisplayEvidence.js`; `tileModel` in `src/ui/presenters/countDiceTiles.js`; `FABRICATE.Check.BoughtDice.*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/design-system/spec.md
+
+## Resource Name
+
+`pool.additionalDice.label` is a trimmed string, default `''`, retained whatever `enabled` or `source` is; it amends decision 22's fixed key set by one optional key (issue 2008 ruling R2), and the companion schema accepts it additively.
+The Studio authors it, for both sources, in a plain `Resource name` field whose hint (`FABRICATE.Admin.Manager.Checks.AdditionalDice.LabelHint`) tells the GM that a blank name shows the amount alone.
+Labelled copy names it (`Momentum 2 available · Spends 1 Momentum`, `Not enough Momentum to buy a die.`, `1 Momentum spent; the roll could not be completed.`), and unlabelled copy drops the noun rather than rendering an empty one (`2 available · Spends 1`).
+It is the only authored string the allowlisted offer and the **Count Display Evidence** carry, inert, and no player surface ever shows the stored path or a macro UUID in its place; the Studio alone shows the authored path, in mono.
+Rows in one batch sharing a resource under different names take the unlabelled copy.
+
+Canonical mapping: `label` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`) and the companion schema (`src/systems/companionCheckEvaluation.js`); the offer's `resourceLabel` in `publicAdditionalDiceOffer` (`src/systems/additionalDiceReach.js`); `additionalDiceCopy` in `src/ui/presenters/additionalDicePrompt.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/companion-api/spec.md
+
+## Shortfall
+
+The least `n ≥ 0` bought dice for which the pool, settled through `resolvePool` with every pending rolled contribution at its least favourable value, is not a zero pool and holds at least the needed count of dice; it is never computed as `needed − dice`, because the floor and `zeroPoolFails` change what a bought die adds.
+The **needed** count is the graded required count on a simple check, and on a routed check the lowest succeeding tier's threshold (0 when a clamped relative check's lowest tier succeeds, none when no tier succeeds); a progressive check has none.
+The roll prompt opens at 0 and states the shortfall as a warning, `At least {shortfall} additional dice needed to be able to succeed.` (`…to succeed without exploding dice.` when the pool explodes), then as a success once enough are chosen; it never pre-selects it, so opening the prompt and pressing Enter spends nothing.
+None is stated where the prompt may not show the needed count: on a secret or unentitled prompt, whose offer carries `reach: null`, nor on a progressive or prepared routed prompt, whose offer carries `reach.needed: null`.
+
+Canonical mapping: `shortfallOf`/`resolveAdditionalDiceReach` in `src/systems/additionalDiceReach.js`; `describeAdditionalDice` in `src/ui/presenters/additionalDicePrompt.js`; `FABRICATE.App.RollPrompt.AdditionalDice.Short*`/`Enough*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Unreachable Attempt
+
+Each offered footer action — Roll, Advantage, Disadvantage, or the single Roll judged as `normal` — is its own attempt, including that action's count advantage dice (issue 2008 ruling R1).
+An attempt is unreachable when, with `limit` **Bought Dice** and every pending rolled contribution at its most favourable value, its pool is still a zero pool (ruling R4), or its dice times the most one original die can contribute — 0, 1, 2 under explode `once`, unbounded under a recursive explode — stay below the needed count; that second limb never holds for a recursive explode, a needed count of 0 or none, and neither limb holds while a pending contribution's most favourable value cannot be computed purely.
+A Tool bonus is rolled when the check is prepared and is already in the pool; a rolled Tool contribution handed to the runner unsettled is a pending contribution, so an attempt it could carry to success is never disabled.
+The prompt disables an unreachable action unless a **rescuing trigger** exists — one that can fire in count mode and forces success or, on a routed check, steps or targets a tier — and a zero-pool attempt is never rescued; a rescued attempt keeps its danger message and every action enabled.
+Pool size is monotone across the actions, so the disabled set is Disadvantage alone, Disadvantage and Roll, or all three, each with its block note; a disabled action keeps its place with `aria-disabled`, and neither Enter nor a click rolls it.
+A secret or unentitled prompt never judges an attempt (ruling R3); a progressive or prepared routed prompt judges only the zero-pool limb.
+A bulk footer action is disabled only when every covered roll would be disabled under it on its own prompt (driver decision D3), and a row that no offered action can reach is marked `· cannot reach` rather than blocked.
+Blocking is a prompt affordance, never an engine refusal: a non-interactive caller or a pre-resolved decision is never blocked.
+
+Canonical mapping: `resolveAdditionalDiceReach`/`buildAdditionalDiceReach` in `src/systems/additionalDiceReach.js`; `countTriggerRescues`/`poolCanFire` in `src/systems/countTriggerReach.js`; `describeAdditionalDice` in `src/ui/presenters/additionalDicePrompt.js`; `RollPromptFooter.svelte`; `FABRICATE.App.RollPrompt.AdditionalDice.Unreachable*`/`Blocked*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
+
 ## Target Source
 
 `evaluation.target.source` is `fixed` or `attribute`.
@@ -1578,7 +1884,7 @@ An unresolved or non-numeric value is a **Target Refusal** and never reads as 0.
 A progressive check and a fixed-range routed check read no target, so their target source is inert.
 The crafting dynamic-DC macro runs after validation, receives the anchor (the adjusted character value under an attribute source) as `anchorDc` with a cloned `evaluation`, and its result replaces that anchor.
 
-Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `CraftingEngine._resolveCheckTarget`/`_resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
+Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `resolveCraftingCheckTarget` in `src/systems/craftingCheckRefusal.js`, `CraftingEngine._resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
 
@@ -1619,17 +1925,41 @@ An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation do
 Optional `data.preRolls` preserves the ordered source, label, expression, actual total and destination of separately evaluated modifiers; the main `data.total` and `data.diceGroups` remain the main check roll's evidence.
 The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
 Only a permitted executed versioned crafting check may carry its executed product and direction into its historical `resolutionSnapshot`, and only when snapshot and result agree.
+Outside sum/over/fixed a summed result also carries **Target Terms** at `data.targetTerms`, plus `data.targetSource` (`'fixed'`/`'attribute'`), and, under an attribute target, `data.targetExpression` (the typed formula, trimmed) and `data.targetActor` (the rolling character's name), each present only when the resolver recorded it; `data.resolvedFormula` names the executed dice expression for a card's dice line.
 
 Canonical mapping: `executedSumEvidence` and the formula runners in `src/systems/checkRoll.js`; `craftingStepHistoryEvidence` in `src/systems/CraftingRunManager.js`; `checkResolutionEvidence` and `historyEvidenceFields` in `src/systems/runHistoryEvidence.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md
+
+## Target Terms
+
+`data.targetTerms` is the ordered list of terms a summed check outside sum/over/fixed records on execution, one entry per step the target passed through: one leading `anchor` (the fixed difficulty, or the resolved character value after any macro), then zero or more `adjustment`/`multiplier` steps, then zero or more `benefit` entries (the settled under scalar contributions, one per router `source`: `tool`, `library`, `situational`, or `advantage`).
+An `adjustment` or `multiplier` term carries a `label` only when a recipe's selected check tier or the relative tier the roll matched supplied one; an `anchor` or `benefit` term never carries a `label`, and only a `benefit` term ever carries a `source`.
+They carry no expression, path, or policy beyond a tier's own name, and they are omitted for a legacy record, a **Target Refusal**, and a secret projection.
+`sanitizeTargetTerms` (`checkDisplay.js`) rebuilds them from the allowlist, dropping anything that is not a well-formed term, and `foldTargetTerms(terms, preRolls)` folds the anchor, then each adjustment (added and floored) or multiplier (applied and floored) in order, then each benefit, then each pre-roll whose `destination` is `'target'`, reproducing the executed `data.target` exactly.
+
+Canonical mapping: `targetTerm`/`sanitizeTargetTerms`/`foldTargetTerms` in `src/ui/presenters/checkDisplay.js`; recorded by the sum runners in `src/systems/checkRoll.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Check Display Projection
+
+`buildCheckDisplay` (`src/ui/presenters/checkDisplay.js`) rebuilds one deep-frozen plain-data record from an allowlist: `evaluation` (only `product` and `direction`), `target`, `comparison`, `terms` (sanitized **Target Terms**), `destination` (`'target'` for a summed under check, `'append'` for over, `null` for a count), `evidence` (an **Executed Check Evidence** projection or `null`), `visibility`, and, for a count, `count` (the **Count Display Evidence** projection).
+`executedCheckDisplay(checkResult)` builds one from a posted check result's `data`, `visibility` and `countDisplay`, and is the only site that ever supplies `evidence`.
+`isPublicCheckDisplay` is the one gate a chat card consults before stating any evidence or its roll total (issue 2054): `visibility.rollMode === 'publicroll'` and `visibility.secret !== true`, because Foundry sends a ChatMessage's `content` to every client whatever its whisper, so an unknown visibility is never treated as public.
+A result box and a salvage summary read the same projection but apply their own narrower withholding rule instead (see **Executed Check Evidence** and **Count Display Evidence**): they withhold only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
+`evaluation` is never spread into the projection, so a hidden `target.expression` or policy field can never leak through it.
+
+Canonical mapping: `buildCheckDisplay`/`executedCheckDisplay`/`isPublicCheckDisplay` in `src/ui/presenters/checkDisplay.js`; consumed by `src/systems/craftCardFields.js`, `src/ui/presenters/CraftingChatCard.js`, `CheckEvidenceRows.svelte`
+
+Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
 ## Standalone Check Roll
 
 It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting System and carries that system's **Check Modifier** catalogue, combination rule, tool bonuses, **Check Breakage** triggers, **Tier Stepping** and failure-result policy, none of which a Standalone Check Roll has a system or a subject to derive.
 A companion wanting those routes a real craft or salvage instead.
 Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
-The version-1 capability descriptor advertises `sum/over/fixed` (including interactive use), `sum/over/attribute`, `sum/under` and both directions of `count`, each with either target source and every row but the first non-interactively.
+The version-1 capability descriptor advertises `sum/over/fixed`, `sum/over/attribute`, `sum/under` and both directions of `count`, each with either target source and every row interactively too; an interactive `count` request that forwards Advantage or has additional dice enabled still refuses `evaluationUnsupported`.
 On the `sum/over/fixed` row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
 An attribute row ignores `dc` and resolves its **Target Source** from the actor, answering `targetUnresolved` when it cannot, and a `sum/under` fixed request without a finite `dc` refuses `evaluationInvalid`.
 A `count` row ignores both `dc` and `target` and grades a **Count Check** exclusively against `evaluation.pool.required`, answering `poolUnresolved` for an unresolved pool `base`/`threshold` and `evaluationInvalid` for any other invalid pool setting, both before a `Roll` is constructed, and a zero pool answers `checkFailed` with no `Roll` at all.
@@ -1651,6 +1981,7 @@ The clamp routes to the closest tier, it does not force success — a below-lowe
 It is threaded only by the crafting `_runRoutedCheck` caller through `runFormulaRouted`'s optional `minOutcomeId`, so salvage and gathering routed checks are unaffected; on a blocked craft the tier it blocked is recorded as `data.blockedOutcomeId`.
 **One ranking (issue 975):** tier ORDER is derived in exactly one place, `rankedRoutedOutcomes`, shared by the forced reroute, this minimum gate and the tier-step pass, and the same ranking rule picks the best qualifying tier and the clamp's tier — a fixed range by `start` and a multiply tier by its threshold, both in the check's direction, an additive relative tier by its benefit-signed `dc`, an **Otherwise Tier** lowest, other non-finite ranks dropped, and the FIRST authored tier kept among equal ranks in both directions.
 The gate consumes it only to LOCATE the required tier and still compares `start` VALUES as a meet in the check's direction, so two fixed tiers sharing a `start` compare equal and the craft passes, where an index comparison would strictly fail it.
+After a successful crafting or salvage roll the player sees the reached tier marked **Your roll**, read from the recorded `outcomeId`; a failed roll, or a secret or blind one, marks no tier.
 
 Canonical mapping: `classifyCheckTotal` and its private `matchRoutedOutcome`/`routeCritOutcome`/`rankedRoutedOutcomes`/`applyTierStepTriggers` in `src/systems/checkRouting.js` (re-exported by `src/systems/checkRoll.js`); `relativeOutcomes[]`/`fixedOutcomes[]` from `_normalizeRoutedCraftingCheck`, `normalizeRoutedCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `Recipe.minSuccessOutcomeId`; `resolveRecipeFixedOutcomeTierOptions` in `src/utils/routedOutcomeKeywords.js`
 
@@ -1712,6 +2043,18 @@ Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSa
 
 Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/data-models/spec.md
 
+## Dormant Override
+
+A salvage component's `dcOverride`/`adjustmentOverride` pair (and a gathering task's own pair) is edited one at a time: `checkOverrideField(evaluation)` names the one field the check's active target source (and, for `successesOverride`, its `count` product) reads, and the other is DORMANT rather than deleted.
+Switching **Fixed difficulty** ↔ **Character value** never rewrites the dormant field.
+`keptOverrides` names every set field that is not the active one, as `{field, value}`, and the editor turns that into a plain callout naming the kept value and stating that the active target source does not read it, so a value authored under one target source is exactly what comes back when the record switches back to it.
+A kind switch (`add` ↔ `multiply`) can leave a kept `adjustmentOverride` invalid for the new kind (a multiplier at or below zero, say); `overrideInvalidForKind` flags that on the ACTIVE field alone, without touching the dormant one (issue 2078).
+Converting a summed check to counting keeps the same principle in the other direction: the record's `dcOverride`/`adjustmentOverride` survives unread while `successesOverride` takes over, and switching back to a summed product restores it exactly as authored.
+
+Canonical mapping: `checkOverrideField`/`keptOverrides`/`overrideInvalidForKind` in `src/ui/svelte/apps/manager/component/overridePlayerSees.js`; `CheckOverrideField.svelte`; `taskOverrideCopy.js`; **Check DC Override**
+
+Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
+
 ## Character Modifier
 
 Since issue 1117 the entries themselves live in the ONE **Modifier Library**, and since issue 1308 that library is WORLD scope (`characterLibraries.modifiers`); a character modifier is the drop row's or event's REFERENCE into it, by `modifierId`, with an operator (`+`/`-`) and its own optional `min`/`max` caps — independent of the entry's own check-side bounds.
@@ -1764,6 +2107,7 @@ Every prune site that can receive it must test for it, argument defaults include
 And the basis must be THREADED AS A PARAMETER rather than dug out of a collaborator inside the pass, so the pass stays a function of its arguments and can be handed, and tested with, an unknown one.
 **A SEEDEDNESS PREDICATE MUST BE ASKED ABOUT THE SUB-KEY THE ID SET IS DRAWN FROM** (issue 1359): a store holding several sub-keys under one setting answers an aggregate `isSeeded()` by ORing across them, so an aggregate answer reports seeded on the strength of a SIBLING and hands the basis a real, empty, prunable id set derived from a sub-key that is simply absent.
 That is also why the three world scope settings are three KEYS and not one — on a shared key the predicate cannot be honest per entity type at all, because one entity type's first write persists the others as empty.
+**A COMPONENT IMPORT IS A SEEDING WRITER** (issue 2218): its first registration flips `isSeeded("entities")` for `fabricate.componentScope` on a world the migration never wrote, as the world catalogue's create does and as a crafting-system import never does, so a system whose own component array is EMPTY goes from an unknown basis to a known one, which no longer vouches for a component id in neither half: an essence source there naming such an id keeps its `sourceComponentId` and loses its `sourceItemUuid` on the next normalize.
 **THE LEGACY HALF COUNTS ONLY WHEN IT IS NON-EMPTY:** an empty in-system array is a legacy KEY rather than a legacy corpus, so it vouches for nothing while licensing a full prune, and the answer is UNKNOWN only when the store is unseeded AND that array is empty — deriving it from seededness alone returns UNKNOWN on every unmigrated client for every system and silently disables every prune in the corpus for a release.
 **A VOCABULARY IS A BASIS TOO:** an icon map is pruned only against a known-complete vocabulary and only against ITS OWN (`componentCategoryIcons` against `componentCategories`, `categoryIcons` against `categories`, never the other's), with an unknown one falling back to the map's own keys so shape rules still apply and nothing is dropped.
 **A DEGRADED ARGUMENT IS THIS RULE'S BLIND SPOT:** a defect that keeps the derivation call and corrupts only what it is derived FROM passes any site-counting census, so the change that first reads an id set rather than only its known/unknown state owns behavioural coverage for the prune's OUTCOME.

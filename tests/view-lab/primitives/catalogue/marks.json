@@ -1,0 +1,845 @@
+[
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "tag",
+      "icon": "fas fa-tag",
+      "aria-pressed": true
+    },
+    "content": ["#Hardwood"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "neutral",
+      "icon": "fas fa-tag",
+      "aria-pressed": false
+    },
+    "content": ["#Refined"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button"
+    },
+    "content": ["Metal"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "tag",
+      "icon": "fas fa-tag"
+    },
+    "content": [
+      "#Alchemy",
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "positive"
+    },
+    "content": ["Enabled"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "warning"
+    },
+    "content": ["Incomplete"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "danger"
+    },
+    "content": ["Blocked"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "info"
+    },
+    "content": ["DC 15"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "accent"
+    },
+    "content": ["Applies to"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "tones — thirteen families, colour and nothing else",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "content": ["Extract"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "the recessive ladder — four ranks, routed by meaning",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "secondary"
+    },
+    "content": ["Salvage mode"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "the recessive ladder — four ranks, routed by meaning",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "neutral"
+    },
+    "content": ["2 steps"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "the recessive ladder — four ranks, routed by meaning",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "subtle"
+    },
+    "content": ["Not in system"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "the recessive ladder — four ranks, routed by meaning",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "muted"
+    },
+    "content": ["Salvage · n/a"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "content": ["default"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "row"
+    },
+    "content": ["row"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "list"
+    },
+    "content": ["list"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "action"
+    },
+    "content": ["action"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "tag-run"
+    },
+    "content": ["tag-run"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — six scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "inspector"
+    },
+    "content": ["inspector"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — four alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "info",
+      "emphasis": "outlined"
+    },
+    "content": ["outlined"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — four alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tint": "lavender",
+      "emphasis": "lit"
+    },
+    "content": ["lit"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — four alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "subtle",
+      "emphasis": "bare",
+      "density": "list"
+    },
+    "content": ["bare"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — four alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "positive",
+      "emphasis": "solid",
+      "density": "list"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Have"
+      },
+      {
+        "tag": "span",
+        "text": "3"
+      }
+    ]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "emphasis — four alternatives, not a composition",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "emphasis": "solid",
+      "density": "list"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Need"
+      },
+      {
+        "tag": "span",
+        "text": "2"
+      }
+    ]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "icon only — a square, one side per density",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "positive",
+      "iconOnly": true,
+      "icon": "fas fa-check",
+      "aria-label": "Available"
+    }
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "icon only — a square, one side per density",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "row",
+      "iconOnly": true,
+      "icon": "fas fa-lock",
+      "aria-label": "Locked"
+    }
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "icon only — a square, one side per density",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "tone": "danger",
+      "density": "list",
+      "iconOnly": true,
+      "icon": "fas fa-xmark",
+      "aria-label": "Blocked"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "kicker — one size, one tracking",
+    "draws": ".k-kicker",
+    "path": "src/ui/svelte/components/Kicker.svelte",
+    "props": {
+      "as": "span"
+    },
+    "content": ["Free floor"]
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "kicker — one size, one tracking",
+    "draws": ".k-kicker",
+    "path": "src/ui/svelte/components/Kicker.svelte",
+    "props": {
+      "as": "span",
+      "tone": "accent"
+    },
+    "content": ["Rewards"]
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "kicker — one size, one tracking",
+    "draws": ".k-kicker",
+    "path": "src/ui/svelte/components/Kicker.svelte",
+    "props": {
+      "as": "span"
+    },
+    "content": ["Businesses at this tier"]
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — four sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 22,
+      "icon": "fas fa-leaf",
+      "tint": "sage"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — four sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 26,
+      "icon": "fas fa-hammer",
+      "tint": "mist"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — four sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 30,
+      "icon": "fas fa-flask",
+      "tint": "lavender"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "icon chip — four sizes, tint on the glyph only",
+    "draws": ".k-ic",
+    "path": "src/ui/svelte/components/Medallion.svelte",
+    "props": {
+      "variant": "glyph-chip",
+      "size": 38,
+      "icon": "fas fa-book",
+      "tint": "peach"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "stat box — the at-a-glance figure",
+    "draws": ".k-stat",
+    "path": "src/ui/svelte/components/StatBox.svelte",
+    "props": {
+      "value": "2",
+      "label": "Active"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "stat box — the at-a-glance figure",
+    "draws": ".k-stat",
+    "path": "src/ui/svelte/components/StatBox.svelte",
+    "props": {
+      "value": "2",
+      "label": "Extract"
+    }
+  },
+  {
+    "spec": "<Kicker> <IconChip> <StatBox>",
+    "cap": "stat box — the at-a-glance figure",
+    "draws": ".k-stat",
+    "path": "src/ui/svelte/components/StatBox.svelte",
+    "props": {
+      "value": "1",
+      "label": "Craft"
+    }
+  },
+  {
+    "spec": "<EssenceChip>",
+    "cap": "row badges — the reference’s essence dot, count only",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Fire": "the chip’s accessible name; the drawing draws the count alone"
+    },
+    "props": {
+      "essence": {
+        "id": "fire",
+        "name": "Fire",
+        "icon": "fas fa-flask",
+        "colorToken": "peach"
+      },
+      "quantity": 2
+    }
+  },
+  {
+    "spec": "<EssenceChip>",
+    "cap": "row badges — the reference’s essence dot, count only",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Earth": "the chip’s accessible name; the drawing draws the count alone"
+    },
+    "props": {
+      "essence": {
+        "id": "earth",
+        "name": "Earth",
+        "icon": "fas fa-leaf",
+        "colorToken": "sage"
+      },
+      "quantity": 1
+    }
+  },
+  {
+    "spec": "<EssenceChip>",
+    "cap": "row badges — the reference’s essence dot, count only",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Metal": "the chip’s accessible name; the drawing draws the count alone"
+    },
+    "props": {
+      "essence": {
+        "id": "metal",
+        "name": "Metal",
+        "icon": "fas fa-hammer"
+      },
+      "quantity": 3
+    }
+  },
+  {
+    "spec": "<EssenceChip>",
+    "cap": "inspector run — name and count, at the inspector scale",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "props": {
+      "essence": {
+        "id": "fire",
+        "name": "Fire",
+        "icon": "fas fa-flask",
+        "colorToken": "peach"
+      },
+      "quantity": 2,
+      "showName": true,
+      "density": "inspector"
+    }
+  },
+  {
+    "spec": "<EssenceChip>",
+    "cap": "inspector run — name and count, at the inspector scale",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "props": {
+      "essence": {
+        "id": "earth",
+        "name": "Earth",
+        "icon": "fas fa-leaf",
+        "colorToken": "sage"
+      },
+      "quantity": 1,
+      "showName": true,
+      "density": "inspector"
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "meter — a value against a maximum",
+    "draws": ".k-track",
+    "path": "src/ui/svelte/components/Meter.svelte",
+    "props": {
+      "value": 7,
+      "max": 11,
+      "valueText": "7 / 11",
+      "label": "Labourers",
+      "segments": [
+        {
+          "tone": "accent"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "meter — two segments, granted vs paid",
+    "draws": ".k-track",
+    "path": "src/ui/svelte/components/Meter.svelte",
+    "partial": "first segment only",
+    "note": "Passes both segments the drawing shows. The shipped meter draws only the first, which is what its API states.",
+    "props": {
+      "value": 1,
+      "max": 3,
+      "valueText": "Max 3",
+      "label": "Free 1",
+      "segments": [
+        {
+          "tone": "accent"
+        },
+        {
+          "color": "var(--fab-accent-soft)"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "banded — colour carries the reading",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/BandedBar.svelte",
+    "props": {
+      "rows": [
+        {
+          "id": "common",
+          "name": "Common",
+          "percent": 12,
+          "fill": "common"
+        },
+        {
+          "id": "rare",
+          "name": "Rare",
+          "percent": 58,
+          "fill": "rare"
+        },
+        {
+          "id": "legendary",
+          "name": "Legendary",
+          "percent": 94,
+          "fill": "legendary"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "banded — risk runs the ramp backwards",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/BandedBar.svelte",
+    "note": "No row names its fill, so each is read off the risk scale at its percentage, which is what `descending` is for.",
+    "props": {
+      "direction": "descending",
+      "rows": [
+        {
+          "id": "hammer",
+          "name": "Breakage",
+          "percent": 88
+        },
+        {
+          "id": "tongs",
+          "name": "Breakage",
+          "percent": 72
+        },
+        {
+          "id": "file",
+          "name": "Breakage",
+          "percent": 26
+        },
+        {
+          "id": "anvil",
+          "name": "Breakage",
+          "percent": 8
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "stages — one bar per stage, side by side",
+    "draws": ".k-stage-row",
+    "path": "src/ui/svelte/components/StageBars.svelte",
+    "note": "Unnumbered: the drawing's caption row sits outside the bar row this replaces and stays drawn, so a numbered specimen would caption every stage twice.",
+    "undrawn": {
+      "Draw the billet stages": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "ariaLabel": "Draw the billet stages",
+      "currentIndex": 2,
+      "numbered": false,
+      "stages": [
+        {
+          "id": "draw",
+          "name": "Draw",
+          "value": 100
+        },
+        {
+          "id": "fold",
+          "name": "Fold",
+          "value": 100
+        },
+        {
+          "id": "grind",
+          "name": "Grind",
+          "value": 45
+        },
+        {
+          "id": "finish",
+          "name": "Finish",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<WorldClockChip>",
+    "cap": "the chip",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/WorldClockChip.svelte",
+    "props": {
+      "label": "World clock",
+      "value": "Day 14 · 08:00"
+    }
+  },
+  {
+    "spec": "<DiceTiles>",
+    "cap": "combined marks — each explosion’s die straight after its parent",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/DiceTiles.svelte",
+    "props": {
+      "legend": true,
+      "model": {
+        "tiles": [
+          {
+            "face": 8,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 10,
+            "marks": ["qualified", "exploded"],
+            "generated": false
+          },
+          {
+            "face": 10,
+            "marks": ["qualified", "exploded"],
+            "generated": true
+          },
+          {
+            "face": 1,
+            "marks": ["cancelled"],
+            "generated": true
+          },
+          {
+            "face": 1,
+            "marks": ["cancelled"],
+            "generated": false
+          },
+          {
+            "face": 3,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 9,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 2,
+            "marks": [],
+            "generated": false
+          }
+        ],
+        "more": 0
+      }
+    }
+  },
+  {
+    "spec": "<DiceTiles>",
+    "cap": "bought dice — the border dashed, its tone kept",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/DiceTiles.svelte",
+    "props": {
+      "legend": true,
+      "model": {
+        "tiles": [
+          {
+            "face": 1,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 20,
+            "marks": ["cancelled"],
+            "generated": false
+          },
+          {
+            "face": 11,
+            "marks": ["qualified"],
+            "generated": false,
+            "bought": true
+          },
+          {
+            "face": 4,
+            "marks": [],
+            "generated": false,
+            "bought": true
+          }
+        ],
+        "more": 0,
+        "bought": 2
+      }
+    }
+  },
+  {
+    "spec": "<DiceTiles>",
+    "cap": "a 280px chat column — wrapping, and the cap",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/DiceTiles.svelte",
+    "props": {
+      "model": {
+        "tiles": [
+          {
+            "face": 1,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 2,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 3,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 4,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 5,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 6,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 7,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 8,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 9,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 10,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 1,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 2,
+            "marks": [],
+            "generated": false
+          },
+          {
+            "face": 3,
+            "marks": ["qualified"],
+            "generated": false
+          },
+          {
+            "face": 4,
+            "marks": [],
+            "generated": false
+          }
+        ],
+        "more": 985
+      }
+    }
+  }
+]

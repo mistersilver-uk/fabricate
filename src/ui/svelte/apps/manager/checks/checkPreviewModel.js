@@ -31,6 +31,7 @@ export const PREVIEW_ABSTENTIONS = Object.freeze({
 });
 
 export { buildReadoutModel } from './checkReadoutModel.js';
+export { countPreviewPlacement } from './countPreviewModel.js';
 
 const NOT_NUMERIC = new Set(['dice', 'invalid', 'non-finite']);
 

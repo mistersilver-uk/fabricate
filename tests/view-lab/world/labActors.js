@@ -1,6 +1,12 @@
 /** Duck-typed actors, items, and the uuid document index. */
 
-import { installUpdateSemantics, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
+import {
+  installSourceSemantics,
+  installUpdateSemantics,
+  makeGetFlag,
+  makeSetFlag,
+  seedFabricateFlag,
+} from './labFlags.js';
 
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
@@ -380,6 +386,7 @@ export function buildLabActors(content) {
     actor.getFlag = makeGetFlag(actor);
     actor.setFlag = makeSetFlag(actor);
     installUpdateSemantics(actor);
+    installSourceSemantics(actor);
     // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
     // itself from a collection that exists — and the actor holding it is built after its items.
     for (const item of items) {
@@ -394,6 +401,43 @@ export function buildLabActors(content) {
       seedFabricateFlag(actor, ['fabricate', 'learnedRecipes'], structuredClone(learned));
     return actor;
   });
+}
+
+/** The knowledge book {@link seedLearnableBook} hands Brenna: its learn cap covers all three recipes. */
+const LEARNABLE_BOOK = Object.freeze({
+  id: 'hb-herbal',
+  name: 'Hedgerow Herbal',
+  registeredItemUuid: 'Item.hb-herbal',
+  originItemUuid: 'Item.hb-herbal',
+  img: `${PORTRAIT_BASE}/sundries/books/book-embossed-roots-green.webp`,
+  recipeIds: ['hb-r-healing', 'hb-r-antitoxin', 'hb-r-oil'],
+  caps: {
+    item: { limitUses: false },
+    learn: { limitLearning: true, learnsAllowed: 3, learnScope: 'perInstance' },
+  },
+});
+
+/**
+ * Stock Brenna with a held book she can learn whole, which is what draws the Read & learn header
+ * action. Behind a world flag, because a held book with members reveals those recipes in her
+ * crafting list and journal and so moves every player frame that reads either.
+ *
+ * @param {object} content Output of `buildLabContent()`, before the document index is built.
+ * @param {object[]} actors Output of {@link buildLabActors}.
+ */
+export function seedLearnableBook(content, actors) {
+  const herbalism = content.systems.find((system) => system.id === 'lab-herbalism');
+  herbalism.recipeItemDefinitions = [...herbalism.recipeItemDefinitions, LEARNABLE_BOOK];
+  content.recipeItems = [...content.recipeItems, LEARNABLE_BOOK];
+  const brenna = actors.find((actor) => actor.id === 'lab-actor-brenna');
+  const copy = recipeItemCopy({
+    id: 'copy-herbal',
+    uuid: LEARNABLE_BOOK.registeredItemUuid,
+    name: LEARNABLE_BOOK.name,
+    icon: 'sundries/books/book-embossed-roots-green.webp',
+  });
+  copy.parent = brenna;
+  brenna.items.push(copy);
 }
 
 /**

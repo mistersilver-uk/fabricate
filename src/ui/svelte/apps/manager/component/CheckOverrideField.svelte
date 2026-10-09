@@ -1,22 +1,23 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One component's salvage check override: a preset Select over the system's own tiers, a Custom…
-  Stepper and Manage presets. It edits `dcOverride` under a fixed target and `adjustmentOverride`
-  under a character value, clears only that field for System default, and never rewrites the other;
-  a kept dormant value is named in a callout. A check graded against one number shows what its
-  player sees.
+  Stepper and Manage presets. It edits `dcOverride` under a fixed target, `adjustmentOverride`
+  under a character value and `successesOverride` under a count, clears only that field for System
+  default, and never rewrites another; each kept dormant DC or adjustment is named in a callout. A
+  check graded against one number, or counting successes, shows what its player sees.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `config` | the active salvage check sub-object \| `null` | `null` | Supplies `evaluation`, `thresholdMode`, `type` and `dc`; absent reads as a roll-high fixed DC. |
-  | `dcOverride` / `adjustmentOverride` | number \| `null` | `null` | The component's two persisted overrides, both passed so the dormant one can be named. |
+  | `dcOverride` / `adjustmentOverride` / `successesOverride` | number \| `null` | `null` | The component's persisted overrides, all passed so the dormant ones can be named. |
   | `tiers` / `systemDc` | `simple.tiers` / number | `[]` / `0` | The preset source in every resolution mode, and the system default's number where `config` has no `dc`; salvage runs no DC macro, so the default always names that static number. |
   | `previewActors` / `resolvePreviewCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and lookup for the Player sees line. |
   | `instanceId` / `disabled` | string / boolean | `''` / `false` | The id stem for the title, and the whole control's disabled state. |
 
   Callbacks:
-  - `onChange(patch)` — `{ dcOverride }` or `{ adjustmentOverride }`, only ever the active field.
+  - `onChange(patch)` — `{ dcOverride }`, `{ adjustmentOverride }` or `{ successesOverride }`, only
+    ever the active field.
   - `onManagePresets()` — open the salvage check's tiers on the Checks screen.
 
   Invariants:
@@ -27,7 +28,7 @@
   import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Select from '../../../components/Select.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -41,7 +42,7 @@
   import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
   import { buildSalvageDcSelectOptions } from './componentEditSelectOptions.js';
   import OverridePlayerSees from './OverridePlayerSees.svelte';
-  import { keptOverride, overrideInvalidForKind } from './overridePlayerSees.js';
+  import { keptOverrides, overrideInvalidForKind } from './overridePlayerSees.js';
   import {
     SALVAGE_DC_CUSTOM,
     resolveSalvageDcSelection,
@@ -53,6 +54,7 @@
     config = null,
     dcOverride = null,
     adjustmentOverride = null,
+    successesOverride = null,
     tiers = [],
     systemDc = 0,
     previewActors = [],
@@ -69,11 +71,12 @@
   }
 
   const evaluation = $derived(normalizeCheckEvaluation(config?.evaluation));
-  const attribute = $derived(evaluation.target.source === 'attribute');
+  const field = $derived(salvageOverrideField(evaluation));
+  const count = $derived(field === 'successesOverride');
+  const attribute = $derived(field === 'adjustmentOverride');
   const under = $derived(evaluation.direction === 'under');
   const kind = $derived(evaluation.target.adjustmentKind);
-  const field = $derived(salvageOverrideField(evaluation));
-  const activeValue = $derived(attribute ? adjustmentOverride : dcOverride);
+  const activeValue = $derived({ dcOverride, adjustmentOverride, successesOverride }[field]);
   const cmp = $derived(underComparisonPhrase(config?.thresholdMode, text));
   const titleId = $derived(`${instanceId}-salvage-dc-title`);
   const invalidId = $derived(`${instanceId}-salvage-dc-invalid`);
@@ -95,13 +98,19 @@
   }
 
   function typeValue(next) {
-    onChange({ [field]: Number.isFinite(next) ? next : null });
+    if (!Number.isFinite(next)) onChange({ [field]: null });
+    else onChange({ [field]: count ? Math.trunc(next) : next });
   }
 
   const formatAdjustment = (value) => formatCheckAdjustment(kind, value);
   const parseAdjustment = (value) => parseCheckAdjustment(kind, value);
 
   const title = $derived.by(() => {
+    if (count)
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Overrides.Title',
+        'Successes needed override'
+      );
     if (attribute)
       return text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideAdjustment',
@@ -113,6 +122,12 @@
   });
 
   const hint = $derived.by(() => {
+    if (count) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Overrides.HintComponent',
+        'Replaces the successes needed for this component. The pool and threshold still come from the check.'
+      );
+    }
     if (!attribute && !under) {
       return text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverrideHint',
@@ -139,19 +154,26 @@
         );
   });
 
-  const customLabel = $derived(
-    attribute
+  const customLabel = $derived.by(() => {
+    if (count)
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Overrides.CustomLabel',
+        'Custom successes needed'
+      );
+    return attribute
       ? text(
           'FABRICATE.Admin.Manager.Component.SalvageEditor.AdjustmentCustomLabel',
           'Custom salvage adjustment'
         )
-      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel', 'Custom salvage DC')
+      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel', 'Custom salvage DC');
+  });
+
+  // Each dormant field is kept, never edited or cleared from here; its callout says so.
+  const keptNotices = $derived(
+    keptOverrides({ field, dcOverride, adjustmentOverride }).map(keptNotice)
   );
 
-  // The dormant field is kept, never edited or cleared from here; the callout says so.
-  const keptNotice = $derived.by(() => {
-    const kept = keptOverride({ attribute, dcOverride, adjustmentOverride });
-    if (!kept) return '';
+  function keptNotice(kept) {
     return kept.field === 'dcOverride'
       ? interpolate(
           text(
@@ -167,7 +189,7 @@
           ),
           { adjustment: formatCheckAdjustment(kind, kept.value) }
         );
-  });
+  }
 </script>
 
 <Field
@@ -188,13 +210,27 @@
         {options}
         ariaLabelledBy={titleId}
         {disabled}
-        triggerData={{ 'data-salvage-dc-preset': '' }}
+        triggerProps={{ 'data-salvage-dc-preset': '' }}
         onChange={choose}
       />
       {#if selection === SALVAGE_DC_CUSTOM}
         <!-- `allowUnset`: a cleared field is the system default. A DC floors at 0, so one `−` click on
              the blank field cannot commit -1; an adjustment is formatted and may be negative. -->
-        {#if attribute}
+        {#if count}
+          <!-- A successes count is an integer 0–20, the range the normalizer keeps. -->
+          <Stepper
+            value={successesOverride}
+            allowUnset
+            step={1}
+            min={0}
+            max={20}
+            fill
+            {disabled}
+            {...stepperLabels(customLabel)}
+            inputProps={{ 'data-salvage-successes-custom': '' }}
+            onChange={typeValue}
+          />
+        {:else if attribute}
           {#key kind}
             <Stepper
               value={adjustmentOverride}
@@ -228,7 +264,7 @@
         {/if}
       {/if}
       <!-- Kept by decision 7: with no authored tiers, the common case, this is the way forward. -->
-      <ManagerButton
+      <Button
         class="manager-salvage-manage-presets"
         data-salvage-manage-presets
         onclick={() => onManagePresets()}
@@ -241,7 +277,7 @@
             'Manage presets'
           )}</span
         >
-      </ManagerButton>
+      </Button>
     </div>
     <span class="manager-salvage-dc-note" data-salvage-override-hint>{hint}</span>
     {#if invalidOverride}
@@ -258,10 +294,10 @@
       </p>
     {/if}
   </div>
-  {#if keptNotice}
-    <!-- A Callout, not a Notice: the kept value is a standing fact about the record (library routing rule). -->
-    <Callout text={keptNotice} dataAttr="data-salvage-override-kept" />
-  {/if}
+  <!-- A Callout, not a Notice: a kept value is a standing fact about the record (library routing rule). -->
+  {#each keptNotices as notice (notice)}
+    <Callout text={notice} data-salvage-override-kept />
+  {/each}
   <OverridePlayerSees
     subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}
     {evaluation}
@@ -269,6 +305,8 @@
     type={config?.type ?? null}
     {dcOverride}
     {adjustmentOverride}
+    {successesOverride}
+    poolDetail
     anchorDc={systemDefaultDc}
     actors={previewActors}
     resolveCharacter={resolvePreviewCharacter}

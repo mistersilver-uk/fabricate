@@ -12,6 +12,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import IconFactRow from '../IconFactRow.svelte';
   import EntityListInspectorFrame from './EntityListInspectorFrame.svelte';
   import SystemRulesRoster from './SystemRulesRoster.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
@@ -39,8 +40,7 @@
     membershipFilter = true,
     // Threaded to the frame. OPT-IN, defaulting to the single toolbar row every catalogue renders.
     splitToolbar = false,
-    // Threaded to the frame, both OPT-IN: a toolbar rung and a row tile's descriptor.
-    toolbarLeadSize = '',
+    // Threaded to the frame, OPT-IN: a row tile's descriptor.
     rowMedallion = null,
     // Threaded to the frame and on to `BulkSelectionToolbar`; `'results'` is the shipped band.
     selectAllScope = 'results',
@@ -86,9 +86,8 @@
     inspectorBodyPlacement = 'trail',
     // WHAT THE SYSTEM ROSTER SAYS WHEN NO SYSTEM HAS THE ENTITY. Threaded to `SystemRulesRoster`.
     rosterEmptyNote = '',
-    // THE ROSTER'S TWO SURFACE DECISIONS, carried here because a page never composes the roster.
+    // THE ROSTER'S SURFACE DECISION, carried here because a page never composes the roster.
     rosterRecessed = false,
-    rosterSearchWell = false,
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -164,7 +163,6 @@
     {countUnit}
     {membershipFilter}
     {splitToolbar}
-    {toolbarLeadSize}
     {rowMedallion}
     {selectAllScope}
     {selectAllLabel}
@@ -202,38 +200,29 @@
         {text('FABRICATE.Admin.Manager.Scoped.List.DefaultsHead', 'World defaults')}
       </p>
       {#each sections as section (section)}
-        <div class="manager-scoped-catalogue-card" data-scoped-list-inherit-count={section}>
-          <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
-            <i class={sectionIcons?.[section] || 'fas fa-sliders'}></i>
-          </span>
-          <span class="manager-scoped-catalogue-card-copy">
-            <span class="manager-scoped-catalogue-card-title">
-              {sectionTitles?.[section] || scopedSectionLabel(section, text)}
-            </span>
-            <span
-              class="manager-scoped-catalogue-card-note"
-              data-scoped-list-inherit-note={section}
-            >
-              {sectionNotes?.[section] ||
-                format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
-                  count: Number(counts[section]) || 0,
-                })}
-            </span>
-          </span>
-        </div>
+        <IconFactRow
+          icon={sectionIcons?.[section] || 'fas fa-sliders'}
+          title={sectionTitles?.[section] || scopedSectionLabel(section, text)}
+          subtitle={sectionNotes?.[section] ||
+            format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
+              count: Number(counts[section]) || 0,
+            })}
+          metaAttr="data-scoped-list-inherit-note"
+          metaValue={section}
+          tile
+          density="rule"
+          data-scoped-list-inherit-count={section}
+        />
       {/each}
       {#each extraCards as card (card.id)}
-        <div class="manager-scoped-catalogue-card" data-scoped-list-extra-card={card.id}>
-          <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
-            <i class={card.icon || 'fas fa-sliders'}></i>
-          </span>
-          <span class="manager-scoped-catalogue-card-copy">
-            <span class="manager-scoped-catalogue-card-title">{card.title}</span>
-            {#if card.note}
-              <span class="manager-scoped-catalogue-card-note">{card.note}</span>
-            {/if}
-          </span>
-        </div>
+        <IconFactRow
+          icon={card.icon || 'fas fa-sliders'}
+          title={card.title}
+          subtitle={card.note || ''}
+          tile
+          density="rule"
+          data-scoped-list-extra-card={card.id}
+        />
       {/each}
     </section>
   {/if}
@@ -252,7 +241,6 @@
     {systemRowAction}
     {rosterEmptyNote}
     recessed={rosterRecessed}
-    searchWell={rosterSearchWell}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}
@@ -279,53 +267,5 @@
     flex-direction: column;
     gap: var(--fab-space-chip);
     min-width: 0;
-  }
-
-  /* ONE WORLD DEFAULT, AS A CARD: a title naming the VALUE over a note stating the arithmetic. */
-  .manager-scoped-catalogue-card {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: flex-start;
-    padding: 6px var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    /* THE RECESS HAS SOMEWHERE TO GO, BECAUSE THIS IS NOT IN THE PANE but in the ASIDE. */
-    background: var(--fab-bg-0);
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-card-icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    /* The ONE lighter surface inside a card: a glyph tile is a CONTROL-sized inset. */
-    background: var(--fab-bg-1);
-    color: var(--fab-accent);
-    font-size: 0.72rem;
-  }
-
-  .manager-scoped-catalogue-card-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-card-title {
-    color: var(--fab-text);
-    font-size: 0.72rem;
-    font-weight: 700;
-    overflow-wrap: break-word;
-  }
-
-  .manager-scoped-catalogue-card-note {
-    color: var(--fab-text-muted);
-    font-size: 0.62rem;
-    line-height: 1.35;
-    overflow-wrap: break-word;
   }
 </style>

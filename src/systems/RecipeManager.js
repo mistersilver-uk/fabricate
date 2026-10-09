@@ -77,7 +77,7 @@ function signatureGuardsMatch(previous, next) {
     previous.systemToken === next.systemToken &&
     previous.recipeMap === next.recipeMap &&
     previous.recipeCount === next.recipeCount &&
-    previous.components === next.components &&
+    previous.components === next.components && // ratchet-exempt(world-scope): not-a-system
     previous.componentCount === next.componentCount &&
     previous.members === next.members
   );

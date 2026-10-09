@@ -65,16 +65,16 @@ test('manager systems text and action cells are constrained at normal widths', (
 });
 
 test('manager systems status cells use stable interactive on-off toggles', () => {
-  const toggleBlock = blockFor('.fabricate-toggle.manager-status-toggle');
-  const onBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-on');
-  const offBlock = blockFor('.fabricate-toggle.manager-status-toggle.is-off');
+  const toggleBlock = blockFor('.fabricate-toggle.fabricate-toggle');
+  const onBlock = blockFor('.fabricate-toggle.fabricate-toggle.is-on');
+  const offBlock = blockFor('.fabricate-toggle.fabricate-toggle.is-off');
   const trackBlock = blockFor('.fabricate-toggle .manager-status-toggle-track');
   const knobBlock = blockFor('.fabricate-toggle .manager-status-toggle-knob');
   const onKnobBlock = blockFor(
-    '.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob'
+    '.fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob'
   );
-  const focusBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus');
-  const focusVisibleBlock = blockFor('.fabricate-toggle.manager-status-toggle:focus-visible');
+  const focusBlock = blockFor('.fabricate-toggle.fabricate-toggle:focus');
+  const focusVisibleBlock = blockFor('.fabricate-toggle.fabricate-toggle:focus-visible');
 
   assert.ok(
     toggleBlock.includes('appearance: none;'),
@@ -131,14 +131,14 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   );
   // The switch sets `border: 0` on the BUTTON.
   const toggleHoverBlock = blockFor(
-    '.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
+    '.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
     'hovering a switch must visibly change its track'
   );
   assert.equal(
-    /\.manager-status-toggle:hover \{/.test(css),
+    /\.fabricate-toggle:hover \{/.test(css),
     false,
     'a hover rule on the border-less button itself is dead code'
   );
@@ -235,7 +235,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
 test('long-labelled switches escape the status cell geometry', () => {
   // (1) The library's grouping switch used to render as "Grou…".
   const groupToggleBlock = blockFor(
-    '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle],\n.fabricate-manager .manager-component-filter-row .manager-status-toggle[data-component-group-by-category]'
+    '.fabricate-manager .manager-recipe-filter-row .fabricate-toggle[data-recipe-group-toggle],\n.fabricate-manager .manager-component-filter-row .fabricate-toggle[data-component-group-by-category]'
   );
   assert.ok(
     groupToggleBlock.includes('max-width: none;'),
@@ -294,8 +294,8 @@ test('a selected browser row reads as an identity cue in the accent family, not 
     ['the selected system card', selectedSystemBlock],
   ]) {
     assert.ok(
-      block.includes('background: var(--fab-surface-soft);'),
-      `${name} uses a neutral soft surface`
+      block.includes('background: var(--fab-surface-active);'),
+      `${name} takes the neutral active surface`
     );
     assert.ok(
       block.includes('border-color: var(--fab-accent-border);'),
@@ -323,8 +323,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-manager .manager-rail-title,\n.fabricate-manager .manager-card-title',
     '.fabricate-manager .manager-inspector-name',
     '.fabricate-manager .manager-recipe-name-row .manager-system-name',
-    // The rail's selected system is now the `<select>`'s own value, not a static span.
-    '.fabricate-manager .manager-scope-select',
+    // The rail's selected system is the scope Select's own value, not a static span.
+    '.fabricate-manager .manager-scope-select .fabricate-select-trigger',
     '.fabricate-manager .manager-recipe-ingredient-set-name',
     '.fabricate-manager input[data-recipe-field="name"]',
   ];
@@ -350,7 +350,7 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
     // The composition list's mono pip is the shared ordered list's ordinal badge (issue 1512).
     '.fabricate-sortable-list-ordinal',
-    '.fabricate-manager .manager-nav-count',
+    '.fabricate-nav .manager-nav-count',
   ];
   for (const selector of MONO) {
     const block = selector.startsWith('.manager-chip')
@@ -383,7 +383,7 @@ test('manager components browser defines drop target and compact responsive list
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
   // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508).
   const toolbarBlock = Array.from(
-    css.matchAll(/\.fabricate-filter-bar\.manager-toolbar\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-filter-bar\.fabricate-filter-bar\s*\{[\s\S]*?\}/g)
   )
     .map((match) => match[0])
     .join('\n');
@@ -453,9 +453,9 @@ test('manager components browser defines drop target and compact responsive list
     'manager toolbar grid should keep rows bounded to the main content width'
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
-  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its search
-  // input takes the shared control font from them; its select triggers take the same 0.72rem
-  // from the shared `Select`'s `toolbar` rung.
+  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its select
+  // triggers take the shared `Select`'s `toolbar` rung's 0.72rem; its search field states its
+  // own 500 12.5px since issue 1782, so no toolbar rule types it.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
@@ -463,10 +463,12 @@ test('manager components browser defines drop target and compact responsive list
     'the component and essence filter rows share the recipe filter row rule'
   );
   assert.ok(
-    blockFor(
-      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-essence-toolbar .manager-search input'
-    ).includes('font-size: var(--fab-recipe-control-font);'),
-    'the component and essence toolbar search inputs are typed by the shared control font, not the Foundry bleed'
+    !/-toolbar \.fabricate-search input[^{]*\{[^}]*font-size/.test(css),
+    'no toolbar types the search input: the field states its own 500 12.5px (issue 1782)'
+  );
+  assert.ok(
+    /\.fabricate-search\.fabricate-search:not\(\.is-compact\) \{[^}]*font-size: 12\.5px;/.test(css),
+    'and the family states it, so the field is not left to the Foundry bleed'
   );
   // The ESSENCE browser's toggle is the third selector in that group (issue 1118). It is
   // addressed by its `data-*` hook because the class it used to carry styled nothing at all —
@@ -475,11 +477,11 @@ test('manager components browser defines drop target and compact responsive list
   // three here is what makes `blockFor` read the whole group: it anchors on `{`, so a selector
   // appended to the list leaves a two-selector lookup matching nothing and failing silently.
   const sortDirectionBlock = blockFor(
-    '.fabricate-button.manager-button.manager-recipe-sort-direction,\n.fabricate-button.manager-button.manager-component-sort-direction,\n.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction]'
+    '.fabricate-button.fabricate-button.manager-recipe-sort-direction,\n.fabricate-button.fabricate-button.manager-component-sort-direction,\n.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]'
   );
   assert.ok(
     sortDirectionBlock.includes('border-radius: 9px;'),
-    'the component sort-direction button escapes the boxy base .manager-button scale'
+    'the component sort-direction button escapes the boxy base .fabricate-button scale'
   );
   assert.ok(
     sortDirectionBlock.includes('font-weight: 600;'),
@@ -580,9 +582,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   const inspectorSourceActionsBlock = blockFor(
     '.fabricate-manager .manager-essence-inspector-source-actions'
   );
-  // Issue 1315 retired the `.manager-icon-button` half of this pair with the manual-mode icon
+  // Issue 1315 retired the `.fabricate-icon-button` half of this pair with the manual-mode icon
   // Force add that was its only consumer, so the rule is now the labelled button alone.
-  const warningActionBlock = blockFor('.fabricate-button.manager-button.is-warning-action');
+  const warningActionBlock = blockFor('.fabricate-button.fabricate-button.is-warning-action');
   const sourceDropBlock = blockFor(
     '.fabricate-manager .manager-essence-source-drop-zone .essence-source-trigger'
   );
@@ -635,7 +637,7 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   assert.ok(
     !mediumQuery.includes(
-      '.fabricate-manager .manager-essence-inspector-source-actions .manager-button'
+      '.fabricate-manager .manager-essence-inspector-source-actions .fabricate-button'
     ),
     'narrow manager layout should not stack the selected essence source actions'
   );
@@ -768,7 +770,7 @@ test('manager environments browser and edit route define compact responsive geom
     'environment thumbnails should render as a square 64px image that suits both scene thumbnails and chosen images'
   );
   assert.ok(
-    taskCountBlock.includes('font-weight: 800;'),
+    taskCountBlock.includes('font-weight: 700;'),
     'environment task count should render as plain emphasized text'
   );
   assert.ok(
@@ -777,7 +779,7 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     !css.includes(
-      '.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {\n  grid-column: 2;\n}'
+      '.fabricate-manager .manager-environment-action-grid .fabricate-icon-button.is-danger {\n  grid-column: 2;\n}'
     ),
     'environment delete quick action should no longer be forced into a second reorder-era grid column'
   );
@@ -813,24 +815,24 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     workspaceBlock.includes(
-      'grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);'
+      'grid-template-columns: var(--fab-manager-env-workspace-grid, minmax(0, 1fr) 300px);'
     ),
     'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths, through the token its narrow override sets'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
-    compBlock.includes('--fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
+    compBlock.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
     'composition grid keeps the shared fallback layout for non-task rows'
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="task"]') &&
-      css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
+      css.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
     'task rows reserve space for a quick action icon beside the overflow-menu action'
   );
   assert.ok(
     css.includes(
       '.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
-    ) && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;'),
+    ) && css.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;'),
     'blind-mode tasks reserve a Weight column wide enough for the stepper and its calculated percentage'
   );
   assert.ok(
@@ -838,7 +840,7 @@ test('manager environments browser and edit route define compact responsive geom
       '.fabricate-manager .manager-environment-comp[data-composition-kind="task"]'
     ) &&
       environmentCompContainerQuery.includes(
-        '--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'
+        '--fab-manager-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'
       ),
     'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
   );
@@ -852,7 +854,7 @@ test('manager environments browser and edit route define compact responsive geom
       '.fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
     ) &&
       environmentCompContainerQuery.includes(
-        '--fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;'
+        '--fab-manager-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;'
       ),
     'narrow blind task rows keep the full-width Weight column so the stepper never overflows it'
   );
@@ -937,32 +939,33 @@ test('manager environments browser and edit route define compact responsive geom
   );
   // The included rows are the shared ordered list's as of issue 1512, so the ranked grid is not a
   // row variant any more: the strip's LEAD track is the list's own cluster, the record's cells are a
-  // grid of their own on the same template, and `--fab-env-comp-grid-ranked` is retired with the
-  // row variant that read it.
+  // grid of their own on the same template, and the ranked grid property is retired with the row
+  // variant that read it, under either name.
   assert.ok(
-    !css.includes('--fab-env-comp-grid-ranked'),
+    !/--fab-(?:manager-)?env-comp-grid-ranked/.test(css),
     'the ranked grid variable is retired with the row variant that read it'
   );
+  // Issue 1522 put the row disclosure in that cluster: badge, gap and chevron, then the grip.
   assert.ok(
-    compBlock.includes('--fab-env-comp-lead: 22px;') &&
-      compBlock.includes('--fab-env-comp-lead-ranked: 58px;'),
-    "the strip's lead track is declared from the list's own badge, grip and gap"
+    compBlock.includes('--fab-manager-env-comp-lead: 58px;') &&
+      compBlock.includes('--fab-manager-env-comp-lead-ranked: 94px;'),
+    "the strip's lead track is declared from the list's own badge, disclosure, grip and gap"
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-head').includes(
-      'grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);'
+      'grid-template-columns: var(--fab-manager-env-comp-lead) var(--fab-manager-env-comp-grid);'
     ),
     'the column strip reads the lead track ahead of the record cells'
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-head.has-rank-controls').includes(
-      'grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;'
+      'grid-template-columns: var(--fab-manager-env-comp-lead-ranked) var(--fab-manager-env-comp-grid) 24px;'
     ),
     'and a ranked strip widens that lead and adds a track under the trailing rocker'
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-cells').includes(
-      'grid-template-columns: var(--fab-env-comp-grid);'
+      'grid-template-columns: var(--fab-manager-env-comp-grid);'
     ),
     'while the record cells read the SAME template, so a label sits over the column it names'
   );
@@ -1027,7 +1030,7 @@ test('manager environment inspector evidence table wraps compact pills without h
         </head>
         <body>
           <main class="fabricate-manager">
-            <section class="fabricate-card manager-inspector-card harness">
+            <section class="fabricate-card harness">
               <h3 class="manager-card-title">Matching evidence</h3>
               <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label="Matching evidence">
                 <tbody>
@@ -1093,7 +1096,7 @@ test('manager environment inspector evidence table wraps compact pills without h
         };
       };
       const table = document.querySelector('.manager-environment-evidence-table');
-      const card = document.querySelector('.manager-inspector-card');
+      const card = document.querySelector('.fabricate-card');
       const longPill = Array.from(
         document.querySelectorAll('.manager-environment-evidence-value-pill')
       ).find((pill) => pill.textContent.includes('VeryLongUnbroken'));
@@ -1234,8 +1237,8 @@ test('manager environment inspector evidence table wraps compact pills without h
     );
     assert.equal(
       report.pillStyle.borderRadius,
-      '4px',
-      'value pills should use compact chip corners'
+      '6px',
+      'value pills should use the chip rung’s corners'
     );
     assert.equal(
       report.pillStyle.overflowWrap,
@@ -1292,7 +1295,7 @@ test('manager environment composition overflow menu renders bounded single-line 
               right: 0;
               top: 38px;
             }
-            .harness .manager-icon-button {
+            .harness .fabricate-icon-button {
               width: 34px;
               height: 34px;
             }
@@ -1308,8 +1311,8 @@ test('manager environment composition overflow menu renders bounded single-line 
         <body>
           <main class="fabricate-manager">
             <div class="harness">
-              <div class="fabricate-action-menu manager-action-menu">
-                <button type="button" class="fabricate-icon-button manager-icon-button" aria-haspopup="menu" aria-label="Open task actions">
+              <div class="fabricate-action-menu">
+                <button type="button" class="fabricate-icon-button" aria-haspopup="menu" aria-label="Open task actions">
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                 </button>
                 <div class="fabricate-action-menu-panel manager-action-menu-panel" role="menu" tabindex="-1" data-keyboard-focus="true" aria-label="Open task actions">
@@ -1455,10 +1458,9 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mainBlock = blockFor('.fabricate-manager .manager-system-edit-main');
   const formBlock = blockFor('.fabricate-manager .manager-system-edit-form');
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
-  // `:not(.fab-stepper-input)` (issue 676).
+  // `:not(.fab-stepper-input)` (issue 676); `:not([type='radio'], [type='checkbox'])` (issue 2151).
   const fieldInputBlock = blockFor(
-    ".fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
-      '.fabricate-field.manager-field select'
+    ".fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])"
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');
@@ -1484,7 +1486,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
     'system edit fields should use a stable two-column grid'
   );
   assert.ok(
-    fieldInputBlock.includes('height: 36px;'),
+    fieldInputBlock.includes('height: 38px;'),
     'system edit inputs and selects should have stable control height'
   );
   assert.ok(
@@ -1496,7 +1498,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
     'feature tiles should seat the state icon beside the copy'
   );
   assert.ok(
-    featureTileIconBlock.includes('flex: 0 0 40px;'),
+    featureTileIconBlock.includes('flex: 0 0 38px;'),
     'feature tile icon should hold the resolution card chip width without shrinking'
   );
   assert.ok(
@@ -1612,14 +1614,14 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
       // scale; the Knowledge row actions and reset cluster join it rather than restating
       // min-height/padding/font-size.
-      '.fabricate-manager .manager-tool-edit-actions .manager-button,\n' +
-        '.fabricate-manager .manager-knowledge-row-actions .manager-button,\n' +
-        '.fabricate-manager .manager-knowledge-reset-actions .manager-button {',
-      '.manager-knowledge-reset-actions .manager-button {',
+      '.fabricate-manager .manager-tool-edit-actions .fabricate-button,\n' +
+        '.fabricate-manager .manager-knowledge-row-actions .fabricate-button,\n' +
+        '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button {',
+      '.manager-knowledge-reset-actions .fabricate-button {',
       1,
     ],
     [
-      '.fabricate-manager .manager-access-roster .manager-search,\n.fabricate-manager .manager-knowledge-roster .manager-search {',
+      '.fabricate-manager .manager-access-roster .fabricate-search,\n.fabricate-manager .manager-knowledge-roster .fabricate-search {',
       // The class the markup used to carry solely to re-derive the Access roster's
       // rule; it is gone from both the stylesheet and the component.
       '.manager-knowledge-roster-search',
@@ -1762,8 +1764,8 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
   const treatment = blockIn(css, shared.slice(0, -2));
   for (const declaration of [
     'border: 1px solid var(--fab-border);',
-    'border-radius: 8px;',
-    'background: var(--fab-overlay-light-03);',
+    'border-radius: 9px;',
+    'background: var(--fab-surface-soft);',
   ]) {
     assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);
   }

@@ -149,6 +149,51 @@ test('repair — skips locked packs and processes unlocked packs', async () => {
   assert.equal(packItem.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-embercap');
 });
 
+// Issue 2217: a derivative shares its compendium source with the entry's own definition.
+const TEMPLATE_UUID = 'Compendium.kit.templates.Item.blank';
+const TEMPLATE_COMPONENT = {
+  id: 'comp-template',
+  name: 'Blank Scroll',
+  registeredItemUuid: TEMPLATE_UUID,
+  originItemUuid: TEMPLATE_UUID,
+  aliasItemUuids: [],
+};
+
+test('repair — stamps a registered derivative with its own component id when the entry definition is listed first', async () => {
+  const scroll = makeItem({
+    uuid: 'Item.scroll-fire',
+    name: 'Scroll of Fire',
+    compendiumSource: TEMPLATE_UUID,
+  });
+  const fire = {
+    id: 'comp-fire',
+    name: 'Scroll of Fire',
+    registeredItemUuid: 'Item.scroll-fire',
+    originItemUuid: 'Item.scroll-fire',
+    aliasItemUuids: [],
+  };
+  const mgr = buildManager([TEMPLATE_COMPONENT, fire], { items: [scroll] });
+
+  const summary = await mgr.repairItemData();
+
+  assert.equal(summary.stamped, 1);
+  assert.equal(scroll.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-fire');
+});
+
+test('repair — an unregistered derivative is still stamped through the compendium source a definition claims', async () => {
+  // Source repair applies no derivative test: it resolves no document.
+  const scroll = makeItem({
+    uuid: 'Item.scroll-frost',
+    name: 'Scroll of Frost',
+    compendiumSource: TEMPLATE_UUID,
+  });
+  const mgr = buildManager([TEMPLATE_COMPONENT], { items: [scroll] });
+
+  await mgr.repairItemData();
+
+  assert.equal(scroll.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-template');
+});
+
 test('repair — requires GM', async () => {
   const mgr = buildManager([EMBERCAP], { items: [] });
   globalThis.game.user.isGM = false;
@@ -244,6 +289,48 @@ test('repair — is idempotent: a second run reports unchanged', async () => {
   assert.equal(component.description, 'Component Pouch');
   assert.equal(second.descriptions.refreshed, 0);
   assert.equal(second.descriptions.unchanged, 1);
+});
+
+test('repair — expands the shared dnd5e inline embed from a LOCKED compendium source', async (t) => {
+  const sharedUuid = 'Compendium.dnd5e.equipment24.Item.dmgSpellScroll00';
+  const raw = 'Scroll rules: @Embed[' + sharedUuid + ' inline]';
+  const { component, run } = buildDescriptionRepairManager({ sourceDescription: raw });
+  const originalResolver = globalThis.fromUuid;
+  t.mock.method(globalThis, 'fromUuid', async (uuid, options) =>
+    uuid === sharedUuid
+      ? {
+          uuid,
+          name: 'Spell Scroll, Cantrip',
+          system: { description: { value: '<p>Shared spell scroll instructions.</p>' } },
+        }
+      : originalResolver(uuid, options)
+  );
+
+  const first = await run();
+  assert.equal(component.description, 'Scroll rules: Shared spell scroll instructions.');
+  assert.equal(first.descriptions.refreshed, 1, 'a repaired embed is actually different');
+  assert.equal(first.skippedLocked, 1, 'reading the compendium never unlocks it');
+
+  const second = await run();
+  assert.equal(second.descriptions.refreshed, 0);
+  assert.equal(second.descriptions.unchanged, 1, 'the resolved snapshot survives the next repair');
+});
+
+test('repair — resolves an embedded text Journal page in the Item description', async (t) => {
+  const pageUuid = 'Compendium.world.notes.JournalEntry.book.JournalEntryPage.page';
+  const { component, run } = buildDescriptionRepairManager({
+    sourceDescription: 'Journal: @Embed[' + pageUuid + ' inline]',
+  });
+  const originalResolver = globalThis.fromUuid;
+  t.mock.method(globalThis, 'fromUuid', async (uuid, options) =>
+    uuid === pageUuid
+      ? { uuid, name: 'Rules Page', text: { content: '<p>Journal instructions.</p>' } }
+      : originalResolver(uuid, options)
+  );
+
+  const summary = await run();
+  assert.equal(component.description, 'Journal: Journal instructions.');
+  assert.equal(summary.descriptions.refreshed, 1);
 });
 
 test('repair — a source that RESOLVES but is BLANK never wipes the stored description', async () => {

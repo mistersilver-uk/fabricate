@@ -666,7 +666,7 @@ describe('InteractableConfigRoot body', () => {
   it('paints the on position with the themed accent token', () => {
     // `styles/fabricate.css` is the shipped global sheet rather than a component's scoped block.
     assert.ok(
-      /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
+      /\.fabricate-toggle\.fabricate-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
     );
   });
@@ -694,9 +694,9 @@ describe('InteractableConfigRoot body', () => {
 
   // The two controls that declined the conversion.
   defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
-    passesProps: [['ManagerButton', 'onclick']],
+    passesProps: [['Button', 'onclick']],
     writes: ['aria-pressed'],
-    passesPropsNo: [['ManagerButton', 'on']],
+    passesPropsNo: [['Button', 'on']],
     compares: [false],
     styleDeclares: [
       [
@@ -708,7 +708,7 @@ describe('InteractableConfigRoot body', () => {
   });
 
   it('asks every pressed button for the inverse of the flag it announces', () => {
-    const pressed = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const pressed = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       attributeExpression(node, 'aria-pressed')
     );
     assert.ok(pressed.length > 0, 'at least one button announces a pressed state');
@@ -751,9 +751,10 @@ describe('InteractableConfigRoot body', () => {
       writes: ['data-interactable-identity-section'],
       spells: ['FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'],
       renders: ['Notice'],
-      passesValues: [
-        ['Notice', 'tone', 'warning'],
-        ['Notice', 'dataAttr', 'data-interactable-needs-config'],
+      // The failed load is the panel's other notice (issue 1779), so the banner is located by its hook.
+      rendersTimes: [[{ at: 'Notice', where: ['data-interactable-needs-config', ''] }, 1]],
+      gives: [
+        { at: 'Notice', where: ['data-interactable-needs-config', ''], attribute: 'tone', is: 'warning' },
       ],
       passesProps: [['Notice', 'title']],
       // The section-wide accent box left with the banner; nothing puts the class back.
@@ -762,7 +763,7 @@ describe('InteractableConfigRoot body', () => {
   );
 
   it('and gates Apply until the selection is complete', () => {
-    const gated = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const gated = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       identifierNames(attributeExpression(node, 'disabled') ?? {}).has('canApplyIdentity')
     );
     assert.equal(gated.length, 1, 'exactly one button is disabled until the selection completes');

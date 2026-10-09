@@ -25,6 +25,7 @@ import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarge
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
@@ -1488,6 +1489,40 @@ test('CraftingEngine executes a matured v1 stage with only its trusted check res
   assert.equal(runManager.getRunHistory(actor)[0].runRevision, committedRevision);
 });
 
+// Issue 1644: the crafting detail marks the tier a roll routed through from the craft result.
+test('CraftingEngine records a successful stage outcome id on the craft result, a failed one none', async () => {
+  for (const [success, expected] of [[true, 'tier-fine'], [false, undefined]]) {
+    const { engine } = setupEngineFixture();
+    const actor = new FakeActor('crafter');
+    const source = new FakeActor('source');
+    engine.installVersionedRunAuthority({
+      consumeExecutionGrant: async (_grant, context) => ({
+        operationId: context.operation === 'start' ? 'start-operation' : 'execute-operation',
+        resolvedCheckResult: { success, outcome: 'Fine', value: 14, data: { outcomeId: 'tier-fine' } },
+      }),
+    });
+    const started = await engine.startVersionedRun({
+      viewer: game.user,
+      actor,
+      sourceActors: [source],
+      recipeId: 'recipe-1',
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+      executionGrant: 'start-grant',
+    });
+    game.time.worldTime = 1120;
+    const result = await engine.executeVersionedStage({
+      actor,
+      componentSourceActors: [source],
+      runId: started.runId,
+      expectedRevision: started.runRevision,
+      requestId: 'request-execute',
+      executionGrant: 'execute-grant',
+    });
+    assert.equal(result.success, success);
+    assert.equal(result.checkResult?.data?.outcomeId, expected, `success ${success}`);
+  }
+});
+
 test('CraftingEngine persists successful spend receipts before a later award ambiguity', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');
@@ -1925,6 +1960,7 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
 
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
   const { engine, runManager } = setupEngineFixture();
+  const restoreDie = installCoreDie();
   const actor = new FakeActor('crafter');
   actor.name = 'Tinker';
   const source = new FakeActor('source');
@@ -1999,6 +2035,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       allowsSituationalModifier: true,
       offerSituationalBonus: true,
       allowAdvantage: true,
+      advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       modifierChoice: null,
     });
     assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
@@ -2057,6 +2094,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     }
   } finally {
     game.i18n = originalI18n;
+    restoreDie();
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }
@@ -2356,7 +2394,7 @@ test('a roll-under versioned prompt explains a character-value target through th
   }
 });
 
-test('a count versioned prompt shows its pre-modifier pool line and successes through the Journal adapter', async () => {
+test('a count versioned prompt shows its Tool-settled pool line and successes through the Journal adapter', async () => {
   const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
   const evaluation = countEvaluation({
     direction: 'under', die: 20, base: '@skill', threshold: '13', required: 2, modifierDestination: 'threshold',
@@ -2371,9 +2409,15 @@ test('a count versioned prompt shows its pre-modifier pool line and successes th
     const { publicPrompt } = await describe();
     await promptJournalStageCheck(publicPrompt);
     const { view } = surface;
-    assert.equal(view.formula, '3d20 · each < 13', 'the pool 3.7 rounded down, before the Tool die');
+    assert.equal(
+      view.formula,
+      '3d20 · each < 17',
+      'the pool 3.7 rounded down, and the threshold moved by the Tool die rolled before the prompt'
+    );
+    assert.equal(view.labels.formulaNote, 'Success on < 17, moved +4 by modifiers');
+    assert.deepEqual([publicPrompt.threshold, publicPrompt.thresholdAnchor], [17, 13]);
     assert.equal(view.neededText, '2 successes needed');
-    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', true]);
     assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
   } finally {
     surface.restore();
@@ -2398,7 +2442,7 @@ test('a fixed-range routed count versioned prompt names no required count', asyn
   const dice = installCountDice({ faces: [] });
   try {
     const fixed = await described('fixed');
-    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 2, null], 'the pre-Tool pool');
+    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 3, null], 'the Tool +1 settled on the pool');
     assert.equal((await described('relative')).required, 3);
   } finally {
     dice.restore();
@@ -2433,8 +2477,8 @@ test('the versioned count descriptor refuses before the Tool roll and captures i
     assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC suffix');
     assert.deepEqual(
       [publicPrompt.target, publicPrompt.allowAdvantage, publicPrompt.allowsSituationalModifier],
-      [null, false, true],
-      'the retained 1d20 offers no advantage and names no target'
+      [null, true, true],
+      'the count rule offers advantage, never the retained 1d20, and names no target'
     );
     assert.deepEqual(
       [publicPrompt.formula, publicPrompt.displayFormula, publicPrompt.resolvedFormula],

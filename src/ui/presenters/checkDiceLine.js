@@ -31,10 +31,47 @@ function depthAt(formula, offset) {
 }
 
 /**
+ * The `)` index closing the innermost bracket around the dice term spanning `start`..`end`, when
+ * that bracket's only content besides whitespace IS the term — the shape `(1d6)` the advantage or
+ * disadvantage bonus die is appended in (issue 2141). A second operand, a function argument
+ * (`min(1d4, 3)`), or flavour carried inside the same brackets (`(1d4[fire])`) makes the group
+ * compound, and a compound group cannot be annotated faithfully, so this returns -1 for either.
+ */
+function loneBracketEnd(masked, start, end) {
+  let balance = 0;
+  let open = -1;
+  for (let i = start - 1; i >= 0; i -= 1) {
+    if (masked[i] === ')') balance += 1;
+    else if (masked[i] === '(') {
+      if (balance === 0) {
+        open = i;
+        break;
+      }
+      balance -= 1;
+    }
+  }
+  if (open === -1 || !/^\s*$/.test(masked.slice(open + 1, start))) return -1;
+  balance = 0;
+  for (let i = end; i < masked.length; i += 1) {
+    if (masked[i] === '(') balance += 1;
+    else if (masked[i] === ')') {
+      if (balance > 0) {
+        balance -= 1;
+      } else {
+        return /^\s*$/.test(masked.slice(end, i)) ? i : -1;
+      }
+    }
+  }
+  return -1;
+}
+
+/**
  * The formula with each top-level dice term followed by its faces, `3d6 (2 + 4 + 3)`, in
- * `roll.dice` order. Flavour text is masked while terms are found, so a die named inside one is
- * never read as a term; a term inside brackets (`min(1d4, 3)`, `(1d4)`) keeps its place in that
- * order but is never annotated, so no face lands inside a fragment.
+ * `roll.dice` order, and a bracketed term that is the lone content of its brackets annotated the
+ * same way after the closing bracket, `(1d6) (2)`. Flavour text is masked while terms are found,
+ * so a die named inside one is never read as a term; any other term inside brackets (`min(1d4, 3)`,
+ * `(1d4[fire])`) keeps its place in that order but is never annotated, so no face lands inside a
+ * compound fragment.
  */
 function withFaces(formula, dice) {
   const masked = formula.replaceAll(FLAVOUR, (flavour) => `[${' '.repeat(flavour.length - 2)}]`);
@@ -44,8 +81,14 @@ function withFaces(formula, dice) {
     const [term, count, faces] = match;
     const rolled = dice[i];
     const matches = rolled?.group === `${count || 1}d${faces}` && rolled.results.length > 0;
-    if (!matches || depthAt(masked, match.index) !== 0) continue;
-    const end = match.index + term.length;
+    if (!matches) continue;
+    const termEnd = match.index + term.length;
+    let end = termEnd;
+    if (depthAt(masked, match.index) !== 0) {
+      const close = loneBracketEnd(masked, match.index, termEnd);
+      if (close === -1) continue;
+      end = close + 1;
+    }
     annotated += `${formula.slice(cursor, end)} (${rolled.results.join(' + ')})`;
     cursor = end;
   }

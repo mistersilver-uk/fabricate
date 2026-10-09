@@ -11,9 +11,17 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun } from '../helpers/journal-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+
+/** A name from content, as accname computes one: hidden nodes skipped, an `aria-label` taken whole. */
+function nameFromContent(node) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1 || node.getAttribute('aria-hidden') === 'true') return '';
+  return node.getAttribute('aria-label') ?? [...node.childNodes].map(nameFromContent).join(' ');
+}
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -23,6 +31,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/systems/foundryCalendar.js',
@@ -36,6 +45,7 @@ const harness = createMountedComponentHarness({
     // The shared primitives this tree draws.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/StageBars.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte'
@@ -172,14 +182,19 @@ describe('RunCard mounted behavior', () => {
     assert.ok(countdown.textContent.includes('8m 20s'), 'countdown formats availableAt - now (1000 - 500 = 500s)');
     const progress = target.querySelector('[data-run-progress]');
     assert.equal(progress.getAttribute('data-run-progress'), '50', 'progress is 50% at the halfway point');
-    assert.equal(progress.getAttribute('role'), 'progressbar', 'progress bar exposes the progressbar role');
-    // The reused Progress.Label key now resolves to run-neutral "Crafting progress"
-    // copy (issue 734); the bar tracks the time gate, not a step count.
+    // Issue 1782: the wrapper carries no role; the bars are a named group of stage progress bars.
+    assert.ok(!progress.hasAttribute('role'), 'the wrapper is layout and a hook only');
+    const group = progress.querySelector('[role="group"]');
     assert.equal(
-      progress.getAttribute('aria-label'),
+      group.getAttribute('aria-label'),
       'FABRICATE.App.Journal.Progress.Label',
-      'progress bar carries the localized crafting-progress aria-label'
+      'the stage group carries the localized progress label'
     );
+    assert.ok(!group.hasAttribute('aria-labelledby'), 'exactly one naming route');
+    assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the card draws no captions');
+    const bar = group.querySelector('[role="progressbar"]');
+    assert.equal(bar.getAttribute('aria-valuenow'), '50', 'the one stage reads its clock');
+    assert.equal(bar.getAttribute('aria-label'), 'Brew', 'and is named by its stage');
   });
 
   it('shows "ready to continue" once the gate has matured', async () => {
@@ -213,17 +228,19 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run, now: 0 });
     const progress = target.querySelector('[data-run-progress]');
     assert.ok(progress, 'the bar survives a stage with no clock');
-    // Issue 1648, UX2-5. The accessible value states what the TRACKS draw. `progress` is null
-    // with no gate, so publishing the clock fraction told a screen-reader user "Progress, 0"
-    // beside a filled track; `.fab-run-progress-tracks` is `aria-hidden`, so there was no second
-    // reading to correct it.
-    assert.equal(progress.getAttribute('aria-valuenow'), '50', 'one of two stages is complete');
-    const tracks = [...target.querySelectorAll('[data-run-progress-track]')];
+    // Issue 1648, UX2-5: the hook states what the tracks draw, completed stages over total. Each
+    // track is its own progress bar since issue 1782, so the reading is per stage as well.
+    assert.equal(progress.getAttribute('data-run-progress'), '50', 'one of two stages is complete');
+    const tracks = [...target.querySelectorAll('[data-stage-bars-stage]')];
     assert.equal(tracks.length, 2, 'one track per authored stage');
     assert.deepEqual(
-      tracks.map((track) => track.dataset.stageProgressState),
+      tracks.map((track) => track.dataset.stageBarsState),
       ['success', 'accent'],
       'the finished stage reads done and the unbegun one reads current'
+    );
+    assert.deepEqual(
+      tracks.map((track) => track.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')),
+      ['100', '0']
     );
     // A countdown needs a deadline and this stage has none. `None` is the string a MATURED wait
     // prints, so the row says nothing about time rather than something false.
@@ -264,7 +281,7 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
     const progress = target.querySelector('[data-run-progress]');
     assert.ok(progress, 'a gated run still reports its clock');
-    assert.equal(progress.getAttribute('aria-valuenow'), '50');
+    assert.equal(progress.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '50');
   });
 
   it('marks the selected card with aria-pressed and the selection class', async () => {
@@ -284,6 +301,69 @@ describe('RunCard mounted behavior', () => {
       assert.equal(target.querySelector('[data-run-progress]').getAttribute('data-run-progress'), '50');
       harness.remount();
     }
+  });
+
+  // Issue 1644: the projection's `completesAsTimePasses` is the world-time scan's own eligibility,
+  // so the card draws exactly what it is given and invents no rule of its own.
+  it('draws the named bolt before the status chip only for a run that finishes its stage as time passes', async () => {
+    const boltKey = 'FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses';
+    const target = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses: true }, now: 0 });
+    const bolt = target.querySelector('[data-run-completes-as-time-passes]');
+    assert.ok(Boolean(bolt), 'the bolt renders');
+    assert.equal(bolt.getAttribute('role'), 'img', 'a glyph alone, so it takes the img role');
+    assert.equal(bolt.getAttribute('aria-label'), boltKey);
+    assert.equal(bolt.dataset.tooltip, boltKey, 'the hover text is the same one key');
+    assert.equal(bolt.querySelector('i').getAttribute('aria-hidden'), 'true');
+    assert.ok(bolt.nextElementSibling.classList.contains('journal-run-status'), 'before the status');
+    harness.remount();
+    for (const completesAsTimePasses of [false, undefined]) {
+      const other = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses }, now: 0 });
+      assert.ok(!other.querySelector('[data-run-completes-as-time-passes]'), String(completesAsTimePasses));
+      harness.remount();
+    }
+  });
+
+  // Issue 1778: the card is ListRow's one button, named by the run, then each state it draws.
+  it('names the card by the run and the states it draws, and describes its context and timing', async () => {
+    const run = {
+      ...makeCraftingRun(),
+      completesAsTimePasses: true,
+      awaitingChoice: true,
+      blindSecretPreview: true,
+    };
+    const target = await harness.mount({ run, now: 500 });
+    const card = target.querySelector('.journal-run-card');
+    assert.equal(card.tagName, 'BUTTON', 'a native button');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    assert.deepEqual(card.getAttribute('aria-label').split(', '), [
+      'Healing Potion',
+      'FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses',
+      'FABRICATE.App.Journal.Status.inProgress',
+      'FABRICATE.App.Journal.Status.awaitingChoice',
+      'FABRICATE.App.Journal.BlindSecret.Badge',
+    ]);
+    const described = card
+      .getAttribute('aria-describedby')
+      .split(' ')
+      .map((id) => target.querySelector(`[id="${id}"]`));
+    assert.ok(described.every(Boolean), 'every description resolves');
+    const timing = described.at(-1).querySelector('.journal-run-card-timing');
+    assert.ok(timing, 'the last description is the timing aside');
+    assert.ok(!card.contains(timing), 'which sits outside the button');
+    assert.equal(timing.querySelectorAll('button, a, input, select, [tabindex]').length, 0);
+    assert.match(nameFromContent(described[0]), /Step 1 of 2/u, 'the context names the step');
+  });
+
+  it('draws the run at the 30px mark, truncated, with phrasing content only inside its button', async () => {
+    const run = { ...makeCraftingRun(), completesAsTimePasses: true, awaitingChoice: true, blindSecretPreview: true };
+    const target = await harness.mount({ run, now: 500 });
+    const card = target.querySelector('.journal-run-card');
+    const row = card.closest('[data-list-row]');
+    assert.ok(row.classList.contains('is-truncated'), 'the name ellipsizes beside its badges');
+    assert.equal(card.querySelector('.fab-medallion').style.width, '30px', "the run's 30px mark");
+    const inside = [...card.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName.toLowerCase());
+    assert.deepEqual(inside, [], 'no block content inside the button');
+    assert.ok(row.querySelectorAll(NON_PHRASING_CONTENT).length > 0, 'while the timing beside it holds some');
   });
 
   it('invokes onSelect with the composite-identity run on click', async () => {

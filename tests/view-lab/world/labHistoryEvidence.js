@@ -29,6 +29,8 @@ export const LAB_HISTORY_DATA_STATES = Object.freeze([
   'history-data-uncertain-awards',
   'history-data-fizzle',
   'history-data-salvage',
+  'history-data-reward-awards',
+  'history-data-reward-awards-multi',
 ]);
 
 const art = (componentId) => `${ICON_BASE}/${ART[componentId]}`;
@@ -187,10 +189,13 @@ function craftingHistoryRun({
   };
 }
 
-function craftingStep(recipe, { status, completedAt, consumed = [], created = [], prepared = null }) {
-  const authored = recipe.getExecutionSteps()[0];
+function craftingStep(
+  recipe,
+  { status, completedAt, consumed = [], created = [], prepared = null, index = 0 }
+) {
+  const authored = recipe.getExecutionSteps()[index];
   return {
-    index: 0,
+    index,
     stepId: authored.id,
     stepName: authored.name || 'Step 1',
     status,
@@ -475,6 +480,114 @@ function salvage(context) {
   };
 }
 
+/** A craft whose stage credited a labelled, rolled bounty and taught one recipe it knew and one it
+ *  did not, beside its Item award (issue 1773). */
+function rewardAwards(context) {
+  const smelted = requireEntry(context.recipes, 'sm-r-iron-ingot', 'recipe');
+  const taught = requireEntry(context.recipes, 'sm-r-longsword', 'recipe');
+  const known = requireEntry(context.recipes, 'sm-r-horseshoe', 'recipe');
+  const finishedAt = context.now - context.hour;
+  const step = craftingStep(smelted, {
+    status: 'succeeded',
+    completedAt: finishedAt,
+    consumed: [partReceipt(context, 'lab-reward-ore', 'sm-iron-ore', 'Iron Ore', 2)],
+    created: [partReceipt(context, 'lab-reward-ingot', 'sm-iron-ingot', 'Iron Ingot', 1)],
+  });
+  const rewards = historyEvidenceFields({
+    currencyCredits: [
+      {
+        resultId: 'lab-reward-bounty',
+        unit: 'gp',
+        amount: 9,
+        rolled: { formula: '2d6', total: 9 },
+        label: 'Guild bounty',
+        reason: 'Paid by the smiths’ guild for the commission',
+        unitName: 'gp',
+      },
+    ],
+    knowledgeGrants: [
+      {
+        resultId: 'lab-reward-taught',
+        recipeId: taught.id,
+        outcome: 'granted',
+        recipeName: taught.name,
+      },
+      {
+        resultId: 'lab-reward-known',
+        recipeId: known.id,
+        outcome: 'alreadyKnown',
+        recipeName: known.name,
+      },
+    ],
+  });
+  return craftingHistoryRun({
+    context,
+    id: stateRunId('history-data-reward-awards'),
+    recipe: smelted,
+    status: 'succeeded',
+    finishedAt,
+    step: { ...step, ...rewards },
+  });
+}
+
+/** A three-stage blade whose final stage credited a bounty and taught a recipe (issue 1773), so the
+ *  rewards read as that stage card's facts rather than as the run's. */
+function rewardAwardsMulti(context) {
+  const blade = requireEntry(context.recipes, 'sm-r-pattern-blade', 'recipe');
+  const taught = requireEntry(context.recipes, 'sm-r-longsword', 'recipe');
+  const finishedAt = context.now - context.hour;
+  const steps = [0, 1, 2].map((index) =>
+    craftingStep(blade, {
+      index,
+      status: 'succeeded',
+      completedAt: finishedAt - (2 - index) * 3600,
+      consumed:
+        index === 0
+          ? [partReceipt(context, 'lab-multi-ingot', 'sm-iron-ingot', 'Iron Ingot', 2)]
+          : [],
+      created:
+        index === 2
+          ? [partReceipt(context, 'lab-multi-steel', 'sm-steel-ingot', 'Steel Ingot', 1)]
+          : [],
+    })
+  );
+  Object.assign(
+    steps[2],
+    historyEvidenceFields({
+      currencyCredits: [
+        {
+          resultId: 'lab-multi-bounty',
+          unit: 'gp',
+          amount: 12,
+          label: 'Commission',
+          reason: 'Paid on delivery of the finished blade',
+          unitName: 'gp',
+        },
+      ],
+      knowledgeGrants: [
+        {
+          resultId: 'lab-multi-taught',
+          recipeId: taught.id,
+          outcome: 'granted',
+          recipeName: taught.name,
+        },
+      ],
+    })
+  );
+  return {
+    ...craftingHistoryRun({
+      context,
+      id: stateRunId('history-data-reward-awards-multi'),
+      recipe: blade,
+      status: 'succeeded',
+      finishedAt,
+      step: steps[0],
+    }),
+    currentStepIndex: 2,
+    steps,
+  };
+}
+
 /**
  * Run sets per focused history-data state, keyed by `journalCaseState`.
  *
@@ -493,5 +606,7 @@ export function historyDataRunSets(context) {
     'history-data-uncertain-awards': () => ({ craftingHistory: [uncertainAwards(context)] }),
     'history-data-fizzle': () => ({ craftingHistory: [fizzle(context)] }),
     'history-data-salvage': () => ({ salvageHistory: [salvage(context)] }),
+    'history-data-reward-awards': () => ({ craftingHistory: [rewardAwards(context)] }),
+    'history-data-reward-awards-multi': () => ({ craftingHistory: [rewardAwardsMulti(context)] }),
   };
 }

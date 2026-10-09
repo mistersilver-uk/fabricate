@@ -5,16 +5,18 @@
   elsewhere:
    - no task selected but tasks exist  -> "Select a gathering task" hint
    - no tasks at all in the environment -> "No available tasks" hint
-   - a task selected -> a header (image, name, description) followed by the
-     shared task requirements section (the same one shown inline when a row is
-     expanded in the center column).
+   - a task selected -> the identity header (tile, name, and the pane's one primary,
+     Attempt), the description, the success-chance bar, then the shared task
+     requirements section (the same one shown inline when a row is expanded in the
+     center column).
 
-  It carries the Attempt action (with the success-chance bar in-line) and a
-  lazily-loaded "What you might find" section for the selected task.
+  It also carries a lazily-loaded "What you might find" section for the selected task.
 -->
 <script>
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
@@ -43,8 +45,8 @@
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);
 
-  // A blocked task (not merely an in-flight `busy` attempt) gets a ban icon + a
-  // tooltip naming the reason. Reuse the center-row callout vocabulary.
+  // A blocked task (not merely an in-flight `busy` attempt) gets a ban icon and a
+  // visible reason, in the center-row callout vocabulary.
   const blocked = $derived(task != null && !attemptable);
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
 
@@ -93,8 +95,16 @@
       : ''
   );
   const blockReason = $derived(blocked ? describeBlockedReasons(blockedReasons, localize) : '');
-
-  const titleId = 'gathering-task-detail-title';
+  // A disabled Attempt keeps its visible label as its name; the reason is visible text it is described by.
+  const uid = $props.id();
+  const reasonId = `${uid}-attempt-reason`;
+  const attemptProps = $derived({
+    class: 'gathering-task-detail-attempt',
+    'data-gathering-attempt': '',
+    'data-gathering-attempt-blocked': blocked ? 'true' : 'false',
+    title: blocked ? blockReason : undefined,
+    'aria-describedby': blocked ? reasonId : undefined,
+  });
 
   // Lazily resolve the per-drop "What you might find" breakdown for the selected
   // task only (it personalizes chances to the selected actor + current
@@ -117,9 +127,9 @@
       : (task?.successChance ?? null)
   );
 
-  function handleAttempt() {
+  function handleAttempt(event) {
     if (!attemptable || busy) return;
-    onAttempt?.({ environmentId, taskId: id });
+    withRollPromptOrigin(event, () => onAttempt?.({ environmentId, taskId: id }));
   }
 
   $effect(() => {
@@ -177,24 +187,24 @@
 {:else}
   <section
     class="gathering-task-detail"
-    aria-labelledby={titleId}
-    aria-label={localize('FABRICATE.App.Gathering.Detail.TaskInspectorLabel')}
+    aria-label={name || localize('FABRICATE.App.Gathering.Detail.TaskInspectorLabel')}
     data-gathering-task-detail
     data-detail-task-id={String(task?.id ?? '')}
   >
-    <header class="gathering-task-detail-header">
-      <span class="gathering-task-detail-thumb-wrap">
-        <img
-          class="gathering-task-detail-thumb"
-          class:is-fallback={!img}
-          src={img || DEFAULT_GATHERING_TASK_IMG}
-          alt=""
-        />
-      </span>
-      <span class="gathering-task-detail-heading">
-        <h2 id={titleId} class="gathering-task-detail-title" title={name}>{name}</h2>
-      </span>
-    </header>
+    <PlayerDetailHeader
+      {name}
+      art={img || DEFAULT_GATHERING_TASK_IMG}
+      primaryLabel={localize('FABRICATE.App.Gathering.Detail.Attempt')}
+      primaryIcon={blocked ? 'fa-solid fa-ban' : ''}
+      primaryDisabled={!attemptable || busy}
+      primaryProps={attemptProps}
+      onclick={handleAttempt}
+    />
+    {#if blocked}
+      <div id={reasonId} data-gathering-attempt-reason>
+        <Notice tone="warning" icon="fa-solid fa-ban" title={blockReason} />
+      </div>
+    {/if}
 
     <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>
       {descriptionText}
@@ -265,8 +275,7 @@
           ? localize('FABRICATE.App.Gathering.Detail.NodeExhaustedPermanent')
           : localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
         detail={nodeExhausted ? '' : respawnEtaText}
-        dataAttr="data-gathering-node-depleted"
-        dataValue=""
+        data-gathering-node-depleted=""
       />
     {:else if nodeNonRegenerating && nodeScarcePermanentText !== ''}
       <!--
@@ -280,32 +289,13 @@
         tone="info"
         icon="fas fa-mountain-sun"
         title={nodeScarcePermanentText}
-        dataAttr="data-gathering-node-scarce"
-        dataValue=""
+        data-gathering-node-scarce=""
       />
     {/if}
 
-    <div class="gathering-task-detail-action" class:has-chance={successChance != null}>
-      {#if successChance != null}
-        <ChanceBar value={successChance} scale="success" />
-      {/if}
-      <span class="gathering-task-detail-attempt-wrap" title={blocked ? blockReason : null}>
-        <button
-          type="button"
-          class="gathering-task-detail-attempt"
-          data-gathering-attempt
-          data-gathering-attempt-blocked={blocked ? 'true' : 'false'}
-          disabled={!attemptable || busy}
-          aria-label={blocked ? blockReason : null}
-          onclick={handleAttempt}
-        >
-          {#if blocked}
-            <i class="fa-solid fa-ban" aria-hidden="true"></i>
-          {/if}
-          {localize('FABRICATE.App.Gathering.Detail.Attempt')}
-        </button>
-      </span>
-    </div>
+    {#if successChance != null}
+      <ChanceBar value={successChance} scale="success" />
+    {/if}
 
     <GatheringTaskRequirements {task} />
 
@@ -348,46 +338,9 @@
     color: var(--fab-text);
   }
 
-  .gathering-task-detail-header {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-  }
-
-  .gathering-task-detail-thumb-wrap {
-    flex: 0 0 auto;
-    width: 64px;
-    height: 64px;
-  }
-
-  .gathering-task-detail-thumb {
-    display: block;
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
-  }
-
-  .gathering-task-detail-thumb.is-fallback {
-    object-fit: contain;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-
-  .gathering-task-detail-heading {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .gathering-task-detail-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* The header grows along its own row; in this column it must not take the free height. */
+  .gathering-task-detail > :global(.player-detail-header) {
+    flex: none;
   }
 
   .gathering-task-detail-description {
@@ -403,7 +356,7 @@
     color: var(--fab-text-muted);
   }
 
-  /* Economy summary (stamina cost vs pool / node count) above the Attempt row. */
+  /* Economy summary (stamina cost vs pool / node count) above the success-chance bar. */
   .gathering-task-detail-economy {
     display: flex;
     flex-direction: column;
@@ -428,62 +381,6 @@
     font-weight: 600;
     background: var(--fab-warning-soft);
     border: 1px solid var(--fab-warning-border);
-  }
-
-  /* Single column (full-width Attempt) by default; two equal columns with
-     whitespace between when a success-chance bar accompanies the button. */
-  .gathering-task-detail-action {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--fab-space-3);
-    align-items: center;
-  }
-
-  .gathering-task-detail-action.has-chance {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  /* Wrapper (not the disabled button) carries the block tooltip so hover is
-     reliable; it fills its grid column. */
-  .gathering-task-detail-attempt-wrap {
-    display: flex;
-  }
-
-  .gathering-task-detail-attempt {
-    width: 100%;
-    appearance: none;
-    -webkit-appearance: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 38px;
-    padding: 0 18px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 6px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .gathering-task-detail-attempt:hover:not(:disabled) {
-    background: var(--fab-accent-hover);
-  }
-
-  .gathering-task-detail-attempt:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .gathering-task-detail-attempt:disabled {
-    opacity: 0.5;
-    cursor: default;
-    background: var(--fab-surface-raised);
-    border-color: var(--fab-border);
-    color: var(--fab-text-muted);
   }
 
   /* The shared requirements block renders as a bordered card in this column. */

@@ -17,6 +17,7 @@ import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import {
   evaluateSituationalBonus,
@@ -45,6 +46,7 @@ import {
   progressiveCheckRefusal,
   resolveActivityCheck,
 } from './countCheck.js';
+import { carryAdditionalDice, checkRequest, checkRequestOptions } from './countCheckRoll.js';
 import {
   createGatheringAttemptResolution,
   noRefusal,
@@ -58,6 +60,7 @@ import {
   cloneJson,
   idOf,
   isBlindWaitingTaskId,
+  mergeCharacterModifierSnapshots,
   normalizeActorList,
   normalizeInteractableRef,
   normalizeList,
@@ -122,6 +125,7 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
+const ACTIVITY = Object.freeze({ craftingModifier: Object.freeze({ activity: 'gathering' }) });
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
 const VERSIONED_START_CONTEXT = Symbol('versionedGatheringStartContext');
@@ -541,7 +545,7 @@ export class GatheringEngine {
     return this._versionedCheckDescriptor({ actor, run, ...resolved });
   }
 
-  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {} } = {}) {
+  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {}, sender = null } = {}) {
     const evaluate = this.versionedRunAuthority?.evaluatePreparedRunCheck;
     if (typeof evaluate !== 'function') {
       throw gatheringLifecycleError(
@@ -549,13 +553,13 @@ export class GatheringEngine {
         'AUTHORITY_UNAVAILABLE'
       );
     }
-    // The gathering card states no roll (R4), and a check result persists whole on the run, so
-    // the executed visibility the crafting and salvage cards gate on is dropped here.
+    // The card states no roll (R4) and the run persists the result whole: drop the display.
     return Promise.resolve(
       evaluate(privateEvaluation, actor, decision, {
         secret: privateEvaluation?.secret === true,
         failureMessage: 'Gathering check failed',
         label: 'Gathering',
+        user: sender,
       })
     ).then(withoutVisibility);
   }
@@ -624,6 +628,7 @@ export class GatheringEngine {
         })
       );
     }
+    // ratchet-exempt(world-scope): not-a-system
     if (resolvedTools.tools.length > 0) {
       const viewer = await this._viewerForRun({ actor, run: resolvedRun });
       const availability = await this._checkTools({
@@ -632,7 +637,7 @@ export class GatheringEngine {
         system: resolved.system,
         environment: resolved.environment,
         task: resolved.task,
-        tools: resolvedTools.tools,
+        tools: resolvedTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools: null,
       });
       if (availability.available !== true) {
@@ -780,8 +785,7 @@ export class GatheringEngine {
       : null;
     const dc = count ? null : target.target;
     const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
-    // A fixed-range routed check grades the raw roll, never a target, and a hidden task names no
-    // numbers, so both keep the prompt's target fields empty, as a count check's already are.
+    // Fixed ranges grade the raw roll and hidden tasks name no numbers: neither shows a target.
     const routedFixed = mode === 'routed' && config?.type === 'fixed';
     const showTarget = !secret && !count && !routedFixed && Number.isFinite(dc);
     // A count check shows its pool line, never a formula, and a hidden task names neither the
@@ -807,8 +811,7 @@ export class GatheringEngine {
           resolveCheckFormulaDisplay(shown, actor, null, undefined, evaluation)?.display ?? shown,
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
         offerSituationalBonus: config?.offerSituationalBonus !== false,
-        // A count check offers no advantage until it is mode-aware (issue 2007).
-        allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        ...advantageOfferFields(config, evaluation, rollFormula),
         target: showTarget ? dc : null,
         direction: showTarget ? evaluation.direction : null,
         comparison: showTarget ? (config?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null,
@@ -841,7 +844,7 @@ export class GatheringEngine {
         mode: checkMode,
         slot,
         rollFormula,
-        checkConfig: config ? cloneJson(config) : null,
+        checkConfig: config && { ...cloneJson(config), ...(count?.additionalDice && ACTIVITY) },
         decisionPolicy: {
           dc: target.source === 'fixed' ? dc : null,
           target: dc,
@@ -997,11 +1000,11 @@ export class GatheringEngine {
       // Virtual-present tools from an active canvas Tool station (`{ systemId, componentIds }`)
       // satisfy a tool without an owned item, and skip breakage, only in the matching system.
       presentTools = null,
-      // Scene-interactable ref when the attempt targets an interactable's own node pool
-      // (issue 302).
+      // Scene-interactable ref when the attempt targets an interactable's own node pool (issue 302).
       interactableRef = null,
       // Opt-in confirm-roll dialog and chat post; off for the API and timed maturation.
       interactive = false,
+      additionalDice = 0,
       lifecycleVersion,
     } = {},
     versionedContext = null
@@ -1170,6 +1173,7 @@ export class GatheringEngine {
         }),
       });
     }
+    // ratchet-exempt(world-scope): not-a-system
     if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor: selectedActor,
@@ -1177,7 +1181,7 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools,
+        tools: taskTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools,
       });
       if (toolResult.available !== true) {
@@ -1265,7 +1269,7 @@ export class GatheringEngine {
       richAttempt,
       presentTools,
       interactableRef,
-      interactive,
+      interactive: checkRequest({ interactive, additionalDice }, { craftingSystem: system, task }),
     });
   }
 
@@ -1854,6 +1858,7 @@ export class GatheringEngine {
           data: redact ? null : this._toolBlockedData({ task, resolvedTools: taskTools }),
         })
       );
+      // ratchet-exempt(world-scope): not-a-system
     } else if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor,
@@ -1861,7 +1866,7 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools,
+        tools: taskTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools,
       });
       if (toolResult.available !== true) {
@@ -1930,7 +1935,7 @@ export class GatheringEngine {
       tools.push(tool);
     }
 
-    tools.push(...normalizeList(task?.tools));
+    tools.push(...normalizeList(task?.tools)); // ratchet-exempt(world-scope): not-a-system
     return { tools, missingToolIds, disabledToolIds };
   }
 
@@ -3050,7 +3055,8 @@ export class GatheringEngine {
   }
 
   _refuseImmediateAttempt(kind, { viewer, actor, environment, task, outcome, failureCode, error }) {
-    if (kind === 'cancelled') return this._cancelledStart({ viewer, actor, environment, task });
+    const start = { viewer, actor, environment, task };
+    if (kind === 'cancelled') return carryAdditionalDice(this._cancelledStart(start), outcome);
     const unwritten = kind === 'run-creation-failed' || kind === 'persist-failed';
     const code =
       failureCode || stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR';
@@ -3061,7 +3067,7 @@ export class GatheringEngine {
       : this._blockedReason('TASK_MISCONFIGURED', {
           data: this._terminalMisconfigurationData({ environment, task, viewer, outcome }),
         });
-    return this._blockedStart({ viewer, actor, environment, task, reason });
+    return carryAdditionalDice(this._blockedStart({ ...start, reason }), outcome?.checkResult);
   }
 
   async _resolveTaskOutcome({
@@ -3769,13 +3775,10 @@ export class GatheringEngine {
       return misconfiguredOutcome({
         code: 'CHECK_TARGET_INVALID',
         message: rolled.message,
-        checkResult: { data: rolled.data },
+        checkResult: { data: rolled.data, additionalDiceNotice: rolled.additionalDiceNotice },
       });
     }
-    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation.
-    if (rolled.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
-    }
+    if (rolled.cancelled) return cancelledOutcome(rolled);
 
     const outcomeName = stringOrNull(rolled.outcome);
     const checkResult = {
@@ -3863,7 +3866,8 @@ export class GatheringEngine {
           }),
           evaluation,
         }),
-        offerSituationalBonus: routed?.offerSituationalBonus !== false,
+        ...authoredOfferOptions(routed),
+        ...checkRequestOptions(interactive),
       },
     });
   }
@@ -3919,7 +3923,7 @@ export class GatheringEngine {
     // Interactive d100: each row and event is its own percentile check, so there is no DC; the
     // prompt collects a flat situational modifier, and a dismissal is a zero-mutation cancel.
     let extraModifier = 0;
-    if (interactive) {
+    if (checkRequest(interactive).interactive) {
       const choice = await promptCheckRoll({
         label: `${rollLabel} — Gathering`,
         name: identityHidden ? rollLabel : task?.name,
@@ -3927,9 +3931,7 @@ export class GatheringEngine {
         activity: 'Gathering',
         img: identityHidden ? null : task?.img,
       });
-      if (!choice || choice.confirmed === false) {
-        return { status: 'cancelled', resultGroups: [], checkResult: null };
-      }
+      if (!choice || choice.confirmed === false) return cancelledOutcome();
       // The bonus is free text, so a dice expression is rolled to a scalar rather than becoming
       // NaN and then 0; each throw takes a flat modifier.
       extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
@@ -3944,7 +3946,7 @@ export class GatheringEngine {
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
       // Dice So Nice and the bonus apply only to an interactive attempt.
-      animate: interactive === true,
+      animate: checkRequest(interactive).interactive,
       extraModifier,
       rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
       speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
@@ -4004,26 +4006,19 @@ export class GatheringEngine {
         task,
         interactive,
       }));
-    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation, before
-    // normalization, which does not model a cancel.
-    if (checkResult?.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
-    }
+    // Before normalization, which does not model a cancel.
+    if (checkResult?.cancelled) return cancelledOutcome(checkResult);
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
       return misconfiguredOutcome({
         code: normalizedCheck.reasonCode || 'CHECK_DIAGNOSTIC',
         message: normalizedCheck.diagnostic.message,
-        checkResult: normalizedCheck,
+        checkResult: { ...normalizedCheck, additionalDiceNotice: checkResult.additionalDiceNotice },
       });
     }
 
     if (normalizedCheck.status === 'failure' || normalizedCheck.success === false) {
-      return {
-        status: 'failed',
-        resultGroups: [],
-        checkResult: normalizedCheck,
-      };
+      return { status: 'failed', resultGroups: [], checkResult: normalizedCheck };
     }
 
     const raw =
@@ -4088,15 +4083,16 @@ export class GatheringEngine {
             activity: 'Gathering',
             img: task?.img,
           }),
-          offerSituationalBonus: progressive?.offerSituationalBonus !== false,
+          ...authoredOfferOptions(progressive),
+          ...checkRequestOptions(interactive),
         },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.
-      if (rolled.cancelled) {
-        return { success: false, status: null, value: null, cancelled: true };
-      }
+      const cancelled = { success: false, status: null, value: null, cancelled: true };
+      if (rolled.cancelled) return carryAdditionalDice(cancelled, rolled);
       // A pool the settled modifiers push past 999 dice, or Foundry's explosion limit.
-      if (rolled.misconfigured) return progressiveCheckTargetInvalid(rolled);
+      if (rolled.misconfigured)
+        return carryAdditionalDice(progressiveCheckTargetInvalid(rolled), rolled);
       // Value-driven: `status` stays null so `resolveProgressiveAward` decides from `value`; a
       // roll error surfaces `success: false`, a terminal failure.
       return {
@@ -4194,7 +4190,7 @@ export class GatheringEngine {
         ],
       });
     }
-    const tools = resolvedTools.tools;
+    const tools = resolvedTools.tools; // ratchet-exempt(world-scope): not-a-system
     if (tools.length === 0 || typeof this.toolBreakage?.plan !== 'function') {
       return [];
     }
@@ -4231,7 +4227,7 @@ export class GatheringEngine {
     presentTools = null,
   }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
-    const tools = resolvedTools.tools;
+    const tools = resolvedTools.tools; // ratchet-exempt(world-scope): not-a-system
     if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
       return [];
     }
@@ -4986,10 +4982,10 @@ function normalizeToolResult(result) {
  * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a failed
  *   outcome (issue 1098); only the routed failure branch opts in.
  */
-/** A prepared check result without its unpersisted executed visibility. */
+/** A prepared check result without its unpersisted executed visibility and count display. */
 function withoutVisibility(evaluated) {
   if (!evaluated || typeof evaluated !== 'object') return evaluated;
-  const { visibility: _visibility, ...result } = evaluated;
+  const { visibility: _visibility, countDisplay: _countDisplay, ...result } = evaluated;
   return result;
 }
 
@@ -5116,6 +5112,11 @@ function normalizeCheckStatus(status) {
 
 function hasOutcomeDiagnostics(raw) {
   return Boolean(raw.diagnostic) || normalizeList(raw.diagnostics).length > 0;
+}
+
+/** A dismissed or refused roll's outcome: the attempt aborts with zero mutation. */
+function cancelledOutcome(rolled = null) {
+  return carryAdditionalDice({ status: 'cancelled', resultGroups: [], checkResult: null }, rolled);
 }
 
 /** A progressive check refusal, before or during the roll: a diagnostic, never a failed attempt. */
@@ -5248,15 +5249,6 @@ function awardsResultsFor(outcome, system) {
   if (outcome?.failureAward !== true) return false;
   if (!activityPermitsFailureResults(system, 'gathering')) return false;
   return normalizeList(outcome?.resultGroups).length > 0;
-}
-
-function mergeCharacterModifierSnapshots(base, environmental) {
-  const baseSnapshot = plainObjectOrNull(base) ?? {};
-  const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
-  return {
-    rows: normalizeList(baseSnapshot.rows),
-    events: normalizeList(environmentalSnapshot.events),
-  };
 }
 
 function normalizeVisibilityResult(result) {

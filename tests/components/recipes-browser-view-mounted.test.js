@@ -28,7 +28,7 @@ import {
 import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -38,6 +38,7 @@ const RECIPE_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
@@ -46,6 +47,13 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // ... which names a reward row by its glyph and its unit's display name, and draws a choice
+  // group as one row of its alternatives (issue 1773).
+  'src/ui/presenters/resultKindGlyphs.js',
+  'src/utils/choiceGroupShape.js',
+  'src/systems/currencyProfile.js',
+  'src/config/currencyPresets.js',
+  'src/utils/objectPath.js',
   // ... which names its check sort key from the system's evaluation (issue 2005) ...
   ...CHECK_TARGET_RAW_MODULES,
   // ... which since issue 1688 runs on the shared adapter-driven pipeline.
@@ -74,8 +82,8 @@ const RECIPE_PRIMITIVES = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/StatusToggle.svelte'
 ];
 
@@ -116,6 +124,7 @@ const inspector = createMountedComponentHarness({
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/apps/manager/recipes/RecipeProduceRow.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
@@ -207,7 +216,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
       assert.equal(header.getAttribute('aria-expanded'), 'true', 'groups default to expanded');
     }
     assert.equal(root.querySelector('[data-recipe-filter-chip]'), null, 'no filter starts active');
-    assert.equal(root.querySelector('.manager-pagination'), null, 'the fixture fits one page');
+    assert.equal(root.querySelector('.fabricate-pagination'), null, 'the fixture fits one page');
   });
 
   it('renders the rows as a list of cards, not a table', async () => {
@@ -239,6 +248,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(renderedRows(), 12, 'the default page holds all twelve');
     assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
+    assert.ok(Boolean(root.querySelector('.fabricate-pagination')), 'twelve rows render the pager');
     chooseSelectOption(root, '[data-pagination-size]', '10');
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
@@ -495,21 +505,21 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       const root = await browser.mount({ recipes: [recipe], resolutionMode: mode });
       const io = root.querySelector('[data-recipe-io]');
       assert.match(io.textContent, /2 in/, `${mode} still reports the ingredient count`);
-      assert.match(io.textContent, /3 groups/, `${mode} reports result GROUPS`);
+      assert.match(io.textContent, /3 sets/, `${mode} reports result SETS`);
       assert.equal(io.textContent.includes('out'), false, `${mode} must not invent an outputs count`);
       assert.ok(io.querySelector('.manager-recipe-io-routed'), `${mode} shows the routing glyph`);
       browser.remount();
     }
   });
 
-  it('says "1 group", never "1 groups"', async () => {
+  it('says "1 set", never "1 sets"', async () => {
     const root = await browser.mount({
       recipes: [makeRecipe({ resultGroupCount: 1 })],
       resolutionMode: 'routedByCheck'
     });
     const io = root.querySelector('[data-recipe-io]').textContent;
-    assert.match(io, /1 group\b/);
-    assert.equal(/1 groups/.test(io), false);
+    assert.match(io, /1 set\b/);
+    assert.equal(/1 sets/.test(io), false);
   });
 
   it('shows the projected check DC in the mono face', async () => {
@@ -529,6 +539,32 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       false,
       'a macro-resolved DC has no number to set'
     );
+  });
+
+  it('names a counting pill by its successes needed in the mono face, and sorts by the count (issue 2006)', async () => {
+    const root = await browser.mount({
+      recipes: [
+        makeRecipe({ id: 'r-three', name: 'Three', checkSummary: { kind: 'successes', dc: 3 } }),
+        makeRecipe({ id: 'r-one', name: 'One', checkSummary: { kind: 'successes', dc: 1 } }),
+      ]
+    });
+    const pill = (id) => root.querySelector(`[data-recipe-id="${id}"] [data-recipe-check]`);
+    assert.equal(pill('r-three').dataset.recipeCheck, 'successes');
+    assert.equal(pill('r-three').textContent.trim(), '3 successes');
+    assert.equal(pill('r-one').textContent.trim(), '1 success');
+    assert.ok(pill('r-three').classList.contains('is-mono'), 'a count is a numeric like a DC');
+    assert.ok(selectOptionLabels(root, '[data-recipe-sort]').includes('Successes needed'));
+    chooseSelectOption(root, '[data-recipe-sort]', 'dc');
+    flushSync();
+    const order = [...root.querySelectorAll('[data-recipe-id]')].map((row) => row.dataset.recipeId);
+    assert.deepEqual(order.filter((id) => id.startsWith('r-')), ['r-one', 'r-three']);
+    browser.remount();
+
+    const macro = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamicSuccesses', dc: null } })]
+    });
+    assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic successes');
+    browser.remount();
   });
 
   it('names a roll-under Target in the mono face, and a character value by its source (issue 2005)', async () => {
@@ -672,7 +708,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     for (const id of ['r1', 'r2']) {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
       assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
-      assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
+      assert.ok(row.querySelector('.fabricate-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643).
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
     }
@@ -695,7 +731,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     for (const id of ['r1', 'r2']) {
       const editButton = root.querySelector(`[data-recipe-id="${id}"] [data-recipe-edit]`);
       assert.ok(editButton, 'the row carries its own Edit pencil');
-      assert.ok(editButton.classList.contains('manager-icon-button'), 'styled like the Books & Scrolls row edit');
+      assert.ok(editButton.classList.contains('fabricate-icon-button'), 'styled like the Books & Scrolls row edit');
       assert.ok(editButton.querySelector('i.fa-pen'), 'the Edit affordance is a pen, matching Books & Scrolls');
     }
 
@@ -925,7 +961,7 @@ describe('RecipesBrowserView lifted browser state', () => {
 
     assert.equal(root.querySelector('[data-recipe-flash]'), null, 'no flash before a refusal');
 
-    root.querySelector('[data-recipe-id="r1"] .manager-status-toggle').click();
+    root.querySelector('[data-recipe-id="r1"] .fabricate-toggle').click();
     flushSync();
 
     assert.equal(calls.length, 1);
@@ -1050,6 +1086,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       [{ kind: 'target', dc: 12 }, 'Target 12'],
       [{ kind: 'attribute', dc: null }, 'Character value'],
       [{ kind: 'dynamicTarget', dc: null }, 'Dynamic'],
+      [{ kind: 'successes', dc: 2 }, '2 successes'],
+      [{ kind: 'dynamicSuccesses', dc: null }, 'Dynamic'],
     ]) {
       await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
       assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');
@@ -1114,10 +1152,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.equal(
-      root.querySelectorAll('.manager-inspector-card').length,
+      root.querySelectorAll('.fabricate-card').length,
       0,
       'a panel inside a window does not also need five boxes'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const box = root.ownerDocument.createElement('div');
+    box.innerHTML = '<section class="fabricate-card"></section>';
+    assert.equal(box.querySelectorAll('.fabricate-card').length, 1, 'the selector can count a card');
     assert.equal(
       root.textContent.includes('Recipe details'),
       false,
@@ -1264,6 +1308,43 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(root.querySelector('[data-recipe-produces-empty]'), null);
   });
 
+  // Issue 1773: a reward row names itself from the rosters the inspector is handed, with its
+  // kind's glyph, never a raw recipe or unit id under a cube.
+  it('names a currency and a knowledge reward by their own rosters and glyphs', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeAuthoredRecipe({
+        id: 'r1',
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'On success',
+            results: [
+              { id: 'coin', kind: 'currency', unit: 'gp', quantity: 1, quantityFormula: '2d6', label: 'Guild bounty' },
+              { id: 'purse', kind: 'currency', unit: 'gp', quantity: 4 },
+              { id: 'lore', kind: 'knowledge', recipeId: 'r-sword', quantity: 1 }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS,
+      recipeOptions: [{ id: 'r-sword', name: 'Forge Longsword' }],
+      currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }]
+    });
+
+    const rows = [...root.querySelectorAll('[data-recipe-produces]')].map((row) => [
+      row.dataset.recipeProducesKind,
+      row.querySelector(':scope .manager-recipe-flow-icon i')?.className ?? '',
+      row.querySelector('.manager-recipe-flow-name').textContent.trim(),
+      row.querySelector('.manager-recipe-flow-qty').textContent.trim()
+    ]);
+    assert.deepEqual(rows, [
+      ['currency', 'fa-solid fa-coins', 'Guild bounty', '2d6 gp'],
+      ['currency', 'fa-solid fa-coins', 'FABRICATE.App.Crafting.Io.CurrencyReward', '4 gp'],
+      ['knowledge', 'fa-solid fa-book-open', 'Forge Longsword', 'FABRICATE.App.Crafting.Io.RecipeKnowledge']
+    ]);
+  });
+
   it('says outright that a recipe with no results makes nothing on a successful craft', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', resultGroups: [], resultItemCount: 0 }),
@@ -1336,7 +1417,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.match(root.textContent, /Set up recipes/);
-    root.querySelector('.manager-button.is-primary').click();
+    root.querySelector('.fabricate-button.is-primary').click();
     flushSync();
     assert.equal(addComponents, 1);
   });
@@ -1762,6 +1843,74 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
     assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
+  });
+
+  // Issue 1773: a choice group is one Produces entry holding its alternatives, captioned with how
+  // many it awards and who chooses.
+  it('draws a result choice group as a box of its alternatives, captioned by its cell', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-choice',
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              {
+                id: 'c1',
+                chooser: 'rolled',
+                awardStrategy: 'upTo',
+                awardCount: 2,
+                alternatives: [
+                  { id: 'a', componentId: 'cmp-herb', quantity: 2 },
+                  { id: 'b', componentId: 'cmp-potion', quantity: 1 }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    const box = root.querySelector('[data-recipe-produces-choice="success"]');
+    assert.ok(box, 'the group is one box');
+    assert.equal(box.querySelector('.manager-recipe-flow-anyof-label').textContent.trim(), 'Up to 2 of · Rolled');
+    assert.deepEqual(
+      [...box.querySelectorAll('[data-recipe-produces]')].map((row) => row.querySelector('.manager-recipe-flow-name').textContent),
+      ['Mountain Herb', 'Healing Potion']
+    );
+  });
+
+  it('draws a failed check’s choice group and each of its alternatives in the failure tone', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-ruin',
+        resultGroups: [
+          { id: 'ok', results: [{ id: 'r', componentId: 'cmp-potion', quantity: 1 }] },
+          {
+            id: 'ruin',
+            role: 'failure',
+            results: [
+              {
+                id: 'c1',
+                alternatives: [
+                  { id: 'a', componentId: 'cmp-herb', quantity: 1 },
+                  { id: 'b', componentId: 'cmp-potion', quantity: 1 }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    const box = root.querySelector('[data-recipe-produces-choice="failure"]');
+    assert.ok(box, 'the failed check’s group is one failure box');
+    assert.deepEqual(
+      [...box.querySelectorAll('[data-recipe-produces]')].map((row) => row.getAttribute('data-recipe-produces')),
+      ['failure', 'failure']
+    );
   });
 
   // Issue 884 — the hero medallion is the recipe's own icon.

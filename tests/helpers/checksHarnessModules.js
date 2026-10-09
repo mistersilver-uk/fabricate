@@ -1,10 +1,13 @@
 /** The ONE dependency manifest every mounted CHECKS suite compiles against (issue 1095, BM9). */
 
 /** Raw `.js` modules the checks editor tree imports directly or transitively (issue 1095). */
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
+  // The ramp `BandedBar` reads its fills from (issue 1782).
+  'src/ui/svelte/util/dropRateTier.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
@@ -22,6 +25,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The count rules and the free-text Convert the evaluator delegates to (issue 2006).
+  'src/ui/svelte/apps/manager/checks/countReadiness.js',
+  'src/ui/svelte/apps/manager/checks/countFormulaConversion.js',
   // The Validation tab's row-merging rules (issue 2083): a fault reads once, as its issue.
   'src/ui/svelte/apps/manager/checks/checksValidationRows.js',
   // `checksReadiness.js` grades a kept salvage/task override through the same rule the
@@ -80,11 +86,24 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
+  // The shared die tiles' model and escaped renderer the readout draws through (issue 2006).
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
+  'src/utils/fillPlaceholders.js',
+  'src/ui/svelte/apps/manager/checks/countInsetModel.js',
+  'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  // The Difficulty card's count callouts, read from the readiness evaluator (issue 2006).
+  'src/ui/svelte/apps/manager/checks/countDifficultyModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
+  'src/ui/svelte/apps/manager/checks/readonlyBandPicture.js',
+  // The Checks route's per-activity words.
+  'src/ui/svelte/apps/manager/checks/checksActivityCopy.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
+  // The Formula card's advantage notes (issue 2007).
+  'src/ui/svelte/apps/manager/checks/checkAdvantageCopy.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
@@ -96,11 +115,31 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // `checkRoll.js` rolls and grades a count check through these (issue 2004).
   'src/systems/countCheck.js',
   'src/systems/countCheckRoll.js',
+  'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
+  // Additional dice's read, spend and reach (issue 2008), and the acknowledgment the spend reuses.
+  'src/systems/additionalDice.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+  'src/utils/MacroExecutor.js',
+  'src/systems/runHistoryEvidence.js',
+  'src/systems/runLifecycleState.js',
   'src/systems/normalize/checkEvaluation.js',
+  'src/systems/normalize/checkAdvantage.js',
+  // The additional-dice group's macro wells (issue 2008): the drop target and its macro checks.
+  'src/ui/svelte/actions/dragDrop.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/model/macroReference.js',
   'src/systems/checkRollDecision.js',
+  // `checkRollDecision.js` plans the keep transform the main roll takes (issue 2007).
+  'src/systems/checkKeepTransform.js',
+  // …from the check's one advantage offer, which the prepared authority also enforces.
+  'src/systems/checkAdvantage.js',
+  'src/systems/preparedDecisionPolicy.js',
   'src/systems/checkRouting.js',
   'src/systems/checkRollOutput.js',
+  // `checkRollOutput.js` offers a public roll to its result card through this leaf.
+  'src/systems/checkCardRolls.js',
   'src/systems/checkModifierRolls.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
@@ -152,19 +191,24 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // modifier row's eligibility control was a checkbox plus an inert pill, and it is now ONE
   // `aria-pressed` toggle button that the card renders itself.
   'src/ui/svelte/components/FillBar.svelte',
+  // The odds histogram's rows (issue 1782).
+  'src/ui/svelte/components/BandedBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   // The product's ONE ordered list (issue 1512), which the difficulty-tier card renders, and the
   // icon button it draws every one of its controls through.
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/IconButton.svelte',
+  // Each trigger is a rule row restating itself as a rule sentence (issue 1782).
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).
   'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The shared on/off switch (issue 1040).
   'src/ui/svelte/components/StatusToggle.svelte',
   // The shared card shell (issue 1427).
@@ -177,8 +221,6 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // for its trailing badge, so it is now in the row's STATIC closure.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker.
@@ -193,15 +235,24 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   // The Formula card's `In the roll prompt` group and the routed outcome row (issue 2005).
   'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+  // The pool's additional-dice group and the option well it shares with the roll-prompt group.
+  'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
   // The progressive editor's roll-under refusal (issue 2005).
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
-  // The rolled readout's eyebrow and a count roll's tiles, the #2006 seam (issue 2080).
+  // The rolled readout's eyebrow (issue 2080) and a count roll's shared die tiles (issue 2006).
   'src/ui/svelte/components/Kicker.svelte',
-  'src/ui/svelte/apps/manager/checks/CheckSimulatorFaces.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
@@ -216,16 +267,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
 ]);
 
 /** The three check EDITORS beside the tree above, for a suite mounting one directly (issue 2005). */
-export const CHECK_EDITOR_RAW_MODULES = Object.freeze([
-  ...CHECKS_TREE_RAW_MODULES,
-  'src/ui/svelte/actions/dragDrop.js',
-  'src/ui/svelte/util/dropUtils.js',
-  'src/ui/model/macroReference.js',
-]);
+export const CHECK_EDITOR_RAW_MODULES = Object.freeze([...CHECKS_TREE_RAW_MODULES]);
 
 export const CHECK_EDITOR_COMPILED_MODULES = Object.freeze([
   ...CHECKS_TREE_COMPILED_MODULES,
-  'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
   'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
   'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

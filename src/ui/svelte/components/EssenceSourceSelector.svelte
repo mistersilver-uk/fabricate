@@ -94,13 +94,13 @@
   searchClass="essence-source-picker-search"
   listClass="essence-source-picker-grid"
   optionClass="essence-source-picker-option"
-  dialogAriaLabel={localize('FABRICATE.Admin.Features.Essences.SourcePickerLabel')}
+  panelLabel={localize('FABRICATE.Admin.Features.Essences.SourcePickerLabel')}
   searchPlaceholder={localize('FABRICATE.Admin.Features.Essences.SearchSourcePlaceholder')}
-  searchAriaLabel={localize('FABRICATE.Admin.Features.Essences.SearchSourceLabel')}
+  searchLabel={localize('FABRICATE.Admin.Features.Essences.SearchSourceLabel')}
   emptyHint={localize('FABRICATE.Admin.Features.Essences.NoComponentsAvailable')}
   noMatchesHint={localize('FABRICATE.Admin.Features.Essences.NoMatchingComponents')}
   measureListMetrics={measurePopoverMetrics}
-  onChoose={(itemId) => onSelect?.(itemId)}
+  onSelect={(itemId) => onSelect?.(itemId)}
 >
   {#snippet trigger({ attributes, open })}
     <div

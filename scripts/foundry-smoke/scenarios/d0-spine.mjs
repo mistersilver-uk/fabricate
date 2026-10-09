@@ -453,11 +453,17 @@ export default {
         }
         // The rail's crafting-system card selects (issue 643): it names the current system AND
         // lists every other, so the GM can switch without a round trip through the system library.
-        const scopeSelectValue = await page
+        // It is the shared Select (issue 1777), so the selected system is its ticked option.
+        const scopeTrigger = page
           .locator('.fabricate-manager .manager-scope-card [data-manager-scope-select]')
+          .first();
+        await scopeTrigger.click();
+        const scopeSelectValue = await page
+          .locator('.fabricate-select-popover [role="option"][aria-selected="true"]')
           .first()
-          .inputValue()
+          .evaluate((option) => option.dataset.popoverOption)
           .catch(() => '');
+        await scopeTrigger.click();
         if (scopeSelectValue !== craftingSetup.systemId) {
           throw new Error(
             `Manager rail system select should name the selected system. Saw: "${scopeSelectValue}".`
@@ -475,7 +481,7 @@ export default {
         if (
           (await page
             .locator(
-              '.fabricate-manager .manager-section-header .manager-button:has-text("Import")'
+              '.fabricate-manager .manager-section-header .fabricate-button:has-text("Import")'
             )
             .count()) > 0
         ) {
@@ -484,7 +490,7 @@ export default {
         if (
           (await page
             .locator(
-              '.fabricate-manager .manager-section-header .manager-button:has-text("Create")'
+              '.fabricate-manager .manager-section-header .fabricate-button:has-text("Create")'
             )
             .count()) > 0
         ) {

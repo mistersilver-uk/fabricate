@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   CHECK_NEVER_FAILS,
   CHECK_TO_ISSUES,
+  allChecksDetail,
   checksValidationRowStates,
 } from '../src/ui/svelte/apps/manager/checks/checksValidationRows.js';
 import { CHECK_READINESS_ISSUE_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
@@ -153,5 +154,41 @@ describe('checksValidationRowStates', () => {
       assert.equal(row.checkId, checkId);
       assert.equal(row.issue.severity, severity);
     }
+  });
+});
+
+describe('allChecksDetail (issue 2084)', () => {
+  const text = (_key, fallback) => fallback;
+  const pool = { die: 10, base: '6', threshold: '8', required: 2 };
+  const detail = (check) => allChecksDetail({ authoredMode: 'Simple', check }, text);
+  const counting = (direction, overrides = {}) => ({
+    product: 'count',
+    direction,
+    pool: { ...pool, ...overrides },
+  });
+
+  it('names an exceed comparison with >, and the meet default with ≥', () => {
+    const evaluation = counting('over');
+    assert.equal(detail({ thresholdMode: 'exceed', evaluation }), 'Simple · 6d10 each > 8');
+    assert.equal(detail({ evaluation }), 'Simple · 6d10 each ≥ 8');
+  });
+
+  it('names a roll-under pool with ≤', () => {
+    assert.equal(detail({ evaluation: counting('under', { threshold: '3' }) }), 'Simple · 6d10 each ≤ 3');
+  });
+
+  it('joins the explode and cancel clauses with the same separator', () => {
+    const evaluation = counting('over', {
+      explode: { enabled: true, faces: { kind: 'best', value: 10 }, once: false },
+      cancel: { enabled: true, faces: { kind: 'worst', value: 1 } },
+    });
+    assert.equal(
+      detail({ rollFormula: '1d20+@abilities.int.mod', evaluation }),
+      'Simple · 6d10 each ≥ 8 · explodes on 10 · 1 cancels a success'
+    );
+  });
+
+  it('keeps a summing check on its formula', () => {
+    assert.equal(detail({ rollFormula: '1d20+2' }), 'Simple · 1d20+2');
   });
 });

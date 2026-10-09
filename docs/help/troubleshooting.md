@@ -60,7 +60,7 @@ The confirmation prompt runs a dry run first and tells you exactly what will hap
 
 **Likely causes for a recipe being deleted:**
 
-- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that had more than one of either.
+- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result set) from a recipe that had more than one of either.
 - You moved a multi-step recipe into Alchemy mode, which does not support multi-step recipes.
 
 **Step-by-step checks:**
@@ -319,11 +319,11 @@ Additional causes:
 - **Routed salvage mode** requires:
   - a salvage check roll formula is configured
   - at least one outcome is declared (such as critical, pass, and fail)
-  - the component maps every declared outcome to an existing result group
+  - the component maps every declared outcome to an existing result set
 - **Progressive salvage mode** requires:
   - a progressive salvage check roll formula is configured
   - every result component has a valid positive difficulty value
-- **Simple salvage mode** requires exactly one result group per component.
+- **Simple salvage mode** requires exactly one result set per component.
   Having none, or two or more, is rejected.
 - Salvage is disabled on the component.
 
@@ -334,8 +334,8 @@ Additional causes:
 2. For **Routed** mode:
    - Is a routed salvage check roll formula configured?
    - Are the outcomes defined (such as critical, pass, and fail)?
-   - Does the component map every declared outcome to an existing result group?
-3. For **Simple** mode: does the component have exactly one salvage result group?
+   - Does the component map every declared outcome to an existing result set?
+3. For **Simple** mode: does the component have exactly one salvage result set?
 4. For **Progressive** mode: does each result component have a valid positive difficulty value?
 5. Is salvage enabled on the component you are trying to salvage?
 6. Is the salvage feature enabled on the crafting system?
@@ -458,6 +458,7 @@ It does two jobs, because both are projections of the same thing — the source 
 - It scans your world items, your unlocked compendiums, and every actor's inventory.
 - It tags each component and each recipe item (book or scroll) source with a durable identity link, so future copies always resolve to the right one.
 - It clears misleading duplicate-source metadata that a copied item inherited from the item it was copied from.
+- A copy renamed from a compendium entry that a component still claims is tagged as that component if it is not registered itself, because Repair Item Data does not tell a renamed copy from the entry; register it as its own component first if that is not what you want.
 - It re-points an owned copy that a duplicate mislabelled, but only when the copy's name clearly identifies a single book or scroll.
 - Locked (system and module) compendiums are skipped by **this** scan, because Fabricate cannot write to them.
 - It never teaches or removes a recipe.
@@ -466,6 +467,8 @@ It does two jobs, because both are projections of the same thing — the source 
 
 - It rewrites the stored description of every component and recipe item from that entry's own source item.
 - Content links in the source description are resolved, so `@UUID[...]` renders as the linked item's name instead of raw link text.
+- Inline `@Embed[...]` references to other Items or text Journal pages are expanded to plain-text descriptions, without rendering interactive embedded HTML.
+- To avoid recursion and oversized descriptions, embedded content is depth- and size-limited; an unavailable embed keeps its original directive, while cyclic or oversized resolved embeds fall back to a document name.
 - Unlike the identity scan above, this **does** reach locked system and module compendiums, because it only reads those items rather than writing to them.
 - Any description you edited by hand for a component or recipe item will be replaced by the source item's text.
 - Tools are not affected; they carry no description.
@@ -510,6 +513,72 @@ It does not reach unlinked token copies that were never saved as world actors, o
 
 ---
 
+## Every Item I Import Updates the Same Component
+
+**Symptom:** You import several different items, such as spell scrolls of the same level, and each one updates the component the first one created.
+You end up with one component carrying the last item's name and image, and matching every one of those items.
+
+**Cause:** The items were built from the same compendium entry and then changed into something else.
+Older versions treated them all as copies of that entry.
+Fabricate now tells a copy of an entry from something built from it by name: a copy that keeps the entry's name is the same thing, and a differently named one is its own component, recipe item, or tool.
+
+**Fix for a component that is already merged:**
+
+1. Open the Crafting Admin panel and find the merged component.
+2. Remove the merged component from every crafting system that holds it.
+   Check what uses it first, because removing it rewrites the recipes that name it.
+   The **Systems using this component** card on its entry in the **Component catalogue** and the bulk remove both do this.
+3. Open the **Component catalogue** in the World section of the Crafting System Manager and delete the merged component's entry there too.
+   Removing the component from a system does not delete its entry, and the entry can only be deleted once no crafting system holds the component.
+   If you leave it, one of the items you import adopts it and the others are left without a catalogue entry.
+4. Import the items again, by dropping them or by using the bulk import.
+   Each one now registers its own component and its own catalogue entry.
+5. Re-add the component to any recipes that used the merged one.
+
+{: .note }
+> **Repair Item Data does not un-merge a component.**
+> A merged component keeps matching every item it absorbed until you delete it and import the items again.
+
+**Things to know:**
+
+- A renamed copy of a compendium entry is registered as its own component and does not claim the entry.
+  An item a player drags straight from the compendium does not match it, so hand out copies from the item you registered.
+- Components and recipe items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored; tools do not.
+- Editing an item's name, image, or description refreshes only the component linked to that item.
+
+**See also:** [Adding Components]({% link components/index.md %}#adding-components) covers importing items.
+[Repairing Item Data](#repairing-item-data) covers the maintenance action for copies players already hold.
+
+---
+
+## An Imported Component Has No Catalogue Entry
+
+**Symptom:** A component you imported into a crafting system does not appear in the world Component catalogue, or its rules editor says its name, image, and description are the system's own.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+You may also have seen the warning "The items were imported, but the world Component catalogue could not be updated. Import them again to add them to it."
+
+**Cause:** Importing an item now also registers a world component that the system holds.
+A component imported before that was added has none.
+The same is true when the catalogue could not be written during an import, which is what the warning reports.
+
+**Fix:** Import the items again, by dropping them, importing the folder or pack, or using the Compendium Directory action.
+Each component without a catalogue entry gets one, and keeps all of its own values.
+
+**Things to know:**
+
+- If the world component for that item has a different id from this system's component, this system's component is left without one.
+  This is typically because another system imported the item first.
+  Linking it would mean renumbering a component that recipes already reference.
+  To recover, check what uses the other system's component for that item, because removing it rewrites the recipes that name it.
+  Then remove that component from every system that holds it, delete its entry in the catalogue, which is only possible once no system holds it, and import the item again.
+- In a world where several systems hold the same item, import it again first in the systems that already hold it.
+  Importing it into a new system first gives that system a world component that the older components cannot adopt.
+- An item that belongs to an actor is imported but never becomes a world component.
+
+**See also:** [Imports also register world components]({% link components/index.md %}#imports-also-register-world-components) and [Importing again and its limit]({% link components/index.md %}#importing-again-and-its-limit).
+
+---
+
 ## An Item Stopped Contributing an Essence After Updating
 
 **Symptom:** After updating Fabricate, one particular item no longer counts towards an essence requirement, while other copies of the same component still do.
@@ -549,7 +618,7 @@ Where Fabricate could not record a merge against a character's in-progress runs,
 Finishing or cancelling those runs clears it.
 
 **See also:** [Essences]({% link essences/index.md %}#one-shared-essence-per-behaviour) covers what the shared record holds and what each crafting system keeps for itself.
-[Protecting Your Worlds]({% link technical/protecting-your-worlds.md %}#reversible-data-migrations) covers how Fabricate runs and aborts an upgrade pass.
+[Protecting Your Worlds]({% link technical/protecting-your-worlds.md %}#fail-safe-data-migrations) covers how Fabricate runs and aborts an upgrade pass.
 
 ---
 

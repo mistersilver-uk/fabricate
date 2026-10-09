@@ -759,9 +759,9 @@
         ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Entry.Tabs"
         ariaLabel="Tool entry sections"
         idStem="world-tool-entry"
-        hookAttribute="data-world-tool-entry-tab"
+        tabDataAttr="data-world-tool-entry-tab"
         badges={tabBadges}
-        badgeAttribute="data-world-tool-entry-tab-badge"
+        badgeDataAttr="data-world-tool-entry-tab-badge"
         danger
       />
 
@@ -831,7 +831,7 @@
                   )}
               onDrop={onSourceDrop}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
-              unlinkAttr="data-world-tool-entry-source-unlink"
+              unlinkDataAttr="data-world-tool-entry-source-unlink"
               onUnlink={sourceLinked ? onUnlinkSource : null}
             />
             <!-- READ-ONLY, and it is the linked Item's OWN description rather than this record's.
@@ -978,7 +978,7 @@
               groupName="world-tool-breakage-mode"
               columns={2}
               legend={sectionLabel('breakage')}
-              dataGroup="world-tool-breakage-mode"
+              data-radio-card-group="world-tool-breakage-mode"
               optionDataAttr="data-world-tool-entry-breakage-mode"
               onChange={changeBreakageChoice}
             />
@@ -1063,7 +1063,7 @@
                       'Breakage chance'
                     )}
                     resolveColor={toolBreakageChanceColor}
-                    trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                    trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)"
                     controlClass="manager-tool-breakage-chance-control"
                     numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                     rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
@@ -1137,7 +1137,7 @@
               groupName="world-tool-onbreak-mode"
               columns={3}
               legend={sectionLabel('onBreak')}
-              dataGroup="world-tool-onbreak-mode"
+              data-radio-card-group="world-tool-onbreak-mode"
               optionDataAttr="data-world-tool-entry-onbreak-mode"
               onChange={(mode) => patchSection('onBreak', { mode })}
             />
@@ -1272,7 +1272,7 @@
     gap: var(--fab-space-3);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
     min-width: 0;
   }
@@ -1363,11 +1363,11 @@
   /* THE UNLINK IS A DESTRUCTIVE CONTROL AND IS DRAWN AS ONE (`proto:2093`): `IconButton.is-danger`
      carries the danger edge and ink but leaves the resting fill neutral. */
   .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone-actions .manager-icon-button) {
+    :global(.manager-item-drop-zone-actions .fabricate-icon-button) {
     flex: 0 0 30px;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-danger-soft);
     font-size: 0.68rem;
   }
@@ -1377,7 +1377,7 @@
   .manager-world-tool-entry-source-description {
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     color: var(--fab-text-muted);
     font-size: 0.68rem;
@@ -1421,7 +1421,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     min-width: 0;
   }
@@ -1471,7 +1471,7 @@
   }
 
   /* AN INVALID FORMULA IS EDGE-MARKED as well as explained; two selectors deep so it beats the
-     shipped `.manager-field input` border. */
+     shipped `.fabricate-field input` border. */
   :global(.manager-world-tool-entry-formula) input[aria-invalid='true'] {
     border-color: var(--fab-danger-border);
   }

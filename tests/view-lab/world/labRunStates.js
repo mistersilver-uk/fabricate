@@ -5,6 +5,7 @@ import {
   resolveGatheringCompositionMode,
 } from '../../../src/systems/gatheringComposition.js';
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
+import { historyEvidenceFields } from '../../../src/systems/runHistoryEvidence.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { LAB_HISTORY_DATA_STATES, historyDataRunSets } from './labHistoryEvidence.js';
@@ -44,6 +45,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'ready-single': 'lab-v1-ready-single',
   'legacy-armed': 'lab-v1-legacy-armed',
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
+  'waiting-auto-completes': 'lab-v1-waiting-auto-completes',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
   'stage-paid': 'lab-v1-stage-paid',
@@ -59,13 +61,19 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'past-stage': 'lab-v1-stage-browser',
   // Issue 2005: the same browser, its past stage rolled roll-under against an executed target.
   'past-stage-under': 'lab-v1-stage-browser',
+  // Issue 2006: its past stage counted successes, recording the net and the margin it cleared.
+  'past-stage-count': 'lab-v1-stage-browser',
   'future-stage': 'lab-v1-stage-browser',
+  // Issue 2103: the same browser under a roll-under crafting check, its future step naming a Target.
+  'future-stage-under': 'lab-v1-stage-browser',
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
   'gathering-check': 'lab-v1-gathering-check',
   'gathering-journal-check-prompt': 'lab-v1-gathering-journal-check-prompt',
   'finished-success': 'lab-v1-finished-success',
   'finished-failure': 'lab-v1-finished-failure',
+  // Issue 2133: a routed count that cleared Masterwork, its line against the check's own count.
+  'finished-routed-count': 'lab-v1-finished-routed-count',
   'finished-cancelled': 'lab-v1-finished-cancelled',
   'active-page-two': 'lab-v1-active-5',
   'finished-page-two': 'lab-v1-finished-5',
@@ -88,6 +96,10 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
   'claim-retained': 'lab-v1-claim-retained',
+  // Issue 1773: a finished craft owing the player a pick, and the same craft once it was settled.
+  'award-choice': 'lab-v1-award-choice',
+  'award-choice-history': 'lab-v1-award-choice-history',
+  'award-choice-forfeit': 'lab-v1-award-choice-forfeit',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
   ...Object.fromEntries(
@@ -107,6 +119,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'history-d100-all-miss',
       'history-gathering-check-failure',
       'history-just-resolved',
+      'history-just-resolved-rewards',
       'history-redacted',
       'history-missing-material',
       'history-gm-deleted-recipe',
@@ -115,7 +128,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'essence-overshoot',
       'past-routed-stage',
       'future-routed-stage',
-      'kind-menu-open',
+      'kind-toggles',
       'history-settling',
       'history-compact-grid',
       'history-compact-tools',
@@ -593,7 +606,9 @@ function journalCaseFactories(context) {
     'cancel-confirmation': readyAlias('lab-v1-cancel-confirmation'),
     'past-stage': () => active(stageBrowserRun(context, multi())),
     'past-stage-under': () => active(stageBrowserRun(context, multi(), UNDER_STAGE_CHECK)),
+    'past-stage-count': () => active(stageBrowserRun(context, multi(), COUNT_STAGE_CHECK)),
     'future-stage': () => active(stageBrowserRun(context, multi())),
+    'future-stage-under': () => active(stageBrowserRun(context, multi())),
     'gathering-straight': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
     'gathering-d100': () =>
@@ -610,6 +625,7 @@ function journalCaseFactories(context) {
       }),
     'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
     'finished-failure': () => finished(terminalCraftingCase(context, checkRoute(), 'failed')),
+    'finished-routed-count': () => finished(routedCountCase(context, checkRoute())),
     'finished-cancelled': () => finished(cancelledCraftingCase(context, multi())),
     'active-page-two': () => pagingContainers(context, single()),
     'finished-page-two': () => pagingContainers(context, single()),
@@ -651,6 +667,9 @@ function journalCaseFactories(context) {
       ),
     wide: () => wideContainers(context, multi()),
     narrow: () => wideContainers(context, multi()),
+    'award-choice': () => finished(awardChoiceCase(context, single(), {})),
+    'award-choice-history': () => finished(awardChoiceCase(context, single(), { settled: true })),
+    'award-choice-forfeit': () => finished(awardChoiceCase(context, single(), { forfeit: true })),
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
     // Persisted history-data witnesses live in their own module; each state seeds one selected
@@ -739,6 +758,7 @@ function prototypeContainers(context, state) {
   }
   if (state === 'filter-paused')
     selected.pauseState = { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR };
+  if (state === 'waiting-auto-completes') selected.completionMode = 'worldTime';
   if (state === 'waiting-auto-eligible') {
     selected.completionMode = 'worldTime';
     const current = selected.steps[selected.currentStepIndex];
@@ -1136,7 +1156,7 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.gatheringRuns, run, false);
     return true;
   }
-  if (state === 'history-just-resolved') {
+  if (state === 'history-just-resolved' || state === 'history-just-resolved-rewards') {
     replacePrototypeFocus(containers.craftingRuns, prototypeCraft(context, 'cord', id), false);
     return true;
   }
@@ -1350,6 +1370,23 @@ const UNDER_STAGE_CHECK = Object.freeze({
   data: { resolvedFormula: '1d20', total: 11, dc: 12, direction: 'under', target: 14, margin: 3 },
 });
 
+/** An executed count check: a net of 3 against 2 needed, a margin of +1. */
+const COUNT_STAGE_CHECK = Object.freeze({
+  success: true,
+  value: 3,
+  data: {
+    product: 'count',
+    direction: 'over',
+    comparison: 'meet',
+    dc: null,
+    target: 8,
+    total: 3,
+    successes: 3,
+    cancelled: 0,
+    margin: 1,
+  },
+});
+
 function stageBrowserRun(context, recipe, pastCheck = null) {
   const authored = recipeSteps(recipe);
   const steps = authored.map((_entry, index) => {
@@ -1411,6 +1448,113 @@ function terminalCraftingCase(context, recipe, status, id = null) {
   });
 }
 
+/** Every alternative of the forfeit fixture is unclaimable: retired, unpriced, or known. */
+const FORFEIT_ALTERNATIVES = Object.freeze([
+  { id: 'retired', componentId: 'sm-retired-ingot', quantity: 2 },
+  { id: 'marks', kind: 'currency', unit: 'mark', quantity: 3, label: 'Guild marks' },
+  { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+]);
+
+/**
+ * A finished horseshoe that left the player a pick of up to two (issue 1773): an ingot, a guild
+ * bounty, a taught longsword and the horseshoe recipe Brenna already knows under `reward-craft`,
+ * which the face disables with its reason. `settled` picks the ingot and the bounty; `forfeit`
+ * offers only rewards none of which can be claimed.
+ */
+function awardChoiceCase(context, recipe, { settled = false, forfeit = false }) {
+  const id = forfeit
+    ? 'lab-v1-award-choice-forfeit'
+    : settled
+      ? 'lab-v1-award-choice-history'
+      : 'lab-v1-award-choice';
+  const run = terminalCraftingCase(context, recipe, 'succeeded', id);
+  const [step] = run.steps;
+  const choice = {
+    choiceId: 'sm-r-horseshoe-reward',
+    resultGroupId: 'rg',
+    awardStrategy: 'upTo',
+    count: 2,
+    alternatives: forfeit
+      ? [...FORFEIT_ALTERNATIVES]
+      : [
+          { id: 'ingot', componentId: 'sm-iron-ingot', quantity: 2 },
+          { id: 'bounty', kind: 'currency', unit: 'gp', quantity: 12, label: 'Guild bounty' },
+          { id: 'lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 },
+          { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+        ],
+  };
+  if (!settled) {
+    step.pendingAwardChoices = [choice];
+    return run;
+  }
+  const picks = ['ingot', 'bounty'];
+  step.pendingAwardChoices = [{ ...choice, picks, settledAt: NOW - HOUR / 2, outcome: 'awarded' }];
+  step.createdResults = [
+    ...step.createdResults,
+    {
+      componentId: 'sm-iron-ingot',
+      quantity: 2,
+      name: 'Iron Ingot',
+      resultRowId: 'rg:reward:ingot',
+    },
+  ];
+  Object.assign(
+    step,
+    historyEvidenceFields({
+      currencyCredits: [
+        {
+          resultId: choice.choiceId,
+          alternativeId: 'bounty',
+          unit: 'gp',
+          amount: 12,
+          label: 'Guild bounty',
+          unitName: 'gp',
+        },
+      ],
+    })
+  );
+  step.groupAwards = [
+    {
+      choiceId: choice.choiceId,
+      chooser: 'playerChooses',
+      awardStrategy: 'upTo',
+      count: 2,
+      selections: picks.map((alternativeId) => ({ alternativeId })),
+    },
+  ];
+  return run;
+}
+
+/**
+ * Runework's routed count (`runeworkCheckMode=routed-count`, two needed) netting 6, so it routed
+ * to Masterwork (+2) and recorded a margin of 2 against that tier's 4, never against the 2.
+ */
+function routedCountCase(context, recipe) {
+  const run = terminalCraftingCase(context, recipe, 'succeeded', 'lab-v1-finished-routed-count');
+  run.steps[0].resolutionSnapshot = {
+    kind: 'check',
+    mode: 'routedByCheck',
+    product: 'count',
+    direction: 'over',
+  };
+  run.steps[0].lastCheckResult = {
+    success: true,
+    outcome: 'Masterwork',
+    value: 6,
+    data: {
+      ...COUNT_STAGE_CHECK.data,
+      type: 'relative',
+      target: 7,
+      total: 6,
+      successes: 6,
+      margin: 2,
+      outcomeId: 'rw-masterwork',
+      success: true,
+    },
+  };
+  return run;
+}
+
 function cancelledCraftingCase(context, recipe) {
   const first = versionedRecipeStep(recipe, 0, 'succeeded', {
     completedAt: NOW - 2 * HOUR,
@@ -1470,16 +1614,31 @@ function automaticCompletedCase(context, recipe, id) {
   });
 }
 
+const authoredGroupResults = (recipe, stepIndex) =>
+  (recipeSteps(recipe)[stepIndex]?.resultGroups ?? []).flatMap((group) => group?.results ?? []);
+
 function authoredResults(recipe, stepIndex) {
-  const authored = recipeSteps(recipe)[stepIndex];
-  return (authored?.resultGroups ?? []).flatMap((group) =>
-    (group?.results ?? []).map((result) => ({
+  return authoredGroupResults(recipe, stepIndex)
+    .filter((result) => (result?.kind ?? 'component') === 'component')
+    .map((result) => ({
       componentId: result.componentId,
       quantity: result.quantity ?? 1,
       name: result.name,
       img: result.img,
-    }))
-  );
+    }));
+}
+
+/** The credits a stage's authored currency results pay, as the reward step records them (1773). */
+function authoredRewards(recipe, stepIndex) {
+  const credits = authoredGroupResults(recipe, stepIndex)
+    .filter((result) => result?.kind === 'currency')
+    .map((result) => ({
+      ...result,
+      resultId: result.id,
+      amount: result.quantity,
+      unitName: result.unit,
+    }));
+  return historyEvidenceFields(credits.length > 0 ? { currencyCredits: credits } : {});
 }
 
 function requireGatheringTask(tasks, mode) {
@@ -1823,6 +1982,7 @@ function completeFixtureRun({ container, run, recipes, state, now }) {
       if (prototypeKey)
         recordPrototypeStage({ actorUuid: run.actorUuid }, prototypeKey, current, stepIndex, true);
       else current.resolutionSnapshot = { kind: 'none', mode: 'simple' };
+      Object.assign(current, authoredRewards(recipe, stepIndex));
       if (recipe?.craftingSystemId === LAB_SYSTEM_IDS.RUNEWORK) {
         current.lastCheckResult = {
           success: true,

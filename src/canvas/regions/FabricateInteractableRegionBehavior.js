@@ -55,9 +55,7 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
       // These run on EVERY connected client, so they stay thin and no-throw.
       tokenEnter: async function tokenEnter(event) {
         try {
-          const manager =
-            globalThis.game?.fabricate?.interactableManager ??
-            globalThis.fabricate?.interactableManager;
+          const manager = globalThis.game?.fabricate?.interactableManager;
           await manager?.onRegionEnter?.(event, this?.behavior ?? this?.parent ?? this);
         } catch {
           // Defensive: a region-event handler must never throw into Foundry.
@@ -65,9 +63,7 @@ export function createInteractableRegionBehaviorClass({ RegionBehaviorType, fiel
       },
       tokenExit: async function tokenExit(event) {
         try {
-          const manager =
-            globalThis.game?.fabricate?.interactableManager ??
-            globalThis.fabricate?.interactableManager;
+          const manager = globalThis.game?.fabricate?.interactableManager;
           await manager?.onRegionExit?.(event, this?.behavior ?? this?.parent ?? this);
         } catch {
           // Defensive: a region-event handler must never throw into Foundry.

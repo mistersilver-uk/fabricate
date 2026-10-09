@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,
@@ -210,16 +210,16 @@ test('accept is a predicate over the value, not a list of values', () => {
   );
 });
 
-test('a <style> opener must be the whole line, and prose naming one opens nothing', () => {
+test('a <style> tag opens a block wherever it sits, and prose naming one opens nothing', () => {
   const svelte = [
     '<script>',
-    "  // a scoped `<style>` is what this component deliberately does not have",
+    '  // a scoped `<style>` is what this component deliberately does not have',
     '  export let height = 40;',
     '</script>',
-    '',
+    '<!-- nor does this `<style>` comment -->',
     '<div class="thing">{height}</div>',
-    '',
-    '<style>',
+    '{#if height}<style>.a { margin: 13px; }</style>{/if}',
+    '<style lang="css">  .thing { padding: 9px; }',
     '  .thing {',
     '    height: 36px;',
     '  }',
@@ -228,11 +228,11 @@ test('a <style> opener must be the whole line, and prose naming one opens nothin
   const css = maskNonStyleRegions(svelte);
 
   assert.equal(css.length, svelte.length, 'masking must not move a single character');
-  assert.deepEqual(pixelValuesIn(css), [36], 'only the real block contributes');
+  assert.deepEqual(pixelValuesIn(css), [13, 9, 36], 'only the real blocks contribute');
   assert.deepEqual(
     declarationsIn('a.svelte', css).map((entry) => `${entry.line}:${entry.property}`),
-    ['10:height'],
-    'the declaration keeps the line it has in the file on disk'
+    ['7:margin', '8:padding', '10:height'],
+    'a one-line block and content on the open-tag line are read, at their lines on disk'
   );
   assert.ok(
     !css.includes('export let height'),
@@ -240,9 +240,9 @@ test('a <style> opener must be the whole line, and prose naming one opens nothin
   );
 });
 
-test('the ManagerButton prose trap stays shut', () => {
+test('the Button prose trap stays shut', () => {
   // A PINNED proof against the real tree rather than a fixture of it.
-  const file = 'src/ui/svelte/components/ManagerButton.svelte';
+  const file = 'src/ui/svelte/components/Button.svelte';
   const source = readFileSync(join(repoRoot, file), 'utf8');
 
   assert.ok(source.includes('<style'), `${file} no longer names <style> in prose; retarget this`);
@@ -260,7 +260,7 @@ test('the ManagerButton prose trap stays shut', () => {
 });
 
 test('every Svelte file carrying a real block is in the corpus, and only those', () => {
-  // The line anchor's COST, which nothing pinned until now.
+  // A real tag the extractor misses would drop that file's block from every gate reading it.
   const carriesBlock = Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))
     .filter(([, source]) => source.includes('</style>'))
     .map(([file]) => file)
@@ -277,8 +277,7 @@ test('every Svelte file carrying a real block is in the corpus, and only those',
     contributes,
     carriesBlock,
     'a Svelte file with a closing </style> must contribute CSS, and only such a file may. A ' +
-      'file missing from the corpus has had its block silently dropped by the line-anchored ' +
-      'extractor — almost certainly an opener sharing its line with something else.'
+      'file missing from the corpus has had its block silently dropped by the `<style>` extractor.'
   );
 });
 
@@ -505,7 +504,11 @@ test('the scan reaches a value written only into a token', () => {
 
     const corpus = collectStyleCorpus({ roots: [root], extensions: ['.svelte', '.css'] });
     const files = Object.keys(corpus);
-    assert.equal(files.length, 2, `the fixture corpus must hold both files, got ${files.join(', ')}`);
+    assert.equal(
+      files.length,
+      2,
+      `the fixture corpus must hold both files, got ${files.join(', ')}`
+    );
 
     const { occurrences } = scanPixelValues({ corpus, properties: ['height'], values: [36, 40] });
 

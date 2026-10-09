@@ -1,10 +1,10 @@
 /**
- * The cascade guard for the `manager-button` → `ManagerButton` sweep (issue 1118).
+ * The cascade guard for the hand-written button class → `Button` sweep (issue 1118).
  * BE PRECISE ABOUT WHAT ENTERS THE DERIVED SET, because this docblock used to claim more than
  * the file delivers and a reviewer proved it by experiment: append a fresh
- * `.fabricate-manager .manager-header-actions .manager-button.is-ghost { font-size: 3rem }`
+ * `.fabricate-manager .manager-header-actions .fabricate-button.is-ghost { font-size: 3rem }`
  * to the sheet and BOTH guards stay green. A NEW RULE does not red this gate. The instrument
- * finds a call site by the literal `class="manager-button…"`, task 9 removed the last of
+ * finds a call site by the literal `class="fabricate-button…"`, task 9 removed the last of
  * those, so `convertingSites` is empty and `atRisk` is empty BY CONSTRUCTION — a new rule
  * derives no candidate to be missing from the reviewed list.
  */
@@ -88,15 +88,14 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
         sites: 6,
       }),
-      // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.manager-button`s is
+      // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.fabricate-button`s is
       // gone: the reference draws ONE primary plus a kebab, so the inspector now renders a
-      // single `InspectorActionButton` — a primitive whose own header records that it is
-      // deliberately NOT `.manager-button` — with the other three commands as `ActionMenu`
-      // DATA rather than as controls. Licensed by the same rule as every other movement in
-      // this ledger: the four SITES left the product, rather than leaving this instrument's
-      // view. The entry is kept at 0 rather than dropped, so the two ledger checks below —
-      // that the file writes no literal `class="manager-button"` and that the instrument
-      // derives no site in it — keep guarding it against a regression.
+      // single primary `Button` — whose class the primitive writes, not this file — with the
+      // other three commands as `ActionMenu` DATA rather than as controls. Licensed by the same
+      // rule as every other movement in this ledger: the four SITES left the product, rather
+      // than leaving this instrument's view. The entry is kept at 0 rather than dropped, so the
+      // two ledger checks below — that the file writes no literal `class="fabricate-button"` and
+      // that the instrument derives no site in it — keep guarding it against a regression.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
         sites: 0,
@@ -107,16 +106,17 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/components/EditorValidationSurface.svelte',
         sites: 1,
       }),
-      Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),
     ]),
   }),
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now.
+      // 14 sites across the recipe editor tree, all `<button>` — 10 booked here now.
+      // 4 -> 1 at issue 1516: the choice group's four `alt <kind>` adders render from one
+      // `{#each}` over the kind menu's own list, so the four sites are one.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-        sites: 4,
+        file: 'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -132,7 +132,7 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
       // REMOVED at issue 1444, and the removal is recorded rather than performed silently.
-      // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<ManagerButton>`
+      // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<Button>`
       // its issue rows rendered as the View deep-link. That tab renders through
       // `EditorValidationSurface` now, and the surface already draws that button from its OWN
       // booked site (task 7 above) — so the control did not change file, it MERGED into one
@@ -150,11 +150,16 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 9,
     files: Object.freeze([
-      // 38 sites across the remaining nineteen components, all `<button>`. The salvage DC card's
-      // Manage presets moved into `CheckOverrideField` with the card (issue 2005).
+      // 38 sites across the remaining twenty components, all `<button>`. The salvage DC card's
+      // Manage presets moved into `CheckOverrideField` with the card (issue 2005), and the three
+      // salvage adds into the salvage card and its stage list (issue 1522).
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
-        sites: 3,
+        file: 'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
+        sites: 2,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
@@ -168,14 +173,20 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
         sites: 4,
       }),
+      // 3 sites in the task editor until issue 1522 split it: the stamina add and the two drop adds.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
-        sites: 3,
+        file: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskStaminaCard.svelte',
+        sites: 1,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskDropsCard.svelte',
+        sites: 2,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/AccessTabView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/KnowledgeView.svelte', sites: 2 }),
-      Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemEditView.svelte', sites: 2 }),
+      // 2 -> 1 at issue 1522: the blocker's Open link left the product for the `Notice`'s action.
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemEditView.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/VocabularyPanel.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte', sites: 2 }),
       Object.freeze({
@@ -251,7 +262,7 @@ const POPULATION_C_FILE = 'src/ui/svelte/apps/manager/ImportFolderMappingModal.s
 const globalRule = (selector) => `${SHEET}#${selector}`;
 
 /** The class the conversion REMOVES from a call site, and the tag-free probe for it. */
-const CONTRACT_CLASS = 'manager-button';
+const CONTRACT_CLASS = 'fabricate-button';
 const writesContractLiteral = (source) =>
   [...source.matchAll(/class="([^"]*)"/g)].some((match) =>
     match[1].split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
@@ -266,7 +277,7 @@ const REVIEWED = [
   // from a class STRING. It is population B, it never gains `fab-manager-button`, and a single
   // chained selector would have snapped it back to the default 34px beside the two 28px
   // controls it sits with — the same stranding hazard as `.manager-knowledge-row-actions
-  // .manager-button` below, found in a second place. The rule split in three: the two
+  // .fabricate-button` below, found in a second place. The rule split in three: the two
   // converted buttons by the primitive's class, the trigger by its own, and a (0,5,0) restate
   // for `InlineVocabularyAdd`'s `role="primary"` Add, whose padding the `is-primary` companion
   // would otherwise have taken at a tie. The trigger half is EXCLUDE below; the other two key
@@ -274,7 +285,7 @@ const REVIEWED = [
 
   // ── INTENDED: the primitive is designed to supersede these ────────────────────────────
   {
-    id: globalRule('.fabricate-button.manager-button.is-ghost:not(:disabled)'),
+    id: globalRule('.fabricate-button.fabricate-button.is-ghost:not(:disabled)'),
     disposition: 'INTENDED',
     convertedReach: [
       // TWO since issue 1373: `World Tool` joined `Back to Tool Rules` on the ghost role,
@@ -305,13 +316,13 @@ const REVIEWED = [
     why:
       "The primitive's `is-ghost` keeps a RESTING border where this rule has none. Beating it " +
       'is the documented purpose of the companion rule. The `:not(:disabled)` qualifier is ' +
-      "task 4's disabled repair, not a change of meaning — see `.manager-button:disabled`. " +
+      "task 4's disabled repair, not a change of meaning — see `.fabricate-button:disabled`. " +
       'No LITERAL `is-ghost` site is left for the tool to derive (task 9), so the population ' +
       'is named instead: every ghost in the manager is a `role="ghost"` prop now, and the ' +
       'three components below are counted from the tree rather than asserted in prose.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-ghost:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.fabricate-button.is-ghost:not(:disabled):hover'),
     disposition: 'INTENDED',
     convertedReach: [
       {
@@ -325,7 +336,7 @@ const REVIEWED = [
       'so it names the largest single holder of it rather than restating all three.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-button'),
+    id: globalRule('.fabricate-manager .manager-header-actions .fabricate-button'),
     disposition: 'INTENDED',
     convertedReach: [
       // 29 until issue 1720 split the group across three units. The container's class token
@@ -345,6 +356,12 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
         buttons: 12,
       },
+      // The Premium advert's `Get Premium` link, counted whole-file for the same reason: the
+      // component renders only inside this container (issue 2220).
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerPremiumIconsAd.svelte',
+        buttons: 1,
+      },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
         container: 'manager-header-actions',
@@ -359,12 +376,12 @@ const REVIEWED = [
       'children — button, chip and save-error. The primitive states the same 0.72rem with no ' +
       'ancestor requirement, so the tie it used to derive was provably zero-pixel. With task ' +
       '9 that tie is no longer derivable at all: every button in this container is a ' +
-      '`<ManagerButton>` now, including the two `ComponentEditorHeader` renders into the ' +
+      '`<Button>` now, including the two `ComponentEditorHeader` renders into the ' +
       'root`s copy of it, which no static count can attribute to either file. So the ' +
       'container`s OWN population is counted from the tree instead.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-primary'),
+    id: globalRule('.fabricate-manager .manager-header-actions .fabricate-button.is-primary'),
     disposition: 'INTENDED',
     convertedReach: [
       // 15 until issue 1720 split the group; the two family units are counted whole-file for
@@ -394,13 +411,13 @@ const REVIEWED = [
     ],
     why:
       "The same container statement for the header's loudest action: `0 var(--fab-space-4)` " +
-      'and weight 700, which are exactly what `.manager-button.fab-manager-button.is-primary` ' +
+      'and weight 700, which are exactly what `.fabricate-button.fab-manager-button.is-primary` ' +
       'states. Zero-pixel either way, and it is what emphasises a header primary the primitive ' +
       'does not render. Its `is-ghost` sibling was RETIRED instead, because a role’s PAINT ' +
       'belongs to the role — the container keeps only its own scale.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
+    id: globalRule('.fabricate-manager .manager-knowledge-row-actions .fabricate-button'),
     disposition: 'EXCLUDE',
     stranding: ['src/ui/svelte/components/ArmedDangerButton.svelte:115'],
     why:
@@ -410,7 +427,7 @@ const REVIEWED = [
       'Deliberately NOT re-chained, and the one place where this instrument is wrong about ' +
       'its own corpus. `collectSites` gives every non-population-B site the primitive class, ' +
       'including `ArmedDangerButton`, which is held out of the conversion and renders the ' +
-      'tokens `fabricate-button manager-button is-danger` from its own markup (the family root ' +
+      'tokens `fabricate-button is-danger` from its own markup (the family root ' +
       'leads it since issue 1502) — so the tool believes a chained ' +
       'selector would still reach it. It would not. Both knowledge rows render an ' +
       '`ArmedDangerButton` inside this container, and chaining would leave that Delete at the ' +
@@ -419,7 +436,7 @@ const REVIEWED = [
       'copied FROM this block, so the tie is zero-pixel.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-knowledge-reset-actions .manager-button'),
+    id: globalRule('.fabricate-manager .manager-knowledge-reset-actions .fabricate-button'),
     disposition: 'INTENDED',
     convertedReach: [
       {
@@ -430,7 +447,7 @@ const REVIEWED = [
     ],
     why:
       'The sibling selector in the same comma group, which also heads `.manager-tool-edit-' +
-      'actions .manager-button` — the Tool Studio cluster that IS the authority the primitive ' +
+      'actions .fabricate-button` — the Tool Studio cluster that IS the authority the primitive ' +
       'copied. Same three values, so the tie was zero-pixel; splitting the group to chain one ' +
       'third of it would restate the authority instead of adopting it. Task 9 converted both ' +
       'of the controls in this container, so the tie is no longer derivable and the container ' +
@@ -438,13 +455,13 @@ const REVIEWED = [
   },
   {
     id: globalRule(
-      '.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button'
+      '.fabricate-manager[data-manager-view="components"] .fabricate-filter-bar .fabricate-button'
     ),
     disposition: 'INTENDED',
     convertedReach: [
       {
         file: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
-        container: 'manager-toolbar',
+        container: 'fabricate-filter-bar',
         buttons: 1,
       },
     ],
@@ -452,7 +469,7 @@ const REVIEWED = [
       'NEWLY at risk at task 4, which put it there: at (0,4,0) it used to beat the ' +
       "primitive's (0,3,0) control outright, and the re-chained bespoke rules are (0,4,0) too, " +
       'so it tied them. Every tie was same-value — this rule and the sort-direction rule ' +
-      'both state `var(--fab-recipe-control-font)`, and the primitive states the 0.72rem that ' +
+      'both state `var(--fab-manager-recipe-control-font)`, and the primitive states the 0.72rem that ' +
       'token resolves to. The one overlap that was NOT identical is against ' +
       '`.manager-clear-filters` (0.78rem), and no `manager-clear-filters` control renders in ' +
       "the components view — that browser's Clear filters carries no bespoke class. Recorded " +
@@ -487,7 +504,7 @@ const REVIEWED = [
       'this one; `re-rooted-controls-host-independence.test.js` pins its specificity.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button'),
+    id: globalRule('.fabricate-button.fabricate-button'),
     disposition: 'EXCLUDE',
     why:
       MOVED_POPULATION +
@@ -496,7 +513,7 @@ const REVIEWED = [
       'leave those triggers with no control treatment at all.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button:disabled'),
+    id: globalRule('.fabricate-button.fabricate-button:disabled'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9, and its NO_CONFLICT filing is worth keeping ' +
@@ -506,11 +523,11 @@ const REVIEWED = [
       "colours in every role, visibly, on `ToolEditView`'s ghost Back for the whole of a save. " +
       'Task 4 qualified every rule that states a resting paint with `:not(:disabled)` rather ' +
       'than chaining this one above them, precisely because this selector also serves ' +
-      '`.manager-icon-button` and every hand-written button the sweep does not convert — which ' +
+      '`.fabricate-icon-button` and every hand-written button the sweep does not convert — which ' +
       'is the same reason it is EXCLUDE now rather than merely safe.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.fabricate-button:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why:
       MOVED_POPULATION +
@@ -519,7 +536,7 @@ const REVIEWED = [
       'sweep must not disturb.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-danger:not(:disabled)'),
+    id: globalRule('.fabricate-button.fabricate-button.is-danger:not(:disabled)'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9. It reached 11 converting sites and shared no ' +
@@ -528,7 +545,7 @@ const REVIEWED = [
       'not come from a `role="danger"` prop.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-danger:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.fabricate-button.is-danger:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE REVIEWED LIST BEFORE: while `is-danger` sites were literal this rule beat ' +
@@ -536,7 +553,7 @@ const REVIEWED = [
       'population narrowed to `ArmedDangerButton`. The hover half of the entry above.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-subtle'),
+    id: globalRule('.fabricate-button.fabricate-button.is-subtle'),
     disposition: 'EXCLUDE',
     why:
       'MOVED NO_CONFLICT -> EXCLUDE by task 9, and it is the delta`s worked example for a ' +
@@ -547,7 +564,7 @@ const REVIEWED = [
   {
     id: scopedRule(
       'ImportFolderMappingModal.svelte',
-      '.manager-import-mapping-row .manager-button.manager-recipe-routing-add-trigger'
+      '.manager-import-mapping-row .fabricate-button.manager-recipe-routing-add-trigger'
     ),
     disposition: 'EXCLUDE',
     why:
@@ -561,14 +578,14 @@ const REVIEWED = [
   {
     id: scopedRule(
       'scoped/SystemRulesRoster.svelte',
-      '.manager-scoped-roster-system .manager-button.is-danger'
+      '.manager-scoped-roster-system .fabricate-button.is-danger'
     ),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved ' +
       'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
-      '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
+      '`fabricate-button is-danger` from its own template and never gains `fab-manager-button`, ' +
       'so this rule cannot be re-chained onto the primitive. What it states is a SIZE taken ' +
       'from the layout context — 26px rather than the page-level 34px — because five of those ' +
       'rows plus three cards, a search field and a pager have to fit one 300px inspector ' +
@@ -577,25 +594,25 @@ const REVIEWED = [
 
   {
     id: globalRule(
-      '.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger'
+      '.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger'
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. The world Component entry`s system rows draw removal as a 26px square EXIT ICON in the row`s own clothing (`proto:944`) rather than as a labelled danger button, and the control is the shared `ArmedDangerButton`: it renders `manager-button is-danger` from its own template and never gains `fab-manager-button`, so this rule cannot be re-chained onto the primitive. What it states is a SIZE and a surface taken from the layout context — the arm/disarm two-step, the Escape and blur disarm and the single-armed-token invariant are all still the primitive`s. The twin of the `SystemRulesRoster` entry above.',
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. The world Component entry`s system rows draw removal as a 26px square EXIT ICON in the row`s own clothing (`proto:944`) rather than as a labelled danger button, and the control is the shared `ArmedDangerButton`: it renders `fabricate-button is-danger` from its own template and never gains `fab-manager-button`, so this rule cannot be re-chained onto the primitive. What it states is a SIZE and a surface taken from the layout context — the arm/disarm two-step, the Escape and blur disarm and the single-armed-token invariant are all still the primitive`s. The twin of the `SystemRulesRoster` entry above.',
   },
 
   {
     id: globalRule(
-      '.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger:not(:disabled)'
+      '.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger:not(:disabled)'
     ),
     disposition: 'EXCLUDE',
     why:
-      'The PAINT half of the entry above. Geometry is unqualified and colour is not, which is the split `.manager-button:disabled` requires: switching the exit icon off must take its colours from the primitive and keep the 26px square it had when enabled.',
+      'The PAINT half of the entry above. Geometry is unqualified and colour is not, which is the split `.fabricate-button:disabled` requires: switching the exit icon off must take its colours from the primitive and keep the 26px square it had when enabled.',
   },
 
   {
     id: globalRule(
-      '.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger'
+      '.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger'
     ),
     disposition: 'EXCLUDE',
     why:
@@ -604,7 +621,7 @@ const REVIEWED = [
 
   {
     id: globalRule(
-      '.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger:not(:disabled)'
+      '.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger:not(:disabled)'
     ),
     disposition: 'EXCLUDE',
     why:
@@ -642,7 +659,7 @@ const REVIEWED = [
   },
 
   {
-    id: globalRule('.fabricate-button.manager-button.is-dashed'),
+    id: globalRule('.fabricate-button.fabricate-button.is-dashed'),
     disposition: 'EXCLUDE',
     why:
       'The geometry half of the RECONCILED bare dashed treatment, and now population B only. ' +
@@ -651,7 +668,7 @@ const REVIEWED = [
       'triggers render the same control as the converted buttons beside them in the same row.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-dashed:not(:disabled)'),
+    id: globalRule('.fabricate-button.fabricate-button.is-dashed:not(:disabled)'),
     disposition: 'EXCLUDE',
     why:
       'The paint half of the same reconciliation, split out so the disabled rule can win. ' +
@@ -660,33 +677,21 @@ const REVIEWED = [
       'ten converted (task 8) the triggers are all that is left.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-dashed:not(:disabled):hover'),
+    id: globalRule('.fabricate-button.fabricate-button.is-dashed:not(:disabled):hover'),
     disposition: 'EXCLUDE',
     why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.manager-checks-preview-actor-trigger'),
+    id: globalRule('.fabricate-button.fabricate-button.manager-checks-preview-actor-trigger'),
     disposition: 'EXCLUDE',
     why:
       'The Checks preview actor popover trigger. `SearchablePopover` renders it from a class ' +
       'string, so it never gains `fab-manager-button`.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.manager-salvage-component-trigger'),
+    id: globalRule('.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
-    why: 'Salvage component popover trigger, population B.',
-  },
-  {
-    id: globalRule('.fabricate-button.manager-button.manager-recipe-component-trigger'),
-    disposition: 'EXCLUDE',
-    why:
-      "NOT IN THE SEEDED LIST as its own entry: the seed named only the group's first line, " +
-      'and this is the second of its three selectors, reaching two more population-B triggers.',
-  },
-  {
-    id: globalRule('.fabricate-button.manager-button.manager-tool-replacement-component-trigger'),
-    disposition: 'EXCLUDE',
-    why: 'The third selector of that same group, likewise population B only.',
+    why: 'Tool replacement component popover trigger, population B only.',
   },
   {
     id: globalRule(
@@ -696,12 +701,12 @@ const REVIEWED = [
     why: 'NOT IN THE SEEDED LIST. The tool replacement card`s own override of that trigger.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.manager-travel-parties-override-trigger'),
+    id: globalRule('.fabricate-button.fabricate-button.manager-travel-parties-override-trigger'),
     disposition: 'EXCLUDE',
     why: 'Travel parties override popover trigger, population B.',
   },
   // REMOVED at issue 1371 r10, and the removal is recorded rather than performed silently.
-  // The two entries were `.manager-button.manager-world-component-register-action` and its
+  // The two entries were `.fabricate-button.manager-world-component-register-action` and its
   // `:not(:disabled):hover`, dispositioned EXCLUDE one revision earlier because the world
   // Component catalogue`s `+ Register item` was a `SearchablePopover` `triggerClass` site —
   // population B, never gaining `fab-manager-button`, so the rule`s 38px height and 9px corner
@@ -720,12 +725,12 @@ const REVIEWED = [
       'issue 1464 unscoped the family, which is the same (0,2,0) at the same position.',
   },
   // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
-  // The entry was `BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button`, dispositioned
+  // The entry was `BulkDeleteCard.svelte#.fab-bulk-delete-card .fabricate-button`, dispositioned
   // EXCLUDE because its only site is `ArmedDangerButton`, which never gains the primitive class.
 
   // ── NO_CONFLICT: derived NOT at risk.
   {
-    id: globalRule('.fabricate-button.manager-button.is-warning-action:not(:disabled)'),
+    id: globalRule('.fabricate-button.fabricate-button.is-warning-action:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     // WAS DEAD, and is the sweep's one entry to move in that direction. Its old `why` said the
     // entry 'should go live rather than away', and this is that: the primitive's sixth role
@@ -743,11 +748,11 @@ const REVIEWED = [
       'Paint only — `border-color`, `color` and `background` — against a primitive that states ' +
       'geometry and no colour, so the two cannot collide whatever the source order. That is ' +
       "the delta's stated reason for admitting `warning` as a role at all, now measured rather " +
-      'than argued. Its `.manager-icon-button` sibling in the same comma group is what the ' +
+      'than argued. Its `.fabricate-icon-button` sibling in the same comma group is what the ' +
       'quick-action Force add beside it renders, and the pair agree by construction.',
   },
   {
-    id: globalRule('.fabricate-button.manager-button.is-primary:not(:disabled)'),
+    id: globalRule('.fabricate-button.fabricate-button.is-primary:not(:disabled)'),
     disposition: 'NO_CONFLICT',
     // The primary paint reaches no LITERAL site at all now.
     convertedReach: [
@@ -768,7 +773,7 @@ const REVIEWED = [
   // task 6). It was RECHAIN at r3: at (0,2,0) it lost its width, padding and font-size to the
   // primitive and the `is-primary` companion, inside a 48px grid track that clipped the label.
   {
-    id: globalRule('.fabricate-manager .manager-setup-links .manager-button'),
+    id: globalRule('.fabricate-manager .manager-setup-links .fabricate-button'),
     disposition: 'NO_CONFLICT',
     // The sweep has now converted EVERY site this rule reaches.
     convertedReach: [
@@ -795,14 +800,9 @@ const REVIEWED = [
         container: 'manager-setup-links',
         buttons: 3,
       },
-      {
-        file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-        container: 'manager-setup-links',
-        buttons: 1,
-      },
     ],
     why:
-      'The setup card`s docs-link row, and the explainer card`s. It declares `flex`, ' +
+      'The setup card`s docs-link row. It declares `flex`, ' +
       '`justify-content` and `text-decoration`; the primitive declares none of the three — ' +
       'the base control states the same `justify-content: center` at (0,2,0) and loses to ' +
       'this rule anyway — so every site it reaches is untouched by the conversion.',
@@ -889,7 +889,7 @@ function endOfOpeningTag(source, from) {
  * `tests/components/manager-filter-bar-source-contract.test.js` is what makes that visible, by
  * refusing a raw element carrying the class anywhere else.
  */
-const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'ManagerToolbar' });
+const CONTAINER_PRIMITIVES = Object.freeze({ 'fabricate-filter-bar': 'FilterBar' });
 
 /**
  * Every region of `source` enclosed by an element whose class list holds `containerClass`.
@@ -936,7 +936,7 @@ function regionsInside(source, containerClass) {
 }
 
 /**
- * How many `<ManagerButton>`s a component renders that a rule with this shape would reach.
+ * How many `<Button>`s a component renders that a rule with this shape would reach.
  *
  * @param {string} source component source text
  * @param {{container?: string, role?: string}} shape what the rule demands of the button
@@ -946,7 +946,7 @@ function primitivesMatching(source, { container, role }) {
   const scopes = container ? regionsInside(source, container) : [source];
   let total = 0;
   for (const scope of scopes) {
-    for (const opening of scope.matchAll(/<ManagerButton[\s/>]/g)) {
+    for (const opening of scope.matchAll(/<Button[\s/>]/g)) {
       const end = endOfOpeningTag(scope, opening.index);
       if (end < 0) continue;
       if (role && !scope.slice(opening.index, end).includes(`role="${role}"`)) continue;
@@ -1108,16 +1108,19 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    123,
-    'the conversion is 123 sites, whether or not a given one has been converted yet'
+    118,
+    // 120 until issue 1522 moved the System blocker's link into its `Notice`'s own action, and
+    // 119 until issue 1521 retired the explainer card's docs link.
+    'the conversion is 118 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    48,
-    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 123-site total above is
-    // unchanged, because nothing converted.
-    'across 48 components'
+    49,
+    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), one for the
+    // salvage DC card's move into `CheckOverrideField` (issue 2005), and one each for the salvage
+    // adds' and the gathering task adds' splits across two files (issue 1522); the site total above
+    // is unchanged by those.
+    'across 49 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
@@ -1126,10 +1129,10 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // two assertions above are defending.
   for (const { file, sites } of converted) {
     const source = readFileSync(resolve(repoRoot, file), 'utf8');
-    const rendered = source.match(/<ManagerButton[\s/>]/g)?.length ?? 0;
+    const rendered = source.match(/<Button[\s/>]/g)?.length ?? 0;
     assert.ok(
       rendered >= sites,
-      `${file} is booked as ${sites} converted sites but renders ManagerButton ${rendered} times`
+      `${file} is booked as ${sites} converted sites but renders Button ${rendered} times`
     );
     assert.ok(
       !writesContractLiteral(source),
@@ -1151,13 +1154,15 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // `<select>` plus a field the GM types into — so the row's three `SearchablePopover` triggers
   // (component, essence, currency unit) are not triggers any more, they are an inline search
   // with its suggestions beneath it, and the two set-level adders that were PICKERS became
-  // plain dashed `<ManagerButton>`s that create an empty row. The sixth is `+ Tag`, which the
+  // plain dashed `<Button>`s that create an empty row. The sixth is `+ Tag`, which the
   // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
-  // writing no `manager-button` class at all.
+  // writing no `fabricate-button` class at all.
+  // AND ONE LEFT AT ISSUE 1516, taking the count to 10: the salvage yield picker's trigger, both
+  // salvage rows now naming their component through the requirement row.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    12,
-    'plus the 12 SearchablePopover triggerClass sites still named as debt'
+    10,
+    'plus the 10 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');
@@ -1167,7 +1172,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
       'would be a 13th population-B site or a converted one, and either is a change to this count'
   );
   assert.ok(
-    !retiredSite.includes('triggerClass="manager-button'),
+    !retiredSite.includes('triggerClass="fabricate-button'),
     `${POPULATION_B_RETIRED_SITE_FILE} must not write the population-B token again`
   );
   assert.match(
@@ -1184,7 +1189,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.match(
     readFileSync(resolve(repoRoot, POPULATION_C_FILE), 'utf8'),
-    /<ManagerButton\b[^]*?class=\{`is-subtle manager-import-mapping-skip/,
+    /<Button\b[^]*?class=\{`is-subtle manager-import-mapping-skip/,
     `${POPULATION_C_FILE} should still build the skip toggle's class from a template, on the ` +
       'primitive — a template that vanished would satisfy the count above by deletion'
   );
@@ -1204,11 +1209,11 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
     cascade.repaints.map((change) => change.property),
     [],
     'the conversion is complete, so no literal call site is left whose cascade winner could ' +
-      'change — a repaint here means a raw `manager-button` class token has come back'
+      'change — a repaint here means a raw `fabricate-button` class token has come back'
   );
 });
 
-test('the manager-button cascade inventory', () => {
+test('the fabricate-button cascade inventory', () => {
   // The report is the deliverable, not a side effect.
   console.log(cascade.renderInventory(dispositionById));
 });

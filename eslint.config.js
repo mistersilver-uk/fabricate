@@ -3,15 +3,10 @@
 // Goals: maintainability, testability, ease of change, and a predictable file
 // structure. Rules are introduced staged-by-path.
 //
-// `npm run lint` is `eslint .` — the WHOLE repository, as of issue #1660. It used
-// to name the roughly eighty `.js` paths that were green, which meant a new file
-// was linted by nothing until somebody remembered to add it. The not-yet-clean
-// files are carried by `eslint.debt.js` instead, which switches off per file only
-// the rules that file fails and leaves every other rule armed on it; `npm run
-// lint:debt` reports what is left and fails on an entry that has been paid off
-// and not removed. `npm run lint:svelte` remains as a focused gate over every
-// `.svelte` file under `src/`. Both run as separate steps of the required `lint`
-// job. See CONTRIBUTING.md.
+// `npm run lint` (`scripts/lint.mjs`) lints the WHOLE repository with this config
+// and fails on a `(file, rule)` count above the base commit's; `no-undef` and parse
+// errors fail at any count. `npm run lint:svelte` runs the same comparison over
+// every `.svelte` file under `src/` alone. See CONTRIBUTING.md.
 //
 // Block order matters in flat config: later blocks override earlier ones, and
 // `eslint-config-prettier` MUST stay last so it can switch off the stylistic
@@ -23,8 +18,6 @@ import importX, { createNodeResolver } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
-
-import { ESLINT_DEBT, ESLINT_TESTS_DEBT } from './eslint.debt.js';
 
 // FoundryVTT injects these at runtime; declaring them readonly stops `no-undef`
 // from flagging legitimate Foundry API access. Kept intentionally broad —
@@ -68,9 +61,6 @@ const foundryGlobals = {
   Macro: 'readonly',
   Scene: 'readonly',
   User: 'readonly',
-  // Fabricate's OWN public global, assigned at `src/main.js`. The documentation macros under
-  // `examples/` call it bare, and they are right to: it really is a global at runtime.
-  fabricate: 'readonly',
 };
 
 // Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
@@ -101,8 +91,8 @@ const svelteRuneGlobals = {
  * The DOMAIN LAYER's roots (issue 1677) — the Architecture Pointers list in
  * `.agents/docs/foundry-and-architecture.md` of where domain and runtime logic lives.
  *
- * Exported because `tests/foundry-global-reads-ratchet.test.js` counts this rule's reports over
- * these roots, and a second spelling of the roots or the names would be a second, drifting answer.
+ * Exported because `tests/foundry-global-reads-ratchet.test.js` proves this rule over these roots,
+ * and a second spelling of the roots or the names would be a second, drifting answer.
  */
 export const DOMAIN_LAYER_ROOTS = Object.freeze([
   'src/config',
@@ -117,8 +107,8 @@ export const DOMAIN_LAYER_ROOTS = Object.freeze([
  * carries.
  *
  * There is no in-scope allow-list, because every sanctioned edge already lies outside these roots:
- * `src/main.js` holds 260 bare reads and `src/ui/` (the shells and `foundryBridge.js`) 173. The 13 in-scope files that are not clean are debt, carried in
- * `eslint-debt.txt` and held at an exact per-file count by the ratchet named above.
+ * `src/main.js` holds 260 bare reads and `src/ui/` (the shells and `foundryBridge.js`) 173. The
+ * in-scope files that are not clean are debt, held at their base count by `npm run lint`.
  *
  * `globalThis.game?.…` is out of reach here and stays that way — see the
  * `unicorn/no-unnecessary-global-this` note below for why that form is the defensive one. Ninety-two
@@ -142,28 +132,6 @@ export const DOMAIN_RESTRICTED_GLOBALS = Object.freeze([
     message: 'Pass the configured value in; `CONFIG` is Foundry runtime state, not domain input.',
   },
 ]);
-
-/**
- * The debt-baseline config blocks, exported so they can be subtracted BY IDENTITY.
- *
- * `npm run lint:debt` and `tests/lint-coverage.test.js` both need "this repository's real config,
- * minus exactly these blocks" — the first to show a contributor what is left to fix, the second to
- * fail when an entry has gone stale because its file is already clean. Rebuilding the blocks from
- * their shape would give each of them a second, drifting definition of what the debt is; a
- * reference comparison cannot drift.
- */
-export const DEBT_BLOCKS = [
-  ...Object.values(ESLINT_DEBT).flatMap((group) =>
-    Object.entries(group).map(([file, rules]) => ({
-      files: [file],
-      rules: Object.fromEntries(rules.map((rule) => [rule, 'off'])),
-    }))
-  ),
-  {
-    files: ['tests/**/*.js'],
-    rules: Object.fromEntries(ESLINT_TESTS_DEBT.map((rule) => [rule, 'off'])),
-  },
-];
 
 export default [
   // 1. Global ignores — build output, deps, generated docs/site, lockfile, and the untracked
@@ -490,40 +458,37 @@ export default [
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
   },
 
+  // 5e. Fabricate's OWN macro global (issue 2153). `src/main.js` assigns `globalThis.fabricate`
+  //     for macros, and module code must not read it back: it carries only the macro API, so a
+  //     service read through it is always undefined. Module code reads `game.fabricate`. The bare
+  //     spelling is `no-undef` here, since only block 6c declares it.
+  {
+    files: ['src/**/*.js', 'src/**/*.svelte'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='globalThis'][property.name='fabricate']" +
+            ':not(AssignmentExpression > MemberExpression.left)',
+          message:
+            '`globalThis.fabricate` is the macro API, not the module; read `game.fabricate`.',
+        },
+      ],
+    },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //
-  //    THE GATE IS A GLOB NOW (issue #1660), so there is nothing to add a new script
-  //    to: `npm run lint` is `eslint .` and a file landing here is linted the moment
-  //    it lands. What this block used to say — that `lint` named a subset of
-  //    `scripts/` one file at a time, and must not be widened to `scripts/**` — is
-  //    obsolete as an instruction, and the measurement behind it is not.
-  //
-  //    The measurement still holds and is still why fifteen `scripts/` files are
-  //    carried as debt rather than fixed: ESLint over `scripts/**` reports roughly a
-  //    thousand findings across 15 of 33 files, and 844 of them are in
-  //    `scripts/foundry-test-run.mjs` alone — the Foundry smoke harness, whose Phase D0
-  //    pins selectors by class, `.nth(N)` index and visible button text with no unit
-  //    coverage over any of them. That is the blocker, by two orders of magnitude;
-  //    `scripts/lib/zip.js` (fails Prettier too, and its autofixes land on the Windows
-  //    `Compress-Archive` path that builds the published artefact, also untested) is a
-  //    real but secondary one.
-  //
-  //    Those fifteen are `ESLINT_DEBT.scripts` in `eslint.debt.js`. Every rule they do
-  //    NOT fail is enforced on them from now on, which the old enumeration could not
-  //    offer at all, and `tests/lint-coverage.test.js` pins the group's size exactly so
-  //    the list cannot grow quietly instead of shrinking.
-  //
-  //    The `files` glob below and that test's `LINTED_EXTENSIONS` must name the same
-  //    extensions, or a newly configured file becomes invisible to the ratchet instead
-  //    of gated by it. That is not left to prose: the test PARSES this glob and fails
-  //    if it names an extension the enumeration would miss. `cjs` is listed because
-  //    this repository is `"type": "module"`, so `.cjs` is how CommonJS gets written
-  //    here — without it such a file would be forced into the `lint` list by the
-  //    ratchet and then fail `no-undef` on `require`, having missed this block's
-  //    Node globals.
+  //    `npm run lint` covers the repository, so a file landing here is linted the
+  //    moment it lands. The `files` glob below and the `LINTED_EXTENSIONS` of
+  //    `tests/scripts-lint-gate-coverage.test.js` must name the same extensions, which
+  //    that test checks by PARSING this glob. `cjs` is listed because this repository
+  //    is `"type": "module"`, so `.cjs` is how CommonJS gets written here, and without
+  //    this block's Node globals it would fail `no-undef` on `require`.
   {
-    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js', 'eslint.debt.js'],
+    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: { ...globals.node },
     },
@@ -543,8 +508,8 @@ export default [
   //     the same commit. That is exactly how this surfaced: the glob gate passed on a built tree
   //     and failed on the runner (issue #1660).
   //
-  //     Scoped to this one file and this one rule, not baselined in `eslint-debt.txt`: a debt
-  //     entry is something to pay off, and there is nothing here to fix. `main.js` is the only
+  //     Scoped to this one file and this one rule rather than left as debt: there is nothing
+  //     here to fix. `main.js` is the only
   //     file in the repository that imports build output — asserted by nothing, because the rule
   //     stays armed everywhere else and would report the next one.
   {
@@ -568,7 +533,10 @@ export default [
   {
     files: [
       'scripts/lib/foundryBrowserBoot.js',
+      'scripts/lib/foundryReadyWorld.js',
       'scripts/foundry-version-assert.mjs',
+      // The Roll terms recorder (issue 2007): one `page.evaluate` body reading `foundry.dice`.
+      'scripts/foundry-roll-terms-record.mjs',
       // The Checks Studio parity extractor (issue 1096): its whole measurement pass is one
       // `page.evaluate` body reading `getComputedStyle` inside the prototype's page.
       'scripts/checks-studio-parity-extract.mjs',
@@ -576,6 +544,9 @@ export default [
       // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
       'scripts/lib/foundryPerfScenarios.js',
       'scripts/foundry-perf-run.mjs',
+      // The Primitive Lab smoke and parity oracle (issue 1487): readiness waits and DOM reads.
+      'scripts/primitive-lab-smoke.mjs',
+      'scripts/primitive-lab-parity.mjs',
       // The smoke walk's page primitives and its scenario modules (issue #1692), which is where
       // those bodies now live. The rest of `scripts/foundry-smoke/` — the profile, the context, the
       // registry, the loop and the cleanup — is deliberately excluded: it holds no in-page body.
@@ -597,7 +568,8 @@ export default [
   {
     files: ['examples/**/*.js'],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals },
+      // Fabricate's own macro global, assigned at `src/main.js`, which a macro calls bare.
+      globals: { ...globals.browser, ...foundryGlobals, fabricate: 'readonly' },
     },
   },
 
@@ -634,7 +606,7 @@ export default [
   },
 
   // 8. Svelte components (Svelte 5 runes). This block IS gated, twice over as of
-  //    issue #1660: `npm run lint` is `eslint .`, and `**/*.svelte` below is what
+  //    issue 1660: `npm run lint` lints `.`, and `**/*.svelte` below is what
   //    makes ESLint SELECT that extension at all during directory expansion — a
   //    `.js`/`.mjs`/`.cjs` file is selected by default, a `.svelte` one only
   //    because some block names it here. Remove this `files` pattern and 329
@@ -645,11 +617,10 @@ export default [
   //    step of the required `lint` CI job. It is a strict subset of `lint` now and
   //    therefore duplicated work; it is kept because it is the focused command to
   //    run while working on a component, and because its findings are attributable
-  //    to one step rather than to a repository-wide sweep. It runs with `--max-warnings=0`, which matters because
-  //    `svelte.configs.recommended` ships two WARN-level rules
-  //    (`svelte/no-at-debug-tags`, `svelte/no-inspect`) — without the flag a
-  //    stray `{@debug}` tag or a leftover `$inspect()` would report and the job
-  //    would still exit 0.
+  //    to one step rather than to a repository-wide sweep. The base comparison
+  //    counts warnings too, which matters because `svelte.configs.recommended`
+  //    ships two WARN-level rules (`svelte/no-at-debug-tags`, `svelte/no-inspect`):
+  //    a new `{@debug}` tag or `$inspect()` call fails rather than printing.
   //
   //    `svelte/no-unused-svelte-ignore` (from the recommended set) makes the
   //    gate bidirectional: a `svelte-ignore` comment that no longer suppresses
@@ -708,19 +679,6 @@ export default [
     },
   },
 
-  // 9. THE DEBT BASELINE (issue #1660).
-  //
-  //    `npm run lint` covers the repository by glob now, so the not-yet-clean files need somewhere
-  //    to be recorded. These blocks switch OFF, per file, exactly the rules that file fails today.
-  //    Every other rule is armed on it. `eslint.debt.js` carries the list and explains why this is
-  //    a per-rule disable rather than an `ignores` entry — the short version is that `ignores`
-  //    would take those files out of ESLint's reach entirely, `no-undef` included, while the
-  //    linted-file COUNT went up, which reads as progress in a diff and is a regression in fact.
-  //
-  //    LAST except for `prettier`, so it overrides every rule block above it — including block 8's
-  //    Svelte layer, which would otherwise re-arm on a `.svelte` file a rule listed here.
-  ...DEBT_BLOCKS,
-
-  // 10. Prettier compatibility — disables formatting rules Prettier owns. LAST.
+  // 9. Prettier compatibility — disables formatting rules Prettier owns. LAST.
   prettier,
 ];

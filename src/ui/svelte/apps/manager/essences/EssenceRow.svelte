@@ -7,7 +7,7 @@
   ARIA: the list is a real `<ul role="list">` of `<li>` cards, and this row carries NO `role="row"` /
   `role="cell"` / `aria-selected` — the `role="table"` head they depended on is deleted, and
   `aria-selected` is not valid on an `<li>` outside a listbox. Selection is conveyed by the
-  `.is-selected` ring, `aria-current` and the inspector heading. THE FIRST `.manager-icon-button`
+  `.is-selected` ring, `aria-current` and the inspector heading. THE FIRST `.fabricate-icon-button`
   MUST STAY THE EDIT PENCIL, because a View Lab case navigates by it; the toggle and the selection
   box emit other elements, so only a new icon button placed BEFORE the pencil could intercept.
 
@@ -27,7 +27,7 @@
   import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
   import IconButton from '../../../components/IconButton.svelte';
@@ -147,7 +147,7 @@
   <Medallion
     icon={essence.icon || 'fas fa-mortar-pestle'}
     tint={essence.colorToken || ''}
-    size={40}
+    size={38}
   />
 {/snippet}
 
@@ -191,14 +191,14 @@
 {/snippet}
 
 {#snippet addToSystemButton()}
-  <ManagerButton
+  <Button
     role="primary"
     data-essence-add-to-system={essence.id}
     onclick={() => onAddToSystem?.(essence.id)}
   >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Essence.AddToSystem', 'Add to this system')}</span>
-  </ManagerButton>
+  </Button>
 {/snippet}
 
 <!-- NEVER hidden for a disabled essence, since hiding a pill removes state: they render muted. -->
@@ -235,7 +235,7 @@
 
 {#snippet selectionBox()}
   <SelectionCheckbox
-    size="lg"
+    density="comfortable"
     wrapper="label"
     checked={bulkSelected}
     ariaLabel={format('FABRICATE.Admin.Manager.BulkEdit.SelectRow', 'Select {name} for bulk edit', {
@@ -268,7 +268,7 @@
 <!--
   THE ROW'S EDIT CONTROL, LABELLED IN THE LIST AND ICON-ONLY IN THE GRID CARD: the words say which
   layer it opens, where an unlabelled pencil beside a world-shared name reads as "edit the essence".
-  IT IS STILL `.manager-icon-button`, AND THAT IS LOAD-BEARING: three surfaces address it by that
+  IT IS STILL `.fabricate-icon-button`, AND THAT IS LOAD-BEARING: three surfaces address it by that
   class alone, and the smoke's locator sits behind a `count() > 0` guard, so losing it would stop a
   published frame rather than fail. `IconButton.svelte` prepends the class itself, so this is the
   caller's EXTRA, and `is-labelled` is computed in because a `class:` directive is element-only.
@@ -386,7 +386,7 @@
       {:else}
         {@render usageReadout()}
         {@render statusToggle()}
-        <!-- FIRST (and only) `.manager-icon-button` in the row stays the edit control; the
+        <!-- FIRST (and only) `.fabricate-icon-button` in the row stays the edit control; the
              View Lab, the smoke and two mounted tests navigate by exactly that selector. -->
         {@render editButton(true)}
       {/if}
@@ -450,8 +450,8 @@
     gap: var(--fab-space-2);
   }
 
-  /* THE LABELLED VARIANT OF `.manager-icon-button`, every value COPIED from the labelled-button
-     authority rather than chosen; it cannot BE a `ManagerButton`, whose auto width would fight the
+  /* THE LABELLED VARIANT OF `.fabricate-icon-button`, every value COPIED from the labelled-button
+     authority rather than chosen; it cannot BE a `Button`, whose auto width would fight the
      square 34px box. Compounded through `.manager-essence-row` on purpose, because a bare selector
      ties at (0,2,0) and is decided by injection order. THE CHILD HALF IS `:global` BECAUSE
      `IconButton.svelte` WRITES THE BUTTON: a forwarded `class` carries no `svelte-<hash>`, so a
@@ -507,7 +507,7 @@
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 

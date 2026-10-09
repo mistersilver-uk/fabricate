@@ -1,22 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  IoTable is the recipe detail's material-economy region and, since issue 917, the
-  COMPOSITION ROOT for the requirement surface: the slot rail, the single open
-  chooser (an alternatives picker or the shared essence pool), and the
-  consumption-plan panel — followed by the unchanged legacy set-level essence rows,
-  the tool rows and the produced outputs.
+  IoTable is the recipe detail's material-economy region and the composition root for the
+  requirement surface: the slot rail with its single open chooser (the group's alternatives as
+  tiles, then its held-stack picker or the shared essence pool when it has either) and the
+  consumption-plan panel, followed by three `DataTable`s (issue 1782): the legacy set-level essences,
+  the tools and the produced outputs, each bounded and unpaged.
 
-  The three-surface presentation it replaces (a flat image grid, a separately
-  stacked alternatives picker and an essence list) could not tell a player which
-  requirement still needed attention, which is the whole job of this area. The
-  have/need pip moved into RequirementTile with it; the `fa-layer-group` alternatives
-  badge was NOT carried across — the rail's disclosure line already states that a
-  slot has alternatives, and the badge used the exact accent trio the open state now
-  claims.
-
-  Legacy set-level `ingredientSet.essences` are threshold-only and never consumed,
-  so they cannot enter an allocation pool and keep their existing row presentation
-  (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
+  Legacy set-level `ingredientSet.essences` are threshold-only and never consumed, so they
+  cannot enter an allocation pool and keep their own table (which also preserves the
+  pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -24,7 +16,7 @@
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
-    ESSENCE_POOL_SLOT_ID,
+    SLOT_KIND,
     buildConsumptionPlan,
     buildRequirementSlots,
   } from '../../../util/requirementSlots.js';
@@ -35,7 +27,10 @@
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
-  import Kicker from '../../../components/Kicker.svelte';
+  import { essenceOvershoots } from './essenceOvershoot.js';
+  import DataTable from '../../../components/DataTable.svelte';
+  import Well from '../../../components/Well.svelte';
+  import AwardPill from './AwardPill.svelte';
 
   let {
     craftability = null,
@@ -73,18 +68,20 @@
   const outputs = $derived(Array.isArray(result?.items) ? result.items : []);
 
   const panelId = $derived(`${idPrefix}-panel`);
-  // The tile the open panel is labelled back at. Every essence tile opens the same
-  // pool, so the first of them owns the label.
   const openSlot = $derived(
     slots.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null
   );
-  const openTileId = $derived(openSlot ? `fabricate-slot-${openSlot.key}` : null);
-  const poolOpen = $derived(!readOnly && openSlotId === ESSENCE_POOL_SLOT_ID && Boolean(openSlot));
-  const openChoices = $derived(
-    readOnly || !openSlotId || poolOpen
+  // Any open essence slot shows the pool: the shared pool slot, or a group whose chosen
+  // alternative is an essence (beneath that group's alternatives).
+  const poolOpen = $derived(!readOnly && openSlot?.kind === SLOT_KIND.ESSENCE);
+  const openStacks = $derived(
+    readOnly || !openSlotId
       ? []
-      : ingredientChoices.filter((choice) => choice?.groupId === openSlotId)
+      : ingredientChoices.filter(
+          (choice) => choice?.kind === 'stack' && choice.groupId === openSlotId
+        )
   );
+  const overshoots = $derived(essenceOvershoots(craftability?.essencePool ?? null));
 
   function essenceLabel(state) {
     return String(state?.name ?? state?.label ?? state?.type ?? state?.essenceType ?? '');
@@ -92,108 +89,168 @@
   function essenceIcon(state) {
     return normalizeEssenceIcon(state?.icon);
   }
+
+  const column = (key, label, extra = {}) => ({ key, label: localize(label), ...extra });
+  const essenceColumns = [
+    column('name', 'FABRICATE.App.Crafting.Io.Columns.Essence', { rowHeader: true }),
+    column('have', 'FABRICATE.App.Crafting.Io.Have', { align: 'end' }),
+    column('need', 'FABRICATE.App.Crafting.Io.Need', { align: 'end' }),
+  ];
+  const toolColumns = [
+    column('name', 'FABRICATE.App.Crafting.Io.Columns.Tool', { rowHeader: true }),
+    column('status', 'FABRICATE.App.Crafting.Io.Columns.Status', { align: 'end' }),
+  ];
+  const outputColumns = [
+    column('name', 'FABRICATE.App.Crafting.Io.Columns.Output', { rowHeader: true }),
+    column('amount', 'FABRICATE.App.Crafting.Io.Columns.Amount', { align: 'end', mono: true }),
+  ];
 </script>
+
+{#snippet identity(artwork, name, labelClass, nameClass)}
+  <span class={labelClass}>
+    <Medallion art={artwork.art} icon={artwork.icon} alt="" size={26} />
+    <span class={nameClass}>{name}</span>
+  </span>
+{/snippet}
+
+{#snippet essenceCell(state, column)}
+  {#if column.key === 'name'}
+    <span class="crafting-io-label">
+      <i class={`crafting-io-essence-icon ${essenceIcon(state)}`} aria-hidden="true"></i>
+      <span class="crafting-io-name">{essenceLabel(state)}</span>
+    </span>
+  {:else if column.key === 'have'}
+    <!-- A word and a count as two children, so the chip's own gap separates them. -->
+    <Chip
+      density="list"
+      emphasis="solid"
+      tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
+      ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span>{countText(state.have)}</span
+      ></Chip
+    >
+  {:else}
+    <Chip density="list" emphasis="solid" tone={statusChipTone('neutral')}
+      ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span>{countText(state.need)}</span
+      ></Chip
+    >
+  {/if}
+{/snippet}
+
+{#snippet toolCell(tool, column)}
+  {#if column.key === 'name'}
+    {@render identity(
+      resolveCraftingArt(tool.img),
+      tool.name,
+      'crafting-io-tool-label',
+      'crafting-io-name'
+    )}
+  {:else}
+    <Chip
+      density="list"
+      tone={statusChipTone(tool.available ? 'success' : 'danger')}
+      icon={`fas ${tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}`}
+      >{tool.available
+        ? localize('FABRICATE.App.Crafting.Io.Available')
+        : localize('FABRICATE.App.Crafting.Io.Unavailable')}</Chip
+    >
+  {/if}
+{/snippet}
+
+{#snippet outputCell(item, column)}
+  {#if item.kind === 'group'}
+    {#if column.key === 'name'}
+      <!-- A choice group (issue 1773): who chooses and how many, over its alternatives. -->
+      <Well label={item.name}>
+        <ul class="crafting-io-outputs">
+          {#each item.members as member, memberIndex (member.name + memberIndex)}
+            <AwardPill item={member} variant="output" />
+          {/each}
+        </ul>
+      </Well>
+    {:else}
+      <!-- A group's amounts are its alternatives', so its own amount cell states none. -->
+      <span class="crafting-io-output-none" aria-hidden="true">—</span>
+    {/if}
+  {:else if column.key === 'name'}
+    {@render identity(
+      resolveCraftingArt(item.img, item.glyph),
+      item.name,
+      'crafting-io-label',
+      'crafting-io-name crafting-io-output-name'
+    )}
+  {:else}
+    <span class="crafting-io-output-qty">{item.amountText ?? `×${item.qty ?? 1}`}</span>
+  {/if}
+{/snippet}
 
 <section class="crafting-io" data-recipe-section="io">
   {#if slots.length > 0}
     <div class="crafting-io-group" data-io-group="ingredients">
+      {#snippet chooser()}
+        <IngredientOptionSelector
+          choices={openStacks}
+          need={openSlot?.need ?? 0}
+          onChoose={onChooseOption}
+        />
+        {#if poolOpen}
+          <EssencePoolPanel
+            pool={craftability?.essencePool ?? null}
+            {readOnly}
+            onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
+          />
+        {/if}
+      {/snippet}
+      <!-- The rail's chooser owns the one panel region, so a slot with nothing to show opens none. -->
       <RequirementRail
         {slots}
         {openSlotId}
         {readOnly}
         {announcement}
         {panelId}
+        choices={ingredientChoices}
         {onOpenSlot}
+        {onChooseOption}
         {onPickForMe}
+        chooser={openStacks.length > 0 || poolOpen ? chooser : null}
       />
-      {#if poolOpen}
-        <EssencePoolPanel
-          pool={craftability?.essencePool ?? null}
-          {readOnly}
-          {panelId}
-          labelledBy={openTileId}
-          onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
-        />
-      {:else if openChoices.length > 0}
-        <!-- `role="region"` is load-bearing: `aria-labelledby` on a roleless `<div>` is
-             not exposed at all, so without it the panel the open tile points
-             `aria-controls` at would be an unnamed generic. The essence pool is a real
-             `<section>` and gets the same treatment for free. -->
-        <div id={panelId} role="region" aria-labelledby={openTileId ?? undefined}>
-          <IngredientOptionSelector choices={openChoices} onChoose={onChooseOption} />
-        </div>
-      {/if}
-      <ConsumptionPlanPanel {plan} {formatList} />
+      <ConsumptionPlanPanel {plan} {overshoots} {formatList} />
     </div>
   {/if}
 
   {#if essences.length > 0}
-    <div class="crafting-io-group" data-io-group="essences">
-      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Essences')}</Kicker>
-      <ul class="crafting-io-list">
-        {#each essences as state, index (state.type ?? state.essenceType ?? index)}
-          <li class="crafting-io-row" data-io-satisfied={state.satisfied ? 'true' : 'false'}>
-            <span class="crafting-io-essence-label">
-              <i class={`crafting-io-essence-icon ${essenceIcon(state)}`} aria-hidden="true"></i>
-              <span class="crafting-io-name">{essenceLabel(state)}</span>
-            </span>
-            <span class="crafting-io-tags">
-              <!-- The reading is a WORD and a COUNT, two children rather than one string, so the
-                   chip's own gap still separates them the way the retired tag's did. -->
-              <Chip density="list" tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
-                ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span
-                  >{countText(state.have)}</span
-                ></Chip
-              >
-              <Chip density="list" tone={statusChipTone('neutral')}
-                ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span
-                  >{countText(state.need)}</span
-                ></Chip
-              >
-            </span>
-          </li>
-        {/each}
-      </ul>
-    </div>
+    <DataTable
+      data-io-group="essences"
+      heading={localize('FABRICATE.App.Crafting.Io.Essences')}
+      columns={essenceColumns}
+      rows={essences}
+      rowKey={(state, index) => state.type ?? state.essenceType ?? index}
+      rowData={(state) => ({ 'data-io-satisfied': state.satisfied ? 'true' : 'false' })}
+      cell={essenceCell}
+    />
   {/if}
 
   {#if tools.length > 0}
-    <div class="crafting-io-group" data-io-group="tools">
-      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Tools')}</Kicker>
-      <ul class="crafting-io-list">
-        {#each tools as tool, index (tool.componentId ?? tool.name ?? index)}
-          <li class="crafting-io-row" data-io-satisfied={tool.available ? 'true' : 'false'}>
-            <span class="crafting-io-tool-label">
-              <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
-              <span class="crafting-io-name">{tool.name}</span>
-            </span>
-            <Chip
-              density="list"
-              tone={statusChipTone(tool.available ? 'success' : 'danger')}
-              icon={`fas ${tool.available ? 'fa-screwdriver-wrench' : 'fa-triangle-exclamation'}`}
-              >{tool.available
-                ? localize('FABRICATE.App.Crafting.Io.Available')
-                : localize('FABRICATE.App.Crafting.Io.Unavailable')}</Chip
-            >
-          </li>
-        {/each}
-      </ul>
-    </div>
+    <DataTable
+      data-io-group="tools"
+      heading={localize('FABRICATE.App.Crafting.Io.Tools')}
+      columns={toolColumns}
+      rows={tools}
+      rowKey={(tool, index) => tool.componentId ?? `${tool.name}-${index}`}
+      rowData={(tool) => ({ 'data-io-satisfied': tool.available ? 'true' : 'false' })}
+      cell={toolCell}
+    />
   {/if}
 
   {#if outputs.length > 0}
-    <div class="crafting-io-group" data-io-group="outputs">
-      <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
-      <ul class="crafting-io-outputs">
-        {#each outputs as item, index (item.name + index)}
-          <li class="crafting-io-output" data-io-output>
-            <Medallion {...resolveCraftingArt(item.img)} alt="" size={32} />
-            <span class="crafting-io-output-name">{item.name}</span>
-            <span class="crafting-io-output-qty">×{item.qty}</span>
-          </li>
-        {/each}
-      </ul>
-    </div>
+    <DataTable
+      data-io-group="outputs"
+      heading={localize('FABRICATE.App.Crafting.Io.Output')}
+      columns={outputColumns}
+      rows={outputs}
+      rowKey={(item, index) => `${item.name}-${index}`}
+      rowData={(item) => ({ 'data-io-output': item.kind ?? 'component' })}
+      cell={outputCell}
+    />
   {/if}
 </section>
 
@@ -210,26 +267,6 @@
     gap: 6px;
   }
 
-  .crafting-io-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .crafting-io-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 6px 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-  }
-
   .crafting-io-name {
     min-width: 0;
     overflow: hidden;
@@ -238,22 +275,13 @@
     font-size: 13px;
   }
 
-  /* Tool row: image tile to the left of the tool name. */
+  /* A cell's identity: the art tile or the essence glyph to the left of the name. */
+  .crafting-io-label,
   .crafting-io-tool-label {
-    flex: 1 1 auto;
     min-width: 0;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-  }
-
-  /* Legacy set-level essence row: FA icon to the left of the essence name. */
-  .crafting-io-essence-label {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-io-essence-icon {
@@ -262,10 +290,8 @@
     color: var(--fab-text-muted);
   }
 
-  .crafting-io-tags {
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: 4px;
+  .crafting-io-output-none {
+    color: var(--fab-text-muted);
   }
 
   .crafting-io-outputs {
@@ -274,28 +300,6 @@
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  /* Rounded rectangle matching the tier award pills + the rounded-square item image
-     it wraps (not a full capsule). */
-  .crafting-io-output {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px 4px 4px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-io-output-name {
-    font-size: 13px;
-  }
-
-  .crafting-io-output-qty {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--fab-text-muted);
+    gap: var(--fab-space-2);
   }
 </style>

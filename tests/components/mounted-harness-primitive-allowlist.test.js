@@ -18,13 +18,9 @@ const SHARED_PRIMITIVES = [
   // The manager's ONE modal-dialog chrome (issue 877). Both import-flow modals render
   // through it, so adding it to a third screen would silently pull it into every suite
   // that mounts a tree containing that screen.
-  'src/ui/svelte/apps/manager/ManagerModal.svelte',
-  // The manager's ONE "how this surface works" explainer card and ONE icon fact row
-  // (issue 881). Both are side-panel primitives, so the shared scoped-entity preview and the
-  // essence on-craft tab already pull them into two different mounted trees and the next side
-  // panel will pull them into a third. The Tags & Categories rail was one of the two justifying
-  // trees until issue 1915 retired it; the explainer card kept its two callers without it.
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+  'src/ui/svelte/components/Modal.svelte',
+  // The manager's ONE icon fact row (issue 881), a side-panel primitive the scoped-entity preview,
+  // the world catalogue shell and the inspectors pull into several mounted trees.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // The manager's ONE chip (issue 883). This is the sharpest case yet.
   'src/ui/svelte/components/Chip.svelte',
@@ -40,27 +36,54 @@ const SHARED_PRIMITIVES = [
   // pulls `SearchablePopover` in behind it, which is exactly the silent fan-out this list
   // exists to turn into a named failure.
   'src/ui/svelte/components/Select.svelte',
-  // THE right-inspector action button (issue 1036, maintainer round 2).
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
   // The list reaches five manager surfaces at once, and it renders the disclosure and the icon
   // button behind it, so a tree holding any converted list pulls three primitives in.
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  // The three instruments over it (issue 1782): the player window, the journal and the Checks
+  // Studio render them, so each joins the trees that already compile the leaf.
+  'src/ui/svelte/components/Meter.svelte',
+  'src/ui/svelte/components/BandedBar.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // The rule row and its sentence (issue 1782): every tree holding the Checks Studio's triggers or
+  // a gathering inspector's condition modifiers renders both.
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
+  // The set picker (issue 1782): the recipe-item editor's contents tab and the crafting bar.
+  'src/ui/svelte/components/SetPicker.svelte',
+  // The inspector rail section (issue 1782): the essence, tool and recipe-item inspectors.
+  'src/ui/svelte/components/Rail.svelte',
+  // The log list (issue 1782): every tree holding the journal's Finished list renders it.
+  'src/ui/svelte/components/LogList.svelte',
+  // The data table (issue 1782): the gathering task editor's drop rules and the crafting IO table.
+  'src/ui/svelte/components/DataTable.svelte',
+  // The typeahead (issue 1782): the recipe-item limits tab and the gathering task and modifier editors.
+  'src/ui/svelte/components/Typeahead.svelte',
+  // Three the manager and the player window both render, adjudicated in when the two-root clause
+  // below arrived (issue 1782): the dice faces of a check's evidence and outcome preview, the
+  // segmented choice the browse filters and the Checks Studio share, and the inset well the
+  // requirement chooser and the dice prompt draw.
+  'src/ui/svelte/components/DiceTiles.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  // The strip of current values (issue 1521): the crafting check card and the gathering detail
+  // render it, so every crafting and gathering tree compiles it.
+  'src/ui/svelte/components/InfoStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
-  // after `Chip`: `manager-button` is a CSS convention repeated across more than sixty
+  // after `Chip`: the button class is a CSS convention repeated across more than sixty
   // components, so every step of the conversion sweep drops this primitive into another
   // mounted tree. Two screens use it today — the Modifiers card in `SystemEditView` and the
   // Tool Studio header, which is the authority the primitive reproduces — and they already
   // sit in four different mounted trees between them.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // THE manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
-  // THE manager's on/off switch (issue 1040). Sharper again than `ManagerButton`.
+  // THE manager's on/off switch (issue 1040). Sharper again than `Button`.
   'src/ui/svelte/components/StatusToggle.svelte',
   // THE manager's card shell (issue 1427).
   'src/ui/svelte/components/InspectorCard.svelte',
@@ -74,8 +97,8 @@ const SHARED_PRIMITIVES = [
   // tasks and events, realms, books-and-scrolls, access and both world scoped-entity lists —
   // and the field reaches four editors and two rosters on top of that, so between them they sit
   // in more mounted trees than any entry above except `Chip`.
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   // THE editor validation surface (issue 1444).
   // BOTH FIGURES ARE RE-DERIVED FROM THE TREE rather than adjusted, because the pair this note
   // replaced had drifted in opposite directions — it said seven renderers and four direct
@@ -137,6 +160,25 @@ const SHARED_PRIMITIVES = [
   // suites: the alchemy view, the app root, the journal view and both inventory suites. Only
   // the three gathering suites are hand-rolled.
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The identity row every player detail pane leads with (issue 1518): the crafting, inventory and
+  // journal trees all render it, so an omission is named here rather than cancelling a suite.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
+  // The requirement chooser (issue 1518): every tree holding the crafting rail renders it, and it
+  // is a new file, so an omission would cancel a suite silently rather than fail it by name.
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  // The browse pager (issue 1518): every player browse list and the inventory inspector's
+  // per-section lists render it, beside the manager's browse screens.
+  'src/ui/svelte/components/Pagination.svelte',
+  // The routed ladder and its dense row (issue 1644): crafting's routed tiers and salvage's routed
+  // body draw them, and the recipe-item preview carries that salvage body into the manager tree.
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
+  // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
+  'src/ui/svelte/components/YieldScale.svelte',
+  // The app navigation and its labelled rows (issue 1777): the manager root and the player shell
+  // both render the first, and the second is in its static closure wherever it is mounted.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */
@@ -374,6 +416,29 @@ test('the shared primitives are reachable from a declared application root, so t
       `${primitive} should be reachable from at least one declared application root`
     );
   }
+});
+
+test('a shared component two application roots render is adjudicated, in or out', () => {
+  // The guard above fires only for a suite that compiles a tree holding a listed primitive but not
+  // the primitive, so an entry every suite already compiles could be dropped without a failure.
+  // This clause is what makes dropping one fail by name (issue 1782).
+  const rootClosures = APPLICATION_ROOTS.map((root) => closures.get(root));
+  const adjudicated = new Set([...SHARED_PRIMITIVES, ...ADJUDICATED_NON_MEMBERS]);
+  const shared = componentPaths.filter(
+    (path) =>
+      /^src\/ui\/svelte\/components\/[^/]+\.svelte$/.test(path) &&
+      rootClosures.filter((closure) => closure.has(path)).length >= 2
+  );
+  assert.ok(
+    shared.includes('src/ui/svelte/components/SetPicker.svelte') && shared.length >= 20,
+    `only ${shared.length} components are reachable from two roots, so the walk stopped seeing them`
+  );
+  assert.deepEqual(
+    shared.filter((path) => !adjudicated.has(path)),
+    [],
+    'these components render under two application roots, so a mounted suite of either tree can ' +
+      'hang on them; add each to SHARED_PRIMITIVES, or record why not in ADJUDICATED_NON_MEMBERS'
+  );
 });
 
 // A COMMENT INSIDE A ROSTER IS INSIDE THAT ROSTER'S CAPTURED BODY (issue 1514).

@@ -13,7 +13,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import Chip from '../../../components/Chip.svelte';
   import {
@@ -307,17 +307,18 @@
 
 <!--
   THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT rather than left below a system list of
-  arbitrary length. An `InspectorActionButton`, NOT a `ManagerButton`: `role="primary"` emits the
-  SUCCESS family, and the sheet declaring it is closed to this lane.
+  arbitrary length.
 -->
 {#snippet essenceInspectorFoot(entry)}
-  <InspectorActionButton
-    tone="primary"
-    icon="fas fa-arrow-up-right-from-square"
-    label={text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Open definition')}
+  <Button
+    role="primary"
+    fullWidth
     data-scoped-essence-open-entry
-    onClick={() => onOpenEntry(entry.id)}
-  />
+    onclick={() => onOpenEntry(entry.id)}
+  >
+    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+    <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Open definition')}</span>
+  </Button>
 {/snippet}
 
 <style>
@@ -352,7 +353,7 @@
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }

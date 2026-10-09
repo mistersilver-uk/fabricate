@@ -1,10 +1,11 @@
 /**
  * The success-counting Checks Studio states (issue 2004) and the roll-under recipe states (issue
  * 2005), each written onto Karrun Forgecraft's crafting, salvage and gathering checks before the
- * runtime boots, so the real normalizer reads them. Count authoring is issue 2006's, so the lab
- * seeds what no control can author yet.
+ * runtime boots, so the real normalizer reads them. Issue 2006's authoring cases start from these
+ * pools and drive the rest through the Studio's own controls.
  */
 import { LAB_SYSTEM_IDS } from './labContent.js';
+import { LAB_MACRO_UUIDS } from './labMacros.js';
 
 const BEST = Object.freeze({ enabled: true, faces: { kind: 'best' } });
 const WORST = Object.freeze({ enabled: true, faces: { kind: 'worst' } });
@@ -105,11 +106,29 @@ const DICE_POOL_EXTENDED = {
 };
 
 /**
+ * Issue 2008: the pool's additional dice, paid from a stored Momentum, with a read macro linked
+ * for when the source switches to macros.
+ */
+const MOMENTUM_DICE = Object.freeze({
+  enabled: true,
+  source: 'path',
+  path: 'system.resources.momentum.value',
+  readMacroUuid: LAB_MACRO_UUIDS.readMomentum,
+  max: 1,
+  label: 'Momentum',
+});
+
+/**
  * Frames 07, 08, 16 and 17: two d20s against four recipe tiers, one needing more successes than
- * dice (additional dice wait for issue 2008), a threshold that rolls dice and a pool that does.
+ * the base pool and one more than additional dice can add, a threshold that rolls dice and a pool
+ * that does. Idrin holds 2 Momentum, Brenna's is set by an active effect and Vosk has none.
  */
 const DICE_POOL_FAULTS = {
   resolutionMode: 'simple',
+  momentum: {
+    'lab-actor-idrin': { value: 2 },
+    'lab-actor-brenna': { value: 2, overridden: true },
+  },
   crafting: {
     simple: {
       evaluation: count('under', {
@@ -118,12 +137,7 @@ const DICE_POOL_FAULTS = {
         threshold: '13',
         required: 2,
         modifierDestination: 'threshold',
-        additionalDice: {
-          enabled: true,
-          source: 'path',
-          path: 'system.resources.momentum.value',
-          max: 1,
-        },
+        additionalDice: MOMENTUM_DICE,
       }),
       tiers: [
         tier('lab-tier-complex-work', 'Complex Work', 2),
@@ -134,12 +148,55 @@ const DICE_POOL_FAULTS = {
     },
   },
   salvage: count('under', { die: 20, base: '2', threshold: '1d4 + 6', required: 1 }),
+  // Frame 16's two issue 2006 faults: an explosion from a face nobody chose, and a kept trigger
+  // reading dice group 1, which the pool's one group never rolls.
   gathering: {
-    evaluation: count('over', { die: 10, base: '2d4', threshold: '8', required: 1 }),
+    evaluation: count('over', {
+      die: 10,
+      base: '2d4',
+      threshold: '8',
+      required: 1,
+      explode: { enabled: true, faces: { kind: 'from', value: null } },
+    }),
     relativeOutcomes: [
       outcome('lab-count-failure', 'Failure', -1, false),
       outcome('lab-count-success', 'Success', 0, true),
     ],
+    checkBreakage: {
+      triggers: [
+        {
+          id: 'lab-trig-group-one',
+          condition: {
+            type: 'diceGroup',
+            groupId: 1,
+            aggregate: 'anyDie',
+            operator: '==',
+            value: 6,
+          },
+          outcome: 'failure',
+          breakTools: false,
+          tierStep: { mode: 'none', steps: 1, tierId: null },
+        },
+      ],
+    },
+  },
+};
+
+/** Frame 07's macro pair: the read macro is a script, the spend macro a chat macro (issue 2008). */
+const DICE_POOL_FAULTS_MACRO = {
+  ...DICE_POOL_FAULTS,
+  crafting: {
+    simple: {
+      ...DICE_POOL_FAULTS.crafting.simple,
+      evaluation: count('under', {
+        ...DICE_POOL_FAULTS.crafting.simple.evaluation.pool,
+        additionalDice: {
+          ...MOMENTUM_DICE,
+          source: 'macro',
+          spendMacroUuid: LAB_MACRO_UUIDS.chatMomentum,
+        },
+      }),
+    },
   },
 };
 
@@ -206,6 +263,30 @@ const DICE_POOL_PILEUP = {
       ],
     },
   },
+};
+
+/**
+ * Frame 21 (issue 2006): summing checks whose free-text formulas count successes. Crafting's
+ * `2d20cs<=@skills.survival.value` against a fixed DC with tier DCs 1, 2 and 3 converts; salvage's
+ * `6d10cs>=8df<=8` cancels on faces that also qualify, so it only warns.
+ */
+const SUM_OVER = Object.freeze({ product: 'sum', direction: 'over' });
+const DICE_POOL_FREETEXT = {
+  resolutionMode: 'simple',
+  crafting: {
+    simple: {
+      rollFormula: '2d20cs<=@skills.survival.value',
+      dc: 1,
+      evaluation: SUM_OVER,
+      tiers: [
+        { id: 'lab-tier-rough-work', name: 'Rough Work', dc: 1, successes: null },
+        { id: 'lab-tier-fine-craft', name: 'Fine Craft', dc: 2, successes: null },
+        { id: 'lab-tier-masterwork', name: 'Masterwork', dc: 3, successes: null },
+      ],
+    },
+  },
+  salvage: SUM_OVER,
+  salvageFormula: '6d10cs>=8df<=8',
 };
 
 /** A trigger forcing `outcome`, by default on every roll (issue 2080). */
@@ -297,11 +378,30 @@ const GATHERING_UNDER_ADD = {
   },
 };
 
+/**
+ * Issue 2006's recipe screens: frame 06's pool needing three successes, with Smithing's own tier
+ * ids needing one and five, and two recipes on those tiers, so the recipe pills differ and sort.
+ */
+const DICE_POOL_RECIPES = {
+  ...DICE_POOL,
+  crafting: {
+    simple: {
+      evaluation: count('over', { ...DICE_POOL.crafting.simple.evaluation.pool, required: 3 }),
+      tiers: [
+        tier('sm-tier-apprentice', 'Apprentice work', 1),
+        tier('sm-tier-masterwork', 'Masterwork', 5),
+      ],
+    },
+  },
+  recipeTiers: { 'sm-r-horseshoe': 'sm-tier-apprentice', 'sm-r-longsword': 'sm-tier-masterwork' },
+};
+
 /** The `checkPreviewState` query values and the checks each seeds. */
 export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
   'dice-pool-extended': DICE_POOL_EXTENDED,
   'dice-pool-faults': DICE_POOL_FAULTS,
+  'dice-pool-faults-macro': DICE_POOL_FAULTS_MACRO,
   'roll-under-fixed': ROLL_UNDER_FIXED,
   'roll-under-dynamic': ROLL_UNDER_DYNAMIC,
   'roll-under-add': ROLL_UNDER_ADD,
@@ -311,6 +411,8 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool-rescued': DICE_POOL_RESCUED,
   'gathering-over': GATHERING_OVER,
   'gathering-under-add': GATHERING_UNDER_ADD,
+  'dice-pool-freetext': DICE_POOL_FREETEXT,
+  'dice-pool-recipes': DICE_POOL_RECIPES,
 });
 
 /** Karrun Forgecraft's crafting and salvage checks as `state` authors them, formula blank. */
@@ -328,14 +430,20 @@ function seedCraftingAndSalvage(system, state) {
   system.salvageCraftingCheck = {
     ...system.salvageCraftingCheck,
     enabled: true,
-    simple: { rollFormula: '', dc: 12, thresholdMode: 'meet', evaluation: state.salvage },
+    simple: {
+      rollFormula: state.salvageFormula ?? '',
+      dc: 12,
+      thresholdMode: 'meet',
+      evaluation: state.salvage,
+    },
   };
 }
 
-/** Karrun Forgecraft's checks as `state` authors them; a state with no crafting keeps its own. */
+/** Karrun Forgecraft's checks as `state` authors them; a slot a state leaves out keeps its own. */
 function seedChecks(system, state) {
   system.modifiers = [...(system.modifiers ?? []), ...(state.modifiers ?? [])];
   if (state.crafting) seedCraftingAndSalvage(system, state);
+  if (!state.gathering) return;
   system.gatheringCraftingCheck = {
     ...system.gatheringCraftingCheck,
     enabled: true,
@@ -352,8 +460,21 @@ export function seedCheckPreviewState(content, actors, stateId) {
   if (!state) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
   seedChecks(system, state);
+  for (const [recipeId, checkTierId] of Object.entries(state.recipeTiers ?? {})) {
+    content.recipes.find((recipe) => recipe.id === recipeId).checkTierId = checkTierId;
+  }
   const gathering = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
   gathering.economy = { ...gathering.economy, resolutionMode: 'routed' };
   const idrin = actors.find((actor) => actor.id === 'lab-actor-idrin');
   idrin.system.skills = { ...idrin.system.skills, smith: { rank: 4 } };
+  stampMomentum(actors, state.momentum ?? {});
+}
+
+/** Each actor's stored Momentum, and the active effect that sets it where one does. */
+function stampMomentum(actors, table) {
+  for (const [actorId, { value, overridden }] of Object.entries(table)) {
+    const actor = actors.find((entry) => entry.id === actorId);
+    actor.system.resources = { ...actor.system.resources, momentum: { value } };
+    if (overridden) actor.overrides = { system: { resources: { momentum: { value: 5 } } } };
+  }
 }

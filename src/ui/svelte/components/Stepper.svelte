@@ -172,8 +172,8 @@
   }
 
   function commitDraft(input) {
-    const text = input.value.trim();
-    emitFormatted(text === formattedDisplay ? undefined : parsedDraft(text), input);
+    const typed = input.value.trim();
+    emitFormatted(typed === formattedDisplay ? undefined : parsedDraft(typed), input);
   }
 
   function keyedValue(key) {
@@ -321,7 +321,7 @@
   .fab-stepper.is-vertical .fab-stepper-adjunct {
     width: 100%;
     height: 26px;
-    border-radius: 6px;
+    border-radius: 7px;
     font-size: 0.7rem;
   }
 
@@ -329,7 +329,7 @@
     width: 100%;
     height: 30px;
     font-size: 1.05rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
@@ -341,7 +341,7 @@
     display: flex;
     box-sizing: border-box;
     width: 100%;
-    height: var(--fab-stepper-fill-height, 36px);
+    height: var(--fab-stepper-fill-height, 38px);
   }
 
   .fab-stepper.is-fill:not(.is-vertical) .fab-stepper-input {
@@ -375,9 +375,29 @@
     cursor: pointer;
   }
 
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) of a 22px button: a 1px padding the negative margin
+     gives back, so the row keeps its 22px and the 2px gap to the input. The background stays on the
+     content box and takes the 7px corner that leaves it the drawn 6px, and the focus ring sits on
+     the 24px edge, which is where the 22px box's ring sat at an offset of 1px. A positioned
+     `::before` would paint the glyph a sub-pixel off. */
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    margin: -1px;
+    padding: 1px;
+    /* ratchet-exempt(design-system): the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box background still draws 6; retires if the adjunct moves to the ::before form or a hit-area token lands */
+    border-radius: 7px;
+    background-clip: content-box;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible {
+    outline-offset: 0;
+  }
+
   .fab-stepper-adjunct:hover:not(:disabled) {
     color: var(--fab-text);
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .fab-stepper-adjunct:disabled {
@@ -401,6 +421,14 @@
     appearance: textfield;
   }
 
+  /* The same 24px target for the typeable input, by a 1px border-box inset the negative margin gives
+     back: the row keeps its 22px, the text stays centred and the focus ring stays where it was. */
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input {
+    box-sizing: border-box;
+    height: 24px;
+    margin-block: -1px;
+  }
+
   .fab-stepper-input::-webkit-outer-spin-button,
   .fab-stepper-input::-webkit-inner-spin-button {
     appearance: none;
@@ -411,6 +439,10 @@
   .fab-stepper-input:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input:focus-visible {
+    outline-offset: 0;
   }
 
   .fab-stepper-adjunct:focus-visible {

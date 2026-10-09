@@ -47,12 +47,12 @@
   never moved to the blocked list, and it never names a "repair it first" remedy,
   which Fabricate has no action for.
 
-  ## Every control is a real <button>
+  ## Controls
 
-  Clear, Done, the per-row remove, the commit and the destroy trigger. Each carries
-  the Foundry reset, because the global `.app button` rule pins a fixed height and a
-  button that only sets `min-height` gets CROPPED in real Foundry — a class of defect
-  mounted tests cannot see.
+  Clear, Done, the commit and the destroy trigger are shared `Button`s: the
+  commit and Done are the pane's one primary, Destroy the plain danger role, since its
+  confirmation is the dialog upstream. The per-row remove stays a 20px hand-rolled
+  button, because a 34px icon button would grow every queue row.
 
   Props:
    - counts / entries / salvageable / blocked / yieldRows: the store's already
@@ -70,6 +70,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Button from '../../../components/Button.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
@@ -293,16 +294,10 @@
 </script>
 
 {#snippet clearAction()}
-  <button
-    type="button"
-    class="bulk-text-button"
-    data-inventory-bulk-clear
-    disabled={busy}
-    onclick={() => onClear?.()}
-  >
+  <Button role="ghost" data-inventory-bulk-clear="" disabled={busy} onclick={() => onClear?.()}>
     <i class="fas fa-xmark" aria-hidden="true"></i>
     <span>{localize('FABRICATE.App.Inventory.Bulk.Clear')}</span>
-  </button>
+  </Button>
 {/snippet}
 
 {#snippet complicationCountLabel()}
@@ -372,8 +367,7 @@
         <EmptyState
           note
           hint={localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
-          dataAttr="data-inventory-bulk-empty"
-          dataValue=""
+          data-inventory-bulk-empty
         />
       {:else}
         <!-- ABOVE the queue, and PRE-COMMIT only. The forecast is what the player weighs
@@ -502,15 +496,10 @@
          entirely once a report stands, leaving only Done. -->
     <div class="bulk-footer" data-inventory-bulk-footer={state}>
       {#if state === 'report'}
-        <button
-          type="button"
-          class="bulk-action"
-          data-inventory-bulk-done
-          onclick={() => onDone?.()}
-        >
+        <Button role="primary" fullWidth data-inventory-bulk-done="" onclick={() => onDone?.()}>
           <i class="fas fa-check" aria-hidden="true"></i>
           <span>{localize('FABRICATE.App.Inventory.Bulk.Done')}</span>
-        </button>
+        </Button>
       {:else}
         <p class="bulk-footer-note" data-inventory-bulk-footer-note>
           {localize('FABRICATE.App.Inventory.Bulk.FooterNote')}
@@ -526,24 +515,24 @@
           {/if}
         </p>
         <div class="bulk-footer-actions">
-          <button
-            type="button"
-            class="bulk-destroy"
-            data-inventory-bulk-destroy
+          <Button
+            role="danger"
+            fullWidth
+            data-inventory-bulk-destroy=""
             disabled={busy || entries.length === 0}
             aria-busy={destroying === true}
             onclick={() => onDestroy?.()}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
             <span>{destroyLabel}</span>
-          </button>
-          <button
-            type="button"
-            class="bulk-action"
-            data-inventory-bulk-salvage
+          </Button>
+          <Button
+            role="primary"
+            fullWidth
+            data-inventory-bulk-salvage=""
             disabled={busy || salvageable.length === 0}
             aria-busy={running === true}
-            onclick={() => onSalvage?.()}
+            onclick={(event) => onSalvage?.(event)}
           >
             <i
               class="fas"
@@ -553,7 +542,7 @@
               aria-hidden="true"
             ></i>
             <span>{localize('FABRICATE.App.Inventory.Bulk.SalvageAction')}</span>
-          </button>
+          </Button>
         </div>
       {/if}
     </div>
@@ -643,39 +632,11 @@
     color: var(--fab-text-subtle);
   }
 
-  /* `.salvage-footer`'s shape — a ruled row, the note explaining the gesture's cost on
-     the left, the actions at their own width on the right — with the one divergence it
-     has to have. That footer carries a SINGLE short button; this one carries two, and
-     the destroy button's label names both a component count and a unit count, so the
-     pair is about as wide as the whole inspector column. Taken literally, the shape
-     therefore left the note a ~70px ribbon eight lines tall at the default window — and
-     this note is the only place the player is told, before committing, that one gesture
-     rolls the whole batch, so unreadable is the same as absent.
-     The row WRAPS instead. The note carries a real flex basis, and flex decides wrapping
-     from base sizes BEFORE it shrinks anything, so the line breaks rather than the note
-     collapsing; the note then owns a full-width line. `margin-left: auto` rather than
-     `justify-content: space-between` keeps the actions right in BOTH layouts —
-     space-between left-aligns a wrapped line that holds only one item. */
-  /* STICKY, and that is a correctness fix rather than polish. The panel only grows —
-     the queue is capped at 25 rows and carries a yield preview and a blocked list under
-     it — so the commit pair sat below the scroll fold with as few as FOUR rows selected
-     at the default window width. A commit control the player has to hunt for past the
-     material it acts on is, for the population this feature exists for, effectively not
-     there. Pinned to the bottom of `.inventory-detail`'s scrollport, it is reachable in
-     every selection size.
-     It needs an OPAQUE fill, not `.inventory-view-column-right`'s own
-     `--fab-surface-soft` (issue 859) — that token is a 5%-alpha overlay, not a fill,
-     so a `--fab-surface-soft` footer let scrolled rows show straight through it. The
-     column's true backdrop is that overlay painted once over `.inventory-view-grid`'s
-     `--fab-surface`, so `--fab-surface` — the opaque base of that composite, and the
-     one token every theme block defines it from — is what the footer paints instead:
-     solid enough to block the scrolled queue, and close enough in tone (the overlay
-     it omits is a bare 5% tint) to still read as part of the panel rather than a
-     foreign bar dropped on top of it.
-     `.bulk-body`'s `padding-bottom` STAYS: it is the Chromium flex-overflow trap
-     recorded above, and it is also what keeps this footer's natural (fully scrolled)
-     resting place off the window edge — sticky can only pull an element UP to the
-     scrollport, never past its own containing block's content edge. */
+  /* STICKY, so the commit stays reachable below a long queue (issue 859). Its fill restates the
+     column's composite exactly — `--fab-surface` under an inset `--fab-surface-soft`, a 5% overlay
+     that alone would let scrolled rows show through — or the difference reads as a box; the
+     inset shadow is that second layer because `flat-ui-style-contract` bans gradients.
+     `.bulk-body`'s `padding-bottom` keeps its fully scrolled resting place off the window edge. */
   .bulk-footer {
     position: sticky;
     bottom: 0;
@@ -690,11 +651,6 @@
     border-top: 1px solid var(--fab-border);
     padding-top: var(--fab-space-3);
     padding-bottom: var(--fab-space-2);
-    /* Sticky needs an opaque fill or scrolled rows show through (issue 859). The fill
-       must reproduce the panel's own composite EXACTLY, or the 5% difference reads as
-       a box: the column paints `--fab-surface-soft` over the grid's `--fab-surface`,
-       so both layers are restated here. The inset shadow is that second layer — a
-       gradient would be the obvious way and `flat-ui-style-contract` bans them. */
     background-color: var(--fab-surface);
     box-shadow: inset 0 0 0 100vmax var(--fab-surface-soft);
   }
@@ -713,11 +669,6 @@
     color: var(--fab-text-subtle);
   }
 
-  /* `0 1 auto`, not `0 0 auto`: at the narrow floor the two buttons together are wider
-     than the inspector column, and a group that cannot shrink overflows it instead of
-     letting its own `flex-wrap` act — the column clips horizontally, so the salvage
-     button loses its right edge with nothing on screen to say so. Shrinkable, the group
-     takes the line's width and the buttons stack, still right-aligned. */
   .bulk-footer-actions {
     /* Full-width stacked actions, matching the reference prototype: the commit control
        is the widest thing on the panel rather than a right-aligned pair. This also
@@ -728,18 +679,9 @@
     gap: var(--fab-space-2);
   }
 
-  .bulk-footer-actions > :global(button) {
-    width: 100%;
-    justify-content: center;
-  }
-
   /* Foundry's global `.app button` pins a fixed height and centres content, so a
      button that sets only `min-height` is CROPPED — its content spills past its own
-     border. Reset the inherited box on EVERY control here. This reproduces only in
-     real Foundry; a mounted test cannot see it. */
-  .bulk-action,
-  .bulk-destroy,
-  .bulk-text-button,
+     border. This reproduces only in real Foundry; a mounted test cannot see it. */
   .bulk-remove {
     box-sizing: border-box;
     appearance: none;
@@ -749,85 +691,6 @@
     font: inherit;
     line-height: 1;
     cursor: pointer;
-  }
-
-  /* CraftButton's spec — the house action primitive — rather than a private fourth
-     one: radius 8, an --accent border, 600/14, sized to its content in a row. */
-  .bulk-action {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    min-height: 30px;
-    padding: 6px 14px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .bulk-action:hover:not(:disabled) {
-    filter: brightness(1.05);
-  }
-
-  /* Destroy is deliberately NOT the primary: it is outlined in the danger ramp and
-     sits left of the action the player is far more likely to want, so the destructive
-     control never wins the eye or the muscle memory. */
-  .bulk-destroy {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    min-height: 30px;
-    padding: 6px 12px;
-    border: 1px solid var(--fab-danger-border);
-    border-radius: 8px;
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .bulk-destroy:hover:not(:disabled) {
-    filter: brightness(1.08);
-  }
-
-  .bulk-action:disabled,
-  .bulk-destroy:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-    border-color: var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    filter: none;
-  }
-
-  /* An inline text control with no box of its own — the `.salvage-again` treatment. */
-  .bulk-text-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .bulk-text-button:hover:not(:disabled) {
-    color: var(--fab-text);
-  }
-
-  .bulk-text-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
   }
 
   .bulk-remove {

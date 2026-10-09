@@ -2,13 +2,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
-  KNOWN_AREA_SCOPED_STRING_USES,
-  KNOWN_AREA_SCOPED_STRING_USE_TOTAL,
-  KNOWN_AREA_SCOPED_STYLE_READS,
-  KNOWN_AREA_SCOPED_STYLE_READ_TOTAL,
-} from './components/design-system-known-debt.js';
-import { assertRatchet, byCodePoint, tallyByKey } from './helpers/ratchetBaseline.js';
+  MODULE_CORPUS,
+  STYLE_CORPUS,
+  assertFloor,
+  assertGateCases,
+  checkGate,
+  gateOver,
+  styleCorpusOf,
+  workingTree,
+} from './helpers/designSystemRatchet.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import {
   STYLE_CORPUS_EXTENSIONS,
@@ -70,11 +74,12 @@ const INLINE_TARGETS = Object.freeze([
 ]);
 
 /** `:root`, or one compound of a theme block's two-selector list. */
-const THEME_ROOT_COMPOUND = /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
+const THEME_ROOT_COMPOUND =
+  /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
 
 /**
- * The prefix that DECLARES an intent to be area-scoped. It is no longer what the gate scans (issue
- * 1497).
+ * The prefix every area-scoped property carries. The gate still measures the set from declaration
+ * sites (issue 1497), and holds the prefix to that set both ways.
  */
 const AREA_SCOPED_PREFIX = '--fab-manager-';
 
@@ -93,7 +98,7 @@ const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w
  * The three shapes that USE one named property, for the channels that are not CSS. THE NAME IS
  * ESCAPED AND BOUNDED, for the reason `AREA_COMPOUND` above is.
  *
- * @param {string} name A whole custom-property name, e.g. `--fab-recipe-col-io`.
+ * @param {string} name A whole custom-property name, e.g. `--fab-manager-recipe-col-io`.
  */
 function areaUseShapes(name) {
   const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
@@ -198,7 +203,8 @@ test('no retired token generation survives anywhere under src/ or styles/', () =
       '`openspec/specs/design-system/spec.md`. A surface that wants to name a colour it already ' +
       'gets from a foundation token reads that token directly; a forwarding alias hides it from ' +
       'every surface outside its own selector. Prose that must name a retired generation belongs ' +
-      'in the spec or in a test, both outside these roots:\n  ' + offences.join('\n  ')
+      'in the spec or in a test, both outside these roots:\n  ' +
+      offences.join('\n  ')
   );
 });
 
@@ -225,7 +231,10 @@ test('every inline target is declared only at theme root', () => {
       'satisfied by an empty set, so this is a broken walk rather than a tidied stylesheet.'
   );
   for (const [name, rules] of declaring) {
-    assert.ok(rules.length > 0, `${name} is no longer declared anywhere, so it is not a foundation token`);
+    assert.ok(
+      rules.length > 0,
+      `${name} is no longer declared anywhere, so it is not a foundation token`
+    );
   }
 
   const offences = [];
@@ -244,7 +253,8 @@ test('every inline target is declared only at theme root', () => {
       'lazy and site-local: the inline moved the substitution point from `.fabricate-manager` to ' +
       'each reading element, and that is value-preserving only while every one of these fourteen ' +
       'resolves to the same text at both places. One redeclaration inside the manager breaks it ' +
-      'silently, at hundreds of sites, in the direction nobody looks:\n  ' + offences.join('\n  ')
+      'silently, at hundreds of sites, in the direction nobody looks:\n  ' +
+      offences.join('\n  ')
   );
 });
 
@@ -263,7 +273,9 @@ test('a rule is cited at the line its own selector starts on', () => {
     const cited = (sources[rule.file] ?? '').split('\n')[rule.line - 1];
     checked += 1;
     if (cited === undefined || !cited.includes(head)) {
-      offences.push(`${rule.file}:${rule.line} \`${rule.selector}\` cites "${(cited ?? '').trim()}"`);
+      offences.push(
+        `${rule.file}:${rule.line} \`${rule.selector}\` cites "${(cited ?? '').trim()}"`
+      );
     }
   }
 
@@ -277,34 +289,40 @@ test('a rule is cited at the line its own selector starts on', () => {
     [],
     'a rule is reported at a line that does not hold the start of its selector, so every offence ' +
       'either of the assertions above prints sends its reader to the wrong place in a ' +
-      '20,000-line stylesheet — or, for a Svelte scoped block, to line 1:\n  ' + offences.join('\n  ')
+      '20,000-line stylesheet — or, for a Svelte scoped block, to line 1:\n  ' +
+      offences.join('\n  ')
   );
 });
 
 /**
- * Every `--fab-*` property whose DECLARATION SITES all sit inside the area (issue 1497).
+ * Every `--fab-*` property whose DECLARATION SITES all sit inside the area (issue 1497), over
+ * `rules`, which default to the working tree's.
  *
  * @returns {{names: string[], sites: Map<string, Array<{file: string, line: number, selector:
  * string}>>}}
  */
+function areaScopedOf(rules) {
+  const sites = new Map();
+  for (const rule of rules) {
+    for (const declaration of declarationsIn(rule.file, rule.body)) {
+      if (!declaration.property.startsWith(TOKEN_PREFIX)) continue;
+      if (!sites.has(declaration.property)) sites.set(declaration.property, []);
+      sites.get(declaration.property).push({ ...rule, property: declaration.property });
+    }
+  }
+  const names = [...sites.keys()]
+    .filter((name) =>
+      sites
+        .get(name)
+        .every((rule) => everyCompound(rule.selector, (compound) => AREA_COMPOUND.test(compound)))
+    )
+    .sort(byCodePoint);
+  return { names, sites };
+}
+
 let cachedAreaScoped = null;
 function areaScopedProperties() {
-  if (cachedAreaScoped === null) {
-    const sites = new Map();
-    for (const rule of shippedStyleRules()) {
-      for (const declaration of declarationsIn(rule.file, rule.body)) {
-        if (!declaration.property.startsWith(TOKEN_PREFIX)) continue;
-        if (!sites.has(declaration.property)) sites.set(declaration.property, []);
-        sites.get(declaration.property).push({ ...rule, property: declaration.property });
-      }
-    }
-    const names = [...sites.keys()]
-      .filter((name) =>
-        sites.get(name).every((rule) => everyCompound(rule.selector, (compound) => AREA_COMPOUND.test(compound)))
-      )
-      .sort(byCodePoint);
-    cachedAreaScoped = { names, sites };
-  }
+  cachedAreaScoped ??= areaScopedOf(shippedStyleRules());
   return cachedAreaScoped;
 }
 
@@ -322,26 +340,53 @@ function nonStyleRegion(file, source) {
     .join('\n');
 }
 
-test('the area-scoped set is measured, and the prefix still means what it says', () => {
+/**
+ * Where the prefix and the measured set disagree: an area-scoped name without the prefix, and a
+ * prefixed name with a declaration outside the area (spec: a `:root` declaration un-scopes it).
+ */
+function prefixDisagreements({ names, sites }) {
+  const prefixed = [...sites.keys()].filter((name) => name.startsWith(AREA_SCOPED_PREFIX));
+  return {
+    prefixed,
+    unprefixed: names.filter((name) => !name.startsWith(AREA_SCOPED_PREFIX)),
+    escaped: prefixed.filter((name) => !names.includes(name)),
+  };
+}
+
+test('the area-scoped set is measured, and the prefix is exactly that set', () => {
   const { names, sites } = areaScopedProperties();
 
   assert.ok(
     sites.size > 100,
     `only ${sites.size} distinct \`${TOKEN_PREFIX}\` properties are declared anywhere, against the ` +
-      '~141 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
+      '~135 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
   );
   assert.ok(
     names.length >= 10,
-    `only ${names.length} properties measured as area-scoped, against the 17 this tree holds. A ` +
+    `only ${names.length} properties measured as area-scoped, against the 16 this tree holds. A ` +
       'set that has collapsed makes every clause below an absence check over nothing.'
   );
 
-  // THE PREFIX IS NOW A CLAIM THE MEASUREMENT HAS TO AGREE WITH.
-  const prefixed = [...sites.keys()].filter((name) => name.startsWith(AREA_SCOPED_PREFIX));
-  const escaped = prefixed.filter((name) => !names.includes(name));
-  assert.ok(prefixed.length > 0, 'no property carries the area prefix, so this control has no domain');
+  const { prefixed, unprefixed, escaped } = prefixDisagreements({ names, sites });
+  assert.ok(
+    prefixed.length > 0,
+    'no property carries the area prefix, so this control has no domain'
+  );
   assert.deepEqual(
-    escaped.map((name) => `${name} — declared at ${sites.get(name).map((rule) => `${rule.file}:${rule.line}`).join(', ')}`),
+    unprefixed,
+    [],
+    `every property declared only under \`${AREA_SELECTOR}\` is area-scoped, and an area-scoped ` +
+      `property carries \`${AREA_SCOPED_PREFIX}\`, so a reader can tell from the name alone that ` +
+      'it is undefined outside the manager. Give it the prefix.'
+  );
+  assert.deepEqual(
+    escaped.map(
+      (name) =>
+        `${name} — declared at ${sites
+          .get(name)
+          .map((rule) => `${rule.file}:${rule.line}`)
+          .join(', ')}`
+    ),
     [],
     `a property named \`${AREA_SCOPED_PREFIX}*\` has a declaration site OUTSIDE ` +
       `\`${AREA_SELECTOR}\`. The name promises area scoping and the tree no longer keeps that ` +
@@ -349,6 +394,27 @@ test('the area-scoped set is measured, and the prefix still means what it says',
       'from declaration sites, so this property has just dropped out of it and is now gated by ' +
       'nothing. Either move the stray declaration inside the area, or rename the property.'
   );
+});
+
+test('an unprefixed in-area property fails, and a :root declaration takes a name out of the area', () => {
+  const judged = (css) => {
+    const rules = rulesIn(css).map((rule) => ({ ...rule, file: 'styles/probe.css' }));
+    const { unprefixed, escaped } = prefixDisagreements(areaScopedOf(rules));
+    return { unprefixed, escaped };
+  };
+  const inArea = (property) => `.fabricate-manager .probe { ${property}: 4px; }`;
+  const atRoot = (property) => `:root { ${property}: 2px; }`;
+
+  assert.deepEqual(judged(inArea('--fab-manager-gap')), { unprefixed: [], escaped: [] });
+  assert.deepEqual(judged(inArea('--fab-gap')), { unprefixed: ['--fab-gap'], escaped: [] });
+  assert.deepEqual(judged(`${atRoot('--fab-gap')}\n${inArea('--fab-gap')}`), {
+    unprefixed: [],
+    escaped: [],
+  });
+  assert.deepEqual(judged(`${atRoot('--fab-manager-gap')}\n${inArea('--fab-manager-gap')}`), {
+    unprefixed: [],
+    escaped: ['--fab-manager-gap'],
+  });
 });
 
 test('an area-scoped property is declared and read only inside its area', () => {
@@ -365,11 +431,13 @@ test('an area-scoped property is declared and read only inside its area', () => 
   );
 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
-  // rather than against a directory.
+  // rather than against a directory. Measured at issue 1782's search field: 29 rules, after the
+  // data table retired the drop grid's two properties and the search shell retired the two
+  // toolbar search rules that read `--fab-manager-recipe-control-font`.
   assert.ok(
-    rules.length >= 30,
+    rules.length >= 25,
     `only ${rules.length} sheet rules mention one of the ${names.length} area-scoped properties, ` +
-      'against the ~90 this sheet holds. With none, the assertion below is vacuous.'
+      'against the 29 this sheet holds. With none, the assertion below is vacuous.'
   );
 
   // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in
@@ -409,46 +477,59 @@ test('an area-scoped property is declared and read only inside its area', () => 
       'looks wrong. Each offence names the compounds that sit outside the area: where they are ' +
       'some of several, split the list so only the manager compound keeps this property; where ' +
       'they are the whole list, the rule is reading an area-scoped property from outside the ' +
-      'area, and what it wants is a foundation token:\n  ' + offences.join('\n  ')
+      'area, and what it wants is a foundation token:\n  ' +
+      offences.join('\n  ')
   );
 });
 
-test('no Svelte scoped style reaches an area-scoped property', () => {
+/** A name without its prefix, so a site nets only against the same property under a new prefix. */
+const stem = (name) => name.replace(/^--fab-(?:manager-)?/u, '');
+
+/** Every line of a Svelte scoped block naming an area-scoped property, over one side's corpus. */
+function areaScopedStyleReads(corpus) {
+  const { names } = areaScopedOf(corpus.rules);
+  const found = [];
+  for (const [file, css] of Object.entries(corpus.styles)) {
+    if (!file.endsWith('.svelte')) continue;
+    for (const [index, text] of css.split('\n').entries()) {
+      if (!text.includes(TOKEN_PREFIX)) continue;
+      for (const name of names) {
+        if (text.includes(name))
+          found.push({ file, line: index + 1, id: `area-scoped read ${name}`, value: stem(name) });
+      }
+    }
+  }
+  return found;
+}
+
+const AREA_STYLE_READ_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
+  areaScopedStyleReads(styleCorpusOf(readFile, files))
+);
+
+test('no Svelte scoped style reaches an area-scoped property', (t) => {
   // A scoped `<style>` cannot guarantee its host renders under `.fabricate-manager`: a component is
   // placed in a directory, not in a DOM subtree, and `apps/manager/ComplicationSummaryRow` is the
   // standing counterexample — it lives under `apps/manager/` and is imported by two player surfaces
   // that render it under `.fabricate-app`.
-  const corpus = collectStyleCorpus({ roots: ['src'], extensions: ['.svelte'] });
-  const files = Object.keys(corpus);
-  const { names } = areaScopedProperties();
-
-  assert.ok(
-    files.length > 100,
-    `only ${files.length} Svelte scoped blocks reached the scan, against the ~195 this tree holds. ` +
-      'An absence gate over an empty corpus passes forever.'
+  const files = Object.keys(collectStyleCorpus({ roots: ['src'], extensions: ['.svelte'] }));
+  assertFloor('area-scoped properties reached from a Svelte scoped style', files.length, 100);
+  // Absolute as well: the base-relative gate nets a rename, so a revert to a base read is green.
+  const tree = workingTree(STYLE_CORPUS);
+  assert.deepEqual(
+    areaScopedStyleReads(styleCorpusOf(tree.readFile, tree.listFiles())).map(
+      (site) => `${site.file}:${site.line} ${site.id}`
+    ),
+    [],
+    'a Svelte scoped style reads an area-scoped property; write the value or a foundation token'
   );
-
-  const found = [];
-  for (const [file, css] of Object.entries(corpus)) {
-    for (const text of css.split('\n')) {
-      if (!text.includes(TOKEN_PREFIX)) continue;
-      for (const name of names) if (text.includes(name)) found.push({ file, name });
-    }
-  }
-
-  assertRatchet({
-    label: 'area-scoped properties reached from a Svelte scoped style',
-    baseline: KNOWN_AREA_SCOPED_STYLE_READS,
-    pinnedTotal: KNOWN_AREA_SCOPED_STYLE_READ_TOTAL,
-    observed: tallyByKey(found, (entry) => `${entry.file} | ${entry.name}`),
-    scanned: files.length,
-    floor: 100,
-    guidance:
-      'A component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot ' +
+  checkGate(
+    t,
+    AREA_STYLE_READ_GATE,
+    'A component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot ' +
       `guarantee that its host renders under \`${AREA_SELECTOR}\` — and where it does not, the ` +
       'property is undefined and the declaration silently falls back to inheritance. Read a ' +
-      'foundation token, or move the rule into the global sheet under an area selector.',
-  });
+      'foundation token, or move the rule into the global sheet under an area selector.'
+  );
 });
 
 test('a use shape matches the whole property name and not a longer one starting with it', () => {
@@ -490,12 +571,39 @@ test('a use shape matches the whole property name and not a longer one starting 
   );
 });
 
-test('no module or template under src/ spells an area-scoped property into a string', () => {
-  // The CHANNEL THAT ACTUALLY HAPPENED, generalised (issue 1508).
-  const sources = collectWorkingTreeSources(['src'], ['.js', '.svelte']);
-  const files = Object.keys(sources);
-  const { names } = areaScopedProperties();
+/** Whether `file` is one the string channel reads: a module or a template under `src/`. */
+const inStringChannel = (file) =>
+  file.startsWith('src/') && (file.endsWith('.js') || file.endsWith('.svelte'));
 
+/** Every line under `src/` spelling an area-scoped property into a string, over one side. */
+function areaScopedStringUses(readFile, files) {
+  const { names } = areaScopedOf(styleCorpusOf(readFile, files).rules);
+  const found = [];
+  for (const file of files) {
+    if (!inStringChannel(file)) continue;
+    for (const [index, text] of nonStyleRegion(file, readFile(file)).split('\n').entries()) {
+      if (!text.includes(TOKEN_PREFIX)) continue;
+      for (const name of names) {
+        if (!text.includes(name)) continue;
+        if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) {
+          found.push({
+            file,
+            line: index + 1,
+            id: `area-scoped property in a string ${name}`,
+            value: stem(name),
+          });
+        }
+      }
+    }
+  }
+  return found;
+}
+
+const AREA_STRING_GATE = gateOver([STYLE_CORPUS, MODULE_CORPUS], areaScopedStringUses);
+
+test('no module or template under src/ spells an area-scoped property into a string', (t) => {
+  // The CHANNEL THAT ACTUALLY HAPPENED, generalised (issue 1508).
+  const files = Object.keys(collectWorkingTreeSources(['src'], ['.js', '.svelte']));
   for (const extension of ['.js', '.svelte']) {
     const reached = files.filter((file) => file.endsWith(extension)).length;
     assert.ok(
@@ -504,33 +612,102 @@ test('no module or template under src/ spells an area-scoped property into a str
         'holds. An absence gate over an empty corpus passes forever.'
     );
   }
-
-  const found = [];
-  for (const [file, source] of Object.entries(sources)) {
-    for (const text of nonStyleRegion(file, source).split('\n')) {
-      if (!text.includes(TOKEN_PREFIX)) continue;
-      for (const name of names) {
-        if (!text.includes(name)) continue;
-        if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) found.push({ file, name });
-      }
-    }
-  }
-
-  assertRatchet({
-    label: 'area-scoped properties spelled into a string under src/',
-    baseline: KNOWN_AREA_SCOPED_STRING_USES,
-    pinnedTotal: KNOWN_AREA_SCOPED_STRING_USE_TOTAL,
-    observed: tallyByKey(found, (entry) => `${entry.file} | ${entry.name}`),
-    scanned: files.length,
-    floor: 400,
-    guidance:
-      'A JavaScript module and a Svelte template are placed in a directory, not in a DOM subtree, ' +
+  assertFloor('area-scoped properties spelled into a string under src/', files.length, 400);
+  checkGate(
+    t,
+    AREA_STRING_GATE,
+    'A JavaScript module and a Svelte template are placed in a directory, not in a DOM subtree, ' +
       'so neither can guarantee that the element it styles renders under ' +
       `\`${AREA_SELECTOR}\` — and where it does not, the property is undefined, the declaration ` +
       'is invalid at computed-value time, and the value falls back to inheritance. Return a ' +
       'foundation token, or put the rule in the global sheet under an area selector. Prose may ' +
       'still name the property, in the backticked spelling the comments under `src/` use, which ' +
       'matches none of the three shapes; a name inside `var(`, followed by a colon, or in ' +
-      'straight quotes does match wherever it is written.',
-  });
+      'straight quotes does match wherever it is written.'
+  );
+});
+
+test('the area-scoped gates fail a new or grown use against base, measuring the area per side', (t) => {
+  const SHEET = 'styles/fabricate.css';
+  const PROBE = 'src/ui/svelte/Probe.svelte';
+  const sheet = (...lines) =>
+    [
+      '.fabricate-manager { --fab-manager-gap: 4px; }',
+      '.fabricate .x { --fab-ink: red; }',
+      ...lines,
+      '',
+    ].join('\n');
+  const probe = (...lines) =>
+    [
+      '<div class="probe"></div>',
+      '<style>',
+      '  .probe { gap: var(--fab-manager-gap); }',
+      ...lines,
+      '</style>',
+      '',
+    ].join('\n');
+  const base = {
+    [SHEET]: sheet(),
+    [PROBE]: probe(),
+    'src/a.js': 'export const a = 1;\n',
+    'README.md': 'x\n',
+  };
+  const read = (name) => `${PROBE}: area-scoped read ${name}`;
+  assertGateCases(t, AREA_STYLE_READ_GATE, base, [
+    {
+      head: { [PROBE]: probe('  .probe { margin: var(--fab-manager-gap); }') },
+      failures: [`${read('--fab-manager-gap')} rose from 1 to 2`],
+    },
+    {
+      head: {
+        [SHEET]: sheet('.fabricate-manager { --fab-ink-2: blue; }'),
+        [PROBE]: probe('  .probe { color: var(--fab-ink-2); }'),
+      },
+      failures: [`${read('--fab-ink-2')} is new (1)`],
+    },
+    { head: { [SHEET]: sheet('.fabricate .y { --fab-manager-gap: 2px; }') }, failures: [] },
+    { head: { 'README.md': 'y\n' }, skipped: 'corpus-unchanged' },
+  ]);
+  assertGateCases(t, AREA_STRING_GATE, base, [
+    {
+      head: { 'src/a.js': "export const a = 'var(--fab-manager-gap)';\n" },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-gap is new (1)'],
+    },
+    {
+      head: {
+        'src/a.js':
+          "// ratchet-exempt(design-system): a probe\nexport const a = 'var(--fab-manager-gap)';\n",
+      },
+      failures: [],
+    },
+  ]);
+
+  // A prefix rename nets against the use it replaces within its file; a copy, or a swap to another
+  // prefixed property, does not.
+  const unprefix = (text) => text.replaceAll('--fab-manager-gap', '--fab-gap');
+  const before = { ...base, [SHEET]: unprefix(base[SHEET]), [PROBE]: unprefix(base[PROBE]) };
+  const swapped = sheet('.fabricate-manager { --fab-manager-pad: 2px; }');
+  assertGateCases(t, AREA_STYLE_READ_GATE, before, [
+    { head: { [SHEET]: base[SHEET], [PROBE]: base[PROBE] }, failures: [] },
+    {
+      head: {
+        [SHEET]: base[SHEET],
+        [PROBE]: probe('  .probe { margin: var(--fab-manager-gap); }'),
+      },
+      failures: [`${read('--fab-manager-gap')} is new (2)`],
+    },
+    {
+      head: { [SHEET]: swapped, [PROBE]: probe().replace('gap)', 'pad)') },
+      failures: [`${read('--fab-manager-pad')} is new (1)`],
+    },
+  ]);
+  const spelled = (name) => `export const a = 'var(${name})';\n`;
+  const spelledBefore = { ...before, 'src/a.js': spelled('--fab-gap') };
+  assertGateCases(t, AREA_STRING_GATE, spelledBefore, [
+    { head: { [SHEET]: base[SHEET], 'src/a.js': spelled('--fab-manager-gap') }, failures: [] },
+    {
+      head: { [SHEET]: swapped, 'src/a.js': spelled('--fab-manager-pad') },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-pad is new (1)'],
+    },
+  ]);
 });

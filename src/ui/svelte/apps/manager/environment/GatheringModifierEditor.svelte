@@ -1,22 +1,31 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The condition-modifier cards and the character-modifier search, suggestions and reference rows
-  for one record: a gathering task's drop, or a gathering event. Written once (issue 1707).
+  The condition-modifier cards, each attached modifier a `RuleRow`, and the character-modifier
+  search, suggestions and reference rows for one record: a gathering task's drop, or a gathering
+  event. Written once (issue 1707).
 
   `subject` is the record a modifier attaches to, never the persisted condition `kind` this markup
   binds. It picks the hook prefix, feeds the card-copy helpers their `scope`, and gates the
   drop-only "No modifiers attached." body. The unit derives nothing: the shell hands down every
-  reader and writer already bound to this record, because an effect here over `suggestions` would
-  silently change the event dropdown's open direction.
+  reader and writer already bound to this record. The character-modifier search is a `Typeahead`.
 
   Invariants:
-  - one `<CharacterModifierBoundsRow>` for both subjects — `stepper-call-site-contract.test.js`.
+  - one `boundsRow` snippet for both subjects — `stepper-call-site-contract.test.js`.
   - every hook name follows `subject` — `manager-environments-mounted.js`.
 -->
 <script>
-  import CharacterModifierBoundsRow from './CharacterModifierBoundsRow.svelte';
+  import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import Field from '../../../components/Field.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
+  import RuleRow from '../../../components/RuleRow.svelte';
+  import Select from '../../../components/Select.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import Typeahead from '../../../components/Typeahead.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
 
   let {
     /**
@@ -30,9 +39,6 @@
     idPrefix = '',
     suggestions = [],
     characterModifierLibrary = [],
-    /** Whether the suggestion list opens upwards. Computed by the shell, never here. */
-    characterModifierSearchOpenUp = false,
-    characterModifierSearchAnchor = $bindable(null),
     characterModifierSearchTerm = $bindable(''),
     /* The shell's shared readers, which take this record and the condition kind. */
     gatheringConditionAvailableOptions = () => [],
@@ -63,19 +69,27 @@
     onSetCharacterModifierOverride = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  const searchLabel = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
+      'Search character modifiers to add'
+    )
+  );
+  const libraryEmptyHint = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
+      'Add a modifier to the system library first to reference it here.'
+    )
+  );
 
   // Literals, not composed: every mirror guard that resolves a selector greps `src/` for the
   // attribute name (the View Lab registry's does), and a composed name is invisible to all of
-  // them. So the eight names are written twice and the 300 lines of markup once.
+  // them. So the seven names are written twice and the 300 lines of markup once; the modifier
+  // row's id hook is written on its `RuleRow` tag for both subjects.
   const HOOK_NAMES = Object.freeze({
     drop: Object.freeze({
       conditionModifiers: 'data-gathering-drop-condition-modifiers',
       conditionModifierPicker: 'data-gathering-drop-condition-modifier-picker',
-      modifierId: 'data-gathering-drop-modifier-id',
       characterModifiers: 'data-gathering-drop-character-modifiers',
       characterModifierSearch: 'data-gathering-drop-character-modifier-search',
       characterModifierSuggestions: 'data-gathering-drop-character-modifier-suggestions',
@@ -85,7 +99,6 @@
     event: Object.freeze({
       conditionModifiers: 'data-gathering-event-condition-modifiers',
       conditionModifierPicker: 'data-gathering-event-condition-modifier-picker',
-      modifierId: 'data-gathering-event-modifier-id',
       characterModifiers: 'data-gathering-event-character-modifiers',
       characterModifierSearch: 'data-gathering-event-character-modifier-search',
       characterModifierSuggestions: 'data-gathering-event-character-modifier-suggestions',
@@ -94,10 +107,73 @@
     }),
   });
 
+  const allConditionsAdded = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+      'All conditions already added.'
+    )
+  );
+  const operatorOptions = $derived([
+    {
+      value: '+',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
+        'Positive'
+      ),
+    },
+    {
+      value: '-',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
+        'Negative'
+      ),
+    },
+  ]);
+
+  // Clearing a bound persists literal `null`, "no bound", which `0` is not; no `min`, because a
+  // modifier's bounds are signed.
+  const bounds = $derived(
+    [
+      ['min', localizeOr('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')],
+      ['max', localizeOr('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')],
+    ].map(([key, label]) => ({ key, label, ...stepperLabels(label) }))
+  );
+
+  /** A condition modifier as a `RuleRow`: the condition heads it and its value is the effect. */
+  function conditionModifierSchema(kind, valueStep) {
+    return {
+      head: (modifier) => ({
+        glyph: gatheringModifierKindIcon(kind, modifier.conditionId),
+        title: gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId,
+      }),
+      steps: [{ key: 'value', render: valueStep }],
+      labels: {
+        remove: localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
+          'Delete modifier'
+        ),
+      },
+    };
+  }
+
+  // Each kind's picker, where focus lands once its last modifier is removed.
+  let pickers = $state({});
+
+  async function deleteConditionModifier(kind, id, last) {
+    onDeleteConditionModifier(kind, id);
+    if (!last) return;
+    await tick();
+    pickers[kind]?.querySelector('.fabricate-select-trigger')?.focus();
+  }
+
+  /** One hook attribute's name, which follows the subject rather than the call site. */
+  function hookName(name) {
+    return (HOOK_NAMES[subject] ?? HOOK_NAMES.drop)[name];
+  }
+
   /** One hook attribute, spread so its name follows the subject rather than the call site. */
   function hook(name, value = '') {
-    const names = HOOK_NAMES[subject] ?? HOOK_NAMES.drop;
-    return { [names[name]]: value };
+    return { [hookName(name)]: value };
   }
 </script>
 
@@ -107,8 +183,33 @@
   {@const availableConditions = gatheringConditionAvailableOptions(row, kind)}
   {@const pickerSelection = modifierPickerSelection(kind)}
   {@const attachedModifiers = gatheringConditionModifierRows(row, kind)}
-  <section
-    class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
+  {@const schema = conditionModifierSchema(kind, modifierValue)}
+  {#snippet modifierValue(modifier, change)}
+    <label class="manager-condition-modifier-value">
+      <span class="visually-hidden"
+        >{localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+          'Modifier value'
+        )}</span
+      >
+      <input
+        type="text"
+        inputmode="numeric"
+        value={gatheringModifierDisplayValue(modifier)}
+        aria-label={localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+          'Modifier value'
+        )}
+        oninput={(event) =>
+          change({ ...modifier, ...signedToOperatorValue(event.currentTarget.value) })}
+        onkeydown={(event) => onConditionModifierKeydown(kind, modifier, event)}
+      />
+      <span aria-hidden="true">%</span>
+    </label>
+  {/snippet}
+  <!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
+  <InspectorCard
+    class="manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
   >
     <header class="manager-character-modifier-row-card-header">
@@ -117,112 +218,73 @@
         <p class="manager-muted">{cardHint}</p>
       </div>
     </header>
-    <div class="manager-condition-modifier-add-row" {...hook('conditionModifierPicker', kind)}>
-      <label class="fabricate-field manager-field manager-condition-modifier-picker">
-        <span class="visually-hidden"
-          >{text(
+    <div
+      class="manager-condition-modifier-add-row"
+      {...hook('conditionModifierPicker', kind)}
+      bind:this={pickers[kind]}
+    >
+      <Field as="div" class="manager-condition-modifier-picker">
+        <span class="visually-hidden" id={`${idPrefix}-${kind}-condition-picker-caption`}
+          >{localizeOr(
             'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
             'Condition'
           )}</span
         >
-        <select
+        <Select
+          size="inline"
           value={pickerSelection}
+          options={availableConditions.map((option) => ({
+            value: option.id,
+            label: option.label || option.id,
+          }))}
           disabled={availableConditions.length === 0}
-          data-tooltip={availableConditions.length === 0
-            ? text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                'All conditions already added.'
-              )
-            : null}
-          onchange={(event) => onSelectModifierPickerOption(kind, event.currentTarget.value)}
-        >
-          {#each availableConditions as option (option.id)}
-            <option value={option.id}>{option.label || option.id}</option>
-          {/each}
-        </select>
-      </label>
-      <button
-        type="button"
-        class="fabricate-icon-button manager-icon-button"
-        aria-label={text(
+          triggerProps={{
+            'data-tooltip': availableConditions.length === 0 ? allConditionsAdded : null,
+          }}
+          ariaLabelledBy={`${idPrefix}-${kind}-condition-picker-caption`}
+          onChange={(next) => onSelectModifierPickerOption(kind, next)}
+        />
+      </Field>
+      <IconButton
+        ariaLabel={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
-        title={text(
+        title={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
         disabled={availableConditions.length === 0 || !pickerSelection}
-        data-tooltip={availableConditions.length === 0
-          ? text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-              'All conditions already added.'
-            )
-          : null}
+        data-tooltip={availableConditions.length === 0 ? allConditionsAdded : null}
         onclick={() => onAddConditionModifier(kind, pickerSelection)}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>
-      </button>
+      </IconButton>
     </div>
     <div class="manager-condition-modifier-row-list">
       {#each attachedModifiers as modifier (modifier.id)}
-        <article
+        <!-- A condition → drop-chance rule; each hook is written per subject, never composed. -->
+        <RuleRow
           class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
-          {...hook('modifierId', modifier.id)}
-        >
-          <header class="manager-character-modifier-row-reference-header">
-            <span class="manager-character-modifier-icon">
-              <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"
-              ></i>
-            </span>
-            <span class="manager-character-modifier-row-reference-label"
-              >{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span
-            >
-            <label class="manager-condition-modifier-value">
-              <span class="visually-hidden"
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                  'Modifier value'
-                )}</span
-              >
-              <input
-                type="text"
-                inputmode="numeric"
-                value={gatheringModifierDisplayValue(modifier)}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                  'Modifier value'
-                )}
-                oninput={(event) =>
-                  onUpdateConditionModifier(
-                    kind,
-                    modifier.id,
-                    signedToOperatorValue(event.currentTarget.value)
-                  )}
-                onkeydown={(event) => onConditionModifierKeydown(kind, modifier, event)}
-              />
-              <span aria-hidden="true">%</span>
-            </label>
-            <button
-              type="button"
-              class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
-                'Delete modifier'
-              )}
-              onclick={() => onDeleteConditionModifier(kind, modifier.id)}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
-          </header>
-        </article>
+          data-gathering-drop-modifier-id={subject === 'event' ? undefined : modifier.id}
+          data-gathering-event-modifier-id={subject === 'event' ? modifier.id : undefined}
+          {schema}
+          value={modifier}
+          onChange={(next) =>
+            next === null
+              ? deleteConditionModifier(kind, modifier.id, attachedModifiers.length === 1)
+              : onUpdateConditionModifier(kind, modifier.id, {
+                  operator: next.operator,
+                  value: next.value,
+                })}
+        />
       {:else}
         <!-- Drop-only, derived from the discriminator: the event copy never carried one. -->
         {#if subject === 'drop'}
           <EmptyState
             compact
             icon="fas fa-sliders"
-            title={text(
+            title={localizeOr(
               'FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers',
               'No modifiers attached.'
             )}
@@ -230,23 +292,42 @@
         {/if}
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 {/each}
 
-<section
-  class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
-  {...hook('characterModifiers')}
->
+{#snippet boundsRow(ref)}
+  <div class="manager-character-modifier-row-bounds fab-cluster" data-gap="3">
+    <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+    {#each bounds as bound (bound.key)}
+      <Field as="div">
+        <span>{bound.label}</span>
+        <Stepper
+          value={ref[bound.key]}
+          allowUnset
+          step={1}
+          fill
+          ariaLabel={bound.ariaLabel}
+          decrementLabel={bound.decrementLabel}
+          incrementLabel={bound.incrementLabel}
+          onChange={(next) => onUpdateCharacterModifier(ref.id, { [bound.key]: next })}
+        />
+      </Field>
+    {/each}
+  </div>
+{/snippet}
+
+<!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
+<InspectorCard class="manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
       <h3 class="manager-card-title">
-        {text(
+        {localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
           'Character modifiers'
         )}
       </h3>
       <p class="manager-muted">
-        {text(
+        {localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
           'Modifiers adjust the final chance based on the attempting character.'
         )}
@@ -254,54 +335,31 @@
     </div>
   </header>
   <div class="manager-character-modifier-add-search-row">
-    <label
-      bind:this={characterModifierSearchAnchor}
-      class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
+    <!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
+    <Typeahead
+      class="manager-character-modifier-add-search"
+      density="compact"
+      bind:query={characterModifierSearchTerm}
+      source={() => suggestions}
+      itemLabel={(option) => option.label || option.id}
+      itemIcon={(option) => option.icon || 'fa-solid fa-user'}
+      onChoose={(option) => onPickCharacterModifier(option.id)}
+      placeholder={localizeOr(
+        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
+        'Search character modifiers...'
+      )}
+      ariaLabel={searchLabel}
+      inputProps={{
+        disabled: characterModifierLibrary.length === 0,
+        'data-tooltip': characterModifierLibrary.length === 0 ? libraryEmptyHint : null,
+      }}
+      listClass="manager-character-modifier-add-suggestions"
+      listProps={hook('characterModifierSuggestions')}
+      optionClass="manager-character-modifier-add-suggestion"
+      optionHeight={30}
+      optionDataAttr={hookName('characterModifierSuggestion')}
       {...hook('characterModifierSearch')}
-    >
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={characterModifierSearchTerm}
-        oninput={(event) => {
-          characterModifierSearchTerm = event.currentTarget.value;
-        }}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
-          'Search character modifiers...'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
-          'Search character modifiers to add'
-        )}
-        disabled={characterModifierLibrary.length === 0}
-        data-tooltip={characterModifierLibrary.length === 0
-          ? text(
-              'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
-              'Add a modifier to the system library first to reference it here.'
-            )
-          : null}
-      />
-      {#if suggestions.length > 0}
-        <div
-          class="manager-tag-suggestions manager-character-modifier-add-suggestions"
-          class:is-above={characterModifierSearchOpenUp}
-          {...hook('characterModifierSuggestions')}
-        >
-          {#each suggestions as option (option.id)}
-            <button
-              type="button"
-              class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-              {...hook('characterModifierSuggestion', option.id)}
-              onclick={() => onPickCharacterModifier(option.id)}
-            >
-              <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-              <span>{option.label || option.id}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </label>
+    />
   </div>
   <div class="manager-character-modifier-row-list">
     {#each rowCharacterModifiers(row) as ref (ref.id)}
@@ -322,97 +380,72 @@
           {#if !libraryEntry}
             <span
               class="manager-character-modifier-stale-warning"
-              data-tooltip={text(
+              data-tooltip={localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-                'Unknown modifier ({id})'
-              ).replace('{id}', ref.modifierId)}
+                'Unknown modifier ({id})',
+                { id: ref.modifierId }
+              )}
             >
               <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
             </span>
           {/if}
-          <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-            <span class="visually-hidden"
-              >{text(
-                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
-                'Operator'
-              )}</span
-            >
-            <select
-              value={ref.operator || '+'}
-              onchange={(event) =>
-                onUpdateCharacterModifier(ref.id, { operator: event.currentTarget.value })}
-            >
-              <option value="+"
-                >{text(
-                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
-                  'Positive'
-                )}</option
-              >
-              <option value="-"
-                >{text(
-                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
-                  'Negative'
-                )}</option
-              >
-            </select>
-          </label>
-          <button
-            type="button"
-            class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-            aria-label={text(
+          <span
+            class="visually-hidden"
+            id={`${idPrefix}-character-modifier-${ref.id}-operator-caption`}
+            >{localizeOr(
+              'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
+              'Operator'
+            )}</span
+          >
+          <Select
+            class={`manager-character-modifier-operator-select ${operatorClass}`}
+            size="inline"
+            value={ref.operator || '+'}
+            options={operatorOptions}
+            ariaLabelledBy={`${idPrefix}-character-modifier-${ref.id}-operator-caption`}
+            onChange={(next) => onUpdateCharacterModifier(ref.id, { operator: next })}
+          />
+          <IconButton
+            class="is-danger manager-character-modifier-row-reference-delete"
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
             )}
             onclick={() => onDeleteCharacterModifier(ref.id)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </header>
-        <CharacterModifierBoundsRow
-          min={ref.min}
-          max={ref.max}
-          onChange={(patch) => onUpdateCharacterModifier(ref.id, patch)}
-        />
+        {@render boundsRow(ref)}
         <div class="manager-character-modifier-override-row">
-          <button
-            type="button"
-            class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-            aria-pressed={hasOverride}
-            aria-label={text(
+          <StatusToggle
+            on={hasOverride}
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
               'Override?'
             )}
+            label={hasOverride
+              ? localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
+                  'Overridden'
+                )
+              : localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                  'Override?'
+                )}
             onclick={() => onSetCharacterModifierOverride(ref, !hasOverride, libraryEntry)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true">
-              <span class="manager-status-toggle-knob"></span>
-            </span>
-            <span class="manager-status-toggle-label">
-              {hasOverride
-                ? text(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
-                    'Overridden'
-                  )
-                : text(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                    'Override?'
-                  )}
-            </span>
-          </button>
+          />
         </div>
         {#if hasOverride}
           <p class="manager-muted manager-character-modifier-override-hint">
-            {text(
+            {localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
               'Overrides the library expression for this row.'
             )}
           </p>
-          <label
-            class="fabricate-field manager-field"
-            for={`${idPrefix}-character-modifier-${ref.id}-expression`}
-          >
+          <Field as="label" for={`${idPrefix}-character-modifier-${ref.id}-expression`}>
             <span
-              >{text(
+              >{localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
                 'Expression'
               )}</span
@@ -426,18 +459,18 @@
                   expressionOverride: event.currentTarget.value,
                 })}
             />
-          </label>
+          </Field>
         {/if}
       </article>
     {:else}
       <EmptyState
         compact
         icon="fas fa-sliders"
-        title={text(
+        title={localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
           'No character modifiers attached.'
         )}
       />
     {/each}
   </div>
-</section>
+</InspectorCard>

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const TOOLBAR_PATH = 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte';
@@ -13,7 +13,7 @@ const CHECKBOX_PATH = 'src/ui/svelte/components/SelectionCheckbox.svelte';
 const toolbar = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-selection-toolbar-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [CHECKBOX_PATH, TOOLBAR_PATH],
   componentPath: TOOLBAR_PATH
 });
@@ -362,7 +362,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('renders the shipped band for an unrecognised scope rather than deleting its box', async () => {
-    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state.
+    // The closed-set contract `Chip`'s tone and `Button`'s role both state.
     for (const selectAllScope of ['results', 'Shown', 'page', '', undefined]) {
       const root = await toolbar.mount({ count: 2, selectAllScope });
       assert.ok(

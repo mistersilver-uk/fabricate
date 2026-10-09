@@ -13,6 +13,7 @@ import { affordsCurrencySpends, buildCurrencyAffordProbe } from '../systems/curr
 import { daysPerYearFromCalendar } from '../systems/foundryCalendar.js';
 import { authorityUnavailableRefusal } from '../systems/journalRunCommands.js';
 import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
+import { withStationPresence } from '../systems/stationPresence.js';
 import { RunJournalBuilder } from '../ui/presenters/RunJournalBuilder.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { findMatchingComponent, resolveItemEssences } from '../utils/essenceResolver.js';
@@ -22,6 +23,69 @@ import {
   localizeGathering,
   getGatheringEngine,
 } from './gatheringRuntime.js';
+
+/** The Journal projector's seams, over `recipeManager`: the shared one or a station view. */
+function createRunJournalBuilder(facade, recipeManager) {
+  return new RunJournalBuilder({
+    craftingRunManager: facade.craftingRunManager,
+    salvageRunManager: facade.salvageRunManager,
+    gatheringRunSource: facade.gatheringRunManager,
+    recipeManager,
+    resolutionModeService: facade.resolutionModeService,
+    recipeVisibility: facade.recipeVisibilityService,
+    getSystem: (systemId) => facade.craftingSystemManager?.getSystem(systemId) ?? null,
+    getTool: (systemId, toolId) => facade._resolveJournalTool(systemId, toolId),
+    getGatheringTask: (environmentId, taskId) =>
+      facade._resolveJournalGatheringTask(environmentId, taskId),
+    // Consulted only for a GM viewer; a player sees the generic blind label (issue 901).
+    getGatheringBlindSecret: (runId) => facade.gatheringBlindRunStore?.get(runId) ?? null,
+    // History names a blind task only once the reveal policy disclosed it, never because the
+    // viewer owns the actor (D-027); the engine makes the chat card's identical decision.
+    isGatheringIdentityHidden: (args) =>
+      getGatheringEngine()?.isHistoricalBlindIdentityHidden?.(args) === true,
+    getResultItem: (itemUuid) => facade._resolveJournalResultItem(itemUuid),
+    getComponent: (systemId, componentId) => facade._resolveJournalComponent(systemId, componentId),
+    getViewer: () => game.user,
+    localize: (key, data) => localizeGathering(key, data),
+    nowWorldTime: () => facade.getWorldTime(),
+    // Unread here, but the snapshot must match every other pass's (issue 1228).
+    resolveComponentForItem: findMatchingComponent,
+    getComponentSourceActors: ({ actor, run }) => {
+      const uuids = Array.isArray(run?.componentSourceActorUuids)
+        ? run.componentSourceActorUuids
+        : [];
+      const sources = uuids.map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null).filter(Boolean);
+      if (sources.length > 0) return sources;
+      return actor ? [actor] : [];
+    },
+    resolveItemEssences: ({ item, recipe }) => {
+      const system = facade.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
+      return resolveItemEssences(
+        item,
+        resolvedComponentsFor(system),
+        recipe?.craftingSystemId,
+        findMatchingComponent
+      );
+    },
+    affordCurrency: ({ actor, recipe, match }) =>
+      buildCurrencyAffordProbe(
+        actor,
+        recipe,
+        facade.craftingEngine?._currencySeams?.() ?? {}
+      )(match),
+    // The aggregate: two currency ingredients affordable alone but not together (issue 1648).
+    affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
+      affordsCurrencySpends(
+        actor,
+        recipe,
+        currencySpends,
+        facade.craftingEngine?._currencySeams?.() ?? {}
+      ),
+    getDismissedRunKeys: ({ actorUuid, viewerId }) =>
+      facade.getDismissedJournalRunKeys({ actorUuid, viewerId }),
+    getJournalActionAvailability: () => facade.getJournalRunAuthorityAvailability(),
+  });
+}
 
 export const journalFacade = {
   /**
@@ -158,6 +222,9 @@ export const journalFacade = {
         getDismissedRunKeys: ({ actorUuid, viewerId }) =>
           this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
         getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
+        // The settle's own claimability, so a tile is disabled exactly when a pick would refuse.
+        getAwardChoiceClaimability: ({ run, actor }) =>
+          this.craftingEngine?.awardChoiceClaimability?.(run, actor) ?? (() => null),
       });
     }
     return this._runJournalBuilder;
@@ -223,11 +290,19 @@ export const journalFacade = {
     return selectable[0];
   },
 
-  /** The unified Journal listing, through the same remembered-actor seam as the gathering listing. */
+  /**
+   * The unified Journal listing, through the same remembered-actor seam as the gathering listing.
+   * An Active Canvas Tool `presentTools` answers stage Tool readiness for this listing only.
+   */
   listJournalForActor(options = {}) {
     this._requireReady();
     const { rememberedActorId } = this._withRememberedActorDefault(options);
     const actor = this._resolveJournalActor(rememberedActorId);
-    return this._getRunJournalBuilder().buildListing({ actor, viewer: game.user });
+    const recipeManager = withStationPresence(this.recipeManager, options.presentTools);
+    const builder =
+      recipeManager === this.recipeManager
+        ? this._getRunJournalBuilder()
+        : createRunJournalBuilder(this, recipeManager);
+    return builder.buildListing({ actor, viewer: game.user });
   },
 };

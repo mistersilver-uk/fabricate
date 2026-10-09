@@ -100,7 +100,7 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Essence.Tabs.Label"
   ariaLabel="Essence editor sections"
   idStem="essence"
-  hookAttribute="data-essence-tab"
+  tabDataAttr="data-essence-tab"
   containerClass="manager-essence-editor-tabs manager-editor-tabs"
   danger
 />

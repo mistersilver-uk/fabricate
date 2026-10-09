@@ -1,14 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Notice from '../../components/Notice.svelte';
-  import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { RUN_KINDS } from '../../util/journalRunKinds.js';
   import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';
+  import JournalKindFilter from './JournalKindFilter.svelte';
   import RunDetail from './RunDetail.svelte';
 
   let { services = null } = $props();
@@ -42,12 +43,12 @@
     }
   );
 
-  const kindOptions = $derived([
-    { value: 'all', label: localize('FABRICATE.App.Journal.Filters.Kind.All') },
-    { value: 'crafting', label: localize('FABRICATE.App.Journal.Filters.Kind.Crafting') },
-    { value: 'gathering', label: localize('FABRICATE.App.Journal.Filters.Kind.Gathering') },
-    { value: 'salvage', label: localize('FABRICATE.App.Journal.Filters.Kind.Salvage') },
-    { value: 'alchemy', label: localize('FABRICATE.App.Journal.Filters.Kind.Alchemy') },
+  // The store holds the shown kind set and owns the union; the filter only flips one kind.
+  const shownKinds = $derived(Array.isArray(journal?.kindFilter) ? journal.kindFilter : RUN_KINDS);
+  const kindFiltered = $derived(RUN_KINDS.some((kind) => !shownKinds.includes(kind)));
+  const listedRuns = $derived([
+    ...(journal?.listing?.activeRuns ?? []),
+    ...(journal?.listing?.history ?? []),
   ]);
   const statusOptions = $derived([
     {
@@ -119,28 +120,20 @@
         <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
           <div class="journal-browse-controls">
             <div class="journal-search-field">
-              <ManagerSearchField
+              <SearchField
                 class="journal-search-control"
-                size="30"
                 value={journal?.search ?? ''}
-                onInput={(value) => journal?.setSearch?.(value)}
+                onChange={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
                 data-journal-search="true"
               />
             </div>
-            <div class="journal-kind-field">
-              <Select
-                size="inline"
-                minWidth={240}
-                maxWidth={340}
-                value={journal?.kindFilter ?? 'all'}
-                options={kindOptions}
-                ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
-                triggerData={{ 'data-journal-kind-filter': true }}
-                onChange={(value) => journal?.setKindFilter?.(value)}
-              />
-            </div>
+            <JournalKindFilter
+              {shownKinds}
+              runs={listedRuns}
+              onToggle={(kind) => journal?.toggleKind?.(kind)}
+            />
           </div>
           <SegmentedControl
             options={statusOptions}
@@ -148,7 +141,7 @@
             onChange={(value) => journal?.setActiveStatusFilter?.(value)}
             groupName="journal-active-status"
             ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
-            dataAttr="data-journal-status-filter"
+            data-journal-status-filter
             fill
           />
 
@@ -156,7 +149,7 @@
             <ActiveRunsList
               runs={activeRuns}
               filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all' ||
+                kindFiltered ||
                 (journal?.activeStatusFilter ?? 'all') !== 'all'}
               totalCount={journal?.activeCount ?? activeRuns.length}
               {selectedRunKey}
@@ -172,8 +165,7 @@
             />
             <HistoryList
               runs={historyRuns}
-              filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all'}
+              filtered={Boolean(journal?.search?.trim()) || kindFiltered}
               totalCount={journal?.historyCount ?? historyRuns.length}
               pageIndex={journal?.historyPage ?? 0}
               pageSize={journal?.historyPageSize ?? 4}
@@ -198,8 +190,7 @@
             <EmptyState
               icon="fas fa-book-open"
               title={localize('FABRICATE.App.Journal.Empty.Detail')}
-              dataAttr="data-journal-empty"
-              dataValue="detail"
+              data-journal-empty="detail"
             />
           {/if}
         </main>
@@ -250,15 +241,6 @@
   }
   .journal-search-field > :global(.journal-search-control) {
     min-width: 0;
-  }
-  .journal-kind-field {
-    min-width: 0;
-  }
-  .journal-kind-field > :global(.fabricate-select) {
-    width: 100%;
-  }
-  .journal-kind-field > :global(.fabricate-select .fabricate-select-trigger) {
-    width: 100%;
   }
   .journal-browse-lists {
     display: grid;

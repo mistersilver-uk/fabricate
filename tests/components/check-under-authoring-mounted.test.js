@@ -596,7 +596,10 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     const state = await mount(routedCheck(count));
     assert.ok(state.root.querySelector('[data-outcome-band-strip]'), 'the strip still draws');
     assert.ok(!state.root.querySelector('[data-outcome-band-strip] [role="slider"]'), 'no handles');
-    assert.ok(!state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-dc]'), 'no DC field');
+    // Issue 2006: a count's rows edit Extra successes, never the kept target's multiplier.
+    const extra = state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-dc]');
+    assert.equal(extra.getAttribute('aria-label'), 'Extra successes');
+    assert.ok(!state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-adjustment]'));
     await state.act((root) => choose(root, 'data-check-direction-option', 'over'));
     assert.equal(state.value.evaluation.product, 'count', 'writes keep the authored product');
   });
@@ -642,7 +645,7 @@ describe('the simple editor draws an under target read-only', () => {
 
   it("offers a roll-under check's best trigger preset on face 1, through the editor", async () => {
     const state = await mountControlled(simpleHarness, simple(evaluation({}, { source: 'fixed' })));
-    const labels = [...state.root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+    const labels = [...state.root.querySelectorAll('[data-rule-row-preset]')].map((button) =>
       button.textContent.trim()
     );
     assert.match(labels[0], /^Natural 1 on 1d20 → /, 'the editor passes its evaluation down');

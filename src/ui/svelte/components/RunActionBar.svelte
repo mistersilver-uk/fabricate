@@ -2,7 +2,7 @@
 <script>
   import SegmentedControl from './SegmentedControl.svelte';
   import IconButton from './IconButton.svelte';
-  import ManagerButton from './ManagerButton.svelte';
+  import Button from './Button.svelte';
 
   let {
     run = {},
@@ -65,7 +65,7 @@
       role="group"
       aria-label={cancel.confirmLabel}
     >
-      <ManagerButton
+      <Button
         role="danger"
         class="fab-run-action-control"
         data-run-action="cancel-confirm"
@@ -74,13 +74,13 @@
       >
         <i class={cancel.icon || 'fas fa-ban'} aria-hidden="true"></i>
         {cancel.confirmLabel}
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         class="fab-run-action-control"
         data-run-action="cancel-keep"
         bind:element={keepControl}
         onkeydown={disarmOnEscape}
-        onclick={() => (armed = false)}>{cancel.keepLabel}</ManagerButton
+        onclick={() => (armed = false)}>{cancel.keepLabel}</Button
       >
     </div>
     <!-- Same shape as the begin side: the prompt is a SIBLING of the decision, rendered after
@@ -103,7 +103,7 @@
     </IconButton>
 
     {#if paused}
-      <ManagerButton
+      <Button
         class="fab-run-action-control is-resume"
         data-run-action="resume"
         aria-label={resume.ariaLabel || undefined}
@@ -113,9 +113,9 @@
       >
         <i class={resume.icon || 'fas fa-play'} aria-hidden="true"></i>
         {resume.label}
-      </ManagerButton>
+      </Button>
     {:else}
-      <ManagerButton
+      <Button
         class="fab-run-action-control"
         data-run-action="pause"
         aria-label={pause.ariaLabel || undefined}
@@ -125,7 +125,7 @@
       >
         <i class={pause.icon || 'fas fa-pause'} aria-hidden="true"></i>
         {pause.label}
-      </ManagerButton>
+      </Button>
 
       {#if completion}
         <div class="fab-run-action-completion" data-run-completion>
@@ -136,14 +136,14 @@
             onChange={completion.onChange}
             groupName={completion.groupName || `run-completion-${run?.id || 'run'}`}
             ariaLabel={completion.ariaLabel || runLabel}
-            dataAttr="data-run-completion-switch"
+            data-run-completion-switch
           />
         </div>
       {/if}
 
       {#if begin}
         <div class="fab-run-begin-decision" data-run-begin>
-          <ManagerButton
+          <Button
             role={beginEnabled ? 'primary' : 'neutral'}
             class="fab-run-action-control fab-run-action-primary"
             data-run-action="begin"
@@ -154,7 +154,7 @@
           >
             <i class={begin.icon || 'fas fa-play'} aria-hidden="true"></i>
             {busy ? begin.busyLabel || begin.label : begin.label}
-          </ManagerButton>
+          </Button>
         </div>
         <!-- The prompt is a SIBLING of the decision, not a child of it. Inside the decision it
              wrapped above the button and left the controls bunched at the left; as its own
@@ -164,7 +164,7 @@
           <p class="fab-run-begin-prompt" data-run-begin-prompt>{begin.prompt}</p>
         {/if}
       {:else}
-        <ManagerButton
+        <Button
           role={primaryEnabled ? 'primary' : 'neutral'}
           class="fab-run-action-control fab-run-action-primary"
           data-run-action="primary"
@@ -175,7 +175,7 @@
         >
           {#if primary?.icon}<i class={primary.icon} aria-hidden="true"></i>{/if}
           {primaryLabel}
-        </ManagerButton>
+        </Button>
       {/if}
     {/if}
   {/if}
@@ -269,11 +269,5 @@
     background: var(--fab-bg-1);
     color: var(--fab-text-subtle);
     font-size: 10.5px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .fab-run-action-bar :global(*) {
-      transition: none;
-    }
   }
 </style>

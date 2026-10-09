@@ -10,11 +10,14 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_TARGET_RAW_MODULES,
+  GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -136,6 +139,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
+    copyModule('src/ui/svelte/apps/gathering/linkedSceneImage.js');
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which imports the foundryCalendar helpers.
     copyModule('src/ui/svelte/util/formatDuration.js');
@@ -143,11 +147,27 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // GatheringView routes its crafting-data subscription through the invalidation-domain
     // taxonomy (issue 1078 part B1); omitting it HANGS this suite (# cancelled).
     copyModule('src/systems/invalidationDomains.js');
+    // Issue 2008: an attempt's additional-dice notice is worded by the prompt presenter.
+    for (const modulePath of [
+      ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+      ...CHECK_TARGET_RAW_MODULES,
+      'src/systems/countEvaluation.js',
+      'src/utils/fillPlaceholders.js',
+    ]) {
+      copyModule(modulePath);
+    }
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+    // Issue 2053: the attempt buttons record the window a roll prompt opens in.
+    // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
+    for (const rawModule of [
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+      'src/ui/svelte/util/rollPromptOrigin.js',
+      'src/ui/svelte/util/dropRateTier.js',
+    ]) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -159,22 +179,31 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
-    // primitive `ui-visual-style/spec.md` names. A hand-rolled harness that omits it HANGS
-    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
-    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+    // `ChanceBar` is a single-row `BandedBar` over the shared `FillBar` (issues 1096, 1782). A
+    // hand-rolled harness that omits either HANGS (# cancelled) rather than failing.
+    for (const instrument of [
+      'src/ui/svelte/components/FillBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      writeCompiledSvelte(instrument);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    for (const dropsModule of GATHERING_DROPS_COMPILED_MODULES) writeCompiledSvelte(dropsModule);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -560,6 +589,68 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.notEqual(warns[0], undefined);
     } finally {
       delete globalThis.ui;
+    }
+  });
+
+  it('warns once for a refused additional-dice choice and stays silent for a dismissal (issue 2008)', async () => {
+    const refused = {
+      success: false,
+      cancelled: true,
+      additionalDiceRefusal: 'choiceInvalid',
+      additionalDiceNotice: { dice: null, limit: 1, available: 1, label: '', source: 'path' },
+    };
+    const misconfigured = {
+      success: false,
+      misconfigured: true,
+      message: 'The check is misconfigured.',
+      data: { boughtDice: { count: 1, source: 'path' } },
+    };
+    // The Journal's replies, which a versioned attempt receives through `executePublicGather`.
+    const { cancelled, ...journalRefused } = refused;
+    const journalSpent = { success: false, reason: 'roll-unavailable', boughtDice: 1 };
+    const cases = [
+      [refused, ['FABRICATE.Check.AdditionalDiceRefusal.ChoiceInvalid']],
+      [misconfigured, ['1 spent; the roll could not be completed.', 'The check is misconfigured.']],
+      [{ success: false, cancelled: true }, []],
+      [
+        { accepted: true, ...journalRefused, reason: 'additional-dice-refused' },
+        ['FABRICATE.Check.AdditionalDiceRefusal.ChoiceInvalid'],
+      ],
+      [
+        { accepted: true, ...journalSpent },
+        ['1 spent; the roll could not be completed.', 'FABRICATE.App.Journal.Reason.RollUnavailable'],
+      ],
+    ];
+    assert.equal(cancelled, true);
+    for (const [reply, expected] of cases) {
+      const warns = [];
+      const notifications = {
+        warn: (msg) => {
+          warns.push(msg);
+        },
+      };
+      Object.defineProperty(globalThis, 'ui', { value: { notifications }, configurable: true, writable: true });
+      try {
+        const services = {
+          listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+          startGatheringAttempt: () => Promise.resolve(reply)
+        };
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+
+        target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
+        await settle();
+
+        assert.deepEqual(warns, expected, JSON.stringify(reply));
+      } finally {
+        delete globalThis.ui;
+        if (mounted) unmount(mounted);
+        mounted = null;
+        target?.remove();
+      }
     }
   });
 

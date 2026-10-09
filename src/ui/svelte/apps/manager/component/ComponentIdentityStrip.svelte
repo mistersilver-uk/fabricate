@@ -25,7 +25,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { componentAttributionNote } from '../scoped/componentScoped.js';
 
@@ -65,6 +65,7 @@
 <section
   class="manager-component-identity-strip"
   data-component-edit-section="identity"
+  data-tab-heading
   aria-label={text('FABRICATE.Admin.Manager.Component.Identity.Label', 'Component identity')}
 >
   <!-- `Medallion` takes the size; the card rung's radius is stated on the card, not here. -->
@@ -72,7 +73,7 @@
     art={component?.img}
     alt=""
     icon="fas fa-cube"
-    size={44}
+    size={38}
     tint={component?.color || ''}
   />
 
@@ -134,7 +135,7 @@
   {#if hasWorldEntry}
     <!-- The card's ONE exit, and the only route from a system's rules to where this component's
          name, image and description are authored. -->
-    <ManagerButton
+    <Button
       class="manager-component-identity-exit"
       data-component-edit-action="open-world-entry"
       disabled={saving}
@@ -147,6 +148,6 @@
         )}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </ManagerButton>
+    </Button>
   {/if}
 </section>

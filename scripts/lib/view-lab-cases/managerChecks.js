@@ -2,7 +2,12 @@
  * System scope: the Checks rail, its modifier panels, and the tags and categories route.
  */
 
-import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  COMPONENT_EDITOR_MATCHES,
+  GATHERING_ROUTE_MODEL_PATTERN,
+  GATHERING_TASK_EDITOR_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
@@ -189,7 +194,7 @@ const underCase = ({ id, label, frame, query = {}, steps, expectView, expectSele
 /*
  * The success-counting preview states (issue 2004): the odds panel, simulator readout, abstention,
  * readiness and Validation rows for a count check, seeded onto Karrun Forgecraft through the lab's
- * `checkPreviewState` (count authoring is issue 2006's), each on the prototype frame it answers.
+ * `checkPreviewState`, each on the prototype frame it answers.
  */
 const COUNT_ODDS = Object.freeze([{ selector: '[data-checks-odds]', scroll: true }]);
 const COUNT_IDRIN = Object.freeze(previewAsActor('lab-actor-idrin'));
@@ -212,6 +217,72 @@ const countCase = ({ id, label, frame, state = 'dice-pool', nav = 'crafting', st
   });
 
 /*
+ * The success-counting authoring states (issue 2006), one per row of its reachable-state capture
+ * matrix and on the prototype frame each answers. Each opens on one of issue 2004's seeded pools
+ * or a summing check, and authors the state it claims through the Studio's own controls.
+ */
+const authoringCase = ({
+  id,
+  label,
+  frame,
+  state = 'dice-pool',
+  nav = 'crafting',
+  steps,
+  ...rest
+}) =>
+  managerCase({
+    id,
+    label: `Manager — Checks count authoring, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: state
+      ? { system: 'lab-smithing', checkPreviewState: state }
+      : { system: 'lab-smithing' },
+    steps: ['Checks', { selector: `#manager-checks-nav-${nav}` }, ...steps],
+    expectView: `checks-${nav}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+    ...rest,
+  });
+const COUNTING = '.fabricate-manager:has([data-check-product-option="count"].is-active)';
+
+/*
+ * Issue 2008's additional-dice group on issue 2004's `dice-pool-faults` crafting pool, which pays
+ * one die from a stored Momentum (`tests/view-lab/world/labCheckPreviews.js`): Idrin holds 2,
+ * Brenna's is set by an active effect and Vosk has none. Each state is authored by steps.
+ */
+const ADDITIONAL_DICE = '[data-check-additional-dice-group]';
+const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: true });
+const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
+const PATH_LINE = (tone, text) =>
+  `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
+const PREVIEW_NOTE = (kind, text) =>
+  `:has([data-checks-preview-additional-dice-note="${kind}"]:text-is("${text}"))`;
+const MOMENTUM_PATH = 'system.resources.momentum.value';
+const additionalDiceCase = ({ steps, expectSelector, ...rest }) =>
+  authoringCase({
+    state: 'dice-pool-faults',
+    steps: [...steps, SHOW_ADDITIONAL_DICE],
+    expectSelector: `.fabricate-manager${expectSelector}`,
+    ...rest,
+  });
+const VALIDATION_NAV = Object.freeze({ selector: '#manager-checks-nav-validation' });
+const additionalDiceValidationCase = ({ steps, issue, expectSelector, ...rest }) =>
+  authoringCase({
+    state: 'dice-pool-faults',
+    nav: 'validation',
+    steps: [
+      { selector: '#manager-checks-nav-crafting' },
+      ...steps,
+      VALIDATION_NAV,
+      { selector: `[data-issue="${issue}"]`, scroll: true },
+    ],
+    expectSelector: `.fabricate-manager [data-checks-panel="validation"]${expectSelector}`,
+    ...rest,
+  });
+const EXPLODE_ROW = Object.freeze({ selector: '[data-check-count-row-explode]', scroll: true });
+
+/*
  * The rolled readout states (issue 2080): each rolled state of the prototype parity matrix, rolled
  * once. The lab's d20 shows 20 first, so each DC or target is chosen to land its named outcome.
  */
@@ -223,7 +294,7 @@ const overFixed = (dc) => [
 ];
 const triggerPreset = (preset) => [
   { selector: '#checks-section-triggers' },
-  { selector: `[data-add-trigger-preset="${preset}"]` },
+  { selector: `[data-check-trigger-presets] [data-rule-row-preset="${preset}"]` },
 ];
 /** Two fixed ranges, Spoiled 1–20 and Sound 21–30, typed onto Runework's fresh fixed list. */
 const FIXED_RANGES = Object.freeze([
@@ -258,6 +329,44 @@ const FIXED_BANDS = Object.freeze([
   ]),
   { selector: `${nthMatch('[data-outcome-row]', 3)} [data-outcome-success-option="success"]` },
 ]);
+/*
+ * The advantage rule's Studio states (issue 2007), authored through the Formula card's own
+ * controls on a summing crafting check, or on issue 2004's seeded counting pool.
+ */
+const ADVANTAGE_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(CheckPromptOptions\.svelte|CheckOptionGroup\.svelte|checkAdvantageCopy\.js)$/,
+]);
+const ADVANTAGE_VALIDATION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(?:ChecksValidationTab\.svelte|checksReadiness\.js|checksCopy\.js)$/,
+]);
+const ADVANTAGE_BLOCK = Object.freeze({ selector: '[data-check-advantage]', scroll: true });
+const advantageMode = (mode) => ({ selector: `[data-check-advantage-mode-option="${mode}"]` });
+const CRAFTING_PANEL = '.fabricate-manager [data-checks-panel="crafting"]';
+const advantageCase = ({
+  id,
+  label,
+  frame,
+  state,
+  steps,
+  expectSelector,
+  scope = CRAFTING_PANEL,
+  ...rest
+}) =>
+  managerCase({
+    id,
+    label: `Manager — Checks advantage authoring, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: state
+      ? { system: 'lab-smithing', checkPreviewState: state }
+      : { system: 'lab-smithing' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }, ...steps, ADVANTAGE_BLOCK],
+    expectView: 'checks-crafting',
+    expectSelector: `${scope} ${expectSelector}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_SOURCES,
+    ...rest,
+  });
 const READOUT = '.fabricate-manager [data-checks-simulator-readout]';
 const rolledCase = ({
   id,
@@ -429,10 +538,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes, so the order is the sort's.
+    // Advantage is switched off first: a keep rule cannot keep a die multiplied by a reference (issue 2007).
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
+      advantageMode('off'),
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
     ],
     expectView: 'checks-crafting',
@@ -666,7 +777,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
       { selector: '[data-recipe-add="routing-option"]' },
     ],
@@ -734,6 +845,74 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // A long name ellipsises beside a whole counting expression and an in-row Selectable control (issue 2044).
+  managerCase({
+    id: 'manager-checks-crafting-modifier-long-name',
+    label: 'Manager — Checks crafting modifier long name',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
+      { selector: '[data-crafting-modifier-row="hb-mod-luck"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The title is the state: before issue 2044 the name had none and pushed the control out.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-row="hb-mod-luck"]' +
+      ':has([data-crafting-modifier-readonly="label"][title^="Lucky find with a deliberately long"])' +
+      ':has([data-crafting-modifier-eligibility="hb-mod-luck"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+    ],
+  }),
+  // The narrow twin: a short name beside a long expression, and both controls inside their rows (issue 2044).
+  managerCase({
+    id: 'manager-checks-crafting-modifier-long-expression-narrow',
+    label: 'Manager — Checks crafting modifier long expression, narrow',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      { selector: '[data-world-modifier="hb-mod-tools"] [data-toggle-modifier]' },
+      {
+        selector: '[data-world-modifier="hb-mod-tools"] [data-world-modifier-field="expression"]',
+        fill: '@skills.nat.total + @abilities.wis.mod + @abilities.int.mod + @prof + 2',
+      },
+      { selector: '[data-world-modifier-done="hb-mod-tools"]' },
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-row="hb-mod-tools"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-row="hb-mod-tools"]' +
+      ':has([data-crafting-modifier-readonly="expression"]:has-text("@abilities.int.mod + @prof"))',
+    position: { width: 1180, height: 820 },
+    expectContained: [
+      {
+        container: '[data-crafting-modifier-row="hb-mod-tools"]',
+        target: '[data-crafting-modifier-eligibility="hb-mod-tools"]',
+      },
+      {
+        container: '[data-crafting-modifier-row="hb-mod-luck"]',
+        target: '[data-crafting-modifier-eligibility="hb-mod-luck"]',
+      },
+    ],
+    kinds: ['manager', 'checks', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   // Two modifiers sharing one fault, so the notice's detail names both and must wrap (issue 2082).
@@ -887,7 +1066,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
   managerCase({
@@ -906,8 +1085,10 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      // The pick is a Requirements card (issue 1522).
+      { selector: '[data-gathering-task-tab="requirements"]' },
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -920,7 +1101,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   managerCase({
@@ -999,15 +1180,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags'],
@@ -1055,7 +1236,7 @@ export const CASES = Object.freeze([
         // `:not(.is-danger)` is load-bearing: an unreferenced row's delete wears `is-danger` and
         // fires in one click with no confirm, which would mutate the fixture mid-capture.
         selector:
-          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .manager-icon-button:not(.is-danger)',
+          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .fabricate-icon-button:not(.is-danger)',
       },
     ],
     expectView: 'tags',
@@ -1064,15 +1245,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags', 'responsive'],
@@ -1249,7 +1430,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [...underMultiplySteps('@skills.med.mod + 51'), ...SCROLL_ODDS],
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
   }),
   underCase({
     id: 'manager-checks-under-attribute-rolled',
@@ -1290,7 +1471,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar])' +
+      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track])' +
       ':not(:has([data-checks-simulator-state="needs-preview-actor"]))',
   }),
   underCase({
@@ -1405,7 +1586,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]):has([data-checks-odds-domain])',
+      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]):has([data-checks-odds-domain])',
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
   }),
@@ -1443,7 +1624,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
     // The 1024x640 declared floor, stacked, for the same enumerated row `manager-checks-stacked-floor`
     // proves for sum/over: the odds panel restacks under the same ladder for a roll-under record.
     position: { width: 1024, height: 640 },
@@ -1636,7 +1817,7 @@ export const CASES = Object.freeze([
     frame: 6,
     steps: [...COUNT_IDRIN, ...COUNT_ODDS],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-checks-odds-row="botch"] [data-checks-odds-bar]',
+      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-banded-bar-row="botch"] [data-banded-bar-track]',
   }),
   countCase({
     id: 'manager-checks-count-over-rolled',
@@ -1705,7 +1886,7 @@ export const CASES = Object.freeze([
     nav: 'gathering',
     steps: COUNT_ODDS,
     expectSelector:
-      '.fabricate-manager [data-checks-odds-product="count"] [data-checks-odds-row="botch"]',
+      '.fabricate-manager [data-checks-odds-product="count"] [data-banded-bar-row="botch"]',
   }),
   countCase({
     id: 'manager-checks-count-progressive',
@@ -1714,7 +1895,7 @@ export const CASES = Object.freeze([
     state: 'dice-pool-extended',
     steps: [{ selector: '[data-checks-preview-difficulties]', fill: '1, 1, 2' }, ...COUNT_ROLL],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-row="botch"]):has([data-checks-simulator-band])',
+      '.fabricate-manager:has([data-banded-bar-row="botch"]):has([data-checks-simulator-band])',
   }),
   countCase({
     id: 'manager-checks-count-zero',
@@ -1738,6 +1919,17 @@ export const CASES = Object.freeze([
     steps: COUNT_ROLL,
     expectSelector:
       '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch]:has([data-checks-simulator-margin="botch"]) [data-checks-simulator-total="-3"]',
+  }),
+  // Issue 1782: a one-outcome chart is the single-row meter, drawn in the histogram's band row.
+  countCase({
+    id: 'manager-checks-count-botch-odds',
+    label: 'a botch-only odds chart',
+    frame: '40 semantic',
+    state: 'dice-pool-extended',
+    nav: 'gathering',
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-product="count"] [role="meter"] .fab-banded-bar-band[data-banded-bar-row="botch"]',
   }),
   rolledCase({
     id: 'manager-checks-count-over-rolled-failure',
@@ -1796,9 +1988,11 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
+      ':has([data-checks-section-notice="countRequiredExceedsBasePool"])' +
       ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
   }),
-  // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082).
+  // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082);
+  // a tier with no successes needed blocks since issue 2006, so it sorts before the face warning.
   countCase({
     id: 'manager-checks-roll-notices-floor',
     label: 'four pool notices stacked at 1024x640',
@@ -1811,8 +2005,8 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-checks-section-notices="roll"]' +
       ' > [data-checks-section-notice="countThresholdInvalid"]:nth-child(1)' +
       ' + [data-checks-section-notice="countExplodeUnbounded"]' +
-      ' + [data-checks-section-notice="countFaceBeyondDie"]' +
-      ' + [data-checks-section-notice="countTierWithoutSuccesses"]:last-child',
+      ' + [data-checks-section-notice="countTierWithoutSuccesses"]' +
+      ' + [data-checks-section-notice="countFaceBeyondDie"]:last-child',
   }),
   countCase({
     id: 'manager-checks-count-readiness',
@@ -1824,8 +2018,613 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-issue="countRequiredExceedsMaxPool"])' +
+      ':has([data-issue="countRequiredExceedsBasePool"])' +
       ':has([data-issue="countTierWithoutSuccesses"])' +
       ':has([data-issue="countThresholdInvalid"])' +
-      ':has([data-issue="countPoolInvalid"])',
+      ':has([data-issue="countPoolInvalid"])' +
+      ':not(:has([data-issue^="countAdditionalDice"]))',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over',
+    label: 'six d10s from a character value, best face exploding, worst cancelling',
+    frame: '06',
+    steps: [...COUNT_IDRIN, { selector: '[data-check-count-row-cancel]', scroll: true }],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ':has([data-check-count-explode-option="extreme"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="keeps"].is-active)' +
+      ':has([data-check-count-cancel-option="extreme"].is-active)' +
+      ':has([data-check-count-destination-option="pool"].is-active)' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over-modifier',
+    label: 'six d10s from a character value, an applied modifier growing the pool',
+    frame: '06',
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-eligibility="hb-mod-medicine"]' },
+      { selector: '#checks-section-roll' },
+      { selector: '[data-check-formula-resolved]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-composed] [data-check-formula-modifier="hb-mod-medicine"])' +
+      ' [data-check-count-actor-line="resolved"]:has-text("grown by")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over-narrow',
+    label: 'six d10s from a character value, at 1024x640',
+    frame: '06',
+    position: { width: 1024, height: 640 },
+    steps: [...COUNT_IDRIN, { selector: '[data-check-count-row-base]', scroll: true }],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-under',
+    label: 'two d20s at or under a character value, modifiers moving the threshold',
+    frame: '07',
+    nav: 'salvage',
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '[data-check-count-threshold-mode-option="value"]' },
+      {
+        selector: '[data-check-count-threshold-expression]',
+        fill: '@abilities.int.mod + @skills.med.mod + 6',
+      },
+      { selector: '[data-check-count-row-threshold]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-direction-option="under"].is-active)' +
+      ':has([data-check-count-base-mode-option="number"].is-active)' +
+      ':has([data-check-count-threshold-mode-option="value"].is-active)' +
+      ':has([data-check-count-test-option="meet"].is-active)' +
+      ':has([data-check-count-destination-option="threshold"].is-active)' +
+      ':has([data-check-additional-dice-group] [data-check-additional-dice][aria-pressed="false"])' +
+      ':not(:has([data-threshold-mode]))' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-off',
+    label: 'explode switched off',
+    frame: '06 variant',
+    steps: [{ selector: '[data-check-count-explode-option="off"]' }, EXPLODE_ROW],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="off"].is-active)' +
+      ':not(:has([data-check-count-explode-repeat]))' +
+      ':not(:has([data-check-count-explode-face]))' +
+      ' [data-check-count-row-explode]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-from',
+    label: 'explode from a chosen face',
+    frame: '06 variant',
+    steps: [
+      { selector: '[data-check-count-explode-option="from"]' },
+      ...parityType('[data-check-count-explode-face]', 1, '9'),
+      EXPLODE_ROW,
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="from"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="keeps"].is-active)' +
+      ':has([data-check-count-clause]:text-is("· explodes on 9 or above"))' +
+      ' [data-check-count-row-explode] [data-check-count-explode-face]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-once',
+    label: 'the best face exploding once',
+    frame: '06 variant',
+    steps: [{ selector: '[data-check-count-explode-repeat-option="once"]' }, EXPLODE_ROW],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="extreme"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="once"].is-active)' +
+      ' [data-check-count-row-explode]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-zero-pool-off',
+    label: 'a pool reduced to zero no longer failing',
+    frame: '06',
+    steps: [
+      { selector: '[data-check-count-zero-pool]' },
+      { selector: '[data-check-count-row-zero]', scroll: true },
+    ],
+    expectSelector: `${COUNTING} [data-check-count-zero-pool][aria-pressed="false"]`,
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-required-block',
+    label: 'successes needed above the most dice that can be rolled',
+    frame: '08',
+    state: 'dice-pool-faults',
+    steps: [{ selector: '[data-check-count-callouts]', scroll: true }],
+    expectSelector:
+      `${COUNTING}:not(:has([data-threshold-mode]))` +
+      ' [data-check-count-callouts] [data-check-count-callout="countRequiredExceedsMaxPool"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-switch',
+    label: 'a summing check with tier DCs switched to count',
+    frame: 'cntExtraOff',
+    state: null,
+    steps: [
+      { selector: '[data-check-product-option="count"]' },
+      { selector: '[data-tier-row="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectSelector:
+      `${COUNTING}:not(:has([data-tier-row]:not(.is-invalid)))` +
+      ' [data-tier-row="sm-tier-masterwork"] [data-tier-successes-missing]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-routed',
+    label: 'routed tiers in extra successes, over a read-only strip with a botch band',
+    frame: '13',
+    nav: 'gathering',
+    steps: [
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-band-scale]', scroll: true },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-outcome-head]:has-text("Extra successes"))' +
+      ':not(:has([data-band-strip-handle]))' +
+      ' [data-band-strip-band="botch"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-routed-light',
+    label: 'routed tiers in extra successes, in the light scheme',
+    frame: '13',
+    nav: 'gathering',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool', colorScheme: 'light' },
+    steps: [
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-band-scale]', scroll: true },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-outcome-head]:has-text("Extra successes"))' +
+      ':not(:has([data-band-strip-handle]))' +
+      ' [data-band-strip-band="botch"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-progressive',
+    label: 'a progressive pool testing each die by exceed, with no difficulty card',
+    frame: '09',
+    state: 'dice-pool-extended',
+    // A progressive pool has the same per-die test as every other slot (issue 2067).
+    steps: [
+      { selector: '[data-check-count-test-option="exceed"]' },
+      { selector: '[data-check-count-fields]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':not(:has([data-check-difficulty-card]))' +
+      ':has([data-check-count-test-option="exceed"].is-active)' +
+      ' [data-check-count-fields]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-triggers',
+    label: 'the count presets, a botch added',
+    frame: '15',
+    steps: [
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-check-trigger-presets] [data-rule-row-preset="botch"]' },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-check-trigger-presets] [data-rule-row-preset="low"])' +
+      ':not(:has([data-check-trigger-presets] [data-rule-row-preset="high"]))' +
+      ' [data-trigger] [data-rule-row-title]:has-text("Net successes")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert',
+    label: 'a summing formula that counts successes, converted from its Validation row',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    nav: 'validation',
+    steps: [
+      { selector: '[data-issue="freeTextCountingFormula"]', scroll: true },
+      {
+        selector:
+          '[data-issue="freeTextCountingFormula"][data-subsystem="crafting"]' +
+          ' [data-validation-row-action]',
+      },
+    ],
+    // Convert stages the draft, then opens the crafting roll section on `Count successes`.
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="crafting"][data-checks-evaluation-product="count"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert-noaction',
+    label: 'a counting formula that cannot convert, its roll-section notice offering Review only',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    nav: 'salvage',
+    steps: [{ selector: '[data-checks-section-notice="freeTextCountingFormula"]', scroll: true }],
+    expectSelector:
+      '.fabricate-manager:has([data-check-formula-average-withheld="die-modifiers"])' +
+      ' [data-checks-section-notice="freeTextCountingFormula"]' +
+      ' [data-notice-action]:text-is("Review")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert-callout',
+    label: 'a summing formula that counts successes, with Convert in the roll section',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    steps: [],
+    expectSelector:
+      '.fabricate-manager:has([data-check-formula-average-withheld="die-modifiers"])' +
+      ' [data-checks-section-notice="freeTextCountingFormula"]' +
+      ' [data-notice-action]:text-is("Convert to count successes")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-tier-zero-point',
+    label: 'a count check with no recipe tiers, owing no tier successes',
+    frame: '16',
+    state: 'dice-pool-faults',
+    steps: [
+      ...Array.from({ length: 4 }, () => ({ selector: nthMatch('[data-remove-tier]', 1) })),
+      { selector: '[data-tiers-empty]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':not(:has([data-checks-section-notice="countTierWithoutSuccesses"]))' +
+      ' [data-tiers-empty]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-readiness-faults',
+    label: 'a missing explode face and a trigger the pool cannot fire, on Validation',
+    frame: '16',
+    state: 'dice-pool-faults',
+    nav: 'validation',
+    steps: [{ selector: '[data-issue="countTriggerGroupUnreachable"]', scroll: true }],
+    expectSelector:
+      '.fabricate-manager:has([data-issue="countFaceMissing"][data-issue-severity="critical"])' +
+      ':has([data-issue="countRequiredExceedsBasePool"][data-issue-severity="warning"])' +
+      ':not(:has([data-issue^="countAdditionalDice"]))' +
+      ' [data-issue="countTriggerGroupUnreachable"][data-issue-severity="warning"]',
+  }),
+  // Frame 08 (`cntExtraOff`): the toggle off keeps the group's head and no nested fields.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-off',
+    label: 'additional dice turned off',
+    frame: '08',
+    steps: [{ selector: '[data-check-additional-dice][aria-pressed="true"]' }],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice][aria-pressed="false"])` +
+      ':not(:has([data-check-additional-dice-fields]))',
+  }),
+  // Frame 07 (`cntLo`): paid from Idrin's stored Momentum, the group after the composed-roll inset,
+  // and the Preview's stepper bounded by what Idrin holds.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path',
+    label: 'paid from a stored path, Idrin holding 2 Momentum',
+    frame: '07',
+    steps: [...COUNT_IDRIN],
+    expectSelector:
+      PREVIEW_NOTE('path', 'Up to 1 for Idrin Ashfall (Momentum 2, at most 1 per roll).') +
+      ':not(:has([data-checks-simulator-readout]))' +
+      ` ${ADDITIONAL_DICE}` +
+      ':has([data-check-additional-dice-source-option="path"].is-active)' +
+      PATH_LINE('resolved', 'Idrin Ashfall → 2') +
+      ':has([data-check-additional-dice-label-field])' +
+      ':has([data-check-additional-dice-max])',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path-narrow',
+    label: 'paid from a stored path, at 1024x640',
+    frame: '07',
+    position: { width: 1024, height: 640 },
+    steps: [...COUNT_IDRIN],
+    expectSelector:
+      ':not(:has([data-checks-simulator-readout]))' +
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-source-option="path"].is-active)` +
+      PATH_LINE('resolved', 'Idrin Ashfall → 2'),
+  }),
+  // `rdySrc` in the Studio: the path cleared, so nothing can be offered.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path-empty',
+    label: 'with no path set',
+    frame: '07, path cleared',
+    steps: [...COUNT_IDRIN, { selector: ADDITIONAL_DICE_PATH, fill: '' }],
+    expectSelector:
+      PREVIEW_NOTE('no-source', 'This check has no source to pay for additional dice.') +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE('danger', 'No source set. Players cannot be offered additional dice until one is.'),
+  }),
+  // Vosk holds no Momentum: a warning line, and the Preview adds no dice for him.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-unresolved',
+    label: 'a Preview-as character with no value at the path',
+    frame: '07, unresolved',
+    steps: [...previewAsActor('lab-actor-vosk')],
+    expectSelector:
+      PREVIEW_NOTE(
+        'unreadable',
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
+      ) +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE(
+        'warning',
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
+      ),
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-overridden',
+    label: 'a Preview-as character whose value an active effect sets',
+    frame: '— (overridden)',
+    steps: [...previewAsActor('lab-actor-brenna')],
+    expectSelector:
+      PREVIEW_NOTE(
+        'overridden',
+        `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so no dice can be added.`
+      ) +
+      ':has(input[data-checks-preview-additional-dice]:disabled)' +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE(
+        'warning',
+        `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so spending it would not lower it. Use a stored value.`
+      ),
+  }),
+  // The retained read macro shows once the source switches; the spend macro is still unset.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro',
+    label: 'paid by macros, the spend macro not yet linked',
+    frame: '07, macros',
+    steps: [{ selector: '[data-check-additional-dice-source-option="macro"]' }],
+    expectSelector:
+      PREVIEW_NOTE('no-source', 'This check has no source to pay for additional dice.') +
+      ` ${ADDITIONAL_DICE}:not(:has(${ADDITIONAL_DICE_PATH}))` +
+      ':has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))' +
+      ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
+  }),
+  // Both macros linked: the Preview never runs the read macro, so the maximum bounds it.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-pair',
+    label: 'paid by a linked read and spend macro',
+    frame: '07, macros',
+    state: 'dice-pool-faults-macro',
+    steps: [],
+    expectSelector:
+      PREVIEW_NOTE(
+        'macro',
+        'The preview never runs the read macro, so up to 1 can be added here.'
+      ) +
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Announce Momentum")',
+    // The linked uuid wraps under its Copy button rather than running beneath it.
+    expectNoHorizontalOverflow:
+      '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-no-actor',
+    label: 'with no Preview-as character',
+    frame: '10 (`noActor`)',
+    steps: [],
+    expectSelector:
+      PREVIEW_NOTE('no-actor', 'Choose a character to see how many they can add.') +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE('muted', 'Choose a character in Preview as to see what this resolves to.'),
+  }),
+  // Frames 07 and 17: additional dice raise the ceiling, so Arcane Work's three successes need
+  // bought dice while Impossible Work's four stay past the most that can ever be rolled.
+  authoringCase({
+    id: 'manager-checks-v3-count-ceiling-additional',
+    label: 'successes needed above the base pool, within additional dice',
+    frame: '07 and 17',
+    state: 'dice-pool-faults',
+    steps: [{ selector: '[data-check-count-callouts]', scroll: true }],
+    expectSelector:
+      `${COUNTING}:has(${ADDITIONAL_DICE} [data-check-additional-dice][aria-pressed="true"])` +
+      ':has([data-check-additional-dice-path-line="muted"])' +
+      ' [data-check-count-callouts]' +
+      ':has([data-check-count-callout="countRequiredExceedsBasePool"]:has-text("Arcane Work"))' +
+      ':not(:has([data-check-count-callout="countRequiredExceedsMaxPool"]:has-text("Arcane Work")))' +
+      ' [data-check-count-callout="countRequiredExceedsMaxPool"]:has-text("Impossible Work")',
+  }),
+  // Frame 22 (`rdySrc`): the path cleared raises the critical row beside the base-pool warning.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice',
+    issue: 'countAdditionalDiceSourceMissing',
+    label: 'additional dice with no source, on Validation',
+    frame: '22',
+    steps: [{ selector: ADDITIONAL_DICE_PATH, fill: '' }],
+    expectSelector:
+      ':has([data-issue="countRequiredExceedsBasePool"][data-issue-severity="warning"])' +
+      ' [data-issue="countAdditionalDiceSourceMissing"][data-issue-severity="critical"]',
+  }),
+  // A list entry is not a stored path the spend can write back.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice-path-invalid',
+    issue: 'countAdditionalDicePathInvalid',
+    label: 'an additional-dice value that is not a stored path, on Validation',
+    frame: '— (path invalid)',
+    steps: [{ selector: ADDITIONAL_DICE_PATH, fill: 'system.items.0.value' }],
+    expectSelector:
+      ':not(:has([data-issue="countAdditionalDiceSourceMissing"]))' +
+      ' [data-issue="countAdditionalDicePathInvalid"][data-issue-severity="critical"]',
+  }),
+  // The spend macro is a chat macro, which Fabricate never runs.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice-macro-invalid',
+    issue: 'countAdditionalDiceMacroInvalid',
+    label: 'a spend macro that is not a script macro, on Validation',
+    frame: '— (macro invalid)',
+    state: 'dice-pool-faults-macro',
+    steps: [],
+    expectSelector:
+      ':not(:has([data-issue="countAdditionalDiceSourceMissing"]))' +
+      ' [data-issue="countAdditionalDiceMacroInvalid"][data-issue-severity="critical"]' +
+      ':has-text("The spend macro is missing or is not a script macro")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep',
+    label: 'roll extra, keep one, on 1d20',
+    frame: '01',
+    steps: parityFormula('1d20 + @prof'),
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-mode-option="keep"].is-active)' +
+      ':has([data-check-advantage-extra][aria-valuetext="2d20"])' +
+      ' [data-check-advantage-note]:text-is("Advantage rolls 2d20 and keeps the highest. Applies to the first dice group, 1d20.")',
+  }),
+  // The same block at the 1024x640 floor: segments, stepper and switch on the narrow card.
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-narrow',
+    label: 'roll extra, keep one, on 1d20, at 1024x640',
+    frame: '01',
+    steps: parityFormula('1d20 + @prof'),
+    position: { width: 1024, height: 640 },
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-extra][aria-valuetext="2d20"])' +
+      ' [data-check-advantage-disadvantage][aria-pressed="true"]',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-multi',
+    label: 'two extra dice on 2d6',
+    frame: '01, with 2d6',
+    steps: [
+      ...parityFormula('2d6 + @prof'),
+      { selector: '.fab-stepper:has([data-check-advantage-extra]) [data-stepper-increment]' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-extra][aria-valuetext="4d6"])' +
+      ' [data-check-advantage-note]:has-text("keeps the 2 highest. Applies to the first dice group, 2d6.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-under',
+    label: 'roll extra, keep one, lower is better',
+    frame: '05',
+    steps: [...parityFormula('1d20'), ...PARITY_UNDER],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-note]:has-text("keeps the lowest."))' +
+      ' [data-check-advantage-disadvantage-hint]:has-text("keeps the highest.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-no-group',
+    label: 'a first dice group that is not a plain die',
+    frame: '— (new copy)',
+    steps: parityFormula('(1d20+2)*2'),
+    // The ordinary average still reads, and the Roll section carries the readiness dot.
+    scope:
+      '.fabricate-manager:has([data-checks-section-dot="roll"])' +
+      ' [data-checks-panel="crafting"]:has([data-check-formula-average="25"])',
+    expectSelector:
+      '[data-check-advantage]:not(:has([data-check-advantage-extra]))' +
+      ':not(:has([data-check-advantage-disadvantage]))' +
+      ' [data-check-advantage-note]:has-text("is not a plain die")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-bonus',
+    label: 'a bonus die of 1d8 + 1',
+    frame: '— (bonus mode)',
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d8 + 1' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-bonus][aria-invalid="false"])' +
+      ' [data-check-advantage-note]:has-text("by (1d8 + 1)")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-bonus-invalid',
+    label: 'a bonus expression that is not dice',
+    frame: '— (bonus mode)',
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d6x' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-bonus][aria-invalid="true"])' +
+      ' [data-check-advantage-bonus-help].is-danger',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-off',
+    label: 'advantage off',
+    frame: '— (off)',
+    steps: [...parityFormula('1d20 + @prof'), advantageMode('off')],
+    expectSelector:
+      '[data-check-advantage]:not(:has([data-check-advantage-disadvantage]))' +
+      ' [data-check-advantage-note]:text-is("The prompt has a single Roll button.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-no-disadvantage',
+    label: 'advantage without disadvantage',
+    frame: '— (advantage only)',
+    steps: [...parityFormula('1d20 + @prof'), { selector: '[data-check-advantage-disadvantage]' }],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-disadvantage][aria-pressed="false"])' +
+      ' [data-check-advantage-disadvantage-hint]:text-is("The prompt offers advantage only.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-count',
+    label: 'a counting pool offering a die either way',
+    frame: '06',
+    state: 'dice-pool',
+    steps: [],
+    expectSelector:
+      '[data-check-advantage="count"]:has([data-check-advantage-count][aria-pressed="true"])' +
+      ' [data-check-advantage-count-dice]',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-count-off',
+    label: 'a counting pool offering no advantage',
+    frame: '06, turned off',
+    state: 'dice-pool',
+    steps: [{ selector: '[data-check-advantage-count]' }],
+    expectSelector:
+      '[data-check-advantage="count"]:has([data-check-advantage-count][aria-pressed="false"])' +
+      ':not(:has([data-check-advantage-count-dice]))',
+  }),
+  // Validation lists the advantage faults. A check raises at most one keep fault and a system has
+  // two formula-bearing checks, so the three ids take two frames: Herbalism's crafting and salvage.
+  managerCase({
+    id: 'manager-checks-validation-advantage',
+    label: 'Manager — Checks validation, advantage rules the roll cannot honour',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('(1d20+2)*2'),
+      { selector: '#manager-checks-nav-salvage' },
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d6x' },
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepNoDie"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager:has([data-issue="advantageKeepNoDie"][data-issue-severity="warning"])' +
+      ' [data-issue="advantageBonusInvalid"][data-issue-severity="critical"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-validation-advantage-reference',
+    label: 'Manager — Checks validation, advantage keeping a die after a character value',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('@abilities.int.mod + 1d20'),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepAfterReference"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager [data-issue="advantageKeepAfterReference"][data-issue-severity="warning"]' +
+      ':has-text("advantage still applies only to 1d20")',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
   }),
 ]);

@@ -9,9 +9,13 @@ import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
+  assertSelectPanelNamedByTrigger,
   chooseSelectOption,
+  chooseSelectOptionByKeyboard,
+  closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
+  selectTriggerText,
 } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -216,21 +220,64 @@ export function registerSystemsCases() {
     assert.ok(card.textContent.includes('Global conditions'));
     assert.ok(card.textContent.includes('Current time of day'));
     assert.ok(card.textContent.includes('Current weather'));
-    assert.deepEqual(
-      Array.from(card.querySelectorAll('[data-systems-gathering-condition="weather"] option')).map(
-        (option) => option.textContent
-      ),
-      ['Clear Sky', 'Storm Rain']
+    // Each shortcut is a `<Select>` named by its caption's stable id (issue 1777).
+    const weather = '[data-systems-gathering-condition="weather"] .fabricate-select-trigger';
+    assert.equal(card.querySelectorAll('select').length, 0, 'no native select is left');
+    assert.deepEqual(selectOptionLabels(target, weather), ['Clear Sky', 'Storm Rain']);
+    closeSelectPanel(target, weather);
+    for (const [kind, name] of [
+      ['timeOfDay', 'Current time of day'],
+      ['weather', 'Current weather'],
+    ]) {
+      const trigger = `[data-systems-gathering-condition="${kind}"] .fabricate-select-trigger`;
+      assert.equal(assertSelectHasResolvedName(target, trigger), name, `${kind} keeps its name`);
+      assert.equal(
+        assertSelectPanelNamedByTrigger(target, trigger),
+        `manager-system-condition-${kind}-caption`
+      );
+    }
+
+    const timeOfDay = '[data-systems-gathering-condition="timeOfDay"] .fabricate-select-trigger';
+    assert.equal(selectTriggerText(target, weather), 'Clear Sky', 'each shows its current value');
+    assert.equal(selectTriggerText(target, timeOfDay), 'High Day');
+    assert.equal(target.querySelector(weather).getAttribute('title'), 'Clear Sky');
+    target.querySelector('#manager-system-condition-weather-caption').click();
+    flushSync();
+    assert.ok(
+      document.activeElement === target.querySelector(weather),
+      'the caption focuses its trigger'
     );
 
-    const weatherSelect = card.querySelector('[data-systems-gathering-condition="weather"] select');
-    weatherSelect.value = 'heavy-rain';
-    weatherSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    flushSync();
-
+    chooseSelectOption(target, weather, 'heavy-rain');
+    chooseSelectOption(target, timeOfDay, 'night');
     assert.deepEqual(
-      calls.find((call) => call[0] === 'updateGatheringConditions'),
-      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [
+        ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }],
+        ['updateGatheringConditions', { timeOfDay: 'night', systemId: 'alchemy' }],
+      ],
+      'each shortcut writes its own condition'
+    );
+  });
+
+  it('picks a Systems Library condition shortcut from the keyboard', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    await chooseSelectOptionByKeyboard(
+      target,
+      '[data-systems-gathering-condition="weather"] .fabricate-select-trigger',
+      'heavy-rain'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]],
+      'Escape wrote nothing; Enter wrote once'
     );
   });
 
@@ -578,14 +625,23 @@ export function registerSystemsCases() {
     assert.ok(scopeCard, 'selected system scope card should render');
     const scopeSelect = scopeCard.querySelector('[data-manager-scope-select]');
     assert.ok(scopeSelect, 'the rail card should expose a system select');
-    assert.equal(scopeSelect.tagName, 'SELECT');
-    assert.equal(scopeSelect.value, 'alchemy', 'the select names the selected system');
+    assert.equal(scopeSelect.getAttribute('role'), 'combobox', 'it is the shared Select (issue 1777)');
+    assert.equal(
+      assertSelectHasResolvedName(target, '[data-manager-scope-select]'),
+      'Select a system',
+      'the trigger keeps the name the native select had'
+    );
     assert.ok(
-      Array.from(scopeSelect.options)
-        .map((option) => option.value)
-        .includes('alchemy'),
+      selectOptionValues(target, '[data-manager-scope-select]').includes('alchemy'),
       'the select lists the systems the manager knows about'
     );
+    assert.equal(
+      target.querySelector(':scope .fabricate-select-popover [aria-selected="true"]')?.dataset
+        .popoverOption,
+      'alchemy',
+      'the select names the selected system'
+    );
+    closeSelectPanel(target, '[data-manager-scope-select]');
     assert.equal(
       scopeCard.querySelector('.manager-scope-name'),
       null,
@@ -669,7 +725,7 @@ export function registerSystemsCases() {
       'pre-condition: the manager opens on the systems library'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await Promise.resolve();
     await tick();
     flushSync();
@@ -699,7 +755,7 @@ export function registerSystemsCases() {
     });
     flushSync();
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await Promise.resolve();
     await tick();
     flushSync();
@@ -754,7 +810,7 @@ export function registerSystemsCases() {
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
-    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .fabricate-button'))
       .find((button) => button.textContent.includes('Review tasks'))
       .click();
     await tick();
@@ -773,7 +829,7 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .fabricate-button'))
       .find((button) => button.textContent.includes('Review events'))
       .click();
     await tick();
@@ -789,7 +845,7 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
-    target.querySelector('.manager-table-scroll .manager-button.is-primary').click();
+    target.querySelector('.manager-table-scroll .fabricate-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -825,7 +881,7 @@ export function registerSystemsCases() {
     assert.ok(
       target.textContent.includes('Create gathering tasks before attaching them to environments.')
     );
-    target.querySelector('[data-gathering-tasks-browser] .manager-button.is-primary').click();
+    target.querySelector('[data-gathering-tasks-browser] .fabricate-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -881,7 +937,7 @@ export function registerSystemsCases() {
     // The Recipe Editor was removed, so the empty state no longer offers a
     // Create Recipe button.
     assert.equal(
-      target.querySelector('.manager-table-scroll .manager-button.is-primary'),
+      target.querySelector('.manager-table-scroll .fabricate-button.is-primary'),
       null,
       'empty recipe state should not offer a create button'
     );
@@ -926,7 +982,7 @@ export function registerSystemsCases() {
       false
     );
 
-    Array.from(target.querySelectorAll('.manager-setup-links .manager-button'))
+    Array.from(target.querySelectorAll('.manager-setup-links .fabricate-button'))
       .find((button) => button.textContent.includes('Add components'))
       .click();
     await tick();
@@ -1000,7 +1056,7 @@ export function registerSystemsCases() {
     // wrong layer: an essence is a world record, and the route out is the setup card's own copy
     // plus the rail's Essence Catalogue entry.
     assert.ok(
-      !target.querySelector('.manager-header-actions .manager-button'),
+      !target.querySelector('.manager-header-actions .fabricate-button'),
       'the Essence Rules header carries no action on an empty system either'
     );
     assert.equal(
@@ -1039,6 +1095,10 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
+    assert.ok(
+      Boolean(target.querySelector(':scope .fabricate-pagination .fabricate-icon-button')),
+      'the pager steps through the shared icon button'
+    );
     target.querySelector('[data-pagination-next]').click();
     await tick();
     flushSync();
@@ -1170,6 +1230,10 @@ export function registerSystemsCases() {
     const dirtyChip = heading.querySelector('[data-system-details-dirty]');
     assert.ok(dirtyChip, 'the Unsaved chip lights while the identity form is dirty');
     assert.ok(
+      dirtyChip.classList.contains('is-action'),
+      'the chip takes the action density of the Save details button beside it'
+    );
+    assert.ok(
       dirtyChip.compareDocumentPosition(heading.querySelector('button[type="submit"]')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       'the chip precedes the Save details button'
@@ -1187,7 +1251,7 @@ export function registerSystemsCases() {
       'the resolution-mode card is no longer on System Overview'
     );
 
-    target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
+    target.querySelector('[data-feature-key="gathering"] .fabricate-toggle').click();
 
     assert.ok(
       calls.some(
@@ -1405,9 +1469,7 @@ export function registerSystemsCases() {
       confirmDiscardSystemDetailsResult: 'cancel',
     });
     typeSystemName('Greater Alchemy');
-    const scope = target.querySelector('[data-manager-scope-select]');
-    scope.value = 'smithing';
-    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', 'smithing');
     await settle();
     assert.ok(
       calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),
@@ -1438,7 +1500,7 @@ export function registerSystemsCases() {
     assert.ok(target.querySelector('[data-system-details-dirty]'), 'the form is dirty');
 
     // The blocker link routes through confirmRouteExit('system-edit').
-    target.querySelector('[data-system-edit-blocker-link]').click();
+    target.querySelector(':scope [data-system-edit-blocker] [data-notice-action]').click();
     await settle();
 
     assert.ok(
@@ -1605,21 +1667,13 @@ export function registerSystemsCases() {
   it("switches to the Validation tab when the Settings tab's blocker link is clicked", async () => {
     await mountSystemOverviewPage(overviewReport);
 
-    const blockerLink = target.querySelector('[data-system-edit-blocker-link]');
-    assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
-    // Audit row 8's forgotten role (issue 1118). This is a "go and look at that" link inside a
-    // callout that already carries the alarm — the triangle, the title and the body copy — and
-    // at the base `.manager-button` weight it competed with the sentence explaining it. Ghost
-    // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
-    // secondary verb beside something that outranks it.
-    assert.ok(
-      blockerLink.classList.contains('fab-manager-button'),
-      `the blocker link renders through the ManagerButton primitive, got ${blockerLink.className}`
-    );
-    assert.ok(
-      blockerLink.classList.contains('is-ghost'),
-      `the blocker link takes the ghost role, got ${blockerLink.className}`
-    );
+    // The blocker is a non-blocking warning Notice in the stacking region (issue 1522), and its
+    // open-overview link is the Notice's own action.
+    const blocker = target.querySelector('[data-system-edit-blocker]');
+    assert.ok(blocker?.matches('.fab-notice.is-warning[data-notice-position="stack"]'));
+    assert.equal(blocker.getAttribute('role'), 'status', 'a standing state, not an alert');
+    const blockerLink = blocker.querySelector('[data-notice-action]');
+    assert.equal(blockerLink?.textContent, 'Open system overview');
     const detailsSave = target.querySelector('[data-system-details-save]');
     assert.ok(Boolean(detailsSave), 'the Identity card renders its Save details submit');
     assert.ok(
@@ -1701,7 +1755,7 @@ export function registerSystemsCases() {
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage feature toggle renders in System Settings');
     // The default fixture has salvage on, so toggling sends false.
-    tile.querySelector('.manager-status-toggle').click();
+    tile.querySelector('.fabricate-toggle').click();
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'salvage' && call[2] === false
@@ -1728,7 +1782,7 @@ export function registerSystemsCases() {
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage toggle still renders so the GM can turn salvage back on');
     assert.equal(
-      tile.querySelector('.manager-status-toggle').getAttribute('aria-pressed'),
+      tile.querySelector('.fabricate-toggle').getAttribute('aria-pressed'),
       'false',
       'the salvage toggle reads as off'
     );
@@ -2222,7 +2276,7 @@ export function registerSystemsCases() {
     const card = target.querySelector('.manager-currency-unit-card');
     assert.ok(card.querySelector('[data-world-currency-unit="gp"]'), 'gp unit should render');
     assert.equal(
-      card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button')
+      card.querySelectorAll('.manager-currency-provider-managed-summary .fabricate-icon-button')
         .length,
       0,
       'no edit/delete icon buttons in read-only summary'
@@ -2439,7 +2493,7 @@ export function registerSystemsCases() {
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
     // Resolution-mode rollback moved to the Crafting Settings page (issue 511).
-    const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
+    const gathering = target.querySelector('[data-feature-key="gathering"] .fabricate-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
     gathering.click();
     await Promise.resolve();

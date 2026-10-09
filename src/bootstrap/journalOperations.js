@@ -4,6 +4,8 @@
  */
 
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { publicAdditionalDiceOffer } from '../systems/additionalDiceReach.js';
+import { publicAdvantageOffer } from '../systems/checkAdvantage.js';
 import { evaluatePreparedCraftingCheck, postCheckRollHandoff } from '../systems/checkRoll.js';
 import { EVENT_SCENE_SOCKET } from '../systems/eventSceneCoordinator.js';
 import { createFoundryJournalRunAuthority } from '../systems/journalRunAuthority.js';
@@ -16,11 +18,22 @@ import {
 } from '../systems/journalRunCommands.js';
 import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
+import { engineWithStationPresence } from '../systems/stationPresence.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
 import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
+
+/** What a player reads when a re-prepared check differs from the one they answered. */
+function checkChangedNotice() {
+  return localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Journal.CheckChanged',
+    undefined,
+    "This roll's details changed while you were deciding. Check them and roll again."
+  );
+}
 
 /** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
 function displayFormula(formula) {
@@ -31,9 +44,13 @@ function displayFormula(formula) {
     .trim();
 }
 
-/** The entitled Journal descriptor's named display fields are the prompt's only input. */
-export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
+/**
+ * The entitled Journal descriptor's named display fields are the prompt's only input. A prompt
+ * reopened because its check `changed` states that in a notice.
+ */
+export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll, { changed } = {}) {
   return prompt({
+    ...(changed === true && { notice: checkChangedNotice() }),
     name: descriptor?.subject ?? descriptor?.label,
     actorName: descriptor?.actorName,
     activity: descriptor?.activity,
@@ -50,20 +67,40 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
     selectedModifiers: descriptor?.selectedModifiers,
     allowAdvantage: descriptor?.allowAdvantage === true,
+    advantageOffer: publicAdvantageOffer(descriptor?.advantageOffer),
     offerSituationalBonus: descriptor?.offerSituationalBonus !== false,
     modifierChoice: descriptor?.modifierChoice ?? null,
     ...(descriptor?.product === 'count' && {
       product: 'count',
       pool: descriptor.pool,
       threshold: descriptor.threshold,
+      thresholdAnchor: descriptor.thresholdAnchor,
       thresholdSource: descriptor.thresholdSource,
       die: descriptor.die,
       explode: descriptor.explode,
       cancel: descriptor.cancel,
+      zeroPoolFails: descriptor.zeroPoolFails,
       required: descriptor.required,
       modifierDestination: descriptor.modifierDestination,
+      pendingTools: descriptor.pendingTools,
+    }),
+    ...(descriptor?.additionalDiceOffer && {
+      additionalDiceOffer: publicAdditionalDiceOffer(descriptor.additionalDiceOffer),
     }),
   });
+}
+
+/**
+ * The requesting client's check seams: the prompt, which states a changed check in a notice, the
+ * entitled roll post, and the toast that says the same as a secondary cue.
+ */
+export function journalCheckSeams() {
+  return {
+    promptCheck: (descriptor, options) =>
+      promptJournalStageCheck(descriptor, promptCheckRoll, options),
+    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    onCheckChanged: () => globalThis.ui?.notifications?.warn?.(checkChangedNotice()),
+  };
 }
 
 /**
@@ -80,6 +117,27 @@ export function withPromptActivity(operations, activity) {
       const prompt = descriptor?.publicPrompt;
       if (!prompt?.label || prompt.activity) return descriptor;
       return { ...descriptor, publicPrompt: { ...prompt, activity: activity() } };
+    },
+  };
+}
+
+/**
+ * A check that cannot roll refuses at describe as it does at evaluate, `roll-unavailable` with its
+ * sentence (issue 2139), so the client clears a stale result as for any misconfigured check. Any
+ * other describe failure still throws.
+ */
+export function withUnrollableCheckRefusal(operations) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      try {
+        return await describeCheck(request);
+      } catch (error) {
+        if (error?.code !== 'CHECK_TARGET_INVALID') throw error;
+        return { required: false, blocked: 'roll-unavailable', detail: { message: error.message } };
+      }
     },
   };
 }
@@ -234,9 +292,10 @@ function buildRunStartOperations(fabricate) {
     start: async ({ actor, payload, executionGrant, requestId, sender }) => {
       const sourceActors = await resolveJournalSourceActors(null, payload, actor);
       if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const start = fabricate.craftingEngine?.startVersionedRun;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const start = engine?.startVersionedRun;
       if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return start.call(fabricate.craftingEngine, {
+      return start.call(engine, {
         viewer: sender,
         actor,
         sourceActors,
@@ -270,11 +329,12 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
     describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
-      const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const describe = engine?.describeVersionedStageCheck;
       if (typeof describe !== 'function') {
         return { required: false, blocked: 'unsupported-operation' };
       }
-      const descriptor = await describe.call(fabricate.craftingEngine, {
+      const descriptor = await describe.call(engine, {
         actor,
         componentSourceActors,
         runId: run.id,
@@ -299,6 +359,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         publicPrompt: {
           allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
           allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+          advantageOffer: publicAdvantageOffer(descriptor.publicPrompt?.advantageOffer),
           offerSituationalBonus: descriptor.publicPrompt?.offerSituationalBonus !== false,
           ...countPromptWording(descriptor.publicPrompt),
         },
@@ -329,13 +390,17 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         );
       return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
         secret: !visible,
+        user: sender,
       });
     },
     authorizeRollHandoff,
   };
 }
 
-/** The stage legs: execute, begin and cancel, each re-resolving its own source actors. */
+/**
+ * The stage legs: execute, begin and cancel, each re-resolving its own source actors. A crafting
+ * command's `payload.presentTools` reaches Tool presence for that command only (issue 2265).
+ */
 function buildStageOperations(fabricate) {
   return {
     execute: async ({
@@ -349,9 +414,10 @@ function buildStageOperations(fabricate) {
     }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const execute = fabricate.craftingEngine?.executeVersionedStage;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const execute = engine?.executeVersionedStage;
       if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return execute.call(fabricate.craftingEngine, {
+      return execute.call(engine, {
         viewer: sender,
         actor,
         componentSourceActors,
@@ -374,9 +440,10 @@ function buildStageOperations(fabricate) {
     }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const begin = fabricate.craftingEngine?.beginVersionedStage;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const begin = engine?.beginVersionedStage;
       if (typeof begin !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return begin.call(fabricate.craftingEngine, {
+      return begin.call(engine, {
         viewer: sender,
         actor,
         componentSourceActors,
@@ -398,6 +465,26 @@ function buildStageOperations(fabricate) {
         expectedRevision,
         executionGrant,
         requestId,
+      });
+    },
+  };
+}
+
+/** The award-choice leg: settle a pending reward pick under its own `chooseAward` grant, on an
+ *  active or terminal run (issue 1773). */
+function buildAwardChoiceOperations(fabricate) {
+  return {
+    chooseAward: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const settle = fabricate.craftingEngine?.settleAwardChoice;
+      if (typeof settle !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return settle.call(fabricate.craftingEngine, {
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+        choiceId: payload.choiceId,
+        picks: payload.picks,
       });
     },
   };
@@ -482,6 +569,7 @@ function createCraftingJournalOperations(fabricate, getService) {
     ...buildRunStartOperations(fabricate),
     ...buildCheckOperations(fabricate, authorizeRollHandoff),
     ...buildStageOperations(fabricate),
+    ...buildAwardChoiceOperations(fabricate),
     ...buildRunMutationOperations(fabricate, managerMutation),
     authorizeRollHandoff,
   };
@@ -495,14 +583,18 @@ export function createJournalCommandsForFabricate(
   service = createJournalRunCommandService({
     authority,
     operations: {
-      crafting: createCraftingJournalOperations(fabricate, () => service),
+      crafting: withUnrollableCheckRefusal(
+        createCraftingJournalOperations(fabricate, () => service)
+      ),
       gathering: withPromptActivity(
-        createGatheringJournalRunOperations({
-          getEngine: () => getGatheringEngine(),
-          runManager: fabricate.gatheringRunManager,
-          getService: () => service,
-          getUser: (userId) => game.users?.get(userId) ?? null,
-        }),
+        withUnrollableCheckRefusal(
+          createGatheringJournalRunOperations({
+            getEngine: () => getGatheringEngine(),
+            runManager: fabricate.gatheringRunManager,
+            getService: () => service,
+            getUser: (userId) => game.users?.get(userId) ?? null,
+          })
+        ),
         () =>
           localizeWith(
             (key) => globalThis.game?.i18n?.localize?.(key),
@@ -518,8 +610,7 @@ export function createJournalCommandsForFabricate(
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
     randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) => promptJournalStageCheck(descriptor),
-    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    ...journalCheckSeams(),
     getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
     onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),

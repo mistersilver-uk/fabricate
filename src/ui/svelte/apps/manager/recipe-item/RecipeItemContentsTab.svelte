@@ -1,25 +1,22 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Contents tab of the recipe-item editor. Lists the recipes a reader can learn from
-  this item (`linkedRecipes`), each removable, and offers a "Link recipe" affordance
-  that picks from `availableRecipes` (recipes not already linked).
+  Contents tab of the recipe-item editor: the recipes a reader can learn from this item, edited as
+  one record's membership through `SetPicker` in its staged form (issue 1782).
 
-  CONTROLLED: emits `onLinkRecipe(recipeId)` / `onRemoveRecipe(recipeId)`; the router
-  merges the change into the draft.
+  CONTROLLED: Apply forwards each recipe it adds as `onLinkRecipe(recipeId)` and each it removes as
+  `onRemoveRecipe(recipeId)`, and the router merges them into the draft; nothing writes before it.
 
   Props:
    - linkedRecipes: `[{ id, name, category, img? }]` recipes currently inside the item.
-   - availableRecipes: `[{ id, name, category, img? }]` candidate recipes to link.
+   - availableRecipes: `[{ id, name, category, img? }]` the system's other recipes.
    - onLinkRecipe(recipeId) / onRemoveRecipe(recipeId).
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import { localizeOr } from '../../../util/localizeOr.js';
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
-  import IconButton from '../../../components/IconButton.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
+  import SetPicker from '../../../components/SetPicker.svelte';
 
   let {
     linkedRecipes = [],
@@ -28,185 +25,91 @@
     onRemoveRecipe = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
+  // Each recipe once, by its first appearance; an id-less entry is no recipe a book can carry.
+  // The seen ids are a plain record: `svelte/prefer-svelte-reactivity` refuses a local `Set`.
+  function distinctRecipes(recipes) {
+    const seen = Object.create(null);
+    return recipes.filter((recipe) => {
+      if (!recipe?.id || seen[recipe.id]) return false;
+      seen[recipe.id] = true;
+      return true;
+    });
   }
 
-  const linkedIds = $derived(new Set((linkedRecipes || []).map((recipe) => String(recipe?.id))));
-  // Only offer recipes that are not already linked.
-  const linkable = $derived(
-    (availableRecipes || []).filter((recipe) => !linkedIds.has(String(recipe?.id)))
-  );
+  const linkedIds = $derived(distinctRecipes(linkedRecipes || []).map((recipe) => recipe.id));
 
-  function categoryLabel(recipe) {
-    return String(
-      recipe?.category ||
-        text('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General')
-    );
-  }
-
-  /**
-   * The linkable recipes, shaped for `SearchablePopover` (issue 1458).
-   *
-   * The category travels as `meta` — the option's SECOND LINE — rather than as a third inline
-   * span. That is a deliberate change and it converges on the rows directly beneath it: a
-   * LINKED recipe already renders its name over its category in a two-line copy block, so the
-   * menu now offers a choice in the shape the choice will take. It is also the case `meta` is
-   * documented for, a picker whose entries differ by a fact rather than by a name.
-   *
-   * `data` reproduces `data-recipe-item-link-recipe-option` verbatim instead of folding it into
-   * the primitive's `dataId`/`data-popover-option`, so the mounted suite that reads a row's
-   * recipe id out of that attribute keeps working against the same hook.
-   */
-  const linkOptions = $derived(
-    linkable.map((recipe) => ({
+  // Every recipe of the system, the linked ones first: the panel marks the members.
+  const recipeOptions = $derived(
+    distinctRecipes([...(linkedRecipes || []), ...(availableRecipes || [])]).map((recipe) => ({
       id: recipe.id,
       label: recipe.name,
-      meta: categoryLabel(recipe),
+      meta: String(
+        recipe.category ||
+          localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General')
+      ),
       img: resolveRecipeImage(recipe),
       data: { 'data-recipe-item-link-recipe-option': recipe.id },
     }))
   );
 
-  function linkRecipe(recipeId) {
-    if (!recipeId) return;
-    onLinkRecipe(recipeId);
+  function applyMembership(next, { added, removed }) {
+    for (const recipeId of added) onLinkRecipe(recipeId);
+    for (const recipeId of removed) onRemoveRecipe(recipeId);
   }
+
+  const addProps = {
+    'data-recipe-item-link-recipe-toggle': '',
+    'data-validation-target': 'recipe-item-link-recipe',
+  };
 </script>
 
 <section
   class="manager-recipe-item-tab"
   data-recipe-item-tab="contents"
-  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Title', 'Recipes inside')}
+  aria-label={localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Title', 'Recipes inside')}
 >
-  <div class="manager-recipe-item-contents-head">
-    <div class="manager-recipe-item-contents-heading">
-      <i class="fas fa-scroll" aria-hidden="true"></i>
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}
-      </h3>
-    </div>
-    <!-- `SearchablePopover` with its CHIP trigger (issue 1458), not a hand-rolled
-         trigger-plus-listbox. The wrapper `<div>` STAYS: it is this head row's second flex
-         item, and it is also the element that carries this component's scoping hash for the
-         `:global(...)` disabled rule below, which would otherwise stop reaching the chip.
-
-         `is-neutral` rides `triggerClass` because the primitive renders the chip without a
-         `tone`, and that class is exactly what `tone="neutral"` emitted. `showChevron={false}`
-         keeps the trigger an ADD control — its leading `fa-plus` says what it does, and a value
-         chevron beside it would imply it shows a current selection.
-
-         THE SEARCH FIELD IS ON, AND `triggerHasPopup` CAME OFF WITH IT (issue 1513). This panel
-         offers every recipe in the world that is not already linked, which on a real world is a
-         library rather than the handful of fixed names the four converted MENUS offer — and a
-         list you scroll to find a name in is the case the primitive's search exists for. The
-         two props move TOGETHER because they are one statement read from either end:
-         `aria-haspopup` says what activating the trigger OPENS, and with a query field in it
-         the panel is a dialog that CONTAINS a listbox rather than a bare listbox. Dropping the
-         prop takes the truthful `dialog` default, which is what
-         `searchable-popover-source-contract.test.js` holds in both directions.
-
-         `stayOpen` WITHOUT `multiple`, which is the separation issue 1513 built the gate for:
-         linking is still one choice at a time and the panel still announces a single-value
-         listbox, but linking a second recipe is the overwhelmingly common next action and
-         re-opening the trigger, re-typing the query and re-finding the place in the library
-         between each one is the whole cost. `showFilteredCount` states the matched-of-total the
-         field now makes reachable.
-
-         `triggerAriaDisabled` RATHER THAN `disabled`, and `stayOpen` is what made the difference
-         load-bearing. The panel outlives a choice now, so the LAST linkable recipe is linked with
-         the panel still open: a native `disabled` would leave the trigger `disabled` and
-         `aria-expanded="true"` at the same time, and Escape's `restoreTriggerFocus()` calls
-         `focus()` on a disabled button — a silent no-op that drops the keyboard user to `<body>`,
-         where Foundry's canvas keybindings are live again. The primitive refuses to open on
-         either flag, so the affordance is closed exactly as firmly; what changes is that the
-         button stays focusable and keeps announcing why it will not open. -->
-    <div class="manager-recipe-item-link-recipe">
-      <!-- THE CONTROL HALF of the validation row action (issue 1517): the `recipeLinked` blocker
-           is answered by linking a recipe, and this trigger is the one control that does it, so
-           `RecipeItemValidationTab` addresses it as `recipe-item-link-recipe` through
-           `triggerData`. A trigger is a real `<button>` and needs no tabindex — but it IS
-           disabled when every recipe is already linked, and `validationFocus.js` refuses a
-           disabled target rather than focusing a control the GM cannot use. The row still
-           changes tab. -->
-      <SearchablePopover
-        options={linkOptions}
-        triggerChip
-        stayOpen
-        showFilteredCount
-        showChevron={false}
-        triggerClass="manager-recipe-item-link-recipe-toggle is-neutral"
-        triggerIcon="fas fa-plus"
-        triggerLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
-        dialogAriaLabel={text(
-          'FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe',
-          'Link recipe'
-        )}
-        triggerData={{
-          'data-recipe-item-link-recipe-toggle': '',
-          'data-validation-target': 'recipe-item-link-recipe',
-        }}
-        searchPlaceholder={text(
-          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
-          'Search recipes…'
-        )}
-        searchAriaLabel={text(
-          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
-          'Search recipes…'
-        )}
-        triggerAriaDisabled={linkable.length === 0}
-        emptyHint={text(
-          'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
-          'Every recipe is already linked'
-        )}
-        onChoose={linkRecipe}
-      />
-    </div>
+  <div class="manager-recipe-item-contents-heading">
+    <i class="fas fa-scroll" aria-hidden="true"></i>
+    <h3 class="manager-card-title">
+      {localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}
+    </h3>
   </div>
 
   <p class="manager-muted manager-recipe-item-contents-hint">
-    {text(
+    {localizeOr(
       'FABRICATE.Admin.Manager.RecipeItem.Contents.Hint',
-      'The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.'
+      'The recipes a reader can learn from this item. Use “Edit recipes” to add or remove them, then Apply.'
     )}
   </p>
 
-  {#if linkedRecipes.length === 0}
+  {#if linkedIds.length === 0}
     <p class="manager-muted" data-recipe-item-contents-empty>
-      {text(
+      {localizeOr(
         'FABRICATE.Admin.Manager.RecipeItem.Contents.Empty',
-        'No recipes linked yet. Use “Link recipe” to add one.'
+        'No recipes linked yet. Use “Edit recipes” to add one.'
       )}
     </p>
-  {:else}
-    <ul class="manager-recipe-item-recipe-list" data-recipe-item-contents-list>
-      {#each linkedRecipes as recipe (recipe.id)}
-        <li class="manager-recipe-item-recipe-row" data-recipe-item-recipe={recipe.id}>
-          <!-- The shared tile (issue 1506). This row was the ONE art tile in the tree already
-               drawing at a published ladder rung — 30px at radius 7 on `--fab-bg-3`, with no edge
-               — so converting it is a KNOWN regression on two geometry axes: the corner moves to
-               the medallion's flat 9px and the tile gains a hairline. Both are geometry, both
-               belong to the size-ladder sweep, and one tile primitive is worth more than one
-               compliant tile: its size is recorded on the `offLadderArtSizes` ledger for it. -->
-          <Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={30} />
-          <div class="manager-recipe-item-recipe-copy">
-            <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
-            <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
-          </div>
-          <IconButton
-            class="is-danger"
-            data-recipe-item-remove-recipe={recipe.id}
-            ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Remove', 'Remove recipe')}
-            title={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Remove', 'Remove recipe')}
-            onclick={() => onRemoveRecipe(recipe.id)}
-          >
-            <i class="fas fa-xmark" aria-hidden="true"></i>
-          </IconButton>
-        </li>
-      {/each}
-    </ul>
   {/if}
+
+  <!-- The validation row's `recipeLinked` address rides the trigger (issue 1517): it is the one
+       control that answers the blocker, and a `<button>` that is never disabled. -->
+  <SetPicker
+    data-recipe-item-contents-picker=""
+    value={linkedIds}
+    options={recipeOptions}
+    onChange={applyMembership}
+    ariaLabel={localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Title', 'Recipes inside')}
+    searchLabel={localizeOr(
+      'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
+      'Search recipes…'
+    )}
+    emptyLabel={localizeOr(
+      'FABRICATE.Admin.Manager.RecipeItem.Contents.NoRecipes',
+      'This system has no recipes yet.'
+    )}
+    addLabel={localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.EditRecipes', 'Edit recipes')}
+    {addProps}
+  />
 </section>
 
 <style>
@@ -214,13 +117,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-contents-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-3);
   }
 
   .manager-recipe-item-contents-heading {
@@ -234,78 +130,7 @@
     margin: 0;
   }
 
-  .manager-recipe-item-link-recipe {
-    position: relative;
-  }
-
-  /* The toggle is a `Chip` (issue 883), so it is NOT in this component's scope: Svelte
-     stamps its hash on this component's own elements only, and a child component's root
-     never carries it. Reaching it needs `:global`, nested under a selector that DOES
-     carry the hash so nothing leaks. `cursor: pointer` is gone because the primitive's
-     own button rule already sets it; only the disabled state is this component's own.
-
-     IT READS BOTH SPELLINGS OF "CLOSED", because since issue 1513 this call site passes
-     `triggerAriaDisabled` rather than `disabled`: the trigger carries `aria-disabled="true"`
-     with the native attribute ABSENT, so it stays focusable and keeps announcing why it will
-     not open. A `:disabled` selector alone therefore stopped matching the only state it was
-     written for — the "every recipe is already linked" panel drew a full-opacity trigger with
-     `cursor: pointer` that silently did nothing. `:is()` rather than a second rule so the two
-     spellings cannot drift apart, and `:disabled` is kept rather than replaced because the
-     primitive still renders the native attribute for any caller that passes `disabled`. */
-  .manager-recipe-item-link-recipe
-    :global(.manager-recipe-item-link-recipe-toggle:is(:disabled, [aria-disabled='true'])) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* The popover panel and its rows were `.manager-recipe-item-link-recipe-list` and
-     `.manager-recipe-item-link-recipe-option`, and both blocks are GONE rather than repaired
-     (issue 1458): `.manager-travel-popover` and `.manager-travel-option` in
-     `styles/fabricate.css` state the same panel and the same row, and repairing a rule that
-     restates the primitive's own would have kept the duplication with a `:global()` on it. */
-
   .manager-recipe-item-contents-hint {
     margin: 0 0 var(--fab-space-2);
-  }
-
-  .manager-recipe-item-recipe-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-recipe-row {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-2);
-  }
-
-  .manager-recipe-item-recipe-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .manager-recipe-item-recipe-name {
-    font-weight: 600;
-    font-size: 0.8rem;
-    color: var(--fab-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .manager-recipe-item-recipe-cat {
-    font-size: 0.62rem;
-    color: var(--fab-text-subtle);
   }
 </style>

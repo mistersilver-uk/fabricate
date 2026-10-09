@@ -56,13 +56,16 @@ import {
 } from './manager/deleteCascades.js';
 import {
   addItemFromUuid,
+  addItemsFromPack,
   addRecipeItemFromUuid,
+  flushImportRegistrations,
   itemSourcesCollaborators,
   migrateLegacyRecipeItems,
   refreshComponentMetadataForUpdatedItem,
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import { sourceSnapshotCollaborators } from './manager/sourceSnapshotCollaborators.js';
 import { deleteTool, toolSourcesCollaborators, upsertTool } from './manager/toolSources.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
@@ -126,6 +129,7 @@ import {
 } from './normalize/tools.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
+import { assertSalvageAmounts } from './rolledAmountResolver.js';
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -215,6 +219,18 @@ function _idSet(...lists) {
   return ids;
 }
 
+const PASS_FAIL_CARRIED_FIELDS = Object.freeze([
+  'dc',
+  'thresholdMode',
+  'tiers',
+  'dcMode',
+  'macroUuid',
+  'checkBreakage',
+  'evaluation',
+  'offerSituationalBonus',
+  'advantage',
+]);
+
 export class CraftingSystemManager {
   /** `seams` injects the Foundry-facing collaborators (issue 800), each defaulting to a safe
    * pass-through; `enrichToHtml` passes through because `enrichHTML` cannot run under happy-dom. */
@@ -261,6 +277,11 @@ export class CraftingSystemManager {
     return _resolveStoreSeam(this._characterLibrariesStore);
   }
 
+  /** The world component scope store behind its seam, or `null` when none is readable. */
+  _resolveComponentScopeStore() {
+    return _resolveStoreSeam(this._componentScopeStore);
+  }
+
   /** The Valid Id Basis for one system's reference pruning, `null` for each set not known to be
    * complete (`DOMAIN.md` Valid Id Basis). It unions the world library with the legacy copy, the
    * live corpus before the 1.28.0 migration, and is never a `migrationVersion` check. */
@@ -284,18 +305,19 @@ export class CraftingSystemManager {
 
   /** The Valid Id Basis for one system's world-scope pruning (issue 1359) plus the icon-map
    * vocabularies, `null` for each basis not known complete. No caller may default one to
-   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it. */
+   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it.
+   * `createItem` and `updateItem` bypass `_normalizeSystem` and read the same basis here. */
   _scopeBasis(system) {
     return {
       componentIds: _scopeEntityBasis(
         _resolveStoreSeam(this._componentScopeStore),
-        system?.components ?? system?.managedItems ?? system?.items
+        system?.components ?? system?.managedItems ?? system?.items // ratchet-exempt(world-scope): basis
       ),
       essenceIds: _scopeEntityBasis(
         _resolveStoreSeam(this._essenceScopeStore),
-        system?.essenceDefinitions ?? system?.essences
+        system?.essenceDefinitions ?? system?.essences // ratchet-exempt(world-scope): basis
       ),
-      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools), // ratchet-exempt(world-scope): basis
       componentCategories: _vocabularyBasis(
         normalizeCustomComponentCategories(system?.componentCategories)
       ),
@@ -561,16 +583,7 @@ export class CraftingSystemManager {
   /** The snapshot cluster's collaborators (issue 1699), rebuilt per call because suites patch
    * these methods on constructed instances. */
   _sourceSnapshotCollaborators() {
-    return {
-      enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
-      resolveImportedComponentSourceData: (itemUuid, source) =>
-        this._resolveImportedComponentSourceData(itemUuid, source),
-      plainTextDescription: (value) => this._plainTextDescription(value),
-      descriptionTextCandidate: (value, seen) => this._descriptionTextCandidate(value, seen),
-      normalizeComponentDescription: (description) =>
-        this._normalizeComponentDescription(description),
-      extractSourceDescription: (source) => this._extractSourceDescription(source),
-    };
+    return sourceSnapshotCollaborators(this);
   }
 
   async _extractSourceDescription(source = null) {
@@ -816,7 +829,7 @@ export class CraftingSystemManager {
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
-    const managedItems = system.components || [];
+    const managedItems = system.components || []; // ratchet-exempt(world-scope): authoring-accessor
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
     return managedItems.filter((item) => {
@@ -1084,10 +1097,10 @@ export class CraftingSystemManager {
           ? updates.tags
           : current.itemTags,
       essenceDefinitions: Object.prototype.hasOwnProperty.call(updates, 'essenceDefinitions')
-        ? updates.essenceDefinitions
+        ? updates.essenceDefinitions // ratchet-exempt(world-scope): writer
         : Object.prototype.hasOwnProperty.call(updates, 'essences')
           ? updates.essences
-          : current.essenceDefinitions,
+          : current.essenceDefinitions, // ratchet-exempt(world-scope): writer
       recipeItemDefinitions: Object.prototype.hasOwnProperty.call(updates, 'recipeItemDefinitions')
         ? updates.recipeItemDefinitions
         : Object.prototype.hasOwnProperty.call(updates, 'recipeItems')
@@ -1182,7 +1195,8 @@ export class CraftingSystemManager {
   }
 
   /** Copy the pass/fail check fields to a destination only when it has no `rollFormula` and the
-   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation and the offer. */
+   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation, the offer and the
+   * advantage rule. */
   _copyPassFailCheckFields(source, destination) {
     if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
       return;
@@ -1194,24 +1208,8 @@ export class CraftingSystemManager {
     if (destFormula.length > 0) return;
 
     destination.rollFormula = source.rollFormula;
-    if ('dc' in source) destination.dc = source.dc;
-    if ('thresholdMode' in source) destination.thresholdMode = source.thresholdMode;
-    if ('tiers' in source) {
-      destination.tiers = Array.isArray(source.tiers)
-        ? source.tiers.map((tier) => ({ ...tier }))
-        : source.tiers;
-    }
-    if ('dcMode' in source) destination.dcMode = source.dcMode;
-    if ('macroUuid' in source) destination.macroUuid = source.macroUuid;
-    if ('checkBreakage' in source) {
-      destination.checkBreakage =
-        source.checkBreakage && typeof source.checkBreakage === 'object'
-          ? structuredClone(source.checkBreakage)
-          : source.checkBreakage;
-    }
-    if ('evaluation' in source) destination.evaluation = structuredClone(source.evaluation);
-    if ('offerSituationalBonus' in source) {
-      destination.offerSituationalBonus = source.offerSituationalBonus;
+    for (const key of PASS_FAIL_CARRIED_FIELDS) {
+      if (key in source) destination[key] = structuredClone(source[key]);
     }
   }
 
@@ -1284,7 +1282,7 @@ export class CraftingSystemManager {
     // Not repointed at the read union (issue 1370): this validates the proposed, unsaved record.
     // `CraftingEngine` checks the union at craft time; both agree while `## CraftingSystem`
     // requirement 36 keeps the union's row set equal to the in-system array's.
-    const components = Array.isArray(system.components) ? system.components : [];
+    const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): pre-persist
     const validator = new SignatureValidator({
       getSystem: (id) => (id === systemId ? system : null),
       getRecipesForSystem: (id) => (id === systemId ? recipeJson : []),
@@ -1323,16 +1321,14 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    // The Valid Id Basis `_normalizeSystem` uses (issue 1359); this site bypasses it, and a
-    // real-but-empty Set on an unreplicated client cannot be refused downstream. `Set|null`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
       ...this._salvageNormalizationContext(system),
     });
     this._assertUniqueComponentSources(system, item);
-    system.components.push(item);
-    advanceDefinitionRevision(system.components);
+    system.components.push(item); // ratchet-exempt(world-scope): writer
+    advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
     await this.save({ put: system, domains: COMPONENT_FACTS });
     return item;
   }
@@ -1346,6 +1342,7 @@ export class CraftingSystemManager {
     const claimedRefs = new Set((references || []).filter(Boolean));
     if (claimedRefs.size === 0) return null;
     return (
+      // ratchet-exempt(world-scope): writer
       (system.components || []).find((item) => {
         if (excludeItemId && item.id === excludeItemId) return false;
         return getItemMatchUuids(item).some((ref) => claimedRefs.has(ref));
@@ -1412,6 +1409,7 @@ export class CraftingSystemManager {
 
   _assertUniqueComponentSourcesForSystem(system) {
     const claims = new Map();
+    // ratchet-exempt(world-scope): writer
     for (const component of system.components || []) {
       for (const ref of getItemMatchUuids(component)) {
         const existing = claims.get(ref);
@@ -1500,50 +1498,15 @@ export class CraftingSystemManager {
     return replaceItemSource(itemSourcesCollaborators(this), systemId, itemId, itemUuid);
   }
 
-  /** Bulk-import all Item documents from a Foundry compendium pack into a crafting system,
-   * delegating to {@link addItemFromUuid}.
-   * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
-   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
   async addItemsFromPack(systemId, packId) {
-    this._assertGM('bulk import from compendium');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    return addItemsFromPack(itemSourcesCollaborators(this), systemId, packId);
+  }
 
-    const pack = game.packs.get(packId);
-    if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
-
-    const documents = await pack.getDocuments();
-    const items = documents.filter((d) => d.documentName === 'Item');
-
-    // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
-    // intra-pack references are the common case, so per-item priming mostly hits the cache.
-    let added = 0;
-    let updated = 0;
-    let skipped = 0;
-    const sourceFallbacks = [];
-    // Items mutate memory only (`persist: false`) and the batch is flushed by one `save()` below
-    // (issue 1086); `dirty` keeps an all-skipped re-drop from writing.
-    let dirty = false;
-    try {
-      for (const item of items) {
-        const uuid = `Compendium.${packId}.${item.id}`;
-        const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
-        if (result.action === 'added') {
-          added++;
-          dirty = true;
-        } else if (result.action === 'updated') {
-          updated++;
-          dirty = true;
-        } else skipped++;
-        if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
-      }
-    } finally {
-      // In `finally`, so items imported before a throw still persist; named, because every item
-      // went into this one system (issue 1078).
-      if (dirty) await this.save({ put: system, domains: COMPONENT_FACTS });
-    }
-
-    return { added, updated, skipped, total: items.length, sourceFallbacks };
+  /** Write the world-component registrations a batch owner collected through `addItemFromUuid`'s
+   * `registrations` option, in one `fabricate.componentScope` save, after its own save resolved.
+   * @returns {Promise<{registered: number, error: Error|null}>} */
+  async flushWorldComponentRegistrations(registrations) {
+    return flushImportRegistrations(itemSourcesCollaborators(this), registrations);
   }
 
   async refreshComponentMetadataForUpdatedItem(item, changes = {}) {
@@ -1554,21 +1517,22 @@ export class CraftingSystemManager {
     this._assertGM('update component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const idx = system.components.findIndex((i) => i.id === itemId);
+    const idx = system.components.findIndex((i) => i.id === itemId); // ratchet-exempt(world-scope): writer
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
-      { ...system.components[idx], ...updates, id: itemId },
+      { ...system.components[idx], ...updates, id: itemId }, // ratchet-exempt(world-scope): writer
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
+    if (updates.salvage) assertSalvageAmounts(updatedItem.salvage, system);
+    // ratchet-exempt(world-scope): writer
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);
     }
-    system.components[idx] = updatedItem;
-    advanceDefinitionRevision(system.components);
+    system.components[idx] = updatedItem; // ratchet-exempt(world-scope): writer
+    advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
     await this.save({ put: system, domains: COMPONENT_FACTS });
-    return system.components[idx];
+    return system.components[idx]; // ratchet-exempt(world-scope): writer
   }
 
   async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
@@ -1692,7 +1656,7 @@ export class CraftingSystemManager {
     if (!resolutionService) return [];
 
     const disabled = [];
-    const items = Array.isArray(system.components) ? system.components : [];
+    const items = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const item of items) {
       if (!item.salvage?.enabled) continue;
       const validation = resolutionService.validateSalvage(item, system);
@@ -1708,14 +1672,15 @@ export class CraftingSystemManager {
    * dropped (issue 764), for `updateSystem` to disclose; a dropped failure group is not counted. */
   _detectDroppedSimpleSalvageGroups(inputSystem, normalizedSystem) {
     if (normalizedSystem?.salvageResolutionMode !== 'simple') return [];
-    const rawItems = Array.isArray(inputSystem?.components)
-      ? inputSystem.components
+    const rawItems = Array.isArray(inputSystem?.components) // ratchet-exempt(world-scope): writer
+      ? inputSystem.components // ratchet-exempt(world-scope): writer
       : Array.isArray(inputSystem?.managedItems)
         ? inputSystem.managedItems
         : Array.isArray(inputSystem?.items)
           ? inputSystem.items
           : [];
     const normalizedById = new Map(
+      // ratchet-exempt(world-scope): writer
       (Array.isArray(normalizedSystem?.components) ? normalizedSystem.components : []).map(
         (component) => [component.id, component]
       )
@@ -1798,7 +1763,7 @@ export class CraftingSystemManager {
     const validSystemIds = new Set(systems.map((system) => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((recipe) => recipe.id));
     const validComponentIds = new Set(
-      systems.flatMap((system) => (system.components || []).map((component) => component.id))
+      systems.flatMap((system) => (system.components || []).map((component) => component.id)) // ratchet-exempt(world-scope): destructive-basis
     );
     await runGatedMutationCleanup({
       passes: [

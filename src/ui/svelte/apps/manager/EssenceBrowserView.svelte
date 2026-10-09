@@ -19,7 +19,7 @@
   import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import {
@@ -32,8 +32,8 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -361,7 +361,7 @@
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
        1157): emptying the bulk selection unmounts the panel and the Clear that was pressed. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-essence-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -369,9 +369,9 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
     <div class="manager-essence-filter-row">
-      <ManagerSearchField
+      <SearchField
         value={searchTerm}
-        onInput={(next) => {
+        onChange={(next) => {
           ui.searchTerm = next;
           ui.pageIndex = 0;
         }}
@@ -400,7 +400,7 @@
             'FABRICATE.Admin.Manager.Essence.MembershipFilterLabel',
             'Filter essences by membership of this system'
           )}
-          dataAttr="data-essence-membership-filter"
+          data-essence-membership-filter
           optionDataAttr="data-essence-membership-option"
           onChange={(value) => {
             membershipFilter = value;
@@ -423,10 +423,10 @@
           value={ui.sortKey}
           options={sortSelectOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Essence.SortLabel', 'Sort essences')}
-          triggerData={{ 'data-essence-sort': '' }}
+          triggerProps={{ 'data-essence-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
-        <ManagerButton
+        <Button
           data-essence-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Essence.ToggleSortDirection',
@@ -445,7 +445,7 @@
               ? text('FABRICATE.Admin.Manager.Essence.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Essence.SortDescending', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
 
       <!-- ICON-ONLY (issue 1036): a list glyph and a grid glyph ARE the two layouts. The compact
@@ -457,7 +457,7 @@
         iconOnly
         groupName="manager-essence-view-mode"
         ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
-        dataAttr="data-essence-view-mode"
+        data-essence-view-mode
         optionDataAttr="data-essence-view-option"
         onChange={(value) => (ui.viewMode = value)}
       />
@@ -467,7 +467,7 @@
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
-            class="manager-essence-chip-clear"
+            class="manager-essence-chip-clear fab-hit-area"
             aria-label={format(
               'FABRICATE.Admin.Manager.Essence.ClearChip',
               'Clear {filter} filter',
@@ -522,7 +522,7 @@
       onSelectAllResults={selection.selectAllResults}
       onClear={selection.clear}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   <!-- The paginated rows and columns are the shared `LibraryShelf`. This studio still supplies its
        own ENTRY, its own hook class and view attribute, and its own grid template — the parts that
@@ -562,11 +562,8 @@
           'No essences match these filters.'
         )}
       >
-        <ManagerButton
-          data-clear-filters="essences"
-          disabled={!filtersActive}
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="essences" disabled={!filtersActive} onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {/snippet}
@@ -636,18 +633,18 @@
     align-items: stretch;
   }
 
-  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS: the shipped `.manager-search` basis is sized for
+  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS: the shipped `.fabricate-search` basis is sized for
      a bar with one or two controls, and at 1280px it pushed the membership control onto a fourth
      band. `flex: 1 1 220px` keeps a floor a query is legible in. */
-  .manager-essence-filter-row :global(.manager-search) {
+  .manager-essence-filter-row :global(.fabricate-search) {
     flex: 1 1 220px;
     min-width: 0;
   }
 
   /* Search wraps onto its own line before the segmented controls start colliding. The row is
      already `flex-wrap`, so this only has to release the search field's basis. */
-  @container fabricate-manager (max-width: 1000px) {
-    .manager-essence-filter-row :global(.manager-search) {
+  @container fabricate-manager (max-width: 960px) {
+    .manager-essence-filter-row :global(.fabricate-search) {
       flex: 1 1 100%;
     }
   }

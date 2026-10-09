@@ -91,9 +91,9 @@
     setBulkRecipeStatus,
   } from '../../../../model/recipeBulkEditModel.js';
   import {
+    bulkCheckTierCopy,
     checkTierDefaultLabel,
     checkTierLabel,
-    checkTierUnit,
   } from '../recipe/recipeOverviewSelectOptions.js';
 
   let {
@@ -329,7 +329,7 @@
     {
       value: RECIPE_CHECK_TIER_DEFAULT,
       label: checkTierDefaultLabel(checkEvaluation, text),
-      hint: CHECK_TIER_COPY[checkTierCopyUnit].defaultHint(),
+      hint: checkTierCopy.defaultHint(),
       group: checkTierInstructionsGroup,
     },
     ...checkTierOptions.map((tier) => ({
@@ -339,66 +339,8 @@
     })),
   ]);
 
-  // What the axis sets, by what a tier names: a DC, a Target, or an adjustment (issue 2005).
-  const checkTierCopyUnit = $derived(
-    { dc: 'dc', target: 'target' }[checkTierUnit(checkEvaluation)] ?? 'adjustment'
-  );
-  const dynamicTargetMessage = () =>
-    text(
-      'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
-      "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
-    );
-  const CHECK_TIER_COPY = {
-    dc: {
-      hint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHint',
-          "The DC these recipes roll against — not the check's outcome tiers."
-        ),
-      defaultHint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHint',
-          "Clears every selected recipe to the system's default DC."
-        ),
-    },
-    target: {
-      hint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintTarget',
-          "The target these recipes roll against — not the check's outcome tiers."
-        ),
-      defaultHint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintTarget',
-          "Clears every selected recipe to the system's default target."
-        ),
-      dynamic: dynamicTargetMessage,
-      noTiers: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersTarget',
-          "This system's crafting check authors no tiers, so every recipe uses its default target. Add tiers under Checks to assign them here."
-        ),
-    },
-    adjustment: {
-      hint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintAdjustment',
-          "The adjustment these recipes apply — not the check's outcome tiers."
-        ),
-      defaultHint: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintAdjustment',
-          'Clears every selected recipe to the base adjustment.'
-        ),
-      // A macro adjusts a character value's target, so the target is what resolves dynamically.
-      dynamic: dynamicTargetMessage,
-      noTiers: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersAdjustment',
-          "This system's crafting check authors no tiers, so every recipe uses its base adjustment. Add tiers under Checks to assign them here."
-        ),
-    },
-  };
+  // What the axis sets, by what a tier names: a DC, a Target, an adjustment or a count.
+  const checkTierCopy = $derived(bulkCheckTierCopy(checkEvaluation, text));
 
   // The section heading and the staged list's accessible name, so both read as one string.
   // `recipe item` remains the canonical spec noun; this is the display name the rail already uses.
@@ -467,8 +409,8 @@
   const checkTierAvailable = $derived(checkTierAxis?.available === true);
   const checkTierReason = $derived(String(checkTierAxis?.reason || ''));
   const checkTierMessage = $derived.by(() => {
-    // A Target or an adjustment check words its own dynamic and no-tier reasons (issue 2005).
-    const worded = CHECK_TIER_COPY[checkTierCopyUnit][checkTierReason];
+    // A Target, adjustment or count check words its own dynamic and no-tier reasons.
+    const worded = checkTierCopy[checkTierReason];
     if (worded) return worded();
     const message = CHECK_TIER_REASON_MESSAGES[checkTierReason];
     return message ? text(message[0], message[1]) : '';
@@ -870,7 +812,7 @@
     fill={true}
     groupName="recipe-bulk-status"
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}
-    dataAttr="data-recipe-bulk-status"
+    data-recipe-bulk-status
     optionDataAttr="data-recipe-bulk-status-option"
     onChange={(value) => setStatus(value)}
   />
@@ -878,8 +820,7 @@
     <Callout
       tone="warning"
       text={blockedWarningText}
-      dataAttr="data-recipe-bulk-blocked-warning"
-      dataValue={String(blockedCount)}
+      data-recipe-bulk-blocked-warning={String(blockedCount) || true}
     />
   {/if}
 
@@ -890,7 +831,7 @@
     fill={true}
     groupName="recipe-bulk-lock"
     ariaLabel={text('FABRICATE.Admin.Manager.BulkEdit.Lock', 'Lock')}
-    dataAttr="data-recipe-bulk-lock"
+    data-recipe-bulk-lock
     optionDataAttr="data-recipe-bulk-lock-option"
     onChange={(value) => setLock(value)}
   />
@@ -899,7 +840,7 @@
        saying there is no recipe-level check tier at all. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
-    subhint={checkTierAvailable ? CHECK_TIER_COPY[checkTierCopyUnit].hint() : ''}
+    subhint={checkTierAvailable ? checkTierCopy.hint() : ''}
   />
   {#if checkTierAvailable}
     <!-- GROUPED, HINTED AND TICKED: two rows are INSTRUCTIONS and the rest are authored tiers.
@@ -918,8 +859,7 @@
     <Callout
       tone="info"
       text={checkTierMessage}
-      dataAttr="data-recipe-bulk-check-tier-unavailable"
-      dataValue={checkTierReason}
+      data-recipe-bulk-check-tier-unavailable={checkTierReason || true}
     />
   {/if}
 
@@ -955,7 +895,7 @@
           </span>
           <button
             type="button"
-            class="fab-bulk-book-pick-clear"
+            class="fab-bulk-book-pick-clear fab-hit-area"
             data-recipe-bulk-book-clear-pick
             aria-label={text(
               'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookClearPick',
@@ -1002,24 +942,24 @@
         options={bookOptions}
         disabled={inert}
         pickerClass="fab-bulk-book-picker"
-        triggerClass="fabricate-button manager-button manager-travel-picker-trigger fab-bulk-book-trigger"
+        triggerClass="fabricate-button manager-travel-picker-trigger fab-bulk-book-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        triggerAriaLabel={text(
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        dialogAriaLabel={booksLabel}
+        panelLabel={booksLabel}
         searchPlaceholder={bookSearchPlaceholder}
-        searchAriaLabel={bookSearchPlaceholder}
+        searchLabel={bookSearchPlaceholder}
         emptyHint={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookNoMatch',
           'No book or scroll by that name.'
         )}
-        onChoose={(id) => pickBook(id)}
+        onSelect={(id) => pickBook(id)}
       />
     {/if}
     {#if stagedBooks.length > 0}
@@ -1041,7 +981,7 @@
             </span>
             <button
               type="button"
-              class="fab-bulk-book-unstage"
+              class="fab-bulk-book-unstage fab-hit-area"
               data-recipe-bulk-book-unstage={entry.id}
               aria-label={entry.unstageLabel}
               disabled={inert}
@@ -1110,7 +1050,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -1129,7 +1069,7 @@
     width: 26px;
     height: 26px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-accent);
     font-size: 0.68rem;
@@ -1180,7 +1120,7 @@
     height: 22px;
     padding: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
     background: transparent;
     color: var(--fab-text-muted);
     font-size: 0.68rem;
@@ -1209,7 +1149,7 @@
     min-height: 30px;
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font-size: 0.68rem;

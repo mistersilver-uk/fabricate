@@ -126,22 +126,30 @@ A change does not rewrite comments in files it is not otherwise editing, unless 
 
 This workflow produced each of these shapes repeatedly, and each already has a rule that answers it; naming them together is what stops review approving them one at a time.
 
-- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ledger.txt`.
-- Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ledger.txt`.
-- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.
+- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ratchet.test.js`.
+- Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.
+- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.
 - Redeclaring a shared helper locally, answered by `tests/scalar-helper-duplicates.test.js` and `tests/category-shim-bindings.test.js`.
 - An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
 
-Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.
-A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.
-`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.
+The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.
+A ratchet computes that baseline at test time, from `RATCHET_BASE` when it is set and otherwise from the merge base with `origin/main`, so no ledger, baseline or pinned total is checked in, and a shrink needs no edit: it passes and is reported as a `shrank` line.
+A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.
+Where a family's markers sit at single sites, a marker excuses only an offender new against the base, so marking one the base already had makes no room for another.
+A PR whose stated purpose is condensation, extraction or pin conversion shows its reduction as `shrank` lines, and a reviewer treats one that reports none as `NEEDS_CHANGES`.
+The helper-duplicate gates are fixed rules with no exception, and the last two shapes have no gate and are caught in review.
 
 ## FoundryVTT Notes and Architecture Pointers
 
 Moved to [`.agents/docs/foundry-and-architecture.md`](.agents/docs/foundry-and-architecture.md) (issue #1661).
 Read it before writing code that calls a Foundry API, hooks into its lifecycle, or touches the manager shell, the gathering data model or the design system.
 It carries rules, not background: the imperatives moved with the evidence rather than being summarised here.
+
+- A new named member of the design-system library adds a catalogue row under `tests/view-lab/primitives/catalogue/`, or an `AWAITING_SPECIMEN` line with its reason in `tests/design-system-lab-coverage.test.js`.
+The coverage gate enforces this, and `AWAITING_SPECIMEN` only shrinks.
+- `npm run lab` opens the Primitive Lab, and `npm run lab:check` mounts every catalogued row and fails on any console, page or request error.
+A specimen sits in a `plinth`, never a `stage`, because `stage` is the workflow's keyed dimension.
 
 ## Markdown & Prose Conventions
 

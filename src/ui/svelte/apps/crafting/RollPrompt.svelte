@@ -1,38 +1,64 @@
 <!--
-  The interactive check prompt, single or bulk, in the shared `ManagerModal` chrome: one header, a
-  scrolling body and a footer of Disadvantage / Roll / Advantage, or one Roll.
+  The interactive check prompt, single or bulk, in the shared `Modal` chrome: one header, a
+  scrolling body and a footer of Disadvantage / Roll / Advantage as the check's advantage offer
+  allows, or one Roll.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan and either the single formula or the bulk subject rows. |
+  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan, the footer `actions`, an optional `notice` sentence and either the single formula or the bulk subject rows. |
   | `onSubmit(answer)` | function | no-op | Called once with the raw form answer; `rollPrompt.js` translates it. |
   | `onDismiss()` | function | no-op | Called once when Escape or the close control dismisses the prompt. |
-
-  Invariants:
-  - Roll is the form's only submit button, so Enter from any field rolls normally; Disadvantage and
-    Advantage are `type="button"` — pinned by `tests/components/roll-prompt-mounted.test.js`.
 -->
 <script>
   import { untrack } from 'svelte';
+  import {
+    actionDeltas,
+    describeAdditionalDice,
+  } from '../../../presenters/additionalDicePrompt.js';
   import Chip from '../../components/Chip.svelte';
   import Field from '../../components/Field.svelte';
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import ManagerModal from '../manager/ManagerModal.svelte';
+  import Modal from '../../components/Modal.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
+  import RollPromptAdditionalDice from './RollPromptAdditionalDice.svelte';
+  import RollPromptFooter from './RollPromptFooter.svelte';
   import RollPromptTarget from './RollPromptTarget.svelte';
+
+  // The first in document order wins, so Advantage takes focus only once Roll is blocked.
+  const INITIAL_FOCUS =
+    "input[name='situationalBonus'], input[name='additionalDice']:not(:disabled), " +
+    "button[type='submit']:not([aria-disabled='true']), " +
+    "button[data-action='advantage']:not([aria-disabled='true'])";
 
   let { data, onSubmit = () => {}, onDismiss = () => {} } = $props();
   let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
   let rollMode = $state(untrack(() => data.defaultRollMode));
   let bonus = $state('');
+  let additionalDice = $state(0);
   let settled = false;
   const instanceId = $props.id();
   const modeCaptionId = `${instanceId}-roll-mode`;
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
   const atCap = $derived(selectedIds.length >= data.choicePlan.maxPicks);
-  const target = $derived(rollPromptTarget(data, selectedIds, bonus));
+  const target = $derived(rollPromptTarget(data, selectedIds, bonus, additionalDice));
+  const dice = $derived(
+    data.additionalDiceOffer &&
+      describeAdditionalDice({
+        offer: data.additionalDiceOffer,
+        pool: target.reachPool,
+        deltas: actionDeltas(data.actions, data.advantageOffer),
+        pending: target.pendingPool,
+        chosen: additionalDice,
+        labels: data.labels.additionalDice,
+        actorName: data.actorName,
+        rolls: data.additionalDiceRolls,
+        rows: data.kind === 'bulk' ? data.subjects : null,
+        bonus,
+      })
+  );
 
   function selectCheckbox(id, checked) {
     if (checked && atCap) return;
@@ -44,7 +70,7 @@
   }
 
   function answer(form, advantage) {
-    if (settled || !form) return;
+    if (settled || !form || dice?.blocked[advantage]) return;
     settled = true;
     const checked = form.querySelectorAll('input[name="craftingModifier"]:checked');
     onSubmit({
@@ -53,6 +79,7 @@
       rollMode,
       advantage,
       chosenModifierIds: [...checked].map((input) => input.value),
+      ...(dice && { additionalDice }),
     });
   }
 
@@ -63,22 +90,25 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   open
   title={data.title}
   subtitle={data.subtitle}
   closeLabel={data.labels.close}
   width="500px"
-  rootAttributes={{ 'data-roll-prompt': data.kind }}
+  dialogProps={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
-  initialFocus="input[name='situationalBonus'], button[type='submit']"
+  initialFocus={INITIAL_FOCUS}
   footerLayout="equal"
   onClose={dismiss}
   onSubmit={(event) => answer(event.target, 'normal')}
 >
   {#snippet body()}
     <div class="fabricate-roll-prompt">
+      {#if data.notice}
+        <Notice tone="warning" title={data.notice} data-roll-prompt-notice="" />
+      {/if}
       {#if data.kind === 'single'}
         {#if data.formula || data.dc !== null}
           <div class="formula-row">
@@ -86,20 +116,20 @@
             <div class="formula-content">
               {#if data.formula}<span
                   class="formula"
+                  aria-live={data.count ? 'polite' : undefined}
                   data-roll-prompt-count={data.count ? data.direction : undefined}
-                  >{data.formula}</span
+                  >{target.formula ?? data.formula}</span
                 >{/if}
-              {#if data.labels.formulaNote}<p class="help formula-note">
-                  {data.labels.formulaNote}
+              {#if target.note ?? data.labels.formulaNote}<p class="help formula-note">
+                  {target.note ?? data.labels.formulaNote}
                 </p>{/if}
-              {#if data.chipText}
-                <RollPromptTarget
-                  text={target.chipText}
-                  source={target.source}
-                  under={!data.count && data.direction === 'under'}
-                  data-roll-prompt-required={data.count?.required}
-                />
-              {/if}
+              <RollPromptTarget
+                text={data.chipText && target.chipText}
+                source={target.source}
+                notice={target.zeroPool}
+                under={!data.count && data.direction === 'under'}
+                data-roll-prompt-required={data.count?.required}
+              />
             </div>
           </div>
         {/if}
@@ -111,7 +141,13 @@
               {#each data.subjects as subject, index (index)}
                 <div class="bulk-row">
                   <span class="bulk-name">{subject.name || data.labels.unnamedSubject}</span>
-                  <span class="bulk-need">{subject.needText}</span>
+                  <span class="bulk-need"
+                    >{subject.needText}{#if dice?.unreachableRows[index]}<span
+                        class="bulk-unreachable"
+                        data-roll-prompt-bulk-unreachable
+                        >{` · ${data.labels.additionalDice.cannotReach}`}</span
+                      >{/if}</span
+                  >
                 </div>
               {/each}
             </div>
@@ -135,7 +171,7 @@
               >
                 {#if multiPick}
                   <SelectionCheckbox
-                    size="sm"
+                    density="compact"
                     wrapper="contents"
                     name="craftingModifier"
                     value={modifier.id}
@@ -195,6 +231,16 @@
         </div>
       {/if}
 
+      {#if dice || data.labels.additionalDiceMixed}
+        <RollPromptAdditionalDice
+          view={dice || { message: { tone: 'info', text: data.labels.additionalDiceMixed } }}
+          labels={data.labels.additionalDice}
+          value={additionalDice}
+          limit={data.additionalDiceOffer?.limit}
+          onChange={(next) => (additionalDice = next)}
+        />
+      {/if}
+
       <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->
       <Field as="div" class="prompt-field mode-field">
         <span class="eyebrow field-caption" id={modeCaptionId}>{data.labels.rollMode}</span>
@@ -212,42 +258,14 @@
   {/snippet}
 
   {#snippet footer()}
-    {#if data.allowAdvantage === true}
-      <button
-        type="button"
-        class="prompt-action"
-        data-action="disadvantage"
-        data-keyboard-focus="true"
-        onclick={(event) => answer(event.currentTarget.form, 'disadvantage')}
-        ><span>{data.labels.disadvantage}</span><small class="action-note"
-          >{data.labels.worse}</small
-        ></button
-      >
-      <button
-        type="submit"
-        class="prompt-action is-primary"
-        data-action="normal"
-        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
-      >
-      <button
-        type="button"
-        class="prompt-action"
-        data-action="advantage"
-        data-keyboard-focus="true"
-        onclick={(event) => answer(event.currentTarget.form, 'advantage')}
-        ><span>{data.labels.advantage}</span><small class="action-note">{data.labels.better}</small
-        ></button
-      >
-    {:else}
-      <button
-        type="submit"
-        class="prompt-action is-primary"
-        data-action="roll"
-        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
-      >
-    {/if}
+    <RollPromptFooter
+      actions={data.actions}
+      blocked={dice?.blocked}
+      blockNote={dice?.blockNote}
+      onAction={answer}
+    />
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   .fabricate-roll-prompt {
@@ -349,6 +367,9 @@
     font-weight: 500;
     white-space: nowrap;
   }
+  .bulk-unreachable {
+    color: var(--fab-danger-text);
+  }
   .bulk-list + .bulk-note {
     margin-top: var(--fab-space-chip);
   }
@@ -399,7 +420,7 @@
     min-width: 0;
     margin: 0;
     padding: 0;
-    border: 1.5px solid var(--fab-border);
+    border: 1.5px solid var(--fab-control-outline);
     border-radius: 50%;
     appearance: none;
     -webkit-appearance: none;
@@ -431,7 +452,7 @@
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']) {
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']) {
     width: 100%;
     box-sizing: border-box;
     height: 30px;
@@ -443,13 +464,13 @@
     color: var(--fab-text);
     line-height: normal;
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']),
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']),
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
     font-family: var(--fab-font-mono);
     font-size: 12px;
     font-weight: 500;
   }
-  .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
+  .fabricate-roll-prompt :global(.bonus-field input:not(:focus-visible)::placeholder) {
     color: var(--fab-text-subtle);
   }
   .fabricate-roll-prompt :global(.mode-field .fabricate-select-trigger) {
@@ -459,42 +480,5 @@
      where `vh` would overflow the window. */
   :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
     max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
-  }
-  .prompt-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: calc(var(--fab-space-2xs) / 2);
-    box-sizing: border-box;
-    height: 44px;
-    min-height: 44px;
-    margin: 0;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
-    appearance: none;
-    -webkit-appearance: none;
-    background: var(--fab-bg-1);
-    color: var(--fab-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    line-height: normal;
-    cursor: pointer;
-  }
-  .prompt-action:hover {
-    border-color: var(--fab-accent-border);
-    color: var(--fab-text);
-  }
-  .prompt-action.is-primary {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-  .action-note {
-    display: block;
-    color: var(--fab-text-secondary);
-    font-size: 9.5px;
-    font-weight: 500;
   }
 </style>

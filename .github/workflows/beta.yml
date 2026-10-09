@@ -26,16 +26,27 @@ concurrency:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Four shards, as in ci.yml: whole, the suite ran 14-15 minutes and met the old 15-minute bound.
+    # `needs: unit-tests` waits for every shard, and any red shard fails it.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      # A release run tests a tree CI already compared with its base, so the ratchets opt out.
+      RATCHET_BASE: none
+      UNIT_TEST_SHARD: ${{ matrix.shard }}/4
     steps:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
       - uses: ./.github/actions/release-setup
       - run: ./node_modules/.bin/playwright install chromium --with-deps
-      - run: npm test
-      - run: npm run build
+      - run: npm run test:shard
+      - if: matrix.shard == 1
+        run: npm run build
 
   smoke-test:
     needs: unit-tests

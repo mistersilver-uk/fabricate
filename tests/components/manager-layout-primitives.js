@@ -33,10 +33,9 @@ import {
   calloutStyles,
   disabledProbeMarkup,
   emptyStateStyles,
-  explainerCardSource,
-  explainerCardStyles,
   iconFactRowStyles,
   readShortWindowRailGeometry,
+  readTitleBarGeometry,
   stackedBodyRule,
 } from './manager-layout-primitives-fixtures.js';
 
@@ -47,7 +46,7 @@ test('manager root defines a scoped responsive app container', () => {
 
   assert.ok(block.includes('container-type: inline-size;'), 'manager should use container queries');
   assert.ok(
-    block.includes('container-name: fabricate-manager;'),
+    block.includes('container-name: fabricate-manager fabricate-option-host;'),
     'manager should name its container'
   );
   assert.ok(block.includes('isolation: isolate;'), 'manager should isolate its shell');
@@ -63,10 +62,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   // pair's earlier position. Both areas are covered by this one block because `.fabricate` is
   // the player app's own root and the manager `<div>`'s ancestor.
   const moduleFocusBlock = blockFor(
-    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate select:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
+    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
   );
   const moduleFocusVisibleBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -109,9 +108,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     // NON-EMPTY, asserted rather than assumed, for the reason the note above gives.
     assert.deepEqual(
       suppressed,
-      ['[tabindex]', 'a', 'button', 'input', 'select', 'textarea'],
-      `the ${area}'s :focus list must name the six element targets the pair is written for, ` +
-        'or the comparison below is between two empty lists'
+      ['[tabindex]', 'a', 'button', 'input', 'textarea'],
+      `the ${area}'s :focus list must name the five element targets the pair is written for — ` +
+        '`select` left with the last native select a template rendered (issue 1777) — or the ' +
+        'comparison below is between two empty lists'
     );
     assert.deepEqual(
       elementsIn(supplying).sort(compareStrings),
@@ -173,18 +173,18 @@ test('manager body starts as a three-region grid and stacks at narrow width', ()
 
 // The rail's crafting-system card SELECTS (issue 643). It used to be a fixed 64px box
 // holding the system's name and an icon-only button, with no way to switch system from
-// the rail at all — so the card is now a micro-label, a real `<select>` over every
-// system, and a text back link out to the system library.
+// the rail at all — so the card is now a micro-label, the shared `<Select>` over every
+// system (issue 1777), and a text back link out to the system library.
 test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const selectBlock = blockFor('.fabricate-manager .manager-scope-select');
+  const selectBlock = blockFor('.fabricate-manager .manager-scope-select .fabricate-select-trigger');
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
   );
   // The manager's keyboard ring is the module-rooted pair's supplying half (issue 1501).
   const focusBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -225,9 +225,17 @@ test('the rail crafting-system card selects a system and links back to the libra
     selectBlock.includes('font-family: var(--fab-font-serif);'),
     'the selected system name keeps the display face'
   );
-  assert.ok(selectBlock.includes('min-width: 0;'), 'the select may shrink inside the rail');
+  assert.ok(selectBlock.includes('width: 100%;'), 'the trigger takes the card width');
   assert.ok(
-    selectBlock.includes('text-overflow: ellipsis;'),
+    selectBlock.includes('min-height: 34px;'),
+    'the trigger stands at the `toolbar` rung’s 34px'
+  );
+  assert.ok(
+    selectBlock.includes('border-radius: 9px;'),
+    'the trigger takes the 34px band’s 9px corner, not the `inline` rung’s 7'
+  );
+  assert.ok(
+    blockFor('.fabricate-select-value').includes('text-overflow: ellipsis;'),
     'a long system name ellipsises rather than reflowing the nav'
   );
   assert.equal(
@@ -247,7 +255,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     'the back link may shrink'
   );
   assert.ok(
-    returnFocusBlock.includes('background: var(--fab-surface-soft);'),
+    returnFocusBlock.includes('background: var(--fab-surface-raised);'),
     'the back link keeps a manager-styled hover'
   );
   assert.ok(
@@ -263,9 +271,9 @@ test('the rail crafting-system card selects a system and links back to the libra
 });
 
 test('manager nav buttons clear host mouse focus and keep green keyboard focus', () => {
-  const navFocusBlock = blockFor('.fabricate-manager .manager-nav-button:focus');
-  const activeNavFocusBlock = blockFor('.fabricate-manager .manager-nav-button.is-active:focus');
-  const navFocusVisibleBlock = blockFor('.fabricate-manager .manager-nav-button:focus-visible');
+  const navFocusBlock = blockFor('.fabricate-nav .manager-nav-button:focus');
+  const activeNavFocusBlock = blockFor('.fabricate-nav .manager-nav-button.is-active:focus');
+  const navFocusVisibleBlock = blockFor('.fabricate-nav .manager-nav-button:focus-visible');
 
   assert.ok(
     navFocusBlock.includes('outline: none;'),
@@ -300,7 +308,7 @@ test('manager inspector count labels wrap without truncation', () => {
     '.fabricate-manager .manager-condition-shortcut-label'
   );
   const conditionShortcutSelectBlock = blockFor(
-    '.fabricate-manager .manager-condition-shortcut select'
+    '.fabricate-manager .manager-condition-shortcut .fabricate-select-trigger'
   );
 
   assert.ok(
@@ -376,8 +384,9 @@ test('manager inspector count labels wrap without truncation', () => {
     'condition shortcut labels should align icons and text'
   );
   assert.ok(
-    conditionShortcutSelectBlock.includes('font-weight: 400;'),
-    'condition shortcut select text should not inherit bold label weight'
+    conditionShortcutSelectBlock.includes('width: 100%;') &&
+      !conditionShortcutSelectBlock.includes('height'),
+    'condition shortcut selects fill the field at the form rung, with no retired 36px pin'
   );
 });
 
@@ -396,7 +405,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // Matched to the reference prototype.
   assert.ok(
     emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
-      emptyPanelBlock.includes('border-radius: 12px;'),
+      emptyPanelBlock.includes('border-radius: 11px;'),
     'the no-state panel should be a rounded 1.5px dashed panel'
   );
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
@@ -409,7 +418,6 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
-    ExplainerCard: explainerCardStyles,
     IconFactRow: iconFactRowStyles,
     Chip: chipStyles,
   })) {
@@ -500,11 +508,12 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
-  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
+  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
   const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
   const warningIconBlock = blockIn(
     calloutStyles,
-    '.manager-callout.is-warning > i,\n  .manager-callout.is-warning .manager-callout-title'
+    '.manager-callout.is-warning > i,\n  .manager-callout.is-warning .manager-callout-item > i,\n' +
+      '  .manager-callout.is-warning .manager-callout-title'
   );
 
   // The specimen's treatment — `library.html:219-220` — is the ONLY shape.
@@ -566,7 +575,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
             <span class="manager-callout-actions"
               ><button
                 type="button"
-                class="fabricate-button manager-button fab-manager-button"
+                class="fabricate-button fab-manager-button"
                 data-probe="callout-action"
                 ><i class="fas fa-globe" aria-hidden="true"></i><span>World Tool</span></button
               ></span
@@ -669,79 +678,41 @@ test('the controls nested inside a callout and a notice own their own pointer ta
   }
 });
 
-// Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
-// rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,
-// a glyph-led list at 0.6875rem/1.5); the Tags & Categories inspector rendered the same
-// meaning as a disc-bulleted `.manager-evidence-list` at 0.82rem AND as a bare
-// `.manager-muted` paragraph. `ExplainerCard` is the one implementation, and it reuses the
-// manager's existing card shell and card-title contract rather than restating them.
-test('the shared explainer card reuses the card shell and owns only the explainer parts', () => {
-  const titleBlock = blockIn(explainerCardStyles, '.manager-explainer-card-title');
-  const listBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list');
-  const rowBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li');
-  const rowGlyphBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li > i');
-
-  // The card shell and the heading come from the manager's ONE contract for each.
+// Each item glyph shares the leading glyph's box and, at every tone, its ink (issue 1521).
+test('the callout items reuse the leading glyph, and no explainer re-derivation survives', () => {
+  const calloutValue = (selector, property) => {
+    const block = blockIn(calloutStyles, selector);
+    return declaration(block.slice(block.indexOf('{') + 1, block.lastIndexOf('}')), property);
+  };
+  const glyphBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
   assert.ok(
-    explainerCardSource.includes('<InspectorCard class="manager-explainer-card"'),
-    'the explainer wears the shared side-panel card shell'
+    glyphBlock.includes('width: 13px;') && glyphBlock.includes('color: var(--fab-text-subtle);'),
+    "an item glyph is the leading glyph's 13px box in the same neutral ink"
   );
-  assert.ok(
-    explainerCardSource.includes('class="manager-card-title manager-explainer-card-title"'),
-    'the explainer title wears the shared card-title contract'
-  );
-  assert.equal(
-    /padding:|border-radius:|border: 1px|font-weight:|text-transform:|font-family:/.test(
-      titleBlock + blockIn(explainerCardStyles, '.manager-explainer-card')
-    ),
-    false,
-    'the explainer must not restate the card shell or the heading scale, weight or family'
-  );
-
-  // The body treatment is the Tool Studio's, which issue 881 names as the reference.
-  for (const declaration of [
-    'grid-template-columns: 20px minmax(0, 1fr);',
-    'font-size: 0.6875rem;',
-    'line-height: 1.5;',
-    'color: var(--fab-text-muted);',
-  ]) {
-    assert.ok(rowBlock.includes(declaration), `an explainer row should declare ${declaration}`);
-  }
-  assert.ok(listBlock.includes('list-style: none;'), 'the explainer list drops disc markers');
-  assert.ok(
-    rowGlyphBlock.includes('color: var(--fab-accent);'),
-    'the row glyph is the accent, as in the Tool Studio reference'
-  );
-
-  // Issue 883: the primitive takes a LIST of links.
-  // out of its card and a one-link primitive is exactly the incompatibility that kept a
-  // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
-  // than kept alongside — two ways to express one link is the drift this pass removes.
-  assert.ok(/\blinks = \[\]/.test(explainerCardSource), 'the explainer takes a list of docs links');
-  for (const dead of ['docsHref', 'docsLabel']) {
+  for (const tone of ['info', 'accent', 'warning', 'success', 'danger']) {
+    const toneSelector =
+      `.manager-callout.is-${tone} > i,\n  .manager-callout.is-${tone} .manager-callout-item > i,\n` +
+      `  .manager-callout.is-${tone} .manager-callout-title`;
     assert.equal(
-      withoutComments(explainerCardSource).includes(dead),
-      false,
-      `${dead} was replaced by the link list and must not survive as a second way in`
+      calloutValue(toneSelector, 'color'),
+      `var(--fab-${tone}-text)`,
+      `${tone} inks the item glyphs in its own family`
     );
   }
-  // The link ROW is the manager's existing `.manager-setup-links` contract.
-  assert.ok(
-    explainerCardSource.includes('<div class="manager-setup-links">'),
-    'the explainer links reuse the shared card-link row'
-  );
+  assert.equal(calloutValue('.manager-callout-item-lead', 'color'), 'var(--fab-text)');
+  assert.equal(calloutValue('.manager-callout-item-lead', 'font-weight'), '600');
   assert.equal(
-    /manager-explainer-card-docs\s*\{/.test(explainerCardStyles),
-    false,
-    'the explainer must not re-derive the card-link row it now reuses'
+    calloutValue('.manager-callout-items', 'margin-top'),
+    'var(--fab-space-2)',
+    'the list sits one step under the body'
   );
 
-  // Every re-derivation is gone from the global sheet, not merely unused.
   for (const dead of [
     'manager-tool-how-it-works',
     'manager-tool-docs-link',
     'manager-evidence-list',
     'manager-tool-inspector-rule-card',
+    'manager-explainer-card',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} was replaced and must not survive as CSS`);
   }
@@ -756,7 +727,7 @@ test('the shared icon fact row is one well, used by every behavior-fact surface'
 
   for (const declaration of [
     'grid-template-columns: 28px minmax(0, 1fr);',
-    'padding: 9px 11px;',
+    'padding: var(--fab-space-2) var(--fab-space-3);',
     'border-radius: 6px;',
     'background: var(--fab-bg-1);',
     'border: 1px solid var(--fab-border);',
@@ -791,7 +762,6 @@ test('every explainer and fact-row site renders through the primitive, not by ha
       (entry) =>
         entry.isFile() &&
         entry.name.endsWith('.svelte') &&
-        entry.name !== 'ExplainerCard.svelte' &&
         entry.name !== 'IconFactRow.svelte'
     )
     .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
@@ -816,7 +786,10 @@ test('every explainer and fact-row site renders through the primitive, not by ha
   for (const [componentPath, imports] of [
     // The Tool preview renders through the shared scoped-entity shell since issue 1362.
     ['tools/ToolBehaviorPreview.svelte', ['ScopedEntityPreview']],
-    ['scoped/ScopedEntityPreview.svelte', ['ExplainerCard', 'IconFactRow']],
+    ['scoped/ScopedEntityPreview.svelte', ['IconFactRow']],
+    // The world catalogue's default cards and the essence primer (issue 1521).
+    ['scoped/EntityCatalogueShell.svelte', ['IconFactRow']],
+    ['essences/EssenceOnCraftTab.svelte', ['Callout']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     // `CraftingSystemManagerRoot.svelte` is NOT on this list any more (issue 1915). Its two
     // explainer cards belonged to the Tags & Categories inspector rail, and that rail is
@@ -899,14 +872,14 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor(
-    '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button'
+    '.fabricate-button.fabricate-button,\n.fabricate-icon-button.fabricate-icon-button'
   );
-  const primaryIconBlock = blockFor('.fabricate-icon-button.manager-icon-button.is-primary');
+  const primaryIconBlock = blockFor('.fabricate-icon-button.fabricate-icon-button.is-primary');
   const primaryIconHoverBlock = blockFor(
-    '.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover'
+    '.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled):hover'
   );
   const iconBlocks = Array.from(
-    css.matchAll(/\.fabricate-icon-button\.manager-icon-button\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-icon-button\.fabricate-icon-button\s*\{[\s\S]*?\}/g)
   );
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -949,11 +922,11 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
     'primary icon buttons should keep a soft green hover state'
   );
   assert.ok(
-    css.includes('.fabricate-button.manager-button:disabled'),
+    css.includes('.fabricate-button.fabricate-button:disabled'),
     'disabled manager buttons should have explicit disabled styling'
   );
   assert.ok(
-    css.includes('.fabricate-button.manager-button:not(:disabled):hover'),
+    css.includes('.fabricate-button.fabricate-button:not(:disabled):hover'),
     'manager hover styles should not target disabled buttons'
   );
 });
@@ -1033,6 +1006,17 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   );
 });
 
+test('the scope trigger is 34px at radius 9 and ellipsises a long system name inside the 220px rail', async () => {
+  const report = await readShortWindowRailGeometry({
+    systemName: 'The Grand Consolidated Guild of Artificers and Alchemists',
+  });
+  assert.equal(report.triggerHeight, 34, 'the trigger is the `toolbar` rung’s 34px');
+  assert.equal(report.triggerRadius, '9px', 'and its corner is the 34px band’s 9');
+  assert.ok(report.valueClipped, 'the long name overflows its value span');
+  assert.equal(report.valueTextOverflow, 'ellipsis', 'and the overflow is an ellipsis');
+  assert.ok(report.triggerRight <= report.scopeRight, 'the trigger stays inside the card');
+});
+
 test('a short window scrolls the rail nav instead of clipping its bottom entries', async () => {
   const report = await readShortWindowRailGeometry();
 
@@ -1082,7 +1066,7 @@ test('a short window scrolls the rail nav instead of clipping its bottom entries
 });
 
 test('the rail nav declares the scroller and the stacked breakpoint hands it back', () => {
-  const navBlock = blockFor('.fabricate-manager .manager-nav');
+  const navBlock = blockFor('.fabricate-nav.manager-nav');
   assert.ok(
     navBlock.includes('flex: 1 1 auto;') &&
       navBlock.includes('min-height:') &&
@@ -1102,7 +1086,7 @@ test('the rail nav declares the scroller and the stacked breakpoint hands it bac
 
   // Stacked, the rail is already a bounded 232px strip that scrolls itself.
   const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
-  const navStart = query.indexOf('.fabricate-manager .manager-nav {');
+  const navStart = query.indexOf('.fabricate-nav.manager-nav {');
   assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
   const stackedNavRule = query.slice(navStart, query.indexOf('}', navStart) + 1);
   assert.ok(
@@ -1127,7 +1111,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     '.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse'
   );
   const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
-  const navCountBlock = blockFor('.fabricate-manager .manager-nav-count');
+  const navCountBlock = blockFor('.fabricate-nav .manager-nav-count');
 
   assert.ok(
     collapsedRailTitleBlock.includes('display: none;'),
@@ -1176,7 +1160,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     'a rail count must not change width between 9 and 10'
   );
   assert.equal(
-    css.includes('.fabricate-manager .manager-nav-count.manager-chip'),
+    css.includes('.fabricate-nav .manager-nav-count.manager-chip'),
     false,
     'the rail count should own its rule rather than borrowing (and undoing) the content chip'
   );
@@ -1209,7 +1193,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
   const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
   const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
-  const titleBlock = blockFor('.fabricate-manager .manager-title');
+  const titleBlock = blockFor('.fabricate-page-header .manager-title');
 
   assert.ok(
     rootBlock.includes('grid-template-rows: auto auto 1fr;'),
@@ -1226,16 +1210,16 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
   // system's name, which the rail's crafting-system card already shows).
   const goldChipBlock =
-    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-premium \{[\s\S]*?\}/.exec(
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-nav \.manager-nav-premium,\s*\.fabricate-manager \.manager-premium-icons-ad-badge \{[\s\S]*?\}/.exec(
       withoutComments(css)
     )?.[0] ?? '';
   assert.ok(
     goldChipBlock.includes('background: var(--fab-badge-gold);'),
-    'the gold chip rule should fill both marks from the gold badge token'
+    'the gold chip rule should fill all three marks from the gold badge token'
   );
   assert.ok(
     goldChipBlock.includes('color: var(--fab-on-badge-gold);'),
-    'and ink both from its paired on-gold token'
+    'and ink all three from its paired on-gold token'
   );
   assert.ok(
     !badgeBlock.includes('--fab-badge-gold'),
@@ -1267,6 +1251,17 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
     titleBlock.includes('font-family: var(--fab-font-serif);'),
     'the manager screen title should override the host h1 font with the studio serif'
   );
+});
+
+// The strip's shipped box, held until issue 1523 converges it on the AppTitleBar specimen: the
+// specimen's inline 12px block padding would push every manager frame, its 9px gap is off the
+// spacing scale, and its full border and radius cannot frame a band spanning the window edge.
+test('the manager titlebar keeps its shipped box until the specimen converges', async () => {
+  const strip = await readTitleBarGeometry();
+  assert.deepEqual(strip.padding, ['8px', '16px', '8px', '16px']);
+  assert.equal(strip.columnGap, '8px', 'the nearest spacing rung to the specimen 9px');
+  assert.deepEqual(strip.borders, ['0px', '0px', '1px', '0px'], 'a bottom rule only');
+  assert.equal(strip.radius, '0px');
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {
@@ -1320,12 +1315,12 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
     assert.ok(chipBlock.includes(declaration), `the chip declares the compact ${declaration}`);
   }
 
-  // 10px is the SAME as 999px at the 20px single-line height (999px clamps to half the
-  // shorter side), so a normal chip is unchanged; they diverge only once a chip wraps,
+  // 11px, the ladder rung, is the SAME as 999px at the 20px single-line height (both clamp to
+  // half the shorter side), so a normal chip is a stadium; they diverge only once a chip wraps,
   // where a stadium around two lines reads as broken. The pill returns for `truncate`,
   // which is single-line by construction.
   assert.ok(
-    chipBlock.includes('border-radius: 10px;'),
+    chipBlock.includes('border-radius: 11px;'),
     'the chip radius must follow a wrap rather than drawing a stadium around two lines'
   );
   assert.ok(
@@ -1402,7 +1397,7 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
-  const armedBlock = blockFor('.fabricate-button.manager-button.is-danger.is-armed');
+  const armedBlock = blockFor('.fabricate-button.fabricate-button.is-danger.is-armed');
   const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
   const rosterFocusBlock = blockFor(
     '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
@@ -1475,7 +1470,7 @@ test('a disabled manager button paints from the disabled rule in every role and 
   );
   assert.ok(
     DISABLED_CONTEXTS.length >= ANCESTOR_CONTEXT_FLOOR,
-    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} manager-button containers, got ` +
+    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} fabricate-button containers, got ` +
       `${DISABLED_CONTEXTS.length} — a shorter list means the prelude scan broke, not that the ` +
       'sheet stopped styling containers'
   );
@@ -1599,7 +1594,7 @@ test('a disabled manager button paints from the disabled rule in every role and 
       for (const role of DISABLED_ROLE_PROBES) {
         record(
           samePaint(off[role], disabledPaint),
-          `${entry.id}: a disabled ${role} button must paint from .manager-button:disabled, ` +
+          `${entry.id}: a disabled ${role} button must paint from .fabricate-button:disabled, ` +
             `not from its role or its container — got border ${off[role].borderColor}, ink ` +
             `${off[role].color}, fill ${off[role].background}; expected border ` +
             `${disabledPaint.borderColor}, ink ${disabledPaint.color}, fill ${disabledPaint.background}`
@@ -1663,7 +1658,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
               <button type="button" class="${managerButtonClassesFor('warning')}" data-probe="warning"><span>Force add</span></button>
               <button type="button" class="${neutral} is-warning" data-probe="misspelt"><span>Force add</span></button>
               <button type="button" class="${neutral}" data-probe="neutral"><span>Force add</span></button>
-              <span class="fabricate-icon-button manager-icon-button is-warning-action" data-probe="icon"></span>
+              <span class="fabricate-icon-button is-warning-action" data-probe="icon"></span>
             </section>
             <span data-token="border" style="color: var(--fab-warning-border)"></span>
             <span data-token="ink" style="color: var(--fab-warning-text)"></span>
@@ -1717,7 +1712,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
     // The pair this repair originally reunited no longer exists. Issue 1315 moved Force add to
     // automatic composition mode, where it renders as the labelled button alone; the icon twin
     // lived in the manual-mode Available-to-add list, which is now plain add/remove, and it was
-    // deleted along with `.manager-icon-button.is-warning-action`. Asserting the two paint alike
+    // deleted along with `.fabricate-icon-button.is-warning-action`. Asserting the two paint alike
     // would compare the live control against a class nothing writes — green, and about nothing.
   } finally {
     await context.close();

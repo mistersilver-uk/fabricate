@@ -4,6 +4,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import {
   calledName,
   identifierNames,
@@ -134,7 +136,9 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
-const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_TITLE_BAR = 'src/ui/svelte/apps/manager/ManagerTitleBar.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+const PAGE_HEADER = 'src/ui/svelte/components/PageHeader.svelte';
 const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const MANAGER_HEADER_CRAFTING_ACTIONS =
   'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
@@ -151,6 +155,8 @@ const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
 const GATHERING_DRAFT_HANDLERS = 'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js';
 const GATHERING_MODIFIER_HANDLERS =
   'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
+// The world corpus, entry editors and drop writes, extracted out of the root (issue 1721).
+const WORLD_SCOPE_MODEL = 'src/ui/svelte/apps/manager/worldScopeModel.svelte.js';
 const GATHERING_UNITS = [
   MANAGER_ROOT,
   GATHERING_ROUTE_MODEL,
@@ -158,13 +164,12 @@ const GATHERING_UNITS = [
   GATHERING_DRAFT_HANDLERS,
   GATHERING_MODIFIER_HANDLERS,
 ];
-const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
-const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
   'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
-// The rail's three entry units answer together for a claim over the entries they share; a claim
-// narrowed to one of them would drop most of its population (issue 1717).
-const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
+// The rail's three entry units render the rows this one model builds (issue 1777).
+const MANAGER_NAV_ITEMS = 'src/ui/svelte/apps/manager/managerNavItems.js';
+// And `NavSidebar` draws them, through its labelled rows part (issue 1777).
+const NAV_SIDEBAR_ROWS = 'src/ui/svelte/components/NavSidebarRows.svelte';
 // The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
 // model it resolves from — so a key that must appear once appears once across the pair.
 const headerCopyLiterals = () => [
@@ -203,6 +208,7 @@ const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svel
 // The world Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
 const GATHERING_INSPECTOR_RAIL =
@@ -216,6 +222,25 @@ const GATHERING_RULE_STEPPER =
 const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 const GATHERING_ECONOMY = 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+// The task editor's tabs and cards (issue 1522).
+const taskPart = (name) => `src/ui/svelte/apps/manager/gathering-task/GatheringTask${name}.svelte`;
+const GATHERING_TASK_PARTS = Object.freeze(
+  [
+    'EditorTabs',
+    'OverviewTab',
+    'NodesCard',
+    'RequirementsTab',
+    'AvailabilityCard',
+    'StaminaCard',
+    'CheckOverrideCard',
+    'RequiredToolsCard',
+    'ResultsTab',
+    'ComponentBrowserCard',
+    'DropsCard',
+    'DropCell',
+    'Card',
+  ].map(taskPart)
+);
 const GATHERING_TASKS_BROWSER = 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
 const SCOPED_VALIDATION_TAB = 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte';
@@ -319,20 +344,22 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
-  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302). The
+  // badge is a model row's marker since issue 1777, so its hook is a model key, never an attribute.
   it('renders the Downtime badge at exactly two sites', () => {
-    const sites = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP))
-      .filter((node) =>
-        (node.attributes ?? []).some((attribute) =>
-          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
-        )
-      )
-      .map((node) => node.name);
+    const isBadgeHook = (name) => String(name ?? '').startsWith('data-world-downtime-badge');
+    const sites = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)]
+      .filter((node) => node.type === 'Property' && isBadgeHook(node.key?.value ?? node.key?.name))
+      .map((node) => node.key.value);
     assert.equal(
       sites.length,
       2,
       `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
+    const written = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP)).filter((node) =>
+      (node.attributes ?? []).some((attribute) => isBadgeHook(attribute.name))
+    );
+    assert.equal(written.length, 0, 'and the group writes no badge of its own beside the model');
   });
 
   // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
@@ -610,20 +637,29 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
-  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
-  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  // `manager-header` is the page header's identity since issue 1720, a caller class on
+  // `PageHeader` since issue 1777, and the two headers stay bare siblings under no wrapper.
   defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
-    attributes: [
-      ['class', 'manager-header'],
-      ['class', 'manager-heading'],
-    ],
+    attributes: [['class', 'manager-header']],
     spells: ['manager-tools-context-header'],
-    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+    renders: ['PageHeader', 'ManagerHeaderActions', 'Medallion'],
+    rendersNo: ['Kicker'],
+    writesNo: ['aria-current'],
   });
 
-  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
-  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
-    attributes: [['class', 'manager-breadcrumbs']],
+  // `manager-breadcrumbs` and `manager-heading` are `PageHeader`'s since issue 1777: the manager
+  // hands it crumbs from `headerBreadcrumbs.js` and writes no trail markup of its own.
+  defineStructureContract('names the breadcrumb trail', PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
+  });
+  defineStructureContract('writes no trail markup in the manager header', MANAGER_PAGE_HEADER, {
+    attributesNo: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
   });
 
   // `manager-header-actions` is the action group's own identity since issue 1720, and the two
@@ -638,12 +674,12 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   defineStructureContract('draws the crafting studios’ header actions', MANAGER_HEADER_CRAFTING_ACTIONS, {
-    renders: ['ManagerButton', 'ComponentEditorHeader'],
+    renders: ['Button', 'ComponentEditorHeader'],
     writes: ['data-checks-save', 'data-component-add-from-catalogue'],
   });
 
   defineStructureContract('draws the gathering studios’ header actions', MANAGER_HEADER_GATHERING_ACTIONS, {
-    renders: ['ManagerButton', 'Chip'],
+    renders: ['Button', 'Chip'],
     writes: ['data-environment-edit-back', 'data-gathering-task-back', 'data-gathering-event-back'],
   });
 
@@ -672,7 +708,7 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('gives a browse route the same main column', MANAGER_VIEWS, {
     spells: ['manager-main', 'manager-filter'],
     spellsExactly: ['FABRICATE.Admin.Manager.Environment.EmptyTitle'],
-    renders: ['ManagerToolbar', 'EmptyState'],
+    renders: ['FilterBar', 'EmptyState'],
     imports: ['../../components/EmptyState.svelte'],
   });
 
@@ -712,7 +748,7 @@ describe('CraftingSystemManager source contract', () => {
   // Same-named systems are disambiguated through the shared helper (issue 346). The rows, their
   // identity buttons and the status switch are driven by the mounted systems and rail cases.
   // `<StatusToggle`, not the class literal (issue 1040): the row's switch renders through the
-  // shared primitive, which is the only thing under `src/` that writes `manager-status-toggle`,
+  // shared primitive, which is the only thing under `src/` that writes `fabricate-toggle`,
   // so a search for the class would read 0 while the control is present and correct.
   defineStructureContract('disambiguates same-named systems in the library', SYSTEMS_BROWSER, {
     declaresProp: ['systemsLoading', 'onToggleSystemEnabled'],
@@ -756,7 +792,6 @@ describe('CraftingSystemManager source contract', () => {
       'gathering.reselectDrop',
       'modifiers.resetSearchOnDrop',
       'modifiers.resetSearchOnEvent',
-      'modifiers.syncSearchDirection',
       'modifiers.reconcileDropPickers',
       'modifiers.reconcileEventPickers',
     ],
@@ -784,7 +819,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, HEADER_MODEL, MANAGER_TITLE_BAR],
     {
       // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
       // cases render this copy, which `text(key, fallback)` still produces under a renamed key.
@@ -925,6 +960,7 @@ describe('CraftingSystemManager source contract', () => {
       GATHERING_DISPLAY,
       GATHERING_DRAFT_HANDLERS,
       GATHERING_MODIFIER_HANDLERS,
+      WORLD_SCOPE_MODEL,
       ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
       ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
@@ -1001,9 +1037,9 @@ describe('CraftingSystemManager source contract', () => {
       ['legend', 'Salvage resolution mode'],
       ['cardId', 'manager-crafting-salvage-resolution-mode'],
       ['groupName', 'manager-crafting-salvage-resolution-mode'],
-      ['dataAttr', 'data-crafting-salvage-resolution-mode'],
       ['optionDataAttr', 'data-crafting-salvage-resolution-mode-option'],
     ],
+    writes: ['data-crafting-salvage-resolution-mode'],
   });
 
   // The recipe card's own legend fallback, stated apart from the salvage card's.
@@ -1043,7 +1079,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'authors straight, d100 and routed on each task, all three selectable',
-    { file: GATHERING_TASK_EDIT, constant: 'resolutionModeOptions' },
+    { file: taskPart('OverviewTab'), constant: 'resolutionModeOptions' },
     {
       property: [
         ['value', 'straight'],
@@ -1058,7 +1094,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'reuses the shared radio cards for the task mode, and patches the task, not the event',
-    { file: GATHERING_TASK_EDIT, fn: 'setTaskResolutionMode' },
+    { file: taskPart('OverviewTab'), fn: 'setTaskResolutionMode' },
     { callsWith: [['onUpdateTask', 'mode']], keys: ['resolutionMode'] }
   );
 
@@ -1089,7 +1125,7 @@ describe('CraftingSystemManager source contract', () => {
   // is selected, rather than rendering an empty heading (#429).
   defineStructureContract(
     'titles the page after the record it edits',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, MANAGER_HEADER_BREADCRUMBS],
     {
       reads: ['selectedSystem.name'],
       spellsExactly: [
@@ -1097,7 +1133,9 @@ describe('CraftingSystemManager source contract', () => {
         'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
       ],
       spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
-      writes: ['data-nav-system-edit'],
+      // The rail row's hook is a model key (issue 1777); the rail census renders it.
+      keys: ['data-nav-system-edit'],
+      keysNo: ['data-nav-system-overview'],
       writesNo: ['data-nav-system-overview'],
       names: ['systemOverviewCount'],
       assignsNo: [['activeView', 'system-overview']],
@@ -1138,7 +1176,7 @@ describe('CraftingSystemManager source contract', () => {
   // real routes now, which is why neither may reappear in the placeholder list either.
   defineStructureContract(
     'derives the placeholder rail from selection and feature gates',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS],
     {
     names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
     declares: ['experimentalFeaturesEnabled'],
@@ -1160,7 +1198,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'advertises the Graph placeholder as the only one, behind the experimental toggle',
-    { file: MANAGER_SYSTEM_NAV, constant: 'placeholderViews' },
+    { file: MANAGER_NAV_ITEMS, constant: 'placeholderViews' },
     {
       property: [
         ['id', 'graph'],
@@ -1178,7 +1216,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'and gates it on the experimental toggle rather than on a system feature',
-    { file: MANAGER_SYSTEM_NAV, fn: 'isViewAvailableForSystem' },
+    { file: MANAGER_NAV_ITEMS, fn: 'isViewAvailableForSystem' },
     { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
   );
 
@@ -1188,7 +1226,10 @@ describe('CraftingSystemManager source contract', () => {
     'renders the selected system in a rail card that selects',
     MANAGER_NAV_RAIL,
     {
-    writes: ['data-manager-scope-select', 'data-manager-rail-section'],
+    writes: ['data-manager-rail-section'],
+    // The scope select is the shared `Select`, its hook stamped on the trigger (issue 1777).
+    renders: ['Select'],
+    property: [['data-manager-scope-select', '']],
     spells: ['manager-scope-return'],
     spellsExactly: [
       'manager-scope-card',
@@ -1226,35 +1267,21 @@ describe('CraftingSystemManager source contract', () => {
       declaresAttribute(node, 'data-manager-import-system', { directives: false })
     );
     assert.ok(Boolean(importButton), 'the system library header still renders Import');
-    assert.equal(importButton.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(importButton.name, 'Button', 'through the shared button primitive');
     assert.equal(attributeExpression(importButton, 'onclick')?.name, 'importSystem');
 
   });
 
-  // A universal over every composition site, which is why it reads all three entry units: the
-  // sites are spread across them and narrowing it to one would drop most of its population.
-  it('never takes the selected pill class from the route a nav parent groups', () => {
-    const parentClasses = MANAGER_NAV_UNITS.flatMap((file) =>
-      [...walkNodes(componentAstOf(file).fragment)].filter(
-        (node) =>
-          node.type === 'TemplateLiteral' &&
-          literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
-      )
-    );
-    assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
-    assert.ok(
-      parentClasses.every((node) => !identifierNames(node).has('isGatheringRoute')),
-      'and does not take the selected pill class from the route it groups'
-    );
-  });
+  // A nav parent's pill is pinned by value: tests/manager-nav-items.test.js ("keeps the Crafting and Gathering parents out of the pill") and the rail census's Crafting and Gathering locked-open states.
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
-  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_SYSTEM_NAV, {
+  defineStructureContract('groups the gathering sections into a rail submenu', [NAV_SIDEBAR_ROWS, MANAGER_NAV_ITEMS], {
     spells: ['manager-nav-group '],
-    // The member path the unit reads through its `navRail` prop, which is what replaced the
-    // root's own `railGroupExpanded` (issue 1717).
-    reads: ['navRail.expanded.gathering'],
+    // The member path the model reads through the unit's `navRail` prop, which is what replaced
+    // the root's own `railGroupExpanded` (issue 1717); it keys it by group id (issue 1777).
+    reads: ['navRail.expanded'],
+    property: [['id', 'gathering']],
     spellsExactly: [
       'manager-nav-submenu',
       'manager-nav-toggle',
@@ -1479,7 +1506,7 @@ describe('CraftingSystemManager source contract', () => {
   // `tests/components/manager-essences-mounted.js`. What stays is the seam and what was deleted.
   defineStructureContract('keeps essence browsing browser-only', ESSENCE_BROWSER, {
     declaresProp: ['onEditEssence', 'showSourceUi', 'browserState'],
-    spellsExactly: ['data-essence-membership-filter'],
+    writes: ['data-essence-membership-filter'],
     namesNo: ['onUpdateEssence'],
     spellsNo: [
       'manager-essence-edit-row',
@@ -1622,7 +1649,7 @@ describe('CraftingSystemManager source contract', () => {
       'https://mistersilver-uk.github.io/fabricate/crafting/recipes/',
     ],
     spellsExactly: ['FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'],
-    spellsNo: ['manager-inspector-card', 'Recipe.Details'],
+    spellsNo: ['fabricate-card', 'Recipe.Details'],
   });
 
   // Both routes into the editor, and the two header actions that are not on this header.
@@ -1696,10 +1723,12 @@ describe('CraftingSystemManager source contract', () => {
 
   // `foundry` is not in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
   // What it must never reach is an application class, which is the member read below.
-  defineStructureContract('keeps the component editor free of Foundry globals', COMPONENT_EDIT, {
-    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
-    readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
-  });
+  for (const file of [COMPONENT_EDIT, ...COMPONENT_EDITOR_CARD_FILES]) {
+    defineStructureContract(`keeps the component editor free of Foundry globals: ${file}`, file, {
+      readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+      readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
+    });
+  }
 
   // The v2 environment editor is a composition editor (issue 429): it wraps records the libraries
   // author rather than authoring tasks of its own, so every task-authoring store action stays out
@@ -1770,23 +1799,32 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
+    // An `InspectorCard` since issue 1777, so the shell class is the primitive's to spell.
+    spells: ['manager-condition-shortcut-card'],
+    spellsNo: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
+  });
+
+  // The positive control for every `spellsNo: ['fabricate-card']` row: the token the reader can find,
+  // in the one component that writes it since issue 1777.
+  defineStructureContract('spells the card shell class in the primitive', INSPECTOR_CARD, {
+    spells: ['fabricate-card'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
   // its copy, its event-specific drop label and its two limit steppers are that leaf's own.
   defineStructureContract('draws the gathering rules inspector', GATHERING_RULES_INSPECTOR, {
     writes: ['data-gathering-inspector-rules'],
+    // The two limits are one shared component (issue 1050), which the rule table names by field
+    // since its selects render through `Select` (issue 1777).
     spellsExactly: [
       'manager-rule-copy',
       'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+      'rewardLimit',
+      'eventLimit',
     ],
-    // The two limits are one shared component now (issue 1050).
-    attributes: [
-      ['rule', 'rewardLimit'],
-      ['rule', 'eventLimit'],
-    ],
+    renders: ['GatheringRuleLimitStepper', 'Select'],
   });
 
   // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook
@@ -1830,7 +1868,7 @@ describe('CraftingSystemManager source contract', () => {
   // The settings tab is where a world's condition and vocabulary values are authored, through the
   // shared pickers rather than through bespoke inputs.
   defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
-    renders: ['ManagerColorPicker', 'IconPicker'],
+    renders: ['TintPickerButton', 'IconPicker'],
     writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
     calls: [
       'onToggleGatheringConditionEnabled',
@@ -1963,88 +2001,111 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The editor is one page, not a tab strip, and the drop table is the row itself rather than a
-  // row plus a responsive duplicate of every one of its labels.
-  defineStructureContract('authors a gathering task on one page', GATHERING_TASK_EDIT, {
-    renders: ['ChanceSlider', 'RadioCardGroup'],
-    names: [
-      'pageSize',
-      'showRewardRuleNotice',
-      'dragDrop',
-      'availableConditionOptions',
-      'selectedConditionOptions',
-      'dropRateTierColor',
+  // The editor is four tabs over one panel (issue 1522), and the drop table is the row itself
+  // rather than a row plus a responsive duplicate of every one of its labels.
+  defineStructureContract('authors a gathering task across four tabs', GATHERING_TASK_EDIT, {
+    renders: [
+      'GatheringTaskEditorTabs',
+      'GatheringTaskOverviewTab',
+      'GatheringTaskRequirementsTab',
+      'GatheringTaskResultsTab',
+      'GatheringTaskValidationTab',
     ],
-    calls: [
-      'onClearDropComponent',
-      'onDropComponentMouseDown',
-      'onComponentDragStart',
-      'dropRateTierClass',
-      'onQuantityInput',
-      'onQuantityKeydown',
-      'onPickImagePath',
-      'onAddToolReference',
-      'onRemoveToolReference',
-    ],
-    callsWith: [['onImportDrop', 'rowId']],
+    names: ['pageSize', 'readiness'],
+    writes: ['data-gathering-task-editor', 'data-gathering-task-panel'],
+  });
+  defineStructureContract('draws the task identity on Overview', taskPart('OverviewTab'), {
+    renders: ['RadioCardGroup', 'GatheringTaskNodesCard'],
+    calls: ['onPickImagePath'],
+    writes: ['data-gathering-task-core-editor'],
+    spellsExactly: ['manager-task-media-column'],
+  });
+  defineStructureContract('gates a task on availability', taskPart('AvailabilityCard'), {
+    names: ['availableConditionOptions', 'selectedConditionOptions'],
+    writes: ['data-gathering-task-availability', 'data-gathering-task-availability-pill'],
+    spellsExactly: ['data-gathering-task-availability-option'],
+    namesNo: ['selectedCondition'],
+    attributesNo: [['type', 'checkbox']],
+  });
+  defineStructureContract('requires tools from the library', taskPart('RequiredToolsCard'), {
+    calls: ['onAddToolReference', 'onRemoveToolReference'],
+    writes: ['data-gathering-task-required-tools'],
+    spellsExactly: ['manager-task-required-tools-card'],
+  });
+  defineStructureContract('browses components to drag', taskPart('ComponentBrowserCard'), {
+    calls: ['onComponentDragStart'],
     writes: [
-      'data-gathering-task-editor',
-      'data-gathering-task-core-editor',
-      'data-gathering-task-availability',
-      'data-gathering-task-availability-pill',
       'data-gathering-task-component-browser',
       'data-gathering-task-component-grid',
       'data-gathering-component-card',
       'data-gathering-component-name-search',
       'data-gathering-component-tag-search',
-      'data-gathering-task-drops-table',
-      'data-gathering-task-drop-component-cell',
-      'data-gathering-task-drop-chance-cell',
-      'data-gathering-task-drop-count',
-      'data-gathering-task-required-tools',
-      'oncontextmenu',
     ],
-    attributes: [['inputmode', 'numeric']],
-    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
     spellsExactly: [
       'manager-selected-tag-pill',
-      'data-gathering-task-availability-option',
-      'manager-task-drop-controls',
-      'manager-task-drop-footer',
       'manager-task-component-browser-card',
       'manager-task-component-grid',
       'manager-task-component-card-grip',
-      'manager-task-media-column',
-      'manager-task-required-tools-card',
+    ],
+  });
+  // A `DataTable` since issue 1782: each row is a drop target through the table's row action.
+  defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
+    renders: ['DataTable', 'GatheringTaskDropCell'],
+    names: ['dragDrop', 'dropZone'],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: ['data-gathering-task-drops-table', 'data-gathering-add-drop'],
+    spellsExactly: ['manager-task-drop-controls', 'data-gathering-task-drop-id'],
+  });
+  defineStructureContract('draws each cell of a drop rule', taskPart('DropCell'), {
+    renders: ['ChanceSlider'],
+    names: [
+      'dropRateTierColor',
+      'onDropComponentMouseDown',
+      'onQuantityInput',
+      'onQuantityKeydown',
+    ],
+    calls: ['onClearDropComponent', 'dropRateTierClass'],
+    writes: [
+      'data-gathering-task-drop-component-cell',
+      'data-gathering-task-drop-chance-cell',
+      'oncontextmenu',
+      'aria-current',
+    ],
+    attributes: [['inputmode', 'numeric']],
+    spells: ['manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spellsExactly: [
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
       'manager-drop-modifier-overflow',
       '[1-9][0-9]{0,2}',
     ],
-    // The one-page editor's absences: no tab strip, no raw internal id, no duplicate back
-    // control, no native single-select availability, no row-level quick actions, no responsive
-    // label duplicates.
-    namesNo: ['selectedCondition'],
-    attributesNo: [['type', 'checkbox']],
-    spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
-    writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
-    spellsNo: [
-      'manager-task-editor-tabs',
-      'Internal ID',
-      'BackToLibrary',
-      'Tasks.SelectDrop',
-      'EditDrop',
-      'manager-labeled-cell manager-drop-component-cell',
-      'manager-labeled-cell manager-drop-rate-cell',
-      'QuantityShortHint',
-    ],
   });
+  // The editor's absences, file by file: no raw internal id, no duplicate back control, no
+  // row-level quick actions, no responsive label duplicates, no hand-rolled tab strip, and no
+  // roleless warning band, whose strips are notices and callouts now.
+  for (const file of [GATHERING_TASK_EDIT, ...GATHERING_TASK_PARTS]) {
+    defineStructureContract(`keeps the task editor's absences in ${file}`, file, {
+      spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
+      writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
+      spellsNo: [
+        'manager-warning-band',
+        'manager-task-editor-tabs',
+        'Internal ID',
+        'BackToLibrary',
+        'Tasks.SelectDrop',
+        'EditDrop',
+        'manager-labeled-cell manager-drop-component-cell',
+        'manager-labeled-cell manager-drop-rate-cell',
+        'QuantityShortHint',
+      ],
+    });
+  }
 
   // Asserted where it is decided rather than over the whole file: a managed-component drop
   // resets the row's identity and enables it.
   defineStructureContract(
     'resets a drop row identity when a managed component lands on it',
-    { file: GATHERING_TASK_EDIT, fn: 'handleDropZoneDrop' },
+    { file: taskPart('DropsCard'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
       callsWith: [['onUpdateDrop', 'rowId']],
@@ -2076,13 +2137,13 @@ describe('CraftingSystemManager source contract', () => {
 
   // The destructive role, read off one element rather than off two strings that happen to sit
   // within 200 characters of each other. The class literal the old match keyed on left the file
-  // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
-  it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
+  // entirely when this toolbar moved onto `Button` (issue 1118).
+  it('renders the task delete as one danger Button wired to the draft delete', () => {
     const [remove] = templateNodes(componentAstOf(MANAGER_HEADER_GATHERING_ACTIONS)).filter(
       (node) => declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
     assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
-    assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(remove.name, 'Button', 'through the shared button primitive');
     assert.equal(attributeValue(remove, 'role'), 'danger', 'in the destructive role');
     assert.equal(
       attributeExpression(remove, 'onclick')?.name,
@@ -2136,7 +2197,10 @@ describe('CraftingSystemManager source contract', () => {
   // What the library draws — rows, pager, per-system counts, selection, the three tabs, the
   // absent creation surface and source drop zone, the dirty guard, the armed removal — is driven
   // by `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it.
-  defineStructureContract('wires the Tools library and focused editor', MANAGER_ROOT, {
+  defineStructureContract('wires the Tools library and focused editor', [
+    MANAGER_ROOT,
+    WORLD_SCOPE_MODEL,
+  ], {
     imports: ['./ToolsBrowserView.svelte', './ToolEditView.svelte'],
     compares: ['tools', 'tool-edit'],
     names: [
@@ -2160,9 +2224,10 @@ describe('CraftingSystemManager source contract', () => {
       'store.removeToolFromSystem',
       'store.setToolSectionInherited',
       // Tool creation is a world-scope write now.
-      'services.resolveToolSource',
       'store.worldScope.tool.createEntity',
     ],
+    // The world-scope model calls the resolver through its `services()` thunk, which no `services.` member path spells.
+    calls: ['resolveToolSource'],
     passesProps: [
       ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
       ['ToolBrowserInspector', 'onAddToSystem'],
@@ -2203,11 +2268,17 @@ describe('CraftingSystemManager source contract', () => {
 
   // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio
   // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
-  // route and asserts the badge is absent at zero; which derivation each span renders is not.
+  // route and asserts the badge is absent at zero; which derivation each span renders is not. The
+  // derivation is a model count marker's value since issue 1777, and the span renders that value.
   it('renders each rail count as the derived number inside the shared count span', () => {
-    const rendered = classRenderedExpressions(
-      componentAstOf(MANAGER_SYSTEM_NAV),
-      'manager-nav-count'
+    const spans = classRenderedExpressions(componentAstOf(NAV_SIDEBAR_ROWS), 'manager-nav-count');
+    assert.deepEqual(
+      spans.flatMap((expression) => memberPaths(expression)),
+      ['marker.value'],
+      'the unit renders the count marker value, and nothing else, in the count span'
+    );
+    const rendered = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)].flatMap((node) =>
+      node.type === 'CallExpression' && calledName(node) === 'countMarker' ? node.arguments : []
     );
     const read = rendered.flatMap((expression) => [
       ...memberPaths(expression),
@@ -2988,18 +3059,26 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
     const root = componentAstOf(MANAGER_ROOT);
-    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
-      declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
-    );
-    assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');
-    const [crumb] = crumbs;
-    assert.equal(crumb.name, 'button', 'and it is a real button, not a static crumb');
-    const navigation = attributeExpression(crumb, 'onclick');
-    assert.ok(callNames(navigation).has('setView'), 'the crumb navigates');
-    assert.ok(
-      memberPaths(navigation).includes('worldScopedEntryRoute.catalogueView'),
-      'to the catalogue the entry route records, rather than to a second copy of that mapping'
-    );
+    // The trail is `headerBreadcrumbs.js`'s since issue 1777, so the model answers for it. The
+    // catalogue view is a value no route has, so a second copy of the mapping cannot pass.
+    const views = [];
+    const crumbs = headerBreadcrumbs({
+      text: (key) => key,
+      header: { title: 'Entry' },
+      currentView: 'world-essence-entry',
+      isWorldScopedRoute: true,
+      worldScopedEntryRoute: { catalogueView: 'catalogue-sentinel', catalogueTitleKey: 'k' },
+      worldScopedEntryCrumb: 'Water',
+      setView: (view) => {
+        views.push(view);
+      },
+    });
+    assert.equal(crumbs.length, 3, 'the entry trail draws World, the catalogue and the entry');
+    const catalogue = crumbs.filter((crumb) => 'data-breadcrumb-world-scoped-catalogue' in crumb);
+    assert.equal(catalogue.length, 1, 'the entry trail draws one intermediate catalogue crumb');
+    assert.equal(typeof catalogue[0].onSelect, 'function', 'and it is a control, not a static crumb');
+    catalogue[0].onSelect();
+    assert.deepEqual(views, ['catalogue-sentinel'], 'to the catalogue the entry route records');
 
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through

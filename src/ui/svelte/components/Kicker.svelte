@@ -8,12 +8,15 @@
   | --- | --- | --- | --- |
   | `as` | `'p'` \| `'span'` \| `'h3'` | `'p'` | A micro-label is sometimes a heading and sometimes not. The union is MEASURED: 62 `<p>`, 3 `<span>` and 1 `<h3>` across `src/ui/svelte/**`. |
   | `tone` / `children` | `'default'` \| `'accent'` / snippet | `'default'` / `undefined` | `accent` is `--fab-accent`, and the specimen states when: "Accent only when it names a whole section"; an unknown tone falls back to the default ink. `children` is the label text, already localized. |
-  | `dataAttr` / `dataValue` | strings | `''` | An optional test/screenshot hook, SPREAD so the attribute is absent when unset. `dataValue` is passed through as written, per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
+
+  Rest spread:
+  - `{...rest}` lands on the host element, written after `class`, and exists for a test or
+    screenshot hook, whose value is written as passed, per the `data-*` spelling rule in
+    `openspec/specs/design-system/spec.md`.
 
   Invariants:
-  - IT TAKES NO `class`, NO `style` AND NO REST SPREAD. A caller that needs LAYOUT keeps its own
-    wrapper and nests this inside it, which is the shape the specimen already draws. A named test
-    hook is the exception, because a hook is not layout.
+  - It takes no `class` and no `style`. A caller that needs layout keeps its own wrapper and nests
+    this inside it, which is the shape the specimen already draws; a hook is not layout.
   - THE INK IS THE MUTED TONE, NOT THE SPECIMEN'S SUBTLE ONE: at 8.5px the subtle tone composites to
     3.69:1 and 3.50:1 over the two grounds, under the 4.5:1 small-text floor
     `openspec/specs/design-system/spec.md` states, while the muted tone clears it in all seven
@@ -23,13 +26,7 @@
     product token, so the eyebrow inherits the surface's UI face and re-skins with it.
 -->
 <script>
-  let {
-    as = 'p',
-    tone = 'default',
-    dataAttr = '',
-    dataValue = '',
-    children = undefined,
-  } = $props();
+  let { as = 'p', tone = 'default', children = undefined, ...rest } = $props();
 
   const HOSTS = new Set(['p', 'span', 'h3']);
 
@@ -38,11 +35,9 @@
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
 
   const accent = $derived(tone === 'accent');
-
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue } : {});
 </script>
 
-<svelte:element this={host} class="fab-kicker" class:is-accent={accent} {...hookAttributes}
+<svelte:element this={host} class="fab-kicker" class:is-accent={accent} {...rest}
   >{@render children?.()}</svelte:element
 >
 

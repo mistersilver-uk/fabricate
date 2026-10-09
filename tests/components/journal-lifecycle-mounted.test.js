@@ -2,22 +2,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
+
 import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
-import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
+import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { Recipe } from '../../src/models/Recipe.js';
-import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
-import { buildLabActors } from '../view-lab/world/labActors.js';
-import {
-  stockJournalPrototype,
-  JOURNAL_PROTOTYPE_BINDINGS,
-} from '../view-lab/world/labJournalPrototype.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
+import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -25,18 +21,23 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { buildLabActors } from '../view-lab/world/labActors.js';
 import {
   buildLabContent,
   LAB_SYSTEM_IDS,
   seedJournalNoCheckFixture,
 } from '../view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
+import {
+  stockJournalPrototype,
+  JOURNAL_PROTOTYPE_BINDINGS,
+} from '../view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   LAB_RETAINED_CLAIM,
   buildLabRunStates,
   createLabJournalCaseController,
 } from '../view-lab/world/labRunStates.js';
-import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
@@ -45,7 +46,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
@@ -55,13 +60,29 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    // Issue 1773: a reward row's glyph.
+    'src/ui/presenters/resultKindGlyphs.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
+    // Issue 1773: the award face's rows.
+    'src/ui/presenters/awardChoiceRows.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     // The roll line signs an executed margin with the shared formatter (issue 2005).
     'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The run kinds the store filters by and the kind filter draws and counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
+    // The store words an additional-dice refusal with the roll prompt's notice (issue 2008).
+    'src/ui/presenters/additionalDicePrompt.js',
+    'src/systems/additionalDiceReach.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/localizeWithFallback.js',
+    'src/systems/countEvaluation.js',
+    'src/systems/countTriggerReach.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/checkEvaluation.js',
+    'src/systems/checkTarget.js',
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
@@ -70,10 +91,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    component('Pagination'),
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    component('ManagerButton'),
+    component('Button'),
     'src/ui/svelte/components/InspectorCard.svelte',
     component('RunActionBar'),
     component('SlotTile'),
@@ -83,24 +104,29 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
-    component('ListRow'),
-    component('YieldScale'),
-    component('OutcomeLadder'),
+    'src/ui/svelte/components/ListRow.svelte',
+    'src/ui/svelte/components/YieldScale.svelte',
+    'src/ui/svelte/components/OutcomeLadder.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
     'src/ui/svelte/apps/journal/ThisRun.svelte',
+    // The run-type multi-select and the box its rows draw (issue 1644).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -528,7 +554,7 @@ function assertScrollContract(target) {
   for (const kind of ['active', 'finished']) {
     const section = target.querySelector(`[data-journal-list="${kind}"]`);
     const scroller = section?.querySelector('[data-journal-list-scroll]');
-    const pager = section?.querySelector('.manager-pagination');
+    const pager = section?.querySelector('.fabricate-pagination');
     assert.ok(section && scroller && pager, `${kind} has section, scroller, and pager`);
     assert.ok(!scroller.contains(pager), `${kind} pager stays outside its scroller`);
   }
@@ -536,7 +562,7 @@ function assertScrollContract(target) {
 
 function assertActionAlignment(target) {
   const header = target.querySelector('.journal-detail-header');
-  const identity = header?.querySelector('.journal-detail-identity');
+  const identity = header?.querySelector('[data-player-detail-header]');
   const actions = header?.querySelector('[data-journal-actions]');
   assert.ok(header && identity && actions, 'identity and actions share the detail header');
 }
@@ -564,6 +590,12 @@ const textsOf = (root, selector) =>
   [...root.querySelectorAll(selector)].map((node) => node.textContent);
 const namesOf = (root) => textsOf(root, '.fabricate-list-row-name');
 const quantitiesOf = (root) => textsOf(root, '.fabricate-list-row-quantity');
+// An Active row's ListRow ROOT (issue 1778). `data-run-id` rides the row's button, and the run's
+// timing is the row's aside, beside that button rather than inside it.
+const activeRowOf = (target, runId) =>
+  target
+    .querySelector(`[data-journal-list="active"] [data-run-id="${runId}"]`)
+    ?.closest('[data-list-row]');
 const section = (target, kind) => target.querySelector(`[data-history-items="${kind}"]`);
 const yieldRows = (target) => [...target.querySelectorAll('[data-yield-entry]')];
 
@@ -916,13 +948,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('retains readable identity and compact timing without expanded internal identifiers', async () => {
     const { target } = await mountState('ready-single');
-    assert.match(target.querySelector('.journal-detail-identity').textContent, /Bend Horseshoe/);
+    assert.match(target.querySelector('[data-player-detail-header]').textContent, /Bend Horseshoe/);
     assert.ok(!target.querySelector('[data-journal-record]'));
     assert.match(target.querySelector('[data-journal-this-run]').textContent, /Started/);
     await harness.remount();
     const gathering = await mountState('gathering-straight');
     assert.match(
-      gathering.target.querySelector('.journal-detail-identity').textContent,
+      gathering.target.querySelector('[data-player-detail-header]').textContent,
       /straight task/
     );
     assert.ok(!gathering.target.querySelector('[data-journal-record]'));
@@ -1444,7 +1476,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
     const large = options.find((option) => option.textContent.includes('iron stock'));
     const small = options.find((option) => option.textContent.includes('copper stock'));
-    assert.match(large.textContent, /3 held · needs 3/);
+    assert.match(large.textContent, /3 held · needs 3 · 2 spare/, 'the fixed group claims one');
     assert.equal(large.disabled, true, 'the candidate would leave the fixed iron group short');
     assert.match(small.textContent, /2 held · needs 1/);
     assert.equal(small.disabled, false, 'the smaller alternate uses its own required amount');
@@ -1492,6 +1524,159 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
   });
 
+  it('paints a partly delivered essence partial and an untouched one short', async () => {
+    const set = ingredientSet('partial-essence', [
+      { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 4 } }] },
+      { id: 'earth', options: [{ match: { type: 'essence', essenceId: 'earth', amount: 2 } }] },
+      { id: 'water', options: [{ match: { type: 'essence', essenceId: 'water', amount: 2 } }] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientEssenceAllocation: {
+        stepId: 'sm-r-horseshoe-step-1',
+        ingredientSetId: set.id,
+        allocation: { 'Item.iron-a': 1 },
+      },
+    });
+    fixture.builderOptions.resolveItemEssences = ({ item }) =>
+      item.componentId === 'iron' ? { fire: 2, water: 1 } : {};
+    const mounted = await mountState('ready-single', fixture);
+    const paint = (groupId) =>
+      mounted.target.querySelector(`[data-slot-id="${groupId}"] .fab-slot-tile-shell`).dataset
+        .slotState;
+    assert.equal(paint('fire'), 'partial', 'two of four delivered is partial, never short');
+    assert.equal(paint('earth'), 'short', 'none delivered stays short');
+    assert.equal(paint('water'), 'partial', 'a single delivered unit already starts the pool');
+  });
+
+  it('offers a short candidate, selects it without readying the run, and locks claimed stock', async () => {
+    const set = ingredientSet('short', [
+      {
+        id: 'choice',
+        options: [
+          componentOption('lots', 'iron', 5),
+          componentOption('spare', 'copper', 1),
+          componentOption('one', 'iron', 1),
+        ],
+      },
+      { id: 'fixed', options: [componentOption('reserved', 'copper', 2)] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([set], {
+        selectedIngredientSetId: set.id,
+        ingredientOptionOverrides: { choice: { optionIndex: 2 } },
+      })
+    );
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, false, 'the met selection can begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const short = options.find((option) => /needs 5/.test(option.textContent));
+    const claimed = options.find((option) => option.textContent.includes('copper stock'));
+    assert.equal(claimed.disabled, true, 'the fixed group claims both copper');
+    assert.equal(short.disabled, false, 'three iron against five is offered, not locked');
+    const reading = mounted.target.querySelector(`[id="${short.getAttribute('aria-describedby')}"]`);
+    assert.match(reading.textContent, /3 held · needs 5/);
+    short.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.equal(overrides.choice.optionIndex, 0, 'pressing the short candidate selects it');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.equal(begin().disabled, true, 'a short stack never readies the run');
+  });
+
+  it('measures each candidate against what the stage can fund, so a short fixed group locks none', async () => {
+    const set = ingredientSet('remainder', [
+      {
+        id: 'choice',
+        options: [componentOption('iron', 'iron', 1), componentOption('steel', 'steel', 1)],
+      },
+      { id: 'fuel', options: [componentOption('coal', 'coal', 2)] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+    });
+    fixture.builderOptions.actor = { ...ACTOR, items: [item('iron-a', 'iron', 5)] };
+    const mounted = await mountState('ready-single', fixture);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, true, 'no coal is held, so the stage cannot begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const iron = options.find((option) => option.textContent.includes('iron stock'));
+    const steel = options.find((option) => option.textContent.includes('steel'));
+    const unavailable = localizedLabel('FABRICATE.App.Journal.Stage.CandidateUnavailable');
+    assert.equal(iron.disabled, false, 'held in full and claimed by nothing the stage can fund');
+    assert.match(iron.textContent, /5 held · needs 1 · 5 spare/);
+    assert.ok(!iron.textContent.includes(unavailable) && !iron.hasAttribute('title'));
+    assert.ok(!iron.hasAttribute('aria-describedby'), 'a met candidate is not described as refused');
+    assert.equal(steel.disabled, false, 'an unheld option is short, never locked');
+    assert.ok(steel.classList.contains('is-short'));
+    const reading = mounted.target.querySelector(`[id="${steel.getAttribute('aria-describedby')}"]`);
+    assert.equal(reading.textContent, `0 held · needs 1 · 0 spare · ${unavailable}`);
+    assert.equal(steel.getAttribute('title'), unavailable);
+    steel.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.deepEqual(overrides.choice, { optionIndex: 1 }, 'the unheld option is chosen by index');
+    assert.equal(begin().disabled, true);
+  });
+
+  it('keeps the list open on an arrow choice and closes it onto the slot tile on activation', async () => {
+    const mounted = await mountState('waiting-open-choice');
+    // Chromium drops focus to the body the moment a focused control is disabled, as each one is
+    // while the choice's command is pending. happy-dom does not, so the drop is played here;
+    // focus-when-enabled-rendered.test.js proves the browser half.
+    const chromiumBlur = new globalThis.window.MutationObserver((records) => {
+      for (const { target } of records) {
+        if (target.disabled && globalThis.document.activeElement === target) {
+          globalThis.document.body.focus();
+        }
+      }
+    });
+    chromiumBlur.observe(mounted.target, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+    const press = (element, key) =>
+      element.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    const pending = async () => {
+      flushSync();
+      await Promise.resolve();
+      return [Boolean(mounted.store.busyRunKey), globalThis.document.activeElement?.tagName];
+    };
+    const tile = () => mounted.target.querySelector(':scope [data-slot-id="metal"] button');
+    const list = () =>
+      mounted.target.querySelector(':scope [data-slot-row] [data-choice-options="metal"]');
+    try {
+      tile().click();
+      flushSync();
+      const radios = [...list().querySelectorAll('[role="radio"]:not(:disabled)')];
+      assert.ok(radios.length > 1, 'the open slot offers more than one candidate');
+      const start = radios.find((radio) => radio.tabIndex === 0);
+      start.focus();
+      press(start, 'ArrowRight');
+      assert.deepEqual(await pending(), [true, 'BODY'], 'the pending command drops focus');
+      await settleAction();
+      assert.ok(list(), 'an arrow choice leaves the list open');
+      const focused = globalThis.document.activeElement;
+      assert.ok(focused !== start && list().contains(focused), 'focus returns to the next candidate');
+      assert.equal(focused.getAttribute('aria-checked'), 'true', 'and that candidate is checked');
+      press(focused, 'Enter');
+      assert.deepEqual(await pending(), [true, 'BODY']);
+      await settleAction();
+      assert.ok(!list(), 'activation closes the list');
+      assert.ok(globalThis.document.activeElement === tile(), 'focus returns to the slot tile');
+    } finally {
+      chromiumBlur.disconnect();
+    }
+  });
+
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
     for (const visible of [true, false]) {
       const mounted = await mountState('recovery-required', {
@@ -1534,7 +1719,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       'unattempted stages do not enter the account'
     );
     assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
-    const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
+    const tracks = [...mounted.target.querySelectorAll('[data-stage-bars-state]')];
     assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
@@ -1617,6 +1802,17 @@ describe('Journal versioned lifecycle (mounted)', () => {
         }
       }
       assertCaseWitness(mounted.target, capture);
+      // Issue 1644, asserted outright: happy-dom matches `:has(A B)` without B, so the case's own
+      // selector cannot see a missing bolt here. One run qualifies; every other state draws none.
+      const bolts = mounted.target.querySelectorAll('[data-run-completes-as-time-passes]');
+      assert.equal(bolts.length, state === 'waiting-auto-completes' ? 1 : 0, `${suffix} bolts`);
+      if (bolts.length === 1) {
+        assert.equal(bolts[0].closest('[data-run-id]').dataset.runId, selectedId);
+        assert.equal(
+          bolts[0].getAttribute('aria-label'),
+          english.FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses
+        );
+      }
       if (HISTORY_DATA_WITNESS[state]) {
         HISTORY_DATA_WITNESS[state](mounted.target, {
           // An alchemy attempt names no recipe: the whole roster is protected text.
@@ -1657,7 +1853,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       if (state === 'awaiting-choice') {
         const row = mounted.target.querySelector('[data-run-id="lab-v1-awaiting-choice"]');
         assert.equal(row.querySelector('[data-run-attention]')?.dataset.runAttention, 'choice');
-        const header = mounted.target.querySelector('.journal-detail-meta [data-run-attention]');
+        const header = mounted.target.querySelector('.player-detail-header-meta [data-run-attention]');
         assert.equal(header?.dataset.runAttention, 'choice');
         assert.ok(mounted.target.querySelector('[data-journal-awaiting-choice="true"]'), 'the one notice names the next move');
         assert.ok(!mounted.target.querySelector('[data-journal-action-blocker]'), 'guidance, never a refusal');
@@ -1852,6 +2048,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.match(preview.textContent, /Setback/);
         assert.match(preview.textContent, /No items/);
         assert.ok(preview.querySelector('[data-outcome-ladder]'));
+        assert.ok(preview.querySelector('[data-outcome-status]'), 'its status glyphs are named');
       } else if (presentation === 'progressive') {
         assert.ok(!preview.querySelector('[data-outcome-ladder], [data-yield-scale]'));
         assert.match(preview.textContent, /budget/i);
@@ -2068,7 +2265,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(slot.textContent, /iron stock/);
     slot.querySelector('button').click();
     flushSync();
-    assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
+    const checked = () =>
+      [...mounted.target.querySelectorAll('[data-choice-id][role="radio"][aria-checked="true"]')];
+    assert.ok(mounted.target.querySelectorAll('[data-choice-id][role="radio"]').length > 0);
+    assert.equal(checked().length, 0, 'the missing held item checks no candidate');
     const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) =>
       entry.textContent.includes('iron stock')
     );
@@ -2078,6 +2278,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(
       mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
       'Item.iron-a'
+    );
+    mounted.target.querySelector(':scope [data-slot-id="metal"] button').click();
+    flushSync();
+    assert.deepEqual(
+      checked().map((radio) => radio.textContent.includes('iron stock')),
+      [true],
+      'the explicit replacement is the one checked candidate'
     );
   });
 
@@ -2225,18 +2432,16 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(left.textContent, /3h 0m 0s/u, 'the TIME card still reports three hours left');
 
     const fill = paused.target.querySelector(
-      '[data-journal-stages] [data-run-progress-track="0"] .fab-fill-bar-fill'
+      '[data-journal-stages] [data-stage-bars-stage="0"] .fab-fill-bar-fill'
     );
     assert.equal(
       fill.getAttribute('style'),
       `width: ${expected}%;`,
       'the detail bar agrees with the label beside it rather than pegging full'
     );
-    const row = paused.target.querySelector(
-      '[data-journal-list="active"] [data-run-id="lab-v1-waiting-auto-eligible"] [data-run-progress]'
-    );
+    const row = activeRowOf(paused.target, 'lab-v1-waiting-auto-eligible');
     assert.equal(
-      row.getAttribute('data-run-progress'),
+      row.querySelector('[data-run-progress]').getAttribute('data-run-progress'),
       String(expected),
       'and so does the list row, which read the same unmoved initiatedAt'
     );
@@ -2268,11 +2473,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(needs.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
 
     // M18 on the Active row: the bar survives the missing gate.
-    const row = mounted.target.querySelector(
-      '[data-journal-list="active"] [data-run-id="lab-v1-stage-not-started"]'
-    );
+    const row = activeRowOf(mounted.target, 'lab-v1-stage-not-started');
     assert.ok(row.querySelector('[data-run-progress]'), 'the row keeps its progress reading');
     assert.ok(!row.querySelector('[data-run-countdown]'), 'and states no remaining time');
+    // The same scope finds a countdown on a gated run, so the absence above is not a blind query.
+    const gated = [...mounted.target.querySelectorAll('[data-journal-list="active"] [data-run-id]')]
+      .map((control) => activeRowOf(mounted.target, control.dataset.runId))
+      .filter((root) => root.querySelector('[data-run-countdown]'));
+    assert.ok(gated.length > 0, 'a gated Active row shows its countdown under the same scope');
     // D-029 on the same row: the merged badge, not the retired word.
     assert.equal(
       row.querySelector('.journal-run-status').textContent.trim(),
@@ -2335,8 +2543,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
     harness.remount();
     const salvage = await mountState('salvage');
-    chooseSelectOption(salvage.target, '[data-journal-kind-filter]', 'salvage');
-    assert.equal(salvage.store.kindFilter, 'salvage');
+    salvage.target.querySelector(':scope [data-journal-kind-trigger]').click();
+    flushSync();
+    for (const kind of ['crafting', 'gathering', 'alchemy']) {
+      salvage.target.querySelector(`:scope [data-journal-kind-option="${kind}"]`).click();
+      flushSync();
+    }
+    assert.deepEqual(salvage.store.kindFilter, ['salvage']);
     assert.ok(salvage.target.querySelector('[data-history-run-id="lab-v1-salvage"]'));
   });
 
@@ -2357,6 +2570,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
       /6 \/ 6/
     );
     assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
+    assert.equal(
+      essence.target
+        .querySelector(':scope [data-essence-threshold="earth"] [role="meter"]')
+        .getAttribute('aria-valuetext'),
+      '6 of 6',
+      'the journal meter reads the localized pool sentence, not "6 slash 6"'
+    );
   });
 
   it('collects all three gathering modes but never treats fixture plans without receipts as awards', async () => {
@@ -2369,8 +2589,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const mounted = await mountState(state);
       const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
       assert.equal(mounted.store.selectedRun.gatheringYield.mode, mode);
-      if (mode === 'routed') assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
-      else assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      if (mode === 'routed') {
+        assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
+        assert.ok(mounted.target.querySelector(':scope [data-outcome-ladder] [data-outcome-status]'));
+      } else {
+        assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      }
       assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0);
 
       mounted.target.querySelector('[data-run-action="primary"]').click();
@@ -2528,7 +2752,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
     const active = target.querySelector('[data-journal-list="active"]');
     const activeScroller = active.querySelector('[data-journal-list-scroll]');
-    const activePager = active.querySelector('.manager-pagination');
+    const activePager = active.querySelector('.fabricate-pagination');
     activeScroller.appendChild(activePager);
     assert.throws(() => assertScrollContract(target));
     active.appendChild(activePager);

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
+import { injectedCss } from '../helpers/chipPaint.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
@@ -11,6 +12,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import {
   chooseSelectOption,
   openSelectPanel,
@@ -153,10 +155,18 @@ describe('RecipeBrowser mounted behavior', () => {
     });
 
     const input = target.querySelector('.crafting-browser-search input');
+    assert.ok(input.closest('.fabricate-search'), 'the shared search field');
     input.value = 'heal';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     assert.deepEqual(searches, ['heal'], 'onSearch called with the typed value');
+  });
+
+  // Issue 1518: the pager paints itself; the browser keeps only its layout slot.
+  it('declares nothing for the shared pager’s own markup', async () => {
+    const target = await harness.mount({ recipes: [recipe()], totalCount: 30, pageSize: 12 });
+    assert.ok(target.querySelector(':scope .crafting-browser-pagination .fabricate-pagination'));
+    assert.ok(!/crafting-browser-pagination[^{]*manager-/.test(injectedCss()));
   });
 
   it('selects a recipe on row click', async () => {
@@ -234,23 +244,138 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.deepEqual(systems, ['sys-b'], 'system change forwards the selected id');
   });
 
-  it('marks favourited rows and forwards the row favourite toggle', async () => {
+  it('marks favourited rows and forwards the row favourite toggle without selecting', async () => {
     const toggled = [];
+    const selected = [];
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' }), recipe({ id: 'r2', name: 'Antitoxin' })],
       totalCount: 2,
       favouriteIds: ['r2'],
-      onToggleFavourite: (id) => toggled.push(id),
+      onSelect: (id) => {
+        selected.push(id);
+      },
+      onToggleFavourite: (id) => {
+        toggled.push(id);
+      },
     });
 
     const r1Fav = target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-fav');
     const r2Fav = target.querySelector('[data-recipe-id="r2"] .crafting-recipe-row-fav');
     assert.equal(r1Fav.classList.contains('is-active'), false, 'unfavourited row star is inactive');
     assert.ok(r2Fav.classList.contains('is-active'), 'favourited row star is active');
+    assert.equal(r2Fav.getAttribute('aria-pressed'), 'true', 'the star keeps its own pressed state');
 
+    // The star sits beside the row's button, so its click reaches no row handler (issue 1778).
+    assert.ok(!r1Fav.closest('.crafting-recipe-row-main'), 'the star is not inside the row button');
     r1Fav.click();
     flushSync();
     assert.deepEqual(toggled, ['r1'], 'row star forwards onToggleFavourite with the recipe id');
+    assert.deepEqual(selected, [], 'and does not select the row');
+  });
+
+  it('keeps Enter and Space on the favourite and cart controls from selecting the row', async () => {
+    // A key on a trailing control reaches no row handler, so it does not select the recipe.
+    const selected = [];
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      onSelect: (id) => {
+        selected.push(id);
+      },
+    });
+
+    for (const control of ['.crafting-recipe-row-fav', '.crafting-recipe-row-add']) {
+      const button = target.querySelector(`:scope [data-recipe-id="r1"] ${control}`);
+      // Declared, so Foundry's keyboard manager leaves Space to the button rather than pausing.
+      assert.equal(button.getAttribute('data-keyboard-focus'), 'true', `${control} declares focus`);
+      for (const key of ['Enter', ' ']) {
+        button.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
+      }
+    }
+    flushSync();
+    assert.deepEqual(selected, [], 'a key on a trailing control selected the row');
+  });
+
+  it('draws each recipe as one list-row button, named by the recipe and its status', async () => {
+    const selected = [];
+    const target = await harness.mount({
+      recipes: [
+        recipe({ id: 'r1', name: 'Healing Potion' }),
+        recipe({ id: 'r2', name: 'Antitoxin', browseStatus: 'missingMaterials' }),
+      ],
+      totalCount: 2,
+      selectedRecipeId: 'r2',
+      onSelect: (id) => {
+        selected.push(id);
+      },
+    });
+
+    const row = target.querySelector('[data-recipe-id="r2"]');
+    assert.ok(row.matches('.fabricate-list-row[role="listitem"]'), 'the row root is the listitem');
+    assert.ok(row.classList.contains('is-danger'), 'an uncraftable row takes the danger tone');
+    assert.ok(
+      !target.querySelector('[data-recipe-id="r1"]').classList.contains('is-danger'),
+      'a craftable row does not'
+    );
+    const buttons = row.querySelectorAll(':scope > button');
+    assert.equal(buttons.length, 1, 'one control per row');
+    const [control] = buttons;
+    assert.ok(control.classList.contains('crafting-recipe-row-main'), 'the control keeps its hook');
+    assert.equal(control.getAttribute('aria-pressed'), 'true', 'pressed while selected');
+    assert.equal(
+      target
+        .querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-main')
+        .getAttribute('aria-pressed'),
+      'false'
+    );
+    assert.equal(
+      control.getAttribute('aria-label'),
+      'Antitoxin, FABRICATE.App.Crafting.Status.MissingMaterials',
+      'the name, then the status the row only draws as a glyph'
+    );
+    assert.equal(
+      target
+        .querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-main')
+        .getAttribute('aria-label'),
+      'Healing Potion, FABRICATE.App.Crafting.Status.Available',
+      'a craftable row is named by its status too'
+    );
+    assert.ok(
+      !control.querySelector('[role="button"], button'),
+      'no control nests inside the row button'
+    );
+    assert.deepEqual(
+      [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName),
+      [],
+      'the row button holds phrasing content only'
+    );
+    assert.equal(target.querySelectorAll(':scope [role="button"]').length, 0, 'no role=button');
+
+    // A click on the root lands on its button, which covers the row.
+    control.click();
+    flushSync();
+    assert.deepEqual(selected, ['r2'], 'the button opens the recipe');
+  });
+
+  it('gives a redacted row its button alone, and an unredacted row its favourite and cart', async () => {
+    const target = await harness.mount({
+      recipes: [
+        recipe({ id: 'r1', name: 'Healing Potion' }),
+        recipe({ id: 'r2', name: 'Antitoxin', redaction: { redacted: true, hiddenFields: [] } }),
+      ],
+      totalCount: 2,
+    });
+
+    const stops = (id) =>
+      [...target.querySelectorAll(`:scope [data-recipe-id="${id}"] button`)]
+        .filter((button) => button.tabIndex >= 0 && !button.disabled)
+        .map((button) => button.className.match(/crafting-recipe-row-\w+/)?.[0]);
+    assert.deepEqual(
+      stops('r1'),
+      ['crafting-recipe-row-main', 'crafting-recipe-row-fav', 'crafting-recipe-row-add'],
+      'three Tab stops on an unredacted row'
+    );
+    assert.deepEqual(stops('r2'), ['crafting-recipe-row-main'], 'one on a redacted row');
   });
 
   it('hides the system dropdown when no systems are supplied', async () => {
@@ -275,6 +400,8 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.ok(badge, 'a non-general row shows the category badge');
     assert.equal(badge.textContent.trim(), 'Weapons', 'badge text is the categoryLabel, not the raw token');
     assert.equal(badge.getAttribute('title'), 'Weapons', 'full label available via title on hover');
+    const system = target.querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-system');
+    assert.equal(system.getAttribute('title'), system.textContent, 'and so is the system name');
   });
 
   it('suppresses the category badge for a general recipe (keyed on category, not redaction)', async () => {

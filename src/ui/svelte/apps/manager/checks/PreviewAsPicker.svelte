@@ -16,7 +16,7 @@
 -->
 <script>
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import { NO_ACTOR_ID } from './previewActorId.js';
 
   let {
@@ -26,13 +26,11 @@
     onChoose = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
-  const actorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.Actor', 'Preview as actor');
+  const noActorLabel = localizeOr('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
+  const actorLabel = localizeOr(
+    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
+    'Preview as actor'
+  );
   const selected = $derived(
     value === NO_ACTOR_ID ? null : (actors.find((actor) => actor.id === value) ?? null)
   );
@@ -54,24 +52,24 @@
   {value}
   {options}
   pickerClass="manager-checks-preview-actor"
-  triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
-  {triggerData}
+  triggerClass="fabricate-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
+  triggerProps={triggerData}
   triggerIcon={selected ? '' : 'fas fa-user-slash'}
   triggerImg={selected?.img || ''}
   triggerLabel={selected?.name || noActorLabel}
-  triggerAriaLabel={actorLabel}
-  dialogAriaLabel={actorLabel}
-  searchPlaceholder={text(
+  ariaLabel={actorLabel}
+  panelLabel={actorLabel}
+  searchPlaceholder={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
     'Search characters...'
   )}
-  searchAriaLabel={text(
+  searchLabel={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
     'Search characters'
   )}
-  emptyHint={text(
+  emptyHint={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
     'No characters match your search.'
   )}
-  onChoose={(id) => onChoose(id)}
+  onSelect={(id) => onChoose(id)}
 />

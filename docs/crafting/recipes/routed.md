@@ -11,7 +11,7 @@ grand_parent: Crafting
 Routed crafting lets one recipe produce different results, with the result chosen at the moment of crafting.
 Use it whenever a single crafting process can lead to more than one outcome.
 
-A routed recipe has one or more ingredient sets and one or more result groups, and exactly one result group is produced per craft.
+A routed recipe has one or more ingredient sets and one or more result sets, and exactly one result set is produced per craft.
 There are two routed resolution modes, and you pick one as the system's **Recipe resolution mode**.
 
 - **Routed by ingredients** selects the result from the ingredients the player uses.
@@ -25,9 +25,9 @@ Every recipe in the system follows the system's mode.
 ## Routed by ingredients
 
 The player's choice of ingredients decides the result.
-Each ingredient set is tied to a result group, so changing the materials changes what is produced.
+Each ingredient set is tied to a result set, so changing the materials changes what is produced.
 In a multi-step recipe, this applies to the step the player is on.
-The choice decides what that step's own result group produces, but the recipe's headline **Produces** row still shows the final product made on its last step.
+The choice decides what that step's own result set produces, but the recipe's headline **Produces** row still shows the final product made on its last step.
 See [Multi-Step Recipes]({% link crafting/recipes/multi-step.md %}) for how the Produces row and its routing hint work across steps.
 
 Use this when different materials should make different things.
@@ -35,14 +35,14 @@ For example, the same gold band could become a Ring of Fire Resistance with a ru
 
 The crafting check is **optional** in this mode, the same as Simple mode.
 It is authored in **The roll** section of **Checks › Crafting** with the same pass or fail editor Simple mode uses: a roll formula, a DC, a meet or exceed comparison, a static or dynamic difficulty, and per-recipe check tiers.
-If you configure a roll formula, the check still rolls when a player crafts, but it never changes which result group is produced.
+If you configure a roll formula, the check still rolls when a player crafts, but it never changes which result set is produced.
 If you configure no roll formula, the craft proceeds with no check.
 Because it uses the same pass or fail check as Simple mode, a Routed by ingredients recipe can pick a per-recipe **Check tier** to shift its DC (but not the outcome-tier controls used by Routed by check).
 
-{% include screenshot.html case="coverage-mode-routed-ingredients-results" caption="One result group tied to each ingredient set." %}
+{% include screenshot.html case="coverage-mode-routed-ingredients-results" caption="One result set tied to each ingredient set." %}
 
-When a recipe has a single result group, you do not need to tie an ingredient set to it.
-The single result group is produced whenever the recipe is crafted.
+When a recipe has a single result set, you do not need to tie an ingredient set to it.
+The single result set is produced whenever the recipe is crafted.
 
 A player sees which materials lead to which result before committing to the craft.
 
@@ -62,6 +62,9 @@ How the roll maps to a tier depends on whether the check's tiers are relative or
 {% include screenshot.html case="coverage-mode-routed-check-checks" caption="The outcome tiers a routed check sorts results into." %}
 
 {% include screenshot.html case="player-crafting-routed-by-check" caption="The same recipe as a player sees it, listing the outcomes the roll can land in." %}
+
+Once you have crafted with a successful roll, the tier your roll reached is marked **Your roll**.
+A failed roll marks no tier, and a roll you could not see (a secret or blind roll) marks none either.
 
 See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers) for the difference.
 
@@ -101,15 +104,15 @@ These reserved names cannot be used as a result name.
 
 If an outcome is neither a reserved name nor one of your result names, the craft stops and reports a setup problem rather than treating it as a player failure.
 
-### A single result group needs no mapping
+### A single result set needs no mapping
 
-When a recipe has exactly one result group, you do not need to map outcomes to results at all.
-The single result group is produced on any non-failure outcome, and nothing is produced when the outcome is a reserved failure name.
-This mirrors the single-result-group rule in Routed by ingredients.
+When a recipe has exactly one result set, you do not need to map outcomes to results at all.
+The single result set is produced on any non-failure outcome, and nothing is produced when the outcome is a reserved failure name.
+This mirrors the single-result-set rule in Routed by ingredients.
 A craft that succeeds in this case never reports a setup problem, and the recipe editor raises no routing warnings for it.
 
 In a multi-step recipe, each step is checked on its own.
-A step with a single result group uses the no-mapping rule, while a step with several result groups needs each success outcome routed to a result.
+A step with a single result set uses the no-mapping rule, while a step with several result sets needs each success outcome routed to a result.
 
 ### Minimum success tier for fixed routed checks
 
@@ -133,7 +136,7 @@ The setting has no effect on relative checks or in Routed by ingredients mode, w
 
 ## Checking your routing in the editor
 
-When a recipe is in Routed by check mode and has more than one result group, the recipe editor's **Validation** tab checks the wiring between outcome tiers and result sets and warns about two common gaps.
+When a recipe is in Routed by check mode and has more than one result set, the recipe editor's **Validation** tab checks the wiring between outcome tiers and result sets and warns about two common gaps.
 
 - A result set that is not assigned to any check outcome.
   It will never be produced, so a check that succeeds can silently make nothing.
@@ -146,7 +149,7 @@ When a recipe is in Routed by check mode and has more than one result group, the
 These are warnings, not blockers.
 The recipe still saves, but the gaps are worth closing before players craft it.
 
-A recipe with a single result group never raises these warnings, because it needs no mapping.
+A recipe with a single result set never raises these warnings, because it needs no mapping.
 
 ---
 

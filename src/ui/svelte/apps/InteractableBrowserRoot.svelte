@@ -29,9 +29,11 @@
     systemDisplayLabel,
     pickDefaultSystemId,
   } from '../util/systemDisambiguation.js';
+  import EditorTabs from '../components/EditorTabs.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import IconButton from '../components/IconButton.svelte';
-  import ManagerSearchField from '../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../components/ManagerToolbar.svelte';
+  import SearchField from '../components/SearchField.svelte';
+  import FilterBar from '../components/FilterBar.svelte';
   import Select from '../components/Select.svelte';
 
   let { services = null } = $props();
@@ -108,6 +110,11 @@
   // term — the search box applies to both kinds of entry.
   let activeTab = $state('tools');
 
+  const BROWSER_TABS = Object.freeze([
+    { id: 'tools', labelKey: 'FABRICATE.Canvas.Browser.ToolsHeading', label: 'Tools' },
+    { id: 'tasks', labelKey: 'FABRICATE.Canvas.Browser.TasksHeading', label: 'Gathering tasks' },
+  ]);
+
   function matchesSearch(label) {
     const needle = search.trim().toLowerCase();
     if (!needle) return true;
@@ -183,34 +190,6 @@
       visualMode,
     });
   }
-
-  // Tab button refs so roving keyboard nav can move DOM focus to the newly
-  // selected tab (WAI-ARIA roving-tabindex pattern).
-  let toolsTabEl = $state(null);
-  let tasksTabEl = $state(null);
-
-  function focusActiveTab() {
-    const el = activeTab === 'tools' ? toolsTabEl : tasksTabEl;
-    el?.focus?.();
-  }
-
-  // Roving keyboard navigation across the two-tab tablist (Left/Right/Home/End):
-  // switch the active tab AND move focus onto it.
-  function onTabKeydown(event) {
-    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-      event.preventDefault();
-      activeTab = activeTab === 'tools' ? 'tasks' : 'tools';
-      focusActiveTab();
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      activeTab = 'tools';
-      focusActiveTab();
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      activeTab = 'tasks';
-      focusActiveTab();
-    }
-  }
 </script>
 
 <div class="fabricate-interactable-browser">
@@ -236,12 +215,12 @@
     </p>
   </header>
 
-  <!-- THE CONTROL ROW IS THE SHARED FILTER BAR (issue 1520). `ManagerToolbar` is a `<section>`
+  <!-- THE CONTROL ROW IS THE SHARED FILTER BAR (issue 1520). `FilterBar` is a `<section>`
        landmark, so it needs its own accessible name and the source contract gates that; the
        browser had no filter-bar string, so `FABRICATE.Canvas.Browser.FiltersLabel` is added
        beside the manager browsers' own `Filters` keys rather than borrowing the window title,
        which would announce the same name twice. -->
-  <ManagerToolbar
+  <FilterBar
     class="fab-ib-controls"
     ariaLabel={text('FABRICATE.Canvas.Browser.FiltersLabel', 'Interactable browser filters')}
   >
@@ -251,7 +230,7 @@
       options={systemSelectOptions}
       onChange={(next) => (selectedSystemId = next)}
       maxWidth={OPTION_PANEL_MAX_WIDTH}
-      triggerData={{ 'data-interactable-browser-system': '' }}
+      triggerProps={{ 'data-interactable-browser-system': '' }}
     />
     <!-- NO caption span beside it. The shared field is a search PILL with a leading glyph and
          no visible label at any of its nineteen sites, and it names its control with
@@ -259,89 +238,36 @@
          been a second, silent name for a control that already has one. (Written without its
          class name: this file's source-shape suite pins the surviving `fab-ib` prefix
          occurrences as an exact allow-list, and a mention in prose adds one.) -->
-    <!-- `size={38}` PUTS THE TWO CONTROLS ON ONE RUNG. The shared search field ships at 34px
-         with a 6px corner and the shared select's form rung is 38px at 9px, so a filter bar
-         holding one of each renders two control heights and two corner radii in the same bar.
-         At this window's 420px the bar wraps and they stack, one directly above the other,
-         which is the arrangement that makes the mismatch most legible rather than one that
-         excuses it. The field publishes that rung as the opt-in a caller uses for exactly this
-         pairing, which is why it is passed here rather than restated as a per-window CSS
-         override. -->
-    <ManagerSearchField
+    <!-- The field and the select beside it share the form rung's 38px and 9px corner. -->
+    <SearchField
       bind:value={search}
-      size={38}
       placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
       ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
-      inputAttrs={{ 'data-interactable-browser-search': '' }}
+      inputProps={{ 'data-interactable-browser-search': '' }}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   {#if systems.length === 0}
-    <p class="fab-ib-empty">
-      {text('FABRICATE.Canvas.Browser.NoSystems', 'No crafting systems available.')}
-    </p>
+    <EmptyState
+      note
+      hint={text('FABRICATE.Canvas.Browser.NoSystems', 'No crafting systems available.')}
+      data-interactable-browser-empty="no-systems"
+    />
   {:else}
-    <div
-      class="fab-ib-tabs"
-      role="tablist"
-      aria-label={text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}
-    >
-      <button
-        type="button"
-        role="tab"
-        id="fab-ib-tab-tools"
-        class="fab-ib-tab"
-        class:is-active={activeTab === 'tools'}
-        aria-selected={activeTab === 'tools'}
-        aria-controls="fab-ib-panel-tools"
-        tabindex={activeTab === 'tools' ? 0 : -1}
-        data-keyboard-focus="true"
-        bind:this={toolsTabEl}
-        onclick={() => (activeTab = 'tools')}
-        onkeydown={onTabKeydown}
-      >
-        {text('FABRICATE.Canvas.Browser.ToolsHeading', 'Tools')}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        id="fab-ib-tab-tasks"
-        class="fab-ib-tab"
-        class:is-active={activeTab === 'tasks'}
-        aria-selected={activeTab === 'tasks'}
-        aria-controls="fab-ib-panel-tasks"
-        tabindex={activeTab === 'tasks' ? 0 : -1}
-        data-keyboard-focus="true"
-        bind:this={tasksTabEl}
-        onclick={() => (activeTab = 'tasks')}
-        onkeydown={onTabKeydown}
-      >
-        {text('FABRICATE.Canvas.Browser.TasksHeading', 'Gathering tasks')}
-      </button>
-    </div>
+    <EditorTabs
+      tabs={BROWSER_TABS}
+      {activeTab}
+      onSelect={(tabId) => (activeTab = tabId)}
+      idStem="fab-ib"
+      activePanelOnly
+      tabDataAttr=""
+      ariaLabelKey="FABRICATE.Canvas.Browser.Title"
+      ariaLabel="Interactable browser"
+    />
 
-    <!-- THE PANELS DECLARE THEIR KEYBOARD FOCUS (issue 1520; restated on its true reason at
-         review). Both carry a static `tabindex="0"` because the ARIA tabs pattern requires the
-         panel itself to be in the tab sequence: from the active tab button, one Tab press lands
-         HERE, and that is the only way a keyboard user reaches the list this tab reveals.
-         Nothing in this file moves focus into a panel — `focusActiveTab` focuses the TAB, and
-         the click handlers move focus nowhere — and neither panel is its own scroll container,
-         since `.fab-ib-section` declares no `overflow` and no height and the window's scroll box
-         is the root. Two earlier drafts of this comment claimed both, and a reader who measured
-         them false could reasonably have deleted the attributes.
-
-         What the attribute buys is unchanged by that correction. While one of these panels holds
-         focus, `KeyboardManager#hasFocus` must return true or Foundry keeps its own bindings
-         live: the arrows pan the canvas underneath, Space pauses the game, and Tab is swallowed
-         before it can reach the row actions. These two elements are the whole of
-         `roleFocusTargets`' `InteractableBrowserRoot.svelte | 2` row; the two tab buttons above
-         are excluded from it twice over, by their roving `tabindex` expression and by the
-         declaration they already carry.
-
-         Do not write the tab role as a quoted attribute literal in a comment here: this file's
-         source-shape suite counts those occurrences and asserts exactly two, so a mention in
-         prose reds it. -->
-
+    <!-- Each panel is a static tab stop, as the ARIA tabs pattern requires: one Tab from the
+         selected tab lands in the list it reveals. `data-keyboard-focus` keeps Foundry's own
+         key bindings suspended while a panel holds focus. -->
     {#if activeTab === 'tools'}
       <div
         class="fab-ib-section"
@@ -353,13 +279,17 @@
       >
         {#if tools.length === 0}
           {#if search.trim()}
-            <p class="fab-ib-empty">
-              {text('FABRICATE.Canvas.Browser.NoMatchingTools', 'No matching tools.')}
-            </p>
+            <EmptyState
+              note
+              hint={text('FABRICATE.Canvas.Browser.NoMatchingTools', 'No matching tools.')}
+              data-interactable-browser-empty="no-matches"
+            />
           {:else}
-            <p class="fab-ib-empty">
-              {text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}
-            </p>
+            <EmptyState
+              note
+              hint={text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}
+              data-interactable-browser-empty="no-tools"
+            />
           {/if}
         {:else}
           <ul class="fab-ib-list">
@@ -410,13 +340,20 @@
       >
         {#if tasks.length === 0}
           {#if search.trim()}
-            <p class="fab-ib-empty">
-              {text('FABRICATE.Canvas.Browser.NoMatchingTasks', 'No matching gathering tasks.')}
-            </p>
+            <EmptyState
+              note
+              hint={text(
+                'FABRICATE.Canvas.Browser.NoMatchingTasks',
+                'No matching gathering tasks.'
+              )}
+              data-interactable-browser-empty="no-matches"
+            />
           {:else}
-            <p class="fab-ib-empty">
-              {text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}
-            </p>
+            <EmptyState
+              note
+              hint={text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}
+              data-interactable-browser-empty="no-tasks"
+            />
           {/if}
         {:else}
           <ul class="fab-ib-list">
@@ -468,10 +405,9 @@
   /* WHAT SURVIVES IN THIS BLOCK, AND WHY (issue 1520).
 
      The window's CONTROLS — the system picker, the search field, the filter row that holds
-     them and the four icon-only placement buttons — are shared primitives' now, so their rules
-     left with the markup that carried them. What is left is this window's own LAYOUT: the
-     scroll column, the header rhythm, the list and its rows, and the two-tab strip that is
-     still hand-rolled.
+     them, the four icon-only placement buttons, the tab strip and the empty notes — are shared
+     primitives' now, so their rules left with the markup that carried them. What is left is this
+     window's own LAYOUT: the scroll column, the header rhythm, and the list and its rows.
 
      Two rules below reach a CHILD COMPONENT's element and are therefore `:global(...)`, each
      anchored on `.fabricate-interactable-browser`, a class this file DOES write, so Svelte's
@@ -486,7 +422,7 @@
     overflow-y: auto;
   }
 
-  /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.manager-toolbar`
+  /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.fabricate-filter-bar`
      draws its own padding, a soft fill and a bottom rule — a divider that reads as a mistake when
      it stops 0.75rem short of both edges. The pull is exactly this column's own inline padding,
      so the bar meets the window and the rows beneath it keep their inset. */
@@ -615,54 +551,5 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-  }
-
-  /* Tab switcher (Tools / Gathering Tasks) — segmented control styling.
-
-     THE RESIDUE THIS PHASE DELIBERATELY DOES NOT CONVERT, and the reason is the ARIA pattern
-     rather than where the primitive lives. `SegmentedControl` is a radiogroup of real radios;
-     this strip is a tablist of tab buttons driving two tabpanel containers by `aria-controls`,
-     with a roving `tabindex` and Left/Right/Home/End. Swapping one for the other is a behaviour
-     change to the keyboard contract, not a re-skin, so it is owed to a change that rules on the
-     pattern. Its `opacity` mutes are inked here anyway, because that debt is independent of the
-     pattern.
-
-     The role names are written unquoted above on purpose: this file's source-shape suite counts
-     the quoted attribute literals and asserts exactly two of each, so a mention in prose reds
-     it. */
-  .fab-ib-tabs {
-    display: flex;
-    gap: 0.25rem;
-    border-bottom: 1px solid var(--fab-border);
-  }
-
-  .fab-ib-tab {
-    flex: 0 0 auto;
-    width: auto;
-    padding: 0.35rem 0.85rem;
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 6px 6px 0 0;
-    background: transparent;
-    color: var(--fab-text-muted);
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .fab-ib-tab.is-active {
-    border-bottom-color: var(--fab-accent);
-    color: var(--fab-text);
-    font-weight: 600;
-  }
-
-  .fab-ib-tab:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .fab-ib-empty {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.85rem;
   }
 </style>

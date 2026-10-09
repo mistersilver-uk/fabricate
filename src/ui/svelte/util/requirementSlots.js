@@ -17,8 +17,8 @@ export const SLOT_STATE = Object.freeze({
   SHORT: 'short',
 });
 
-// Every essence requirement in a set is funded from ONE pool, so every essence tile opens the same
-// chooser. The tiles stay individually keyed for rendering; only the chooser key is shared.
+// Every essence requirement in a set is funded from ONE pool, so every plain essence tile opens
+// one chooser. The tiles stay individually keyed for rendering; only the chooser key is shared.
 export const ESSENCE_POOL_SLOT_ID = 'essence-pool';
 
 // A rail with any openable slot always resolves SOMETHING open, so without this sentinel a click on
@@ -76,7 +76,7 @@ function buildSlot(state, index, chosenGroupIds) {
     key: groupId ?? `requirement-${index}`,
     groupId,
     // Fixed slots are not selectable, so they open nothing.
-    slotId: pickSlotId(kind, groupId),
+    slotId: pickSlotId(kind, groupId, state?.hasChoice === true),
     kind,
     state: stateOf(kind, state, chosenGroupIds.has(groupId)),
     interactive: kind !== SLOT_KIND.FIXED,
@@ -100,7 +100,10 @@ function buildSlot(state, index, chosenGroupIds) {
   };
 }
 
-function pickSlotId(kind, groupId) {
+// A group with alternatives keeps its own chooser even when its chosen option is an
+// essence; only a plain essence requirement opens the shared pool.
+function pickSlotId(kind, groupId, hasChoice) {
+  if (hasChoice && groupId) return groupId;
   if (kind === SLOT_KIND.ESSENCE) return ESSENCE_POOL_SLOT_ID;
   return kind === SLOT_KIND.CHOICE ? groupId : null;
 }
@@ -241,12 +244,18 @@ export function buildConsumptionPlan(craftability, { chosenGroupIds = [] } = {})
   };
 }
 
+// Held over needed, so an essence amount is never compared against an item count.
+function coverageOf(option) {
+  const need = toCount(option?.need);
+  return need > 0 ? toCount(option?.have) / need : toCount(option?.have);
+}
+
 function bestOption(options) {
   const ranked = [...options].sort((left, right) => {
     const satisfied = Number(right?.satisfied === true) - Number(left?.satisfied === true);
     if (satisfied !== 0) return satisfied;
-    const held = toCount(right?.have) - toCount(left?.have);
-    if (held !== 0) return held;
+    const covered = coverageOf(right) - coverageOf(left);
+    if (covered !== 0) return covered;
     return toCount(left?.optionIndex) - toCount(right?.optionIndex);
   });
   return ranked[0] ?? null;
@@ -277,7 +286,7 @@ function applyStackChoice(overrides, choice) {
   });
 }
 
-// The option the player holds most of, preferring one that satisfies, with the authored option
+// The option that satisfies, then the best covered (held over needed), with the authored option
 // order as the final tie-break so the suggestion is stable across renders. Read STRAIGHT off the
 // craftability's `ingredientChoices`: a second implementation would drift from the engine's plan.
 export function suggestChoiceOverrides(craftability) {
@@ -291,4 +300,20 @@ export function suggestChoiceOverrides(craftability) {
     else if (choice.kind === 'stack') applyStackChoice(overrides, choice);
   }
   return Object.fromEntries(overrides);
+}
+
+// Whether a "Pick for me" suggestion moves any group onto an essence alternative it
+// was not already on.
+export function switchesOntoEssence(craftability, suggestedOptions) {
+  const choices = Array.isArray(craftability?.ingredientChoices)
+    ? craftability.ingredientChoices
+    : [];
+  return choices.some((choice) => {
+    const index = suggestedOptions?.[choice?.groupId]?.optionIndex;
+    if (choice?.kind !== 'option' || index == null || index === choice.selectedOptionIndex) {
+      return false;
+    }
+    const options = Array.isArray(choice.options) ? choice.options : [];
+    return options.some((option) => option?.optionIndex === index && option.isEssence === true);
+  });
 }

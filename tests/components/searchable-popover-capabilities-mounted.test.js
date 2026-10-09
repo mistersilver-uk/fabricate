@@ -82,10 +82,10 @@ const mountPicker = (props) =>
   harness.mount({
     options: ICONS,
     triggerLabel: 'Icon',
-    dialogAriaLabel: 'Choose an icon',
+    panelLabel: 'Choose an icon',
     searchPlaceholder: 'Search icons...',
     emptyHint: 'No icons defined',
-    onChoose: (id) => {
+    onSelect: (id) => {
       chosen.push(id);
     },
     ...props,
@@ -313,18 +313,18 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       harness.remount();
     });
 
-    it('resolves a `triggerAriaLabel` conflict in favour of the spread', async () => {
+    it('resolves a `ariaLabel` conflict in favour of the spread', async () => {
       await mountPicker({
         useTriggerSnippet: true,
         callerAriaLabel: 'Caller name',
-        triggerAriaLabel: 'Primitive name',
+        ariaLabel: 'Primitive name',
       });
 
       assert.equal(
         trigger().getAttribute('aria-label'),
         'Primitive name',
         'a caller supplying a `trigger` snippet names the button IN the snippet and does not pass ' +
-          '`triggerAriaLabel`; passing both is a conflict the spread-last rule resolves this way'
+          '`ariaLabel`; passing both is a conflict the spread-last rule resolves this way'
       );
       harness.remount();
     });
@@ -792,10 +792,10 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
-  // ── `triggerAriaLabelledBy` (issue 1504) ──────────────────────────────────────────────────
-  describe('`triggerAriaLabelledBy`', () => {
+  // ── `ariaLabelledBy` (issue 1504) ──────────────────────────────────────────────────
+  describe('`ariaLabelledBy`', () => {
     it('lands as `aria-labelledby` beside `aria-label`, and is absent when nothing is passed', async () => {
-      await mountPicker({ triggerAriaLabelledBy: 'field-caption', triggerAriaLabel: 'Resolution' });
+      await mountPicker({ ariaLabelledBy: 'field-caption', ariaLabel: 'Resolution' });
       assert.equal(trigger().getAttribute('aria-labelledby'), 'field-caption');
       assert.equal(
         trigger().getAttribute('aria-label'),
@@ -804,7 +804,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
           'it, which is the whole reason a labelled field passes one'
       );
 
-      await mountPicker({ triggerAriaLabel: 'Resolution' });
+      await mountPicker({ ariaLabel: 'Resolution' });
       assert.ok(
         !trigger().hasAttribute('aria-labelledby'),
         'a caller that passes nothing renders the trigger it renders today, with the attribute ' +
@@ -814,7 +814,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
 
     it('reaches a `trigger` snippet`s own button through the same spread as the rest', async () => {
-      await mountPicker({ useTriggerSnippet: true, triggerAriaLabelledBy: 'field-caption' });
+      await mountPicker({ useTriggerSnippet: true, ariaLabelledBy: 'field-caption' });
       const button = trigger();
       assert.ok(button.classList.contains('caller-trigger'), 'the caller drew this button');
       assert.equal(
@@ -865,7 +865,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
 
     it('keeps the panel, the query and the focus holder across consecutive choices', async () => {
       const chosenHere = [];
-      await mountPicker({ multiple: true, value: [], onChoose: (id) => chosenHere.push(id) });
+      await mountPicker({ multiple: true, value: [], onSelect: (id) => chosenHere.push(id) });
       const open = await openPanel();
       search(open, 'a');
       const holder = holderOf(open);
@@ -1008,7 +1008,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       await mountPicker({
         showSearch: false,
         triggerHasPopup: 'listbox',
-        triggerAriaLabel: 'Choose an icon',
+        ariaLabel: 'Choose an icon',
         triggerOnKeydown: (event) => {
           seen.push({ key: event.key, prevented: event.defaultPrevented });
         },

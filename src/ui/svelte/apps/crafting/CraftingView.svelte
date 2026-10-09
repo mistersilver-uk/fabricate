@@ -151,6 +151,11 @@
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
   const showRunSummary = $derived(Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id);
+  // A reward the outcome left to pick, until this client settles it in the Journal (issue 1773).
+  const awardPending = $derived(
+    rollResult?.awardChoicePending === true &&
+      services?.journal?.awardChoiceSettled?.(rollResult.runId) !== true
+  );
 
   // Shopping-list entries enriched with display name/img from the listing.
   const shoppingEntries = $derived(
@@ -308,10 +313,12 @@
           <RunSummaryPanel
             recipe={selectedRecipe}
             {rollResult}
+            {awardPending}
             canCraft={craftability?.canCraft === true}
             busy={craftInFlight}
             onCraftNext={onCraft}
             onDismiss={onDismissRun}
+            onOpenRun={(runId) => services?.navigateToJournalRun?.(runId)}
           />
         {:else}
           <ShoppingList

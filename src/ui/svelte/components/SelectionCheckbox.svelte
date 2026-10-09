@@ -7,7 +7,8 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `checked` / `indeterminate` / `disabled` | booleans | `false` | The three input states. `indeterminate` is a DOM PROPERTY, not an attribute, so it is applied through an effect rather than markup — written in markup it would do nothing at all, silently. |
-  | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | 18px/r5, 20px/r6, 22px/r6. Each size is DECLARED, never derived: a scale that multiplied one number would make the shipped 18px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
+  | `density` | `'compact'` \| `'default'` \| `'comfortable'` | `'default'` | 18px/r5, 20px/r6, 22px/r6. Each box is declared, never derived: a scale that multiplied one number would make the shipped 18px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
+  | `decorative` | boolean | `false` | Draws the box ALONE, `aria-hidden` and with no input, for a host element that already carries the checked state itself: a multi-select picker row announces it with `aria-selected`, and an input inside that row would nest one control in another. `wrapper`, `ariaLabel`, `onChange` and the rest spread do nothing in this form. |
   | `wrapper` | `'label'` \| `'contents'` | `'label'` | `label` renders a `<label>` around the input and box, for a host whose action group would otherwise leave the visible box with no label association and no click target. `contents` renders the two as bare siblings, for a host whose OWN root is a `<label>` — nesting labels is invalid HTML and an ambiguous click target. |
   | `ariaLabel` / `element` | already-localized string / bindable | `''` / `null` | The accessible name — this is an import-free leaf — and the real input, exposed so a host can manage focus, since it is visually hidden and cannot be reached by query without reaching through this component's internals. |
   | `onChange(checked)` | function | no-op | The input's new checked state. |
@@ -28,16 +29,19 @@
     checked = false,
     indeterminate = false,
     disabled = false,
-    size = 'md',
+    density = 'default',
     wrapper = 'label',
+    decorative = false,
     ariaLabel = '',
     onChange = () => {},
     input = $bindable(null),
     ...rest
   } = $props();
 
-  const SIZES = new Set(['sm', 'md', 'lg']);
-  const sizeClass = $derived(SIZES.has(size) ? `is-${size}` : 'is-md');
+  const SIZE_CLASSES = Object.freeze({ compact: 'is-sm', default: 'is-md', comfortable: 'is-lg' });
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, density) ? SIZE_CLASSES[density] : 'is-md'
+  );
 
   const glyph = $derived(indeterminate ? 'fas fa-minus' : 'fas fa-check');
 
@@ -57,6 +61,10 @@
     onchange={(event) => onChange(event.currentTarget.checked)}
     {...rest}
   />
+  {@render box()}
+{/snippet}
+
+{#snippet box()}
   <span
     class="fab-selection-check {sizeClass}"
     class:is-checked={checked}
@@ -65,7 +73,9 @@
   >
 {/snippet}
 
-{#if wrapper === 'contents'}
+{#if decorative}
+  {@render box()}
+{:else if wrapper === 'contents'}
   {@render control()}
 {:else}
   <label class="fab-selection-checkbox" class:is-disabled={disabled}>{@render control()}</label>
@@ -79,6 +89,18 @@
     align-items: center;
     flex: 0 0 auto;
     cursor: pointer;
+  }
+
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) around a 16-22px box: an invisible inset on the label,
+     so the box and its neighbours do not move. */
+  .fab-selection-checkbox::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
   }
 
   .fab-selection-checkbox.is-disabled {
@@ -104,14 +126,14 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    border: 1px solid var(--fab-border-strong);
+    border: 1px solid var(--fab-control-outline);
     color: transparent;
   }
 
   .fab-selection-check.is-sm {
     width: 16px;
     height: 16px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 8px;
   }
 
@@ -120,6 +142,7 @@
     height: 20px;
     border-radius: 6px;
     background: var(--fab-bg-0);
+    background-clip: padding-box;
     font-size: 10px;
   }
 
@@ -128,6 +151,7 @@
     height: 22px;
     border-radius: 6px;
     background: var(--fab-bg-0);
+    background-clip: padding-box;
     font-size: 10px;
   }
 

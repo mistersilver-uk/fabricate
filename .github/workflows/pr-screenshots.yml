@@ -55,54 +55,45 @@ concurrency:
   group: pr-screenshots-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Read-only here; each write is granted on the one job that needs it (SonarCloud: capture alone
+# holds the PR write and the OIDC token, and no render shard holds any write at all).
 permissions:
   contents: read
-  pull-requests: write # to update the managed screenshot block
 
 jobs:
-  capture:
+  # ONE selection, computed once, then split across parallel runners (issue 2119). A 357-frame
+  # selection took 40 minutes and more on one runner; the maintainer's ruling is that no change may
+  # wait that long. `render` is the matrix of shards and `capture` merges and publishes once.
+  #
+  # THE TIMEOUTS ARE ONE BUDGET. `check-screenshots` waits on this workflow's whole run, and its
+  # `--capture-timeout-minutes` in `ci.yml` must equal select + warm-foundry + the longer of
+  # render and verify-chrome (which run side by side) + capture;
+  # `tests/ci-workflow-semantics.test.js` asserts that sum. The full registry, split twelve ways,
+  # is about fifty-five frames a runner.
+  select:
     # Same-repo PRs only. A fork PR has no secrets to harvest with and no write token to publish
     # with, so running it would produce a guaranteed red that its author cannot clear.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    # Raised from 25 (issue 1055). The full registry had crept to within seconds of the old
-    # ceiling — the last run under it finished in 24m37s — so the next case to land tipped the
-    # job into a CANCELLED conclusion at 25m12s, before its publish step. That reads as a
-    # capture failure while actually being a capacity one, which is the expensive kind of red:
-    # it points the reader at the frames rather than at the clock. A capture is also
-    # self-limiting in a way a hung test is not (it renders a finite, declared case list), so a
-    # generous ceiling costs nothing on the happy path and buys room for the registry to grow.
-    #
-    # Raised again from 40 (issue 1594) — the same failure, one registry-doubling later. 40 held
-    # while selection stayed narrow, and it does not hold for a design-system-wide change, whose
-    # changed files map to the WHOLE registry rather than to a handful of cases. The first head to
-    # hit it was issue 1506's pull request: 273 changed files selected 303 cases, 348 with the lab
-    # surface set, and the job was cancelled at 40m13s inside `Render the selected frames`.
-    # The measured rate on `ubuntu-latest` is 9 to 10 seconds per frame including setup — 196
-    # frames in 30m10s and 142 in 23m52s, both the same day — so the 335 publishable cases this
-    # registry holds today are a 53 to 56 minute capture. 75 leaves about 20 minutes, another
-    # 115-odd cases, before this number has to move again; re-derive it from the per-frame rate
-    # and the registry size, never from this ceiling.
-    timeout-minutes: 75
-    # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
-    # should state the write it needs where the write happens.
+    timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: write
-      id-token: write # OIDC role assumption for the S3 upload
+      pull-requests: read
+    # Whether the credentials exist, not the credentials: nothing in this job boots Foundry.
     env:
-      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
-      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
-      FOUNDRY_ADMIN_KEY: fabricate-test-admin
-      FOUNDRY_TELEMETRY: "false"
+      HAS_FOUNDRY_CREDENTIALS: ${{ secrets.FOUNDRY_USERNAME != '' && secrets.FOUNDRY_PASSWORD != '' }}
+    outputs:
+      ids: ${{ steps.select.outputs.ids }}
+      render: ${{ steps.select.outputs.render }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      foundry_cache_hit: ${{ steps.foundry-cache.outputs.cache-hit }}
 
     steps:
       - uses: actions/checkout@v6
 
       - name: Check Foundry credentials
         run: |
-          if [ -z "$FOUNDRY_USERNAME" ] || [ -z "$FOUNDRY_PASSWORD" ]; then
+          if [ "$HAS_FOUNDRY_CREDENTIALS" != "true" ]; then
             echo "::warning::Foundry credentials unavailable; the View Lab cannot harvest chrome."
             echo "::warning::Falling back to the maintainer-pasted evidence path."
             echo "SKIP_CAPTURE=true" >> "$GITHUB_ENV"
@@ -130,7 +121,7 @@ jobs:
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
           SELECTION=$(node -e '
             const { readFileSync } = require("node:fs");
-            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, hasUiChanges }) => {
+            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, rendersCapture }) => {
               const entries = readFileSync("changed-files.jsonl", "utf8")
                 .split("\n")
                 .filter(Boolean)
@@ -138,137 +129,146 @@ jobs:
               const files = entries.map((entry) => entry.filename);
               const patches = Object.fromEntries(entries.map((entry) => [entry.filename, entry.patch]));
               const ids = mapChangedFilesToCases(files, { patches }).map((c) => c.id);
-              process.stdout.write(`${hasUiChanges(files)}\n${ids.join(",")}`);
+              process.stdout.write(`${rendersCapture(files)}\n${ids.join(",")}`);
             });
           ')
-          HAS_UI=$(printf '%s' "$SELECTION" | head -n 1)
+          RENDER=$(printf '%s' "$SELECTION" | head -n 1)
           IDS=$(printf '%s' "$SELECTION" | tail -n +2)
           echo "ids=$IDS" >> "$GITHUB_OUTPUT"
-          echo "has_ui=$HAS_UI" >> "$GITHUB_OUTPUT"
+          echo "render=$RENDER" >> "$GITHUB_OUTPUT"
           if [ -z "$IDS" ]; then
             echo "No changed file selects a View Lab case; nothing to render."
           else
             echo "Selected $(echo "$IDS" | tr ',' '\n' | wc -l) case(s)."
           fi
-          # `check-screenshots` arms on exactly the same predicate (`isUiFile` over the changed
-          # set). When it is unarmed there is no gate for these frames to satisfy, so rendering and
-          # publishing them is pure cost — a surface-coverage capture on a lab-infrastructure PR
-          # that changes no render file at all, this one included.
+          # `rendersCapture` is true when the change arms `check-screenshots` (`isUiFile` over the
+          # changed set), and also when a non-render product file a case's `sourceMatches` names
+          # changed (issue 2153): an engine fix shipped alone publishes its frames as evidence
+          # though the gate demands none. A change to the lab's own inputs and nothing else is
+          # the one selection left unrendered, because its surface-coverage capture would satisfy
+          # no gate and evidence no product change.
           #
-          # The saving is deliberately taken on the RENDER and PUBLISH steps only, not by zeroing
+          # That saving is deliberately taken on the RENDER and PUBLISH steps only, not by zeroing
           # `ids`. Everything before them still runs: the chrome harvest, the committed-provenance
           # check, and `view-lab-chrome-drift.test.js`, which verifies the frame builder still
           # transcribes this Foundry build. Skipping those on a lab-infrastructure change would
           # withdraw the verification exactly when the change most needs it.
-          if [ "$HAS_UI" != "true" ]; then
-            echo "No render file changed; check-screenshots is unarmed, so frames are verified but not rendered or published."
+          if [ -n "$IDS" ] && [ "$RENDER" != "true" ]; then
+            echo "Only the lab's own inputs changed, so frames are verified but not rendered or published."
           fi
+          # The shards: balanced, each in selection order, every distinct-evidence group on one
+          # runner so the renderer's byte-identity check still sees the whole group. None when
+          # nothing renders; verify-chrome still verifies the harvest.
+          MATRIX=$(node scripts/view-lab-shards.mjs plan "$IDS" "$RENDER")
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node.js
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
-        # arbitrary code on a runner that holds an OIDC role and a PR write token. Playwright's
-        # browser download is invoked explicitly below, so nothing here needs a lifecycle script.
-        run: npm ci --ignore-scripts
-
-      - name: Cache Playwright Chromium
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        id: cache-playwright
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright Chromium
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npm run test:foundry:install
-
-      # Caches the Foundry release ARCHIVE, which the harvest reads. This is the same cache entry
-      # the smoke workflow already maintains, reused rather than duplicated — deliberately, because
-      # a second entry holding licensed material is a second exposure.
-      - name: Cache Foundry binary
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        uses: actions/cache@v5
+      # Probe, do not restore: `warm-foundry` fills a cold cache once, so the shards and
+      # verify-chrome never each boot Foundry and download it with the same account at once.
+      - name: Probe the Foundry archive cache
+        if: env.SKIP_CAPTURE != 'true'
+        id: foundry-cache
+        uses: actions/cache/restore@v5
         with:
           path: .foundry-e2e/cache
           key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
+          lookup-only: true
 
-      # BEFORE the archive step, not after the harvest. On a cold cache that step boots Foundry, and
-      # `foundry-test-up.mjs` refuses to assemble a data directory without `dist/`. Building later
-      # worked only for as long as the cache probe was a `foundryvtt-*.zip` glob that a stale entry
-      # could satisfy; the moment the probe became exact, the first genuinely cold run failed here.
-      - name: Build module
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        run: npm run build
+  # Boots Foundry once to fill a cold archive cache, and saves it for every later job. On a warm
+  # cache every step skips; the job still runs, so the jobs after it keep a plain success() chain
+  # rather than needing always() to survive a skipped dependency.
+  warm-foundry:
+    needs: select
+    if: needs.select.outputs.ids != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
 
-      # The felddy image does NOT bundle Foundry; it authenticates and downloads on first boot. So
-      # on a cold archive cache there is no way to obtain the chrome without a credentialed boot,
-      # and the lab's "seconds, no Docker" property does not transfer to CI. This step pays that
-      # cost only when the cache missed.
-      #
-      # The probe names the EXACT archive the pinned image will download, not `foundryvtt-*.zip`.
-      # A glob is satisfied by whatever the cache happens to hold, so a restored entry carrying the
-      # previous major reported "warm", skipped the boot, and harvested the wrong Foundry's chrome —
-      # caught only by the provenance gate below, a whole CI cycle later.
-      - name: Obtain the Foundry release archive
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        run: |
-          VERSION=$(node --input-type=module -e "
-            import { readPinnedFoundryImage, foundryVersionFromTag } from './scripts/lib/foundryImagePin.js';
-            const { tag } = readPinnedFoundryImage('docker-compose.foundry.yml');
-            const version = foundryVersionFromTag(tag);
-            if (!version) throw new Error('the pinned image tag ' + tag + ' names no exact Foundry build');
-            process.stdout.write(version);
-          ")
-          ARCHIVE=".foundry-e2e/cache/foundryvtt-${VERSION}.zip"
-          if [ ! -f "$ARCHIVE" ]; then
-            echo "No cached $ARCHIVE — booting Foundry once to populate it."
-            npm run test:foundry:up
-            npm run test:foundry:down
-          else
-            echo "Archive cache is warm for $ARCHIVE; no boot required."
-          fi
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.select.outputs.foundry_cache_hit != 'true'
 
-      - name: Harvest window chrome
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        run: npm run viewlab:chrome:harvest
+      - name: Fill the Foundry archive cache
+        if: needs.select.outputs.foundry_cache_hit != 'true'
+        uses: ./.github/actions/prepare-view-lab
+        with:
+          archive-only: 'true'
 
-      # The chrome and the frame builder are two halves of one artefact: `foundryChromeSpec.js` is
-      # a hand transcription of `_renderFrame`/`_updateFrame`/`#applyPosition`, pinned by the
-      # `applicationMjsSha256` in committed provenance. A newer stylesheet rendered through markup
-      # transcribed from an older build gives genuine CSS around a stale DOM, and the PNG cannot
-      # tell you which — strictly worse than no frame, because a wrong frame is believed.
-      #
-      # CI never rewrites the provenance. That file is a human attestation that someone re-read
-      # `application.mjs` and confirmed the transcription still holds; a bot that refreshes it on
-      # mismatch converts the drift gate into a rubber stamp.
-      - name: Verify chrome matches committed provenance
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        run: |
-          PINNED=$(node -p "require('./tests/view-lab/chrome-provenance.json').foundryVersion")
-          HARVESTED=$(node -e "
-            import('./scripts/lib/foundryChromeCache.js').then(({ resolveChromeCache }) => {
-              const cache = resolveChromeCache(process.cwd());
-              process.stdout.write(cache ? cache.version : '');
-            });
-          ")
-          echo "pinned=$PINNED harvested=$HARVESTED"
-          if [ "$PINNED" != "$HARVESTED" ]; then
-            echo "::error::Harvested Foundry $HARVESTED does not match the pinned $PINNED."
-            echo "::error::Re-read client/applications/api/application.mjs, confirm the frame builder still transcribes it, and commit the refreshed provenance."
-            exit 1
-          fi
+  render:
+    needs: [select, warm-foundry]
+    if: needs.select.outputs.ids != '' && needs.select.outputs.render == 'true'
+    name: Render shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      # Every shard reports its own failures rather than being cancelled by the first.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
 
-      # Run the chrome-dependent suites ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns
-      # "no cache, skip" into a failure — but only for a process that actually runs them, which is
-      # why it is set here on the test command rather than on the job. Setting it as a job env var
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare the View Lab
+        uses: ./.github/actions/prepare-view-lab
+
+      - name: Render the selected frames
+        env:
+          CASE_IDS: ${{ matrix.ids }}
+        run: node scripts/view-lab-screenshots.mjs apps "$CASE_IDS"
+
+      # The PNGs and the manifest BY NAME, never the directory or a parent of it: see LICENSING
+      # above. A day is enough for `capture` to read them.
+      - name: Upload this shard's frames
+        uses: actions/upload-artifact@v6
+        with:
+          name: view-lab-shard-${{ matrix.shard }}
+          path: |
+            ui-screenshot-artifact/apps/*.png
+            ui-screenshot-artifact/apps/manifest.json
+          if-no-files-found: error
+          retention-days: 1
+
+  # The chrome-dependent suites verify the one harvest every shard draws from, so they run ONCE,
+  # beside the shards rather than ahead of any of them; `capture` needs this job, so a failed
+  # verification still withholds the publish.
+  verify-chrome:
+    needs: [select, warm-foundry]
+    if: needs.select.outputs.ids != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare the View Lab
+        uses: ./.github/actions/prepare-view-lab
+
+      # Run the chrome-dependent suites against the same harvest the shards draw with.
+      # `VIEWLAB_REQUIRE_CHROME=1` turns "no cache, skip" into a failure — but only for a process
+      # that actually runs them, which is why it is set here on the test command rather than on the job. Setting it as a job env var
       # alongside a job that never runs `npm test` reads as a safety control and is not one; this
       # file did exactly that until review caught it.
       #
@@ -313,7 +313,6 @@ jobs:
       # because it was transcribed in more places than that, which is the mirror rot this collapse
       # ends. No colon inside the name: a plain YAML scalar cannot carry one.
       - name: Run every chrome-dependent suite, where a missing harvest fails instead of skipping
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
         run: |
@@ -324,11 +323,46 @@ jobs:
             tests/components/component-edit-frame-rendered.test.js \
             tests/components/world-component-entry-frame-rendered.test.js
 
-      - name: Render the selected frames
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'
+  # Runs only when every shard and the chrome verification succeeded: a failure there fails the
+  # run unpublished, as a failed render always has.
+  capture:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [select, render, verify-chrome]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
+    # should state the write it needs where the write happens.
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write # OIDC role assumption for the S3 upload
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
+        # arbitrary code on a runner that holds an OIDC role and a PR write token, as this one does.
+        run: npm ci --ignore-scripts
+
+      - name: Download every shard's frames
+        uses: actions/download-artifact@v7
+        with:
+          pattern: view-lab-shard-*
+          path: ui-screenshot-artifact/shards
+
+      # One manifest, identical to what a single unsharded render writes, and a refusal when the
+      # shards lost, repeated or invented a case.
+      - name: Merge the shards into one frame set
         env:
-          CASE_IDS: ${{ steps.select.outputs.ids }}
-        run: node scripts/view-lab-screenshots.mjs apps "$CASE_IDS"
+          CASE_IDS: ${{ needs.select.outputs.ids }}
+        run: node scripts/view-lab-shards.mjs merge "$CASE_IDS" ui-screenshot-artifact/shards ui-screenshot-artifact/apps
 
       # OIDC role assumption, matching every other AWS workflow in this repo
       # (`pr-screenshots-cleanup.yml`, `backfill-provenance.yml`, `promote-to-*.yml`). This job
@@ -347,7 +381,6 @@ jobs:
       # it. The publish step below warns loudly and the maintainer-pasted evidence path is unchanged.
       - name: Configure AWS credentials (OIDC)
         id: aws
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
@@ -356,7 +389,6 @@ jobs:
 
       # Scoped to the PNG output directory BY NAME. Never a parent, and never `.foundry-chrome`.
       - name: Publish into the PR's screenshot block
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.select.outputs.has_ui == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}

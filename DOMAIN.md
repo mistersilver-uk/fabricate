@@ -317,12 +317,14 @@ The Manager rail's trailing-track marker vocabulary is one FAMILY, not four unre
 #### World Component / World Essence / World Tool
 
 The world-scoped record holding one entity's IDENTITY — name, description, icon, colour and source item link — exactly once for the whole world, never editable from a crafting system.
+A component import REGISTERS each imported component as a World Component its system HOLDS — the world entity plus a `(component, system)` **System Membership Record** — and a system that takes membership of one that already exists ADOPTS it (issue 2218).
+A component whose system holds no such pair is "a component with no World Component", never "record-less".
 
 [Notes](docs/domain/records.md#world-component--world-essence--world-tool)
 
 #### World Defaults
 
-**PERSISTED AND WRITTEN** as of `1.30.0` (issue 1358 modelled it; issue 1359 persists it at `fabricate.<entity>Scope.defaults` and normalizes it on every load; READ through it as of issue 1370, though nothing RESOLVES through it in practice: the migration writes every membership record fully OVERRIDING, and while `## CraftingSystem` requirement 36 holds the in-system record decides every key it carries, so a world default is reached only for a key that record does not carry).
+**PERSISTED, WRITTEN AND RESOLVED THROUGH** (issue 1358 modelled it; issue 1359 persists it at `fabricate.<entity>Scope.defaults` and normalizes it on every load; issue 1372 made the **Read Union** answer an INHERITING section from it): a system resolves a world default wherever its membership record inherits that section and the world has authored it, and a record written by add-from-catalogue or by a component import inherits from the start.
 The second layer of `## Scoped Entity Definitions`: the behaviour every crafting system inherits for one entity until it overrides a SECTION of it.
 
 [Notes](docs/domain/records.md#world-defaults)
@@ -335,8 +337,8 @@ ONE world setting, `fabricate.worldVocabulary`, holding THREE INDEPENDENT vocabu
 
 #### System Membership Record
 
-**PARTLY LIVE** (modelled at issue 1358, persisted at issue 1359, WRITTEN by the `1.30.0` migration of issue 1363; and READ by every non-UI reader as of issue 1370 through the **Scoped Entity Read Seam**, though it decides nothing while `## CraftingSystem` requirement 36 holds - its `member` flag is the membership filter, and the keys it resolves are only those the in-system record does not carry).
-The migration writes one record per ORIGINAL definition with EVERY SECTION OVERRIDDEN and each value copied verbatim, so nothing inherits at migration time and no system's resolved behaviour changes.
+**LIVE** (modelled at issue 1358, persisted at issue 1359, written by the `1.30.0` migration of issue 1363, read through the **Scoped Entity Read Seam** since issue 1370, and deciding which layer answers a section since issue 1372): its presence is the membership filter, and its `inherit` map selects the world default or the in-system record per section.
+HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue and a component import (issue 2218) write one that inherits every section, the import with the two exceptions its notes state.
 The third layer of `## Scoped Entity Definitions`: one record per `(entity, system)` carrying `{ entityId, systemId, inherit, <overrides>, enabled? }`.
 
 [Notes](docs/domain/records.md#system-membership-record)
@@ -361,7 +363,7 @@ The ONE door every non-UI reader of a crafting system's `components`, `essenceDe
 
 #### World Identity Snapshot
 
-The WORLD copy of an entity's identity that the `1.30.0` migration takes from the in-system record.
+The WORLD copy of an entity's identity, taken from the in-system record by the `1.30.0` migration and, for a component, by the import that registers it (issue 2218).
 **IT HAS A WRITER AS OF ISSUE 1371** — the three world entry editors, which write onto the world record itself — so it is no longer a copy nothing touches, and divergence is reachable from BOTH directions: an in-system edit the snapshot has not seen, or a world-catalogue edit no crafting system reads.
 
 [Notes](docs/domain/records.md#world-identity-snapshot)
@@ -438,6 +440,39 @@ Who picks the alternative a RESULT-side **Choice Group** awards: the PLAYER, or 
 
 [Notes](docs/domain/terms.md#chooser)
 
+#### Selection Roll
+
+The roll a RESULT-side **Choice Group** makes when the ROLL is its **Chooser**: one roll per alternative awarded, read against the alternatives' **Selection Ranges**.
+
+[Notes](docs/domain/terms.md#selection-roll)
+
+#### Selection Range
+
+The lowest and highest **Selection Roll** that select one alternative of a rolled **Choice Group**: whole numbers, never overlapping, and free to leave gaps.
+
+[Notes](docs/domain/terms.md#selection-range)
+
+#### Pending Award Choice
+
+A choice group whose chooser is the player that has been awarded but awaits settlement.
+The player must pick one or more alternatives according to the **Award Strategy**, settling the choice exactly once.
+
+[Notes](docs/domain/terms.md#pending-award-choice)
+
+#### Claimable
+
+An alternative in a pending award choice that remains available for selection at settle time.
+An alternative is claimable if its component or source item still exists, its reward would be accepted by the world, or (for knowledge results) its recipe is available, observable, and not already known.
+
+[Notes](docs/domain/terms.md#claimable)
+
+#### Forfeited
+
+A pending award choice that settles with no picks, because no alternative remains claimable or because a clean-up would otherwise drop its run.
+The settled choice records the forfeit and remains in history until the next clean-up.
+
+[Notes](docs/domain/terms.md#forfeited)
+
 #### Rolled Amount
 
 A RESULT amount authored as a roll expression instead of a fixed integer, resolved ONCE per result per award against the acting character — the crafter at award time, the gatherer in `plan()`, whose planned integer `create()` then awards without rolling again.
@@ -459,7 +494,7 @@ What `IngredientSet.resolveIngredientSelection` reports about the search that pr
 
 #### Slot
 
-The player-facing name for one requirement position in the crafting app's requirement rail.
+The player-facing name for one requirement position in the crafting app's requirement rail, drawn as one tile of the shared requirement chooser.
 
 [Notes](docs/domain/terms.md#slot)
 
@@ -500,6 +535,13 @@ An enabled Tool-owned bonus expression evaluated against the same actor that sup
 The per-check, GM-authored **unified trigger model** persisted as `checkBreakage` — `{ triggers[] }` (the old per-block `enabled` flag was dropped; an empty list is inert).
 
 [Notes](docs/domain/terms.md#check-breakage-checkbreakage)
+
+#### Preset Polarity
+
+Which end of a die the **Add a common trigger** presets treat as best: `'low'` (the `high`-id preset names the lowest face) under a roll-under evaluation, else `'high'`, whatever the check's product.
+A preset produces an ordinary trigger with no marker, so the polarity decides only the face a NEW preset names, never an already-authored trigger.
+
+[Notes](docs/domain/terms.md#preset-polarity)
 
 #### Provider (vocabulary boundary)
 
@@ -597,6 +639,7 @@ A single produced item output that references a component.
 #### Result Group
 
 A named collection of results.
+The interface calls it a **result set**, matching **Ingredient Set**; `ResultGroup` is the persisted identifier.
 
 [Notes](docs/domain/terms.md#result-group)
 
@@ -722,7 +765,7 @@ Gathering-only choice between `targeted` and `blind` environment behavior.
 
 #### Task Resolution Mode
 
-Gathering-only choice between `routed` and `progressive` task resolution.
+A gathering task's choice among `d100`, `straight` and `routed` resolution; `progressive` is legacy, kept at runtime and not offered for new authoring.
 
 [Notes](docs/domain/terms.md#task-resolution-mode)
 
@@ -857,6 +900,7 @@ The RECORD that selects check modifiers under the `bySubject` combination rule, 
 #### Recipe Check Tier
 
 The per-recipe reference to one of the `{id, name, dc}` DC tiers a crafting system's check slot authors (`Recipe.checkTierId`), naming the DC that recipe rolls against, or under a character-value target the **Difficulty Adjustment** its nullable `adjustment` supplies.
+Under a counting check the same tier names `successes` (0 to 20) in place of `dc`, and the recipe's picked tier then supplies the successes needed.
 
 [Notes](docs/domain/terms.md#recipe-check-tier)
 
@@ -1065,6 +1109,13 @@ The set of UUIDs that identify an owned item and its canonical source for compon
 
 [Notes](docs/domain/terms.md#item-source-reference-chain)
 
+#### Derivative Source
+
+A registration source Item built from a compendium entry and then changed into a different thing: a non-clone whose compendium **Source UUID** resolves to a document none of whose names it shares.
+At registration and source replacement it keys on its own uuid alone, as a clone does, so each one becomes its own component, tool or recipe-item definition instead of overwriting the one registered before it.
+
+[Notes](docs/domain/terms.md#derivative-source)
+
 #### Recipe Item Match Tiers
 
 The four-tier precedence the one shared, **system-scoped** matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) uses to resolve which recipe-item definition an owned item IS (issue 555, made per-system by issue 567): the list-aware durable identity tier is evaluated first, then among the source tiers the first match wins with no fall-through: (1) `identity` — the durable per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf (the third `roles` sibling after `componentId`/`toolId`), then the legacy scalar `flags.fabricate.recipeItemDefinitionId` (a transitional read-only fallback), each naming a definition in the candidate set exclusively and otherwise falling through; (2) `uuid` — the item's own uuid in the definition's union refs; (3) `compendium` — the item's compendium **Source UUID** in the union; (4) `duplicate` — the item's `_stats.duplicateSource` in the union.
@@ -1155,12 +1206,122 @@ The normalized check policy of product, direction, target and pool settings that
 
 [Notes](docs/domain/terms.md#check-evaluation)
 
+#### Situational Bonus Offer
+
+`offerSituationalBonus` (true unless explicitly `false`), a per-check display flag deciding only whether the interactive roll prompt shows a **Situational bonus** field, carried beside `evaluation` on all eight normalized check sub-objects.
+`allowsSituationalModifier` stays the runtime's separate authority gate, so a Tool bonus, an eligible named modifier and a programmatic bonus keep applying while the offer is off.
+
+[Notes](docs/domain/terms.md#situational-bonus-offer)
+
+#### Advantage Rule
+
+The `advantage` record (`mode: 'off'|'keep'|'bonus'` for summing, `extraDice`, `bonusExpression`, `offerDisadvantage`, `countEnabled`, `countDice`), normalized by `normalizeCheckAdvantage` and carried beside `evaluation`, never inside it, on all eight normalized check sub-objects.
+A **Standalone Check Roll** authors none of its own and rolls under the untouched default record, by maintainer ruling R2.
+
+[Notes](docs/domain/terms.md#advantage-rule)
+
+#### Keep (Roll Extra, Keep One)
+
+Under an **Advantage Rule**'s `mode: 'keep'`, `findKeepGroup` proves the authored formula's first top-level dice group a plain, unmodified, additively-positioned `NdS`, and `checkKeepTransform.js` mutates that term directly on the constructed `Roll` (never by string rewriting), rolling `extraDice` more and keeping the original count in the check's direction.
+
+[Notes](docs/domain/terms.md#keep-roll-extra-keep-one)
+
+#### Bonus Die
+
+Under an **Advantage Rule**'s `mode: 'bonus'`, `bonusExpression` contributes a separate dice expression instead of changing the check's own dice: appended to the total on `sum/over`, pre-rolled unsigned and settled onto the target on `sum/under`.
+
+[Notes](docs/domain/terms.md#bonus-die)
+
+#### Advantage Offer
+
+`resolveAdvantageOffer`'s `{ advantage, disadvantage, kind, detail }`, the one derivation every prompt producer, descriptor transport and the engine's authority gate read to decide which of Advantage and Disadvantage a check offers, and `intersectAdvantageOffers`'s all-or-nothing reduction of it over a batch.
+
+[Notes](docs/domain/terms.md#advantage-offer)
+
 #### Count Check
 
 A `product: 'count'` **Check Evaluation** rolls a `pool.die`-sided dice pool sized by `pool.base`, counts dice that qualify against `pool.threshold` net of any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
 The explode rule adds and re-rolls a die when the best qualifying face for the check's direction comes up (or a named face), and the cancel rule removes a success when the worst face comes up (or a named face); `pool.modifierDestination` sends every applied modifier and bonus to the pool ("Each adds dice") or the threshold ("Each moves the threshold").
 
 [Notes](docs/domain/terms.md#count-check)
+
+#### Evaluation Product
+
+`evaluation.product` (`sum` default, or `count`), the "What the roll produces" axis choosing between a summed total and a **Count Check**'s pool; a switch is lossless and retains both sides' settings.
+
+[Notes](docs/domain/terms.md#evaluation-product)
+
+#### Structured Pool
+
+`evaluation.pool`, the die, base, threshold, required-successes and explode/cancel record a **Count Check** grades in place of a formula and target, authored by the Checks Studio's pool controls in place of the typed formula.
+
+[Notes](docs/domain/terms.md#structured-pool)
+
+#### Free-Text Counting Formula
+
+The `freeTextCountingFormula` readiness warning: a summed check whose formula carries a success-counting die suffix (`cs`, `cf`, `even` or `odd`), measured against the wrong number because the check still adds the dice.
+
+[Notes](docs/domain/terms.md#free-text-counting-formula)
+
+#### Counting Formula Conversion
+
+The staged `Convert to count successes` action that rebuilds a convertible **Free-Text Counting Formula** as a **Structured Pool**, copying its DC and tier DCs into successes needed (plus one where the check graded `exceed`) and retaining the formula and DCs for reference.
+
+[Notes](docs/domain/terms.md#counting-formula-conversion)
+
+#### Extra Successes
+
+A counting check's relative outcome-tier column, editing the same `outcome.dc` field a summing check calls a DC delta, now read as successes above the check's required count.
+
+[Notes](docs/domain/terms.md#extra-successes)
+
+#### Die Qualification Marks
+
+The `qualified`/`cancelled`/`exploded` marks one rolled die in a **Count Check**'s projection can carry, combined on a single tile and rendered by the shared `DiceTiles` primitive.
+
+[Notes](docs/domain/terms.md#die-qualification-marks)
+
+#### Count Display Evidence
+
+The allowlisted `count` projection every non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, plus the escaped **Resource Name** of a public roll's **Bought Dice**, never persisted beyond the post.
+A chat card states it only on a public roll, while the result box and the salvage summary state it on any roll but a blind or secret one.
+
+[Notes](docs/domain/terms.md#count-display-evidence)
+
+#### Additional Dice
+
+The authored `pool.additionalDice` policy that lets a **Count Check**'s roller buy up to `limit = min(max, floor(available / rolls))` extra pool dice at roll time, at one unit of a resource per die.
+The resource is a number stored at a document path in the acting actor's `_source`, or a read/spend macro pair, and the cost is spent immediately before the main dice and never refunded.
+
+[Notes](docs/domain/terms.md#additional-dice)
+
+#### Bought Dice
+
+The dice **Additional Dice** added to one roll: a count-only pool contribution placed after advantage, never a modifier, settled with every other pool change into the one count Roll.
+An executed result records them as `data.boughtDice = { count, source }`, omitted when none were bought, and a public result marks the last original dice in roll order `bought` with a dashed tile border.
+
+[Notes](docs/domain/terms.md#bought-dice)
+
+#### Resource Name
+
+The optional authored `pool.additionalDice.label` that player surfaces use to name what pays for **Bought Dice**, as in `Momentum 2 available · Spends 1 Momentum`.
+Without one they fall back to the amount alone (`2 available · Spends 1`), and no player surface ever shows the stored path or a macro UUID.
+
+[Notes](docs/domain/terms.md#resource-name)
+
+#### Shortfall
+
+The fewest **Bought Dice** whose settled pool is not a zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
+The roll prompt states it and never pre-selects it, and states none where it may not show the needed count.
+
+[Notes](docs/domain/terms.md#shortfall)
+
+#### Unreachable Attempt
+
+One footer action, judged on its own, whose pool even with `limit` **Bought Dice** and every pending rolled contribution at its most favourable value is still a zero pool, or whose dice times the most one die can contribute stay below the needed count.
+The roll prompt disables it unless a count trigger can rescue it, which a zero pool never can, while a secret or unentitled prompt judges none and a non-interactive caller is never blocked.
+
+[Notes](docs/domain/terms.md#unreachable-attempt)
 
 #### Target Source
 
@@ -1185,6 +1346,20 @@ The misconfigured answer a check gives, before any roll, spend or award, when it
 The recorded arithmetic meaning of a rolled check, including ordered evidence for separately evaluated modifiers when present, separate from its authored evaluation and from any forced outcome.
 
 [Notes](docs/domain/terms.md#executed-check-evidence)
+
+#### Target Terms
+
+`data.targetTerms`, the ordered `{kind: 'anchor'|'adjustment'|'multiplier'|'benefit', value, source?, label?}[]` a summed check outside sum/over/fixed records on execution: the fixed or resolved-attribute anchor, each difficulty step, then each settled under benefit by its router source.
+Folding them, then the target-destined `preRolls`, in arithmetic order reproduces `data.target` exactly.
+
+[Notes](docs/domain/terms.md#target-terms)
+
+#### Check Display Projection
+
+The one immutable plain-data record `buildCheckDisplay` rebuilds from an allowlist for a posted check: evaluation product and direction, effective target, comparison, sanitized **Target Terms**, destination, **Executed Check Evidence**, executed visibility and, for a count, its **Count Display Evidence**.
+It never spreads the authored `evaluation` record, and `isPublicCheckDisplay` is the one gate a chat card consults before stating any of it.
+
+[Notes](docs/domain/terms.md#check-display-projection)
 
 #### Standalone Check Roll
 
@@ -1229,6 +1404,12 @@ The system-level gathering check singleton (`system.gatheringCraftingCheck = { e
 A per-attempt DC shift applied **only where a DC is used** — i.e. the simple and routed runners.
 
 [Notes](docs/domain/terms.md#check-dc-override)
+
+#### Dormant Override
+
+A component's or task's `dcOverride`, `adjustmentOverride`, or `successesOverride` that the check's active target source or product does not currently read: kept verbatim across a target-source or product switch, never rewritten, and named in a plain callout rather than offered for editing.
+
+[Notes](docs/domain/terms.md#dormant-override)
 
 #### Character Modifier
 
@@ -1317,7 +1498,8 @@ Module Configuration
 |  |- travelConfig (the world realm library, revealMode and modifierVisibility; a crafting system keeps only gatheringRealmSettings.enabled)
 |  |- characterLibraries ({ characterPrerequisites, modifiers } — the two WORLD character libraries; a crafting system keeps NEITHER and has no participation flag over them)
 |  |- theme
-|  |- experimentalFeatures
+|  |- experimentalFeatures (gates the recipe graph placeholder, the GM Manager's World > Downtime surface and its Premium crafting-icons advert)
+|  |- premiumIconsAdDismissed (whether a GM has dismissed the GM Manager's Premium crafting-icons advert for this world)
 |  |- recipeItemFlagStampVersion (one-shot flag-stamp version)
 |  |- componentFlagStampVersion (one-shot flag-stamp version)
 |  |- toolFlagStampVersion (one-shot flag-stamp version)
@@ -1597,7 +1779,8 @@ Conflicting nonempty evidence leaves that field unknown rather than falling thro
 
 **Completion Mode** is a run-level preference: `manual` asks the player to execute a ready stage, while `worldTime` permits eligible completion when world time advances.
 The switch may appear during a no-check countdown even with unresolved materials; its visibility is not permission to spend them automatically.
-Automatic crafting stops without spending on material, currency, choice, essence, Tool or player-check requirements and on validation failures, retaining the preference.
+Automatic crafting stops without spending, retaining the preference: the automatic blocker refuses a stage whose selected ingredient set holds any ingredient group, whether an item, a currency option or a choice of options, a stage or recipe Tool, or a player check in the recipe's system; an owed claimable award pick holds the world-time scan; and an essence requirement or any other unmet requirement stops at the stage's own validation.
+A run **finishes its current stage as time passes** when the world-time scan will take it once its gate passes and that stage carries no automatic blocker; the Journal marks it with a bolt, and a later stage may still stop.
 Pause freezes the remaining gate time, including zero; resume reanchors it at the current world time, and neither manual nor automatic execution advances a paused run.
 Cancellation remains possible while paused, retains completed spending and awards, and forfeits elapsed time without refunding unspent inputs.
 Public crafting preserves one-call execution when the stage is ready and all choices are supplied, through the same version-1 authority boundary; Journal start controls may leave a run awaiting manual execution.

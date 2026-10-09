@@ -24,7 +24,7 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
@@ -98,6 +98,11 @@ describe('the check-modifier catalogue card (mounted)', () => {
       const rows = card.querySelectorAll('[data-crafting-modifier-readonly="label"]');
       assert.equal(rows.length, CATALOGUE.length, 'every entry is read out');
       assert.equal(rows[0].textContent.trim(), 'Medicine');
+      assert.equal(
+        rows[0].getAttribute('title'),
+        'Medicine',
+        'the name carries its full text, since a long one ellipsises (issue 2044)'
+      );
       assert.equal(
         card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
         '@abilities.med.mod'

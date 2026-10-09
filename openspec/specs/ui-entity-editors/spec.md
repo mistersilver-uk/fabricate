@@ -14,53 +14,44 @@ Every edit stages into that draft and commits in one `updateRecipe` call on Save
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
 A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows the derived authoring-state pill for a recipe the activation check would refuse — `Incomplete` while it is on, `Can't enable` while it is off.
 
-### Resolution-mode banner
+### Resolution-mode callout
 
-Every tab is headed by a **resolution-mode banner** naming the crafting system's `resolutionMode`, describing what it means, and offering a chip that routes to Crafting Settings.
-Resolution mode is a property of the **system**, never of a recipe: the banner reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
+Overview, Ingredients, Results and Tools — the tabs the mode shapes — each carry in their heading block a neutral callout naming the system's `resolutionMode`, describing it, and offering an action that routes to Crafting Settings; the action gives it `role="note"`.
+Resolution mode is a property of the **system**, never of a recipe: the callout reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
+Access, Books & Scrolls and Validation carry no mode callout.
 Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, so no second, drifting table exists.
 
-### Context rail
+### No right rail
 
-The editor's right-hand column is the shell's existing `manager-inspector` aside (not a second nested grid), and it is **always present** on `recipe-edit`.
-
-Its top section is **mode-conditional**, driven by the system's canonical `visibilityMode` through the `craftingEffect(mode)` matrix — the same single source of truth the crafting nav and Crafting Settings consume:
-
-| `visibilityMode`    | `craftingEffect`   | Rail top section                                                                                                              |
-| ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `restricted`        | `showAccess`       | **Who can craft this** — the players and characters granted this recipe, plus a **Manage access** deep-link to the Access tab |
-| `item`, `knowledge` | `showBooksScrolls` | **Appears in** — the books/scrolls that teach this recipe, plus an **Open Books & Scrolls** deep-link                         |
-| `global`            | neither            | No section: a globally-visible system grants no per-recipe access and uses no books                                           |
-
-The rail is **read-only in every mode**.
-Authoring lives on the owning screen: the Access tab owns `recipe.access`, and Books & Scrolls owns book membership.
-
-Below the mode-conditional section, in every mode, the rail carries the recipe's **Category** selector, the **Recipe mode** (Simple / Complex) segmented control when the system's resolution mode permits multiple ingredient sets, the **Step mode** (Single / Multi-step) segmented control, and a **Validation** mini-list showing either an _All clear_ pill or the failing readiness checks with a deep-link into the Validation tab.
+The editor has no right rail (issue 676); Category and Step mode live on Overview, the access roster on the Access tab, and the books that teach the recipe on Books & Scrolls.
+The Access tab is read-only; Books & Scrolls offers only the per-book remove described under `### Visibility Form`.
+Each renders only when the system's canonical `visibilityMode` asks for it through the `craftingEffect(mode)` matrix: Access under `restricted`, Books & Scrolls under `item` and `knowledge`, and neither under `global`.
+Authoring lives on the owning screen: the Access screen owns `recipe.access`, and Books & Scrolls owns book membership.
 
 ### Access rosters (restricted mode)
 
-The rail's access rows are **resolved in the admin store** and handed to the rail as display rows; the rail never resolves an id itself.
+The Access tab's rows are **resolved in the admin store** and handed to the tab as display rows; the tab never resolves an id itself.
 Three rules govern that resolution, and each exists because the naive alternative silently misreports who can craft a recipe:
 
 - **A character's controlling players are a SET, not one user.**
   The runtime predicate grants access to any viewer whose **assigned character** is that actor **OR** who holds Foundry `OWNER` on it — a union, not a fallback chain.
   Each resolved character therefore carries `controlledBy: Array<{ id, name, avatar, assigned }>` (assigned-first, then name-sorted), never a singular "played by" field.
 - **`ownership.default >= OWNER` reaches the whole table.**
-  When it does, the character carries `sharedWithAllPlayers: true` and the rail renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
-  With no controllers at all, the rail renders **no** sub-line rather than inventing an attribution.
+  When it does, the character carries `sharedWithAllPlayers: true` and the Access tab renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
+  With no controllers at all, the Access tab renders **no** sub-line rather than inventing an attribution.
 - **GMs are filtered before ownership is tested.**
   `Document#testUserPermission` short-circuits every GM (Assistant GMs included) to `OWNER`, so the roster is derived from Foundry's non-GM `game.users.players` roster first.
   The same roster now backs the Access tab's grantable **Players** list, which previously offered GMs as targets even though granting one had no effect.
 
 Granted **character** ids resolve over **every world actor**, not the player-character roster: the runtime predicate applies no type filter, so a grant naming a non-player-character actor is still honoured by the engine and must still be displayed.
-An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the rail must not mutate the grant.
+An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the Access tab must not mutate the grant.
 The rosters re-project on user CRUD and on actor CRUD, with `updateActor` key-filtered to `ownership` / `name` / `img` changes so an ordinary HP update does not re-project.
 
 ### Base Form
 
 - Name (implemented in Manager)
 - Description (implemented in Manager)
-- Category (always includes reserved `General`) — implemented, in the context rail
+- Category (always includes reserved `General`) — implemented, on the Overview tab
 - Locked toggle — see `### Locked`
 
 In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
@@ -73,13 +64,13 @@ Note: alchemy `checkMode: tiered` dispatches through the same routed-check runne
 
 ### Visibility Form
 
-Per-recipe visibility is authored on the **Access tab** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
+Per-recipe visibility is authored on the **Access screen** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
 The recipe editor itself carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card (gated on the superseded `recipeVisibility.listMode`) is retired, and `access` is read-forward-seeded from `visibility.allowedUserIds` for legacy systems.
-The recipe editor's context rail shows a **read-only** summary of the grant plus a deep-link to the Access tab.
+The recipe editor's Access tab shows a **read-only** summary of the grant plus a deep-link to the screen that authors it.
 
 If the system's visibility mode consumes an item or teaches by knowledge (`item` / `knowledge`):
 
-- The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
+- The recipe editor's Books & Scrolls tab lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
   There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
 - Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only while the system's membership-basis marker is unset), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
   A multi-row selection can remove membership the same way from the recipe browser's bulk edit panel.
@@ -105,21 +96,23 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
-Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
+Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no callout: a control the engine will ignore is worse than no control, and a callout explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
 Under `bySubject` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
 
-1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
+1. **Inert callout** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
 The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
 `noCheck` and `noFormula` remain, and their copy states the real remaining cause **without naming any placeholder**, because a GM told to reference one would be told to do something that does nothing.
 The control gains no new state.
-   The control is replaced entirely — nothing authored here could change a roll — and the banner names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
-   The banner wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
+   The control is replaced entirely — nothing authored here could change a roll — and the callout names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
+   The callout wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
 2. **Controls** — the grid renders a picker cell for the eligible-id subset.
    There is **no combination-rule select**: a recipe chooses WHICH modifiers apply, never HOW they combine.
 
 The per-recipe select-row grid's worst case is **three** cells — Category, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
 Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
+Under a fixed roll-under target the Check tier options read `{name} (Target {dc})` and `Default target`, and under a character value `{name} (−2)` or `{name} (×½)` and `Default · base adjustment`, never a DC.
+Under a counting check the Check tier options read `{name} · {n} successes` (`{name} · 1 success`, or `{name} · — successes` when a tier sets none) and `Default · {required} successes`, and the editor header's check fact names the same count, never a DC.
 Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (nothing is appended to that recipe's check roll); selecting **Inherit system default** drops the `modifierIds` key.
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
 Under **Inherit system default** the pill row is replaced by a read-only line naming the inherited set through the active language's list formatting (or stating that the system default set is empty, so no check modifier applies to this recipe).
@@ -131,8 +124,8 @@ The add-menu button is disabled at the cap and an add is refused a second time i
 A legacy `craftingModifier.policy` left on disk by a pre-1055 world is CARRIED FORWARD untouched by every writer on this tab.
 This surface no longer authors a rule and must not silently delete one either — dropping a key while editing a neighbouring one is data loss disguised as a set edit — and the key is inert regardless, because the resolver never reads it.
 
-The inert banner reuses the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render alongside its sibling on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
-It renders full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
+The inert statement is the shared `Callout` (tone `warning`, its Checks action giving it `role="note"`), full-bleed below the modifier grid.
+It replaces the control the grid would otherwise hold rather than squeezing into a single grid cell, and it is never the tab's heading-block callout, which the resolution-mode callout already is.
 
 **Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`checkModifierResolver.js`, which replaced the crafting-only `craftingModifierResolver.js` in issue 1095), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
 
@@ -172,7 +165,7 @@ That historical triple is not the live one: `noPlaceholder` retired with the pla
 **Checks studio — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
 It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Apply all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
-The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
+The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a named container (`container: fabricate-option-host / inline-size`), so the shipped `@container fabricate-option-host (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
 
 **NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, World › Rules & Resources › Modifiers (issue 1311; it was System settings › Modifiers until the library moved to world scope).
 Crafting used to carry an entry editor here, which made the Checks screen a second editor for a system-level library and made salvage and gathering second-class states of that asymmetry; two editors for one array is how two screens come to disagree about which wrote last.
@@ -227,11 +220,12 @@ It keeps every convention the settings-list cards already have and the Checks ca
   No stored value changes — the affix only ever supplied the sigil on write, so a persisted path already carries it.
   The summary row reads the stored expression back verbatim for the same reason;
 - the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
-- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, and a check appends the dice to its roll formula so the roll is made once and shows on the card, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
+- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, a check that adds to its total appends the dice to its roll formula so the roll is made once and shows on the card, and a roll-under check rolls them first and raises its target by the result, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
   An entry whose expression transforms its dice total (`cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, judged by `classifyModifierExpression` with character paths taken as zero) carries the transformed variant of the note instead: where modifiers compete it has no comparable average, so entries with an ordinary average are chosen ahead of it.
   It is a NOTE, not a warning, and it raises no readiness issue of its own: the blocking `modifierRollExpression` is RETIRED, because there is nothing left to report about an entry that rolls.
   A transformed entry that a check ranks is reported on that check's Modifiers readiness instead, as the non-blocking `modifierAverageUnavailable` (`ui-system-studio`).
 
+The section hint describes a modifier as a benefit a check applies the way it applies bonuses — added to the total, raising a roll-under target, or moving a success count's threshold or dice — never as something always added to the roll.
 The summary row keeps its `@`-stripped inline expression and its `Roll` chip, and gains the signed bounds chip.
 The Checks screens' read-only modifier cards deep-link here, expanding the section and scrolling it into view; the link goes through the same route-exit guard every other manager navigation does, so leaving a dirty Checks draft still prompts.
 
@@ -275,15 +269,44 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 #### The requirement row
 
-ONE row shape authors every requirement, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set, and the world Tool entry's copy of that same set.
+ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets, a gathering task's result sets and a component's salvage result sets.
 Its anatomy is the kind FIRST and the value second:
 
 ```text
-[plate] [kind select] [name field] [quantity] [or…] [remove]
+[plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
 
+The fixed-or-rolled toggle is drawn on component and currency result rows alone, and a knowledge result row draws no amount, because a recipe is taught once; a progressive result row draws neither the toggle nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
+
+- **A result's amount is fixed or rolled.**
+Rolled swaps the stepper for a roll expression in the same slot, at the same width and height, so the toggle moves nothing else in the row; Fixed removes the expression from the result and keeps its quantity, and switching back restores what was typed.
+Opening Rolled and typing nothing writes nothing.
+The expression's placeholder is a dice expression and names no roll-data path, and its hint says a missing character value counts as 0.
+An expression that cannot be rolled, or can never award a positive amount, is marked invalid on the row with its reason on a line of its own, and the save refuses it.
+- **A flat result row names its subject and cannot clear it.**
+Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
+On a gathering task's or a salvage set's results, adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+- **A recipe result set adds through one `Result` adder.**
+It is a dashed button over the kind menu, headed **"Add a result"** and offering the set's kinds, and it appends directly when the set offers one kind.
+A progressive set's adder keeps the label "Add result stage" and appends an unnamed stage.
+The button shows "Result" and is named "Add a result", and its menu opens from the button's start edge, so the menu stays over the list it adds to.
+The row it appends carries its kind and no value, so it never raises another row's quantity, and focus moves to that row's name field, even where the add moves the adder itself, as a progressive set's first stage does.
+Naming a flat result row moves focus to its amount toggle, else to its naming body's first field, else to its next control, and never to the document.
+A non-progressive set offers `component`, `currency` where the system takes part in currency and the world has units, and `knowledge` where learned knowledge is observable; a progressive set offers `component` alone.
+- **A currency result opens its naming body; a knowledge result states what it teaches.**
+Once a currency result names its unit, a body beneath the row offers **"Call it"** and **"Why they get it"**, both optional, and a closing line states what the player sees, or "No description — the player just sees" the unit when both are empty.
+No other kind opens it, and an ingredient row never does.
+A knowledge result draws one help line beneath it saying that crafting teaches the recipe and that a player who cannot already see the taught recipe reads "Unknown recipe" in its place, and the help line describes the row's name field.
+The naming body's fields are described by its closing line, so each field's description is the sentence the player will read.
+A knowledge result on a system where learned knowledge is not observable is drawn read-only, saying why: its tag reads "Learning off" and its help line gives way to the reason.
+A knowledge result whose taught recipe is no longer in its system draws a "Missing recipe" face with the row's remove, and the Validation tab flags the set, because every craft of it would be refused.
+A fixed currency amount is a whole number, and a fraction is marked invalid on the row with its reason.
+- **A result row too narrow for one line wraps by rule, never by overflow.**
+Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
+
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
-The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
+The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
 The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
@@ -291,15 +314,23 @@ A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a gr
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
-Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+Unnamed, it is an inline search field — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
+The list's POSITION is the requirement and its DOM parent is not: it is a floating surface under `design-system`, portalled to the nearest application root, because a list positioned inside the row is clipped by the row's scrolling ancestor.
+It flips ABOVE the field only where that root has no room below, and in neither placement does it cover the field it completes.
 - **A suggestion starts where the query starts.**
-The panel sits directly under the field it completes, so each suggestion's glyph and label are left-aligned against the typed text above them; a suggestion centred in its panel is not continuing what the GM typed.
+The panel shares the left edge of the field it completes, beneath it or flipped above it, so each suggestion's glyph and label are left-aligned against the typed text; a suggestion centred in its panel is not continuing what the GM typed.
 This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
 The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
-Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
-- **What Enter commits is the top suggestion, not the typed string.**
+Tabbing to a suggestion failed identically while the list sat in the row's tab order, which is why suppressing the pointer path alone was half a fix.
+The list is no longer in that order, so a suggestion is reached from the field's own keys and never by Tab.
+- **What Enter commits is a suggestion, not the typed string.**
+`Enter` commits the active option, and with none active the TOP suggestion.
 A requirement names a catalogue ENTRY by id rather than carrying a free name, so a query matching nothing commits nothing rather than authoring an unresolvable id.
+- **The field drives its list, and focus never leaves it.**
+The input is the holder of `design-system`'s listbox contract: `ArrowDown` and `ArrowUp` move the active option, which the field names through `aria-activedescendant`, and a new query starts with none active.
+The list is open only while the field holds focus and the query is non-empty, so a blur or a press elsewhere closes it and keeps the query.
+`Escape` clears the query, which closes the list.
 - **An empty catalogue DEGRADES the field rather than blocking it.**
 The input still renders and is still typeable, and its own placeholder says there is nothing to name yet.
 A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
@@ -318,15 +349,20 @@ What must hold there is that the tag ARM stays whole: the policy word, the chips
 Every adder creates a row carrying its KIND and no value; the row's own field names it.
 No adder chooses a subject, so none can dedupe against a requirement the set already holds — a GM who names one component twice is told so by the Validation tab, which is where a check the adder cannot make belongs.
 
-A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per bare requirement, replacing the loose per-row and footer add-buttons.
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" menu** per bare requirement, replacing the loose per-row and footer add-buttons.
 It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
 A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
+The menu and the adders are drawn from one list, so they offer the same kinds in the same order, and no row inside the box draws the `or…` control.
+A result-side box draws one `alt <kind>` adder per offered kind, `alt component`, `alt currency` and `alt knowledge`, from the same list its set's `Result` adder offers.
+Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
-The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
-The header is what lets each entry be one word.
-The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
-The width is stated by the caller and not left to the shared picker's own floor, which is sized for lists of world components and actors and is wide enough that the panel overflowed the application window.
+The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase eyebrow, over entries that read from their own left edge.
+The eyebrow is the caller's: **"Accept instead"** on ingredients, and **"Add an alternative"** or **"Add a result"** on results.
+The header is what lets each entry be the kind's own label alone.
+The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency`, or on a result `Recipe knowledge` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
+It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
+The width is stated by the caller and not left to the shared menu's own floor, which is sized for a row's overflow commands rather than four one-word kinds.
 
 Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
 One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
@@ -336,7 +372,7 @@ They are drawn at their own two scales: `or…` is a control among controls, lev
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
-Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
+Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" menu's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
 Unit presence alone is not authorisation, and since issue 1278 it is emphatically not: the ladder is WORLD scope, so a world with a fully authored ladder still has systems that do not charge for anything, and the participation toggle is the only thing that says which do.
 Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
@@ -345,6 +381,30 @@ The per-option `tagMatch` (any / all) control is retained on every tag alternati
 The set-level **"Add essence"** control is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 The add-new essence OFFER — withholding a DISABLED essence, while keeping an already-authored one reachable — is applied where an essence is actually CHOSEN, which is the row's own field.
 An adder that names nothing cannot leak a disabled essence, so the adders gate on the system HAVING essences and the field narrows the list.
+
+#### A result choice group
+
+A recipe's flat reward row carries the `or…` control, headed **"Add an alternative"**, immediately before its remove; choosing a kind converts the row IN PLACE into a choice group whose first alternative is the row's own pick and whose second is an empty row of that kind, and focus moves to that row's name field.
+The group keeps the row's id, and it opens on **Any one of** with the player choosing, writing no setting of its own.
+A gathering task's result, a salvage result and a progressive stage carry no convert control, and the results tab's standing roll-budget strip on a progressive system adds that no stage offers a choice of reward.
+
+The group's header is one `role="group"` described by its help line, and its first line reads left to right as one sentence:
+
+- How many it awards: a `Select` offering **Any one of** and **Up to N of**; up to N opens on a fixed N of two.
+- N, under up to N only: the amount slot's Fixed | Rolled control, a fixed N held at two or more, and a rolled N exactly one expression in its place.
+- Repeats, under up to N by roll only: a neutral button naming its own state, **Unique** or **Repeats allowed**, defaulting to unique, its slot as wide as its wider word.
+- Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
+
+Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
+Switching to rolled writes no range and no expression of its own; switching to the player hides the expression, every range and repeats, which the draft keeps so that switching back restores them and the save does not write; switching to any one of drops N and repeats.
+Removing alternatives down to one unwraps the group into that alternative, without the group's settings or its range.
+Focus moves to that row's `or…` control, never to the document.
+Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
+
+Under a roll each alternative carries a RANGE CELL in its convert control's slot, after the row's divider: a d20 glyph titled **"Selection roll range"**, then two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**, `{name}` being the alternative's subject or, unnamed, its kind's word.
+A range overlapping another's, one whose lowest roll is above its highest, or one with an end that is not a whole number marks both fields invalid with its reason on a line of its own across the row.
+The reason is stated once a field is committed, on its `change` or `blur`, rather than on every keystroke; at a narrow width the cell follows the toggle and the amount on the row's second line.
+A rolled group with no rollable expression or a missing range, an up-to group with no N, a group of fewer than two alternatives, and any group in a progressive system's set are flagged by the Validation tab on their set and refused by the save, both reading one set of shape rules.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 
@@ -355,7 +415,7 @@ A click-only stepper is a keyboard regression.
 
 ### Step Structure UI
 
-Step mode (Single / Multi-step) is authored from the context rail's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
+Step mode (Single / Multi-step) is authored from the Overview tab's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
 
 If multistep is enabled:
 
@@ -381,13 +441,22 @@ The GM component surfaces: the component browser and the component editor.
    Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
 4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
    The persisted `routed` token is displayed as "Routed by check".
-5. The result-group editor remains reachable when salvage is disabled.
+5. The result-set editor remains reachable when salvage is disabled.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
-   The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
-   The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+   The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
+   The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
+   The control (`component/CheckOverrideField.svelte`, on the component editor only) edits the one field the active check reads.
+   Under a roll-under fixed target it edits `component.salvage.dcOverride` as `Target override` (`Replaces the system target for this component. The total must stay {cmp} it.`), its presets reading `{name} — Target n` beside `System default — Target n`.
+   Under a character value it edits `component.salvage.adjustmentOverride` as `Difficulty adjustment override`, hinted as added to or multiplied into the character value and rounded down; its presets are the named `salvageCraftingCheck.simple.tiers` whose `adjustment` is valid for the kind, each reading `{name} — {adjustment}` beside `System default — base adjustment`, and a custom multiplier is kept exactly (`×0.7`).
+   A roll-high fixed check keeps `Salvage DC override` and its `System default — DC n` wording unchanged.
+   System default nulls only the active field, a dormant DC or adjustment override survives with its own notice (`A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.`), and changing the source never rewrites either.
+   Player sees reads `Salvage check · stay {cmp} {dc}` for a fixed roll-under target, and `Salvage check · stay {cmp} {target} ({source})` or `Salvage check · reach {target} ({source})` for a character value, naming the Preview-as character's value and the adjustment.
+   Under a counting check the control is labelled `Successes needed override` and edits `component.salvage.successesOverride` (0–20); its presets are the named `salvageCraftingCheck.simple.tiers` with non-null `successes`, each reading `{name} — {n} successes needed`, and System default clears only `successesOverride`.
+   A kept DC or adjustment override is never rewritten, and each is named in its own dormant notice.
+   Player sees reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}`.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
    A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.
@@ -486,23 +555,23 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result group editor
+- One result set editor
 
 ### Routed UI
 
 The routing basis is the system **mode**, not a per-recipe provider: the recipe inspector carries NO result-selection provider selector (it was removed in the routed split — the basis is derived from `routedByIngredients` / `routedByCheck`).
 
 - `routedByIngredients` UI:
-  - Ingredient sets map to result groups via `resultGroupId`.
+  - Ingredient sets map to result sets via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
   - The crafting check is optional (no provider toggle, no check requirement surfaced here) and is authored via the shared simple pass/fail editor (`SimpleCraftingCheckEditor`, bound to `craftingCheck.simple`).
   - `routedByIngredients` recipes offer the per-recipe "Check tier" (DC-tier) dropdown sourced from `craftingCheck.simple.tiers` when the simple check uses static `dcMode`; they do NOT get the `minSuccessOutcomeId` minimum-success-tier control (which is `routedByCheck + fixed` only).
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
-  - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
+  - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
     The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
-  - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
-- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
+  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 
 ### Alchemy check-mode selector (issue 554)
 
@@ -532,7 +601,7 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 
 - alchemy + `simple` → the simple pass/fail editor rendered below the selector, with a LIVE Active switch: simple is OPTIONAL, and turning it off stages `checkMode: "none"`.
 - alchemy + `tiered` → the routed editor below the selector, with the LOCKED always-on reading of the switch and the requiredHint (ungated by `checksEnabled`).
-  Tiered cannot be disabled because it routes result groups by outcome tier and so cannot resolve without a roll.
+  Tiered cannot be disabled because it routes result sets by outcome tier and so cannot resolve without a roll.
 - alchemy + `none` → the shared switched-off panel with its "Turn this check on" action, and a live Active switch reading off.
   Turning it back on stages `checkMode: "simple"`.
 - The Crafting checks help copy describes simple/tiered and the off state.
@@ -540,11 +609,11 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 ### Alchemy Recipe UI (GM Editor)
 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
-  Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
   - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
     No "add result set" beyond the two.
-  - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
+  - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 
@@ -567,7 +636,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
-  The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
-  The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
-  The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+  An art-less component falls back to a glyph rather than emitting an image element with no source.

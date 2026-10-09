@@ -6,8 +6,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
+
+import { borrowBrowser } from './layout-harness.js';
 
 /** Every scoped `<style>` block in a harness's compiled tree, in manifest order. */
 export function collectScopedCss({ repoRoot, compiledModules }) {
@@ -58,7 +59,7 @@ export function managerShellPage({
       <div class="probe-host">
         <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="${view}">
           <div class="manager-titlebar"></div>
-          <header class="manager-header"></header>
+          <header class="fabricate-page-header manager-header"></header>
           <div class="manager-body">
             <nav class="manager-rail"></nav>
             ${productMarkup}
@@ -155,7 +156,7 @@ export const ENTRY_FRAME_STACKED_ARRANGEMENT = `
  * @param {(control: string) => string} pageFor the suite's page builder, given the control rules.
  */
 export async function measureEntryFrameArrangements(pageFor, viewport) {
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
   try {
     const tab = await browser.newPage({ viewport });
     const measured = async (control) => {
@@ -306,7 +307,7 @@ export const ENTRY_FRAME_CHECKS = Object.freeze([
     'keeps BOTH halves when it stacks over a pane of a definite height: each keeps its content, the tab strip stays in the column, and the frame scrolls (M26, M32)',
     ({ stacked: { main, column, strip, rail, frameScrolls } }) => {
       // WHY THIS CHECK EXISTS ────────────────────────────────────────────────────────────── The
-      // frame stacks below `@container fabricate-manager (max-width: 1000px)`, and until r19-entry2
+      // frame stacks below `@container fabricate-manager (max-width: 960px)`, and until r19-entry2
       // nothing measured the stacked side on either consumer — this suite's own comment said so, as
       // a reason to stay wide.
       const height = ({ top, bottom }) => bottom - top;

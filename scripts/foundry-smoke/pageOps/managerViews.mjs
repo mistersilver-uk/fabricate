@@ -21,29 +21,19 @@ import {
 import { chooseSelectOption } from './selectControl.mjs';
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (Fabricate's
- * shared modal, `.manager-modal[data-roll-prompt]`). A caller that knows the prompt opens passes a
- * longer `timeout`; the default keeps a prompt-less path cheap.
+ * Answer the roll prompt an action is known to open: capture it, then click Roll. Whether a prompt
+ * opens is the caller's to state, never inferred from a short wait, because under load a prompt
+ * can mount long after any guess and leave its action blocked. `timeout` is only a hang guard.
  */
-export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
+export async function answerRollPrompt(ctx, label, { timeout = 60_000 } = {}) {
   const { page, screenshot } = ctx;
   const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
-  try {
-    await dialog.waitFor({ state: 'visible', timeout });
-  } catch {
-    return false;
-  }
+  await dialog.waitFor({ state: 'visible', timeout });
   await screenshot(page, label);
-  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage) or "Roll" for a
-  // non-d20 / d100 check (single button).
-  const rollBtn = dialog
-    .locator(
-      'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
-    )
-    .first();
-  await rollBtn.click().catch(() => {});
-  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-  return true;
+  // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
+  // Select's "Public roll" trigger first and opened it instead, leaving the prompt standing.
+  await dialog.locator('button[type="submit"]').first().click();
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 });
 }
 
 /**
@@ -464,7 +454,7 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
     // Return to the browser: the category filter chip and the collapsed group both survive.
     await page
       .locator(
-        '.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")'
+        '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Back to recipes")'
       )
       .first()
       .click();
@@ -549,7 +539,7 @@ export async function assertManagerLayoutStable(page, label) {
         '.manager-knowledge-learned-row',
         '[data-manager-tool-id]',
         '[data-tool-edit-view]',
-        '.manager-inspector-card',
+        '.fabricate-card',
         '.manager-system-edit-form',
         '.manager-edit-card',
         '.manager-toggle-row',

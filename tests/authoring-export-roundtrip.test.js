@@ -21,6 +21,7 @@ const {
   normalizeExportEnvelope,
 } = await import('./helpers/fullAuthoringFixture.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
+const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 function seedFutureCheckFields(fixture) {
   const authoredEvaluations = new Map();
@@ -57,12 +58,23 @@ function seedFutureCheckFields(fixture) {
             readMacroUuid: 'Macro.read',
             spendMacroUuid: 'Macro.spend',
             max: 4,
+            label: `Resource ${ordinal}`,
           },
         },
       };
+      // Issue 2007: a non-default advantage record per slot, so a dropped record cannot pass.
+      const advantage = {
+        mode: ordinal % 2 === 0 ? 'off' : 'bonus',
+        extraDice: 1 + (ordinal % 4),
+        bonusExpression: `1d${ordinal + 3} + 1`,
+        offerDisadvantage: false,
+        countEnabled: false,
+        countDice: 1 + (ordinal % 5),
+      };
       fixture.system[checkName][slot] ??= {};
       fixture.system[checkName][slot].evaluation = evaluation;
-      authoredEvaluations.set(`${checkName}.${slot}`, evaluation);
+      fixture.system[checkName][slot].advantage = advantage;
+      authoredEvaluations.set(`${checkName}.${slot}`, { evaluation, advantage });
     }
   }
   fixture.system.craftingCheck.simple.tiers = [
@@ -82,9 +94,10 @@ function seedFutureCheckFields(fixture) {
 }
 
 function assertFutureCheckFields(payload, authoredEvaluations, stage) {
-  for (const [key, evaluation] of authoredEvaluations) {
+  for (const [key, { evaluation, advantage }] of authoredEvaluations) {
     const [checkName, slot] = key.split('.');
     assert.deepEqual(payload.system[checkName][slot].evaluation, evaluation, `${key} ${stage}`);
+    assert.deepEqual(payload.system[checkName][slot].advantage, advantage, `${key} ${stage}`);
   }
   assert.equal(payload.system.craftingCheck.simple.tiers[0].adjustment, 0.5);
   assert.equal(payload.system.craftingCheck.simple.tiers[0].successes, 3);
@@ -117,6 +130,12 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
       ]
     }
   ];
+  // Issue 1516: a recipe result's rolled amount, authored through the result card, rides the same trip.
+  const rolledResult = { id: 'res-rolled', componentId: 'comp-herb', quantity: 2, quantityFormula: '1d4+1' };
+  fixture.recipes[0].resultGroups = [{ id: 'rg-1', name: 'Vigor', results: [rolledResult] }];
+  // …and so does a salvage result's, authored through the salvage row.
+  const herbSalvage = fixture.system.components.find((component) => component.id === 'comp-herb').salvage;
+  herbSalvage.resultGroups = [{ ...herbSalvage.resultGroups[0], results: [{ ...rolledResult, id: 'salv-rolled', componentId: 'comp-ore' }] }];
   const h = makeHarness(fixture);
 
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
@@ -152,6 +171,16 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
 
   const second = exportCurrent(h, FIXTURE_SYSTEM_ID);
   assertFutureCheckFields(second, authoredEvaluations, 're-export');
+  // The harness stores systems verbatim, so the persisting normalizer is exercised directly.
+  const persisted = new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { componentScopeStore: null, essenceScopeStore: null, toolScopeStore: null }
+  )._normalizeSystem(second.system);
+  for (const [key, { evaluation, advantage }] of authoredEvaluations) {
+    const [checkName, slot] = key.split('.');
+    assert.deepEqual(persisted[checkName][slot].evaluation, evaluation, `${key} persisted`);
+    assert.deepEqual(persisted[checkName][slot].advantage, advantage, `${key} persisted`);
+  }
 
   assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
 
@@ -232,6 +261,12 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
     false,
     '…and a component that authored nothing keeps the key ABSENT, so it goes on inheriting'
   );
+  const [salvageResult] = herb.salvage.resultGroups[0].results;
+  assert.equal(salvageResult.quantityFormula, '1d4+1', 'a salvage result keeps its rolled amount');
+  assert.equal(salvageResult.quantity, 2, 'beside the authored quantity');
+  const [recipeResult] = second.recipes[0].resultGroups[0].results;
+  assert.equal(recipeResult.quantityFormula, '1d4+1', 'a recipe result keeps its rolled amount');
+  assert.equal(recipeResult.quantity, 2, 'beside the authored quantity');
   const task = second.gatheringConfig.system.tasks.find((entry) => entry.name === 'Forage Herbs');
   assert.equal(task.resolutionMode, 'routed');
   assert.deepEqual(task.resultGroups, sourceTask.resultGroups);

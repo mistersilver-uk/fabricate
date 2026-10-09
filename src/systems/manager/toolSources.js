@@ -9,6 +9,7 @@ import {
   FABRICATE_FLAG_NAMESPACE,
 } from '../../config/flags.js';
 import { Tool } from '../../models/Tool.js';
+import { findRegisteredDefinition, settleCompendiumClaim } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, TOOL_FACTS } from './collaborators.js';
 
@@ -47,16 +48,10 @@ function findToolForUpsert(tools, data, snapshot, source, flagKey) {
     if (byId) return byId;
   }
   const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
-  if (durableId) {
-    const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
-    if (byDurableId) return byDurableId;
-  }
-  const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
-  return (
-    tools.find((entry) =>
-      [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))
-    ) || null
-  );
+  // A tool is not matched through a compendium source the snapshot records only as an alias,
+  // which is one that no longer resolves.
+  const claimed = [snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean);
+  return findRegisteredDefinition(tools, snapshot, source, [durableId], claimed);
 }
 
 function sourceFlagState(source, flagKey) {
@@ -111,7 +106,7 @@ async function restoreSourceProvenance({ source, provenance }) {
 
 async function rollbackToolTransaction(io, system, previousTools, sourceFlagStates, cause) {
   const errors = [cause];
-  system.tools = previousTools;
+  system.tools = previousTools; // ratchet-exempt(world-scope): writer
   for (let index = sourceFlagStates.length - 1; index >= 0; index -= 1) {
     const state = sourceFlagStates[index];
     try {
@@ -168,9 +163,10 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
   const flagKey = io.toolRoleFlagKey(system.id);
   const hasSourceRequest = typeof itemUuid === 'string' && !!itemUuid.trim();
   const source = hasSourceRequest ? await resolveToolSourceItem(itemUuid.trim()) : null;
-  const snapshot = source ? await io.buildToolSourceSnapshot(itemUuid.trim(), source) : null;
-  const tools = Array.isArray(system.tools) ? system.tools : [];
-  const existing = findToolForUpsert(tools, data, snapshot, source, flagKey);
+  const resolved = source ? await io.buildToolSourceSnapshot(itemUuid.trim(), source) : null;
+  const tools = Array.isArray(system.tools) ? system.tools : []; // ratchet-exempt(world-scope): writer
+  const existing = findToolForUpsert(tools, data, resolved, source, flagKey);
+  const snapshot = settleCompendiumClaim(resolved, existing, source);
   // The Valid Id Basis `_normalizeSystem` uses (issue 1308), via the same helper: this site
   // bypasses `_normalizeSystem`, and a real-but-empty Set here would strip every tool's
   // prerequisites in a healthy migrated world.
@@ -190,13 +186,13 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
 
   const nextTools = existing
     ? tools.map((entry) => (entry === existing ? staged : entry))
-    : [...tools, staged];
-  const previousTools = system.tools;
-  system.tools = nextTools;
+    : [...tools, staged]; // ratchet-exempt(world-scope): writer
+  const previousTools = system.tools; // ratchet-exempt(world-scope): writer
+  system.tools = nextTools; // ratchet-exempt(world-scope): writer
   try {
     await io.saveSystems({ put: system, domains: TOOL_FACTS });
   } catch (error) {
-    system.tools = previousTools;
+    system.tools = previousTools; // ratchet-exempt(world-scope): writer
     throw error;
   }
 
@@ -219,16 +215,16 @@ export async function deleteTool(io, systemId, toolId) {
   io.assertGM('delete tool');
   const system = io.getSystem(systemId);
   if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-  const tools = Array.isArray(system.tools) ? system.tools : [];
+  const tools = Array.isArray(system.tools) ? system.tools : []; // ratchet-exempt(world-scope): writer
   const tool = tools.find((entry) => String(entry?.id) === String(toolId)) || null;
   if (!tool) return { deleted: false };
 
-  const previousTools = system.tools;
-  system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
+  const previousTools = system.tools; // ratchet-exempt(world-scope): writer
+  system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId)); // ratchet-exempt(world-scope): writer
   try {
     await io.saveSystems({ put: system, domains: TOOL_FACTS });
   } catch (error) {
-    system.tools = previousTools;
+    system.tools = previousTools; // ratchet-exempt(world-scope): writer
     throw error;
   }
 

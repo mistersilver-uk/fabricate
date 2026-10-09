@@ -103,7 +103,7 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Tools.Editor.Tabs"
   ariaLabel="Tool editor sections"
   idStem="tool"
-  hookAttribute=""
+  tabDataAttr=""
   containerClass="manager-tool-editor-tabs manager-editor-tabs"
   danger
 />

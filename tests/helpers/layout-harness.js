@@ -27,6 +27,23 @@ export async function openLayoutContext(options) {
 }
 
 /**
+ * A launched-browser stand-in on the shared browser: `newPage` opens each page in a fresh context,
+ * as `Browser#newPage` does, and `close` disposes those contexts and never the browser.
+ */
+export async function borrowBrowser() {
+  const browser = await sharedBrowser();
+  const contexts = [];
+  return {
+    async newPage(options) {
+      const context = await browser.newContext(options);
+      contexts.push(context);
+      return context.newPage();
+    },
+    close: () => Promise.all(contexts.map((context) => context.close())),
+  };
+}
+
+/**
  * Read one element's border box and its computed style, in the page.
  *
  * @returns {{box: {x: number, y: number, width: number, height: number, top: number, right: number,

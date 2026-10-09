@@ -1,4 +1,18 @@
-import { checkDisplayForCard } from './craftCardFields.js';
+import { settleCardRolls } from './checkCardRolls.js';
+import { settlePromptedCheck } from './journalCheckPrompt.js';
+import {
+  evaluatePreparedJournalCheck,
+  withPreparedAdditionalDiceOffer,
+  withSpentAdditionalDice,
+} from './journalPreparedCheck.js';
+import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
+import {
+  authorizeAwardChoice,
+  awardChoiceDismissalRefusal,
+  validAwardChoicePayload,
+} from './journalRunAwardChoice.js';
+import { serializedOperationResult, terminalRun, validText } from './journalRunReply.js';
+import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -23,6 +37,7 @@ const MUTATING_ACTIONS = new Set([
   'setCompletionMode',
   'setSelection',
   'cancel',
+  'chooseAward',
 ]);
 
 function failure(reason, extra = {}) {
@@ -34,15 +49,12 @@ function currentRevision(run) {
   return Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
-function validText(value) {
-  return typeof value === 'string' && value.trim() !== '';
-}
-
 function validRequest(request) {
   if (!validText(request?.requestId) || !validText(request?.sessionId)) return false;
   if (!validText(request?.actorUuid) || !validText(request?.runType)) return false;
   if (!MUTATING_ACTIONS.has(request?.action) && request?.action !== 'releaseCheck') return false;
   if (request.action !== 'start' && !validText(request?.runId)) return false;
+  if (request.action === 'chooseAward' && !validAwardChoicePayload(request.payload)) return false;
   return Number.isInteger(request?.expectedRevision) && request.expectedRevision >= 0;
 }
 
@@ -53,20 +65,6 @@ function replyMatches(pending, payload) {
     pending.runId === payload.runId &&
     pending.expectedRevision === payload.expectedRevision
   );
-}
-
-function safeRollDecision(value) {
-  const decision = value && typeof value === 'object' ? value : {};
-  const modifierIds = decision.modifierIds ?? decision.chosenModifierIds;
-  return {
-    bonus: typeof decision.bonus === 'string' ? decision.bonus : null,
-    rollMode: typeof decision.rollMode === 'string' ? decision.rollMode : null,
-    advantage: typeof decision.advantage === 'string' ? decision.advantage : null,
-    // `null` when no choice was offered, so the prepared defaults roll; `[]` is an answer.
-    modifierIds: Array.isArray(modifierIds)
-      ? modifierIds.filter((id) => typeof id === 'string')
-      : null,
-  };
 }
 
 /**
@@ -97,10 +95,18 @@ export function normalizeJournalRunDismissals(value) {
   return Object.fromEntries(entries);
 }
 
-function terminalRun(run) {
-  return ['succeeded', 'complete', 'completed', 'cancelled', 'failed', 'archived'].includes(
-    String(run?.status ?? '').toLowerCase()
-  );
+/**
+ * Only a settle keeps the request id its caller names, so an API caller can replay it from the
+ * ledger; any other command mints its own, as a check's follow-up sends must (issue 1773).
+ */
+function requestIdFor(command, randomId) {
+  const kept = command.action === 'chooseAward' && validText(command.requestId);
+  return kept ? command.requestId : randomId();
+}
+
+/** A settle spends nothing, so the sender's owner-or-GM check is its whole authorization. */
+function commandAuthorizer(request, operation) {
+  return request.action === 'chooseAward' ? authorizeAwardChoice : operation.authorize;
 }
 
 function operationUnavailable() {
@@ -151,6 +157,15 @@ function actorUuidList(actors, fallbackUuids = []) {
   return Array.isArray(fallbackUuids) ? fallbackUuids.filter(validText) : [];
 }
 
+function executeCommandUnavailable(started) {
+  return {
+    ...started,
+    success: false,
+    authorityUnavailable: true,
+    reason: 'execute-command-unavailable',
+  };
+}
+
 function installEngineAuthority(engine, authority) {
   if (typeof engine?.installVersionedRunAuthority !== 'function') {
     throw new TypeError('The versioned run engine authority adapter is unavailable');
@@ -199,14 +214,7 @@ export async function executePublicCraft({
   ) {
     return started;
   }
-  if (typeof executeCommand !== 'function') {
-    return {
-      ...started,
-      success: false,
-      authorityUnavailable: true,
-      reason: 'execute-command-unavailable',
-    };
-  }
+  if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
   const settled = await executeCommand(
     {
       actorUuid: actor?.uuid,
@@ -222,12 +230,13 @@ export async function executePublicCraft({
         },
         trigger: 'manual',
         sourceActorUuids: actorUuidList(sourceActors),
+        ...(options?.presentTools && { presentTools: options.presentTools }),
       },
     },
     // The caller's flag, never a constant (issue 1780): the crafting UI passes `true` and expects
     // the roll dialog, while a macro omits it and `craftRecipe` defaults it to the non-interactive
     // route issue 1683 added, so the API never waits on a prompt nobody answers.
-    { interactive: options?.interactive === true }
+    { interactive: options?.interactive === true, ...decisionAdditionalDice(options) }
   );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
@@ -259,6 +268,7 @@ export async function executePublicGather({
   actor,
   executeCommand = null,
   interactive = false,
+  additionalDice = 0,
 } = {}) {
   if (typeof requestStart !== 'function') return operationUnavailable();
   const started = await requestStart();
@@ -266,14 +276,7 @@ export async function executePublicGather({
   if (started.requiresExecution !== true || started.canExecuteImmediately !== true) return started;
   const runId = validText(started.runId) ? started.runId : null;
   if (!runId) return started;
-  if (typeof executeCommand !== 'function') {
-    return {
-      ...started,
-      success: false,
-      authorityUnavailable: true,
-      reason: 'execute-command-unavailable',
-    };
-  }
+  if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
   const settled = await executeCommand(
     {
       actorUuid: actor?.uuid,
@@ -288,7 +291,7 @@ export async function executePublicGather({
     },
     // The caller's flag, for the reason `executePublicCraft` gives (issue 1780): the gathering
     // screen passes `interactive: true` and expects its roll dialog.
-    { interactive: interactive === true }
+    { interactive: interactive === true, ...decisionAdditionalDice({ additionalDice }) }
   );
   return { ...started, ...settled };
 }
@@ -324,7 +327,7 @@ export function createJournalExecutionReconstructor({
 /**
  * Install crafting start, execute and cancel requests through the command service.
  * Resolved Actor inputs become UUID targets, whose sender ownership is checked by the authority.
- * @param {{engine: object, service: object}} options
+ * A station's `presentTools` is a start or execute payload key only when the caller supplied one.
  * @returns {object} The supplied engine with its versioned authority adapter installed.
  */
 export function installCraftingJournalRunAuthority({ engine, service } = {}) {
@@ -341,6 +344,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
       completionMode,
       craftingSystemId,
       submittedItems,
+      presentTools,
     }) =>
       service.executeJournalRunCommand({
         actorUuid: actor?.uuid,
@@ -361,6 +365,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
               }))
             : [],
           sourceActorUuids: actorUuidList(sourceActors),
+          ...(presentTools && { presentTools }),
         },
       }),
     requestExecute: ({
@@ -371,6 +376,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
       expectedRevision,
       selectionPlan,
       trigger = 'manual',
+      presentTools,
     }) =>
       service.executeJournalRunCommand({
         actorUuid: actor?.uuid,
@@ -382,6 +388,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
           selectionPlan,
           trigger,
           sourceActorUuids: actorUuidList(componentSourceActors, componentSourceActorUuids),
+          ...(presentTools && { presentTools }),
         },
       }),
     requestCancel: ({
@@ -528,12 +535,12 @@ export function createGatheringJournalRunOperations({
         requestId,
       });
     },
-    evaluateCheck: ({ actor, privateEvaluation, decision }) => {
+    evaluateCheck: ({ actor, privateEvaluation, decision, sender }) => {
       const runtime = currentEngine();
       if (typeof runtime?.evaluatePreparedVersionedCheck !== 'function') {
         return operationUnavailable();
       }
-      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision });
+      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision, sender });
     },
     execute: ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const runtime = currentEngine();
@@ -567,99 +574,6 @@ export function createGatheringJournalRunOperations({
   };
 }
 
-function serializedOperationResult(result, { secret = false, runId = '' } = {}) {
-  const source = result && typeof result === 'object' ? result : failure('operation-unavailable');
-  const run = source.run && typeof source.run === 'object' ? source.run : {};
-  const base = {
-    success: source.success === true,
-    runId: source.runId ?? run.id ?? runId,
-    status: source.status ?? run.status ?? null,
-    runRevision: source.runRevision ?? run.runRevision ?? null,
-  };
-  if (secret) {
-    return {
-      ...base,
-      secret: true,
-      reason: source.success === true ? null : 'operation-failed',
-    };
-  }
-  const results = Array.isArray(source.results) ? source.results : [];
-  return {
-    ...base,
-    reason: source.reason ?? null,
-    message: source.message ?? null,
-    disposition: source.disposition ?? null,
-    waiting: source.waiting === true,
-    terminal: source.terminal === true || terminalRun(run),
-    authorityUnavailable: source.authorityUnavailable === true,
-    automaticBlocked: source.automaticBlocked === true,
-    blocker: source.blocker ?? null,
-    accepted: source.accepted === true,
-    cancelled: source.cancelled === true,
-    refunded: source.refunded === true,
-    partialRefund: source.partialRefund === true,
-    restoredCount: Number.isFinite(source.restoredCount) ? source.restoredCount : 0,
-    consumed: source.consumed === true,
-    ...(Object.hasOwn(source, 'requiresExecution') && {
-      requiresExecution: source.requiresExecution === true,
-    }),
-    ...(Object.hasOwn(source, 'canExecuteImmediately') && {
-      canExecuteImmediately: source.canExecuteImmediately === true,
-    }),
-    // Gathering refuses in its own vocabulary (`state` and the coded `blockedReasons`), where
-    // crafting uses `reason` and `message`; dropping them left a refusal no surface could word
-    // (issue 1759).
-    ...(Object.hasOwn(source, 'state') && { state: source.state ?? null }),
-    ...(Object.hasOwn(source, 'blockedReasons') && {
-      blockedReasons: Array.isArray(source.blockedReasons) ? source.blockedReasons : [],
-    }),
-    createdResultUuids:
-      source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
-  };
-}
-
-/**
- * A crafting reply's executed check projection for the player's result box (issue 2005), or null:
- * a blind roll, which the roller never sees, a non-crafting run and a stage with no rolled check
- * have none. The caller attaches it only for an entitled initiator.
- */
-function executedCheckFor(runType, checkResult) {
-  const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
-  return check?.evidence && check.visibility?.rollMode !== 'blindroll' ? check : null;
-}
-
-/**
- * Whether the attested initiator may receive a visible roll's private facts (its handoff and its
- * executed evidence), re-read against the fresh actor, sender and run after the commit.
- */
-async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...authorization }) {
-  if (typeof operation.authorizeRollHandoff !== 'function') return true;
-  try {
-    const freshActor = await resolveUuid(request.actorUuid);
-    const freshSender = getUser?.(request.senderId) ?? null;
-    const freshRun =
-      freshActor && validText(request.runId)
-        ? await operation.getRun?.({
-            actor: freshActor,
-            runId: request.runId,
-            includeHistory: true,
-          })
-        : null;
-    return Boolean(
-      freshActor &&
-      freshSender &&
-      (await operation.authorizeRollHandoff({
-        actor: freshActor,
-        run: freshRun,
-        sender: freshSender,
-        ...authorization,
-      }))
-    );
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
@@ -675,6 +589,7 @@ async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...
  * @param {number} [deps.timeoutMs=15000] Remote-reply timeout, not cancellation of server work.
  * @param {Function|null} [deps.promptCheck] Local safe-descriptor prompt returning a roll decision.
  * @param {Function|null} [deps.postRollHandoff] Post an already evaluated, entitled roll without rerolling.
+ * @param {Function|null} [deps.onCheckChanged] Tell the player a re-prepared check differs from the one answered.
  * @param {Function} [deps.getDismissals] Read this user's dismissal map.
  * @param {Function} [deps.setDismissals] Awaited replacing write of this user's dismissal map.
  * @param {Function} [deps.now] Wall-clock milliseconds for tokens and dismissal timestamps.
@@ -693,6 +608,7 @@ export function createJournalRunCommandService({
   timeoutMs = JOURNAL_RUN_COMMAND_TIMEOUT_MS,
   promptCheck = null,
   postRollHandoff = null,
+  onCheckChanged = null,
   getDismissals = () => ({}),
   setDismissals = async () => {},
   now = () => Date.now(),
@@ -737,18 +653,14 @@ export function createJournalRunCommandService({
     ) {
       return failure('stale-stage');
     }
-    const authorized = await operation.authorize?.({
-      actor,
-      run,
-      payload: request.payload ?? {},
-      sender,
-    });
+    const context = { actor, run, sender, request, payload: request.payload ?? {} };
+    const authorized = await commandAuthorizer(request, operation)?.(context);
     if (authorized === false) return failure('source-owner-required');
     if (authorized?.success === false) return authorized;
     return { success: true, sender, actor, operation, run, revision };
   }
 
-  async function executeOperation(request, context, helpers) {
+  async function executeOperation(request, context, helpers, spent) {
     const { actor, operation, run } = context;
     const binding = {
       operation: request.action === 'releaseCheck' ? 'execute' : request.action,
@@ -789,23 +701,15 @@ export function createJournalRunCommandService({
       preparedPayload = prepared?.payload ?? preparedPayload;
       executionOperation = prepared?.executionOperation ?? executionOperation;
     }
-    const prepareToken = request.payload?.prepareToken;
-    if (request.action === 'execute' && prepareToken) {
-      const token = helpers.consumePrepareToken(prepareToken, binding);
-      if (!token) return failure('prepare-token-invalid');
-      privateEvaluation = token.binding?.privateEvaluation;
+    if (request.action === 'execute' && request.payload?.prepareToken) {
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
-      const resolvedCheckResult = await evaluate({
-        actor,
-        run,
-        sender: context.sender,
-        privateEvaluation,
-        decision: {
-          ...safeRollDecision(request.payload?.rollDecision),
-          ...token.binding?.decisionPolicy,
-        },
-      });
+      const { consumePrepareToken } = helpers;
+      const seams = { evaluate, consumePrepareToken, currentRealmIsActiveGm, spent };
+      const prepared = await evaluatePreparedJournalCheck({ request, context, binding, ...seams });
+      if (prepared.response) return prepared.response;
+      const resolvedCheckResult = prepared.checkResult;
+      privateEvaluation = prepared.privateEvaluation;
       // A check that cannot roll carries its refusal sentence, which the player sees.
       if (resolvedCheckResult?.misconfigured === true) {
         return failure('roll-unavailable', { message: resolvedCheckResult.message ?? null });
@@ -820,10 +724,12 @@ export function createJournalRunCommandService({
       } = resolvedCheckResult;
       responseRollHandoff = rollHandoff;
       secretCheck = secret === true;
-      trustedContext = {
-        operationId: request.requestId,
-        resolvedCheckResult: trustedResolvedCheckResult,
-      };
+      const entitlement = { operation, request, resolveUuid, getUser, privateEvaluation };
+      const offered = await cardOffer(trustedResolvedCheckResult, rollHandoff, {
+        ...entitlement,
+        payload: request.payload ?? {},
+      });
+      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
       const preparationGrant = helpers.createExecutionGrant({
         ...binding,
@@ -838,24 +744,21 @@ export function createJournalRunCommandService({
         preparationGrant,
         requestId: request.requestId,
       });
-      if (descriptor?.blocked) return failure(descriptor.blocked);
+      if (descriptor?.blocked) return failure(descriptor.blocked, descriptor.detail);
       if (descriptor?.required) {
+        const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
         const token = helpers.issuePrepareToken(
           {
             ...binding,
             privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: {
-              allowsSituationalModifier:
-                descriptor.publicPrompt?.allowsSituationalModifier === true,
-              allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
-            },
+            decisionPolicy: preparedDecisionPolicy(publicPrompt),
           },
           { expiresAt: now() + 60_000 }
         );
         return {
           success: true,
           checkRequired: true,
-          promptDescriptor: descriptor.publicPrompt ?? {},
+          promptDescriptor: publicPrompt ?? {},
           prepareToken: token,
         };
       }
@@ -868,6 +771,21 @@ export function createJournalRunCommandService({
       };
     }
 
+    const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
+    const plan = { binding, preparedPayload, executionOperation };
+    try {
+      return await commitOperation(request, context, helpers, { ...facts, ...plan });
+    } finally {
+      // Every way out closes the card offer; one the reply already settled is gone by now.
+      await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    }
+  }
+
+  /** Runs the operation under its execution grant and answers the reply an entitled sender reads. */
+  async function commitOperation(request, context, helpers, prepared) {
+    const { actor, operation, run } = context;
+    const { binding, preparedPayload, executionOperation, trustedContext } = prepared;
+    const { responseRollHandoff, secretCheck, privateEvaluation } = prepared;
     const method = operation[executionOperation];
     if (typeof method !== 'function') return failure('unsupported-operation');
     if (!currentRealmIsActiveGm()) return failure('active-gm-required');
@@ -900,23 +818,11 @@ export function createJournalRunCommandService({
     const check = secretCheck
       ? null
       : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
-    const handoff = response.success && !secretCheck ? responseRollHandoff : null;
-    // Evidence and the handoff share one entitlement: an unentitled initiator receives neither.
-    if (
-      (handoff || check) &&
-      (await initiatorEntitled({
-        operation,
-        request,
-        resolveUuid,
-        getUser,
-        payload,
-        privateEvaluation,
-        result,
-      }))
-    ) {
-      return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
-    }
-    return response;
+    // A handoff the result card carried is not posted again by the requester.
+    const carried = await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    const handoff = secretCheck || carried ? null : responseRollHandoff;
+    const entitlement = { operation, request, resolveUuid, getUser, payload, privateEvaluation };
+    return withEntitledFacts(response, { check, handoff }, { ...entitlement, result });
   }
 
   async function handleRequest(request, senderId) {
@@ -924,13 +830,16 @@ export function createJournalRunCommandService({
     if (!currentRealmIsActiveGm()) {
       return failure('active-gm-required');
     }
+    const spent = {};
     // A run command's logical identity is its request, whatever the payload names.
-    return authority.run({ ...request, operationId: undefined, senderId }, async (helpers) => {
+    const claimed = { ...request, operationId: undefined, senderId };
+    const response = await authority.run(claimed, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
       if (!context.success) return context;
-      return executeOperation({ ...request, senderId }, context, helpers);
+      return executeOperation({ ...request, senderId }, context, helpers, spent);
     });
+    return withSpentAdditionalDice(response, spent, request.expectedRevision);
   }
 
   function buildReply(request, recipientId, response) {
@@ -989,7 +898,7 @@ export function createJournalRunCommandService({
     const request = {
       kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
       ...command,
-      requestId: randomId(),
+      requestId: requestIdFor(command, randomId),
       sessionId,
       senderId: undefined,
       payload: command.payload && typeof command.payload === 'object' ? command.payload : {},
@@ -1009,39 +918,22 @@ export function createJournalRunCommandService({
    * Run one Journal command, resolving a required check on the way. `interactive` is the CALLER'S:
    * the public API defaults it to `false`, because `promptCheck` awaits a human with no timeout of
    * its own, so a non-interactive caller settles the check on the engine's defaults, the route a
-   * player takes after answering (issue 1683).
+   * player takes after answering (issue 1683), buying only the `additionalDice` it names.
    */
-  async function executeJournalRunCommand(command, { interactive = true } = {}) {
+  async function executeJournalRunCommand(command, options = {}) {
+    const { interactive = true } = options;
     const first = await sendCommand(command);
     if (!first?.checkRequired) return first;
     if (!interactive) {
+      const rollDecision = decisionAdditionalDice(options);
       return sendCommand({
         ...command,
-        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision: {} },
+        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision },
       });
     }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
-    const decision = await promptCheck(first.promptDescriptor);
-    if (!decision || decision.confirmed === false) {
-      await sendCommand({
-        ...command,
-        action: 'releaseCheck',
-        payload: { prepareToken: first.prepareToken },
-      });
-      return { success: false, cancelled: true, reason: 'roll-cancelled' };
-    }
-    const settled = await sendCommand({
-      ...command,
-      payload: {
-        ...command.payload,
-        prepareToken: first.prepareToken,
-        rollDecision: safeRollDecision(decision),
-      },
-    });
-    if (settled?.rollHandoff && typeof postRollHandoff === 'function') {
-      await postRollHandoff(settled.rollHandoff);
-    }
-    return settled;
+    const seams = { sendCommand, promptCheck, postRollHandoff, onCheckChanged };
+    return settlePromptedCheck(command, first, seams);
   }
 
   function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {
@@ -1063,7 +955,8 @@ export function createJournalRunCommandService({
     }
     const run = actor ? await operation.getRun?.({ actor, runId, includeHistory: true }) : null;
     if (!run) return failure('run-not-found');
-    if (!terminalRun(run)) return failure('active-run');
+    const refused = terminalRun(run) ? awardChoiceDismissalRefusal(run) : failure('active-run');
+    if (refused) return refused;
     const key = journalRunDismissalKey({ actorUuid, runType, runId });
     const next = normalizeJournalRunDismissals({ ...getDismissals(), [key]: now() });
     await setDismissals(next);

@@ -65,6 +65,8 @@
       },
       ...(stage.route ? [{ id: 'route', label: text('ChosenRoute'), value: stage.route }] : []),
       ...presentCurrencySpends(stage.currencySpends, localize),
+      // A stage card states one string per fact, so a reward's wrap segments join back into one.
+      ...stage.rewards.map((reward) => ({ ...reward, value: [reward.value].flat().join('') })),
     ];
   }
   // The transient banner's evidence rows, and WHETHER THERE ARE ANY (issue 1648, M22).
@@ -123,7 +125,15 @@
     {#if account.summary}<span>{account.summary.value}</span>{/if}
     {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
     {@render items(resultHeading, account.results, 'transient-produced')}
+    {@render rewardFacts()}
   {/if}
+{/snippet}
+
+<!-- Each credit and grant as its own fact row, in the history and in the just-finished banner. -->
+{#snippet rewardFacts()}
+  {#each account.rewards as reward (reward.id)}
+    <JournalFactRow icon={reward.icon} label={reward.label} value={reward.value} />
+  {/each}
 {/snippet}
 
 {#snippet essenceRecaps()}
@@ -146,14 +156,13 @@
 <div class="journal-history-detail" data-journal-history-detail>
   {#if !recovery}
     {#if account.settling}
-      <Notice tone="info" title={text('SettlementTitle')} dataAttr="data-journal-settling" />
+      <Notice tone="info" title={text('SettlementTitle')} data-journal-settling="" />
     {:else if showTransient || account.failed}
       <Notice
         tone={account.failed ? 'danger' : 'success'}
         title={localize(`FABRICATE.App.Journal.Verdict.${run.status}`)}
         detail={account.failed ? account.failureDetail : ''}
-        dataAttr="data-journal-verdict"
-        dataValue={run.status}
+        data-journal-verdict={run.status === undefined ? '' : run.status}
         evidence={hasVerdictEvidence ? verdictEvidence : null}
       />
     {/if}
@@ -199,6 +208,7 @@
       {/each}
       {@render essenceRecaps()}
       {@render items(resultHeading, account.results, 'produced')}
+      {@render rewardFacts()}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
         <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />
       {/if}
@@ -253,7 +263,7 @@
     {@render items(text('ToolsUsed'), account.tools, 'tools')}
   {/if}
   <ThisRun {run} {services} />
-  <Callout tone="neutral" text={account.closed} dataAttr="data-journal-guidance" />
+  <Callout tone="neutral" text={account.closed} data-journal-guidance />
 </div>
 
 <style>

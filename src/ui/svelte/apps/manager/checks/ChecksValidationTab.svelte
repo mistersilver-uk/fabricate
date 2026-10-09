@@ -9,17 +9,15 @@
   the ENABLE gate reads COMMITTED state, so a draft that clears every blocking issue must NOT be
   reported as "Ready to enable". `sections` is the list of in-play subsystem checks `ChecksView`
   resolves; a subsystem that is switched off is omitted upstream. A transient warning names the
-  Preview-as actor: it renders as a row but is never counted in the tally or the hero.
+  Preview-as actor: it renders as a row but is never counted in the tally or the hero. A summing
+  formula that converts carries `Convert to count successes` in place of View, which calls
+  `onConvert(subsystem)`; the host stages the conversion (issue 2006).
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { checkIssueText, checkTickCopy } from './checksCopy.js';
-  import {
-    CHECK_ISSUE_CONTROLS,
-    evaluateCheckReadiness,
-    sectionForIssue,
-  } from './checksReadiness.js';
+  import { checkIssueText, checkTickCopy, convertActionCopy } from './checksCopy.js';
+  import { evaluateCheckReadiness, issueControl, sectionForIssue } from './checksReadiness.js';
   import { checksValidationRowStates, issueRowStatus } from './checksValidationRows.js';
 
   let {
@@ -29,6 +27,7 @@
     dirty = false,
     dirtyActivities = [],
     onSelectIssue = () => {},
+    onConvert = () => {},
   } = $props();
 
   function text(key, fallback, data) {
@@ -72,15 +71,22 @@
   // ONE ROW PER FAULT (issue 2083): `checksValidationRowStates` pairs a failing check with the
   // issue it owns, so the readiness checklist line keeps its tick or cross on the SAME row the
   // issue's severity and sentence render on, rather than adding a second "Warning" row beside it.
-  // BUILT IS NOT RENDERED: `EditorValidationSurface` sorts each group with `block` first and a
-  // `critical` issue maps to `block`, so it RISES ABOVE EVERY TICK — the requirement being met,
-  // not a defect — and everything else is one rank, so below the criticals the order authored
-  // here is the order drawn.
+  // BUILT IS NOT RENDERED: under `issuesFirst` the surface sorts each group blocking, then
+  // warning, then pass, so every issue rises above every tick (issue 2130), and within a rank the
+  // order authored here is the order drawn.
   //
   // A group with NEITHER still states its result, which is reachable: a gathering check in
   // `d100` mode with no eligible modifiers reports no tick and no issue, and dropping the group
   // would read as "gathering was not evaluated", a different and equally wrong claim.
+  function convertAction(subsystem, issue) {
+    const copy = convertActionCopy(issue);
+    if (!copy) return {};
+    const onAction = () => onConvert(subsystem);
+    return { action: { labelKey: copy.label[0], descriptionKey: copy.description[0], onAction } };
+  }
+
   function issueRow(subsystem, issue, { transient = false, checkId = '', status } = {}) {
+    const control = issueControl(issue);
     return {
       id: checkId || issue.id,
       ...checkIssueText(issue.id, issue.data, text),
@@ -89,7 +95,8 @@
       target: { activity: subsystem, section: sectionForIssue(issue.id) },
       // NO KEY rather than an empty one for a route-only row: the host resolves any non-empty
       // string, so `focusTarget: ''` would report as focus-wired while focusing nothing.
-      ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
+      ...(control ? { focusTarget: control } : {}),
+      ...convertAction(subsystem, issue),
       dataAttrs: {
         'data-subsystem': subsystem,
         'data-issue': issue.id,
@@ -159,16 +166,19 @@
     return tally;
   });
 
-  // The hero. Three states, and the UNSAVED one is not decoration: readiness ran against the
+  // The hero. Four states, and the UNSAVED one is not decoration: readiness ran against the
   // live DRAFT while enabling reads what is COMMITTED.
   const summary = $derived.by(() => {
     if (counts.blocking > 0) {
       return {
         status: 'block',
-        title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked', 'Blocking issues'),
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked',
+          'Blocked from enabling'
+        ),
         sub: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroBlockedSub',
-          'This system saves while incomplete, but it will not enable until every blocking issue is cleared.'
+          'Clear the blocking issues before this crafting system can be enabled.'
         ),
       };
     }
@@ -178,12 +188,22 @@
         status: 'warn',
         title: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsaved',
-          'Clean, but not saved yet'
+          'No blocking issues, but not saved yet'
         ),
         sub: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsavedSub',
           'These results describe your unsaved edits to {activities}. Enabling the system reads what is saved, so save the checks before enabling.'
         ).replace('{activities}', names),
+      };
+    }
+    if (counts.warnings > 0) {
+      return {
+        status: 'warn',
+        title: text('FABRICATE.Admin.Manager.Validation.SummaryWarnings', 'Enabled with warnings'),
+        sub: text(
+          'FABRICATE.Admin.Manager.Validation.SummaryWarningsSub',
+          'Saves and enables — review the warnings when you can.'
+        ),
       };
     }
     return {
@@ -211,6 +231,7 @@
     {counts}
     {groups}
     rowDataAttr="data-checks-validation-check"
+    issuesFirst={true}
     {onSelectIssue}
   />
 </div>

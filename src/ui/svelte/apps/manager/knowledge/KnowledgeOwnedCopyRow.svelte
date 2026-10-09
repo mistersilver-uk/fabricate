@@ -6,13 +6,13 @@
   - Only `spent` disables Expend — `inert` does not gate the craft path, so refusing here would apply
     a gate the engine does not. An UNCAPPED copy disables it too: expending would write nothing.
   - The spent-row dim is scoped to the identity/meta column and MUST NOT reach the action cluster,
-    where `.manager-button:disabled`'s own `opacity: 0.62` would composite it to ~0.38.
+    where `.fabricate-button:disabled`'s own `opacity: 0.62` would composite it to ~0.38.
 
   Props: copy, armedToken (the surface's single armed token), onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
@@ -137,7 +137,7 @@
     title={matchTierTitle(copy)}
   >
     <span class="manager-knowledge-copy-identity">
-      <Medallion art={copy.img} icon="fas fa-book" size={44} alt="" />
+      <Medallion art={copy.img} icon="fas fa-book" size={38} alt="" />
       <span class="manager-knowledge-copy-copy">
         <!-- The prototype's rhythm — name, type, quantity — which leaves line 2 the state chips. -->
         <span class="manager-knowledge-copy-heading">
@@ -186,7 +186,7 @@
       role="group"
       aria-label={text('FABRICATE.Admin.Manager.Knowledge.RowActions', 'Copy actions')}
     >
-      <ManagerButton
+      <Button
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
@@ -196,7 +196,7 @@
         <!-- NOT `fa-fire-flame-curved`: that is the uses chip's glyph, one element away. -->
         <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
-      </ManagerButton>
+      </Button>
       <ArmedDangerButton
         token={deleteToken}
         armed={armedToken === deleteToken}
