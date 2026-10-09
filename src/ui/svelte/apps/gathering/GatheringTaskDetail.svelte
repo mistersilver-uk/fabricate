@@ -386,6 +386,6 @@
   /* The shared requirements block renders as a bordered card in this column. */
   .gathering-task-detail :global(.gathering-task-details) {
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
   }
 </style>

@@ -1253,15 +1253,27 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   );
 });
 
-// The strip's shipped box, held until issue 1523 converges it on the AppTitleBar specimen: the
-// specimen's inline 12px block padding would push every manager frame, its 9px gap is off the
-// spacing scale, and its full border and radius cannot frame a band spanning the window edge.
-test('the manager titlebar keeps its shipped box until the specimen converges', async () => {
+// The strip's shipped box is the AppTitleBar specimen's: 8/16 padding, an 8px gap, and a bottom
+// rule with no radius across the window edge (issue 2257 D4).
+test('the manager titlebar draws the AppTitleBar specimen box', async () => {
   const strip = await readTitleBarGeometry();
   assert.deepEqual(strip.padding, ['8px', '16px', '8px', '16px']);
-  assert.equal(strip.columnGap, '8px', 'the nearest spacing rung to the specimen 9px');
+  assert.equal(strip.columnGap, '8px', 'the specimen gap');
   assert.deepEqual(strip.borders, ['0px', '0px', '1px', '0px'], 'a bottom rule only');
   assert.equal(strip.radius, '0px');
+});
+
+// The names the band moved into visually hidden text add no width to the badge and paint no box.
+test('the manager titlebar hidden names take no width', async () => {
+  const strip = await readTitleBarGeometry();
+  assert.ok(
+    Math.abs(strip.badgeWidth - (strip.markWidth + strip.badgeInset)) <= 0.5,
+    `the badge should be the mark plus its padding and borders, got ${strip.badgeWidth}`
+  );
+  assert.equal(strip.hiddenNames.length, 2, 'the badge and the status each hide one name');
+  for (const { width, height } of strip.hiddenNames) {
+    assert.ok(width <= 1 && height <= 1, `a hidden name painted a ${width}x${height} box`);
+  }
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {

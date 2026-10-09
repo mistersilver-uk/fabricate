@@ -280,7 +280,7 @@
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
         <div class="inventory-detail-accordion-header">
           <span class="inventory-detail-book-recipe-static">
-            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
             <span class="inventory-detail-row-name">{recipe.name}</span>
           </span>
           {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(
@@ -327,7 +327,7 @@
                   aria-controls={expanded ? bodyId : undefined}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
-                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
                   <span class="inventory-detail-row-name">{recipe.name}</span>
                   <i
                     class="fas inventory-detail-accordion-caret"
@@ -426,7 +426,7 @@
     gap: 6px;
     padding: 5px 12px;
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-accent-soft);
     color: var(--fab-accent);
     font-size: 12px;
@@ -514,7 +514,7 @@
 
   .inventory-detail-accordion-item {
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     overflow: hidden;
   }
@@ -539,10 +539,10 @@
     align-items: center;
     gap: var(--fab-space-3);
     padding: 0;
-    /* Defuse Foundry's fixed global button height so the 40px thumb isn't clamped/misaligned
+    /* Defuse Foundry's fixed global button height so the 38px thumb isn't clamped/misaligned
        (matches the min-height the sibling recipe/read-learn buttons pin). */
     height: auto;
-    min-height: 40px;
+    min-height: 38px;
     border: none;
     background: none;
     color: var(--fab-text);
@@ -559,11 +559,11 @@
   .inventory-detail-accordion-toggle:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 9px;
   }
 
   .inventory-detail-accordion-body {
     padding: 0 var(--fab-space-2) var(--fab-space-2)
-      calc(40px + var(--fab-space-2) + var(--fab-space-3));
+      calc(38px + var(--fab-space-2) + var(--fab-space-3));
   }
 </style>

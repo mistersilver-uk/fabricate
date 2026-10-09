@@ -68,6 +68,16 @@ export const CASES = Object.freeze([
     // The panel's own accessible name is the assertion, not merely the panel.
     expectSelector:
       '.fabricate-manager .fabricate-action-menu-panel[role="menu"][aria-label^="System actions for"]',
+    // The panel at 11 and its items at 7, concentric with its 4px padding (issue 2257).
+    expectLayout: {
+      controls: [
+        { selector: '.fabricate-action-menu-panel', styles: 'border-radius: 11px' },
+        {
+          selector: '.fabricate-action-menu-panel button.manager-action-menu-item:first-child',
+          styles: 'border-radius: 7px',
+        },
+      ],
+    },
     kinds: ['manager', 'systems'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
   }),

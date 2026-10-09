@@ -465,6 +465,16 @@ export const CASES = Object.freeze([
     expectView: 'environment-edit',
     // The open menu's Force add itself, not the section that holds it.
     expectSelector: '.fabricate-manager .fabricate-action-menu-panel [data-action="force-include"]',
+    // The panel at 11 and its items at 7, concentric with its 4px padding (issue 2257).
+    expectLayout: {
+      controls: [
+        { selector: '.fabricate-action-menu-panel', styles: 'border-radius: 11px' },
+        {
+          selector: '.fabricate-action-menu-panel [data-action="force-include"]',
+          styles: 'border-radius: 7px',
+        },
+      ],
+    },
     kinds: ['manager', 'environments'],
     sourceMatches: [
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,

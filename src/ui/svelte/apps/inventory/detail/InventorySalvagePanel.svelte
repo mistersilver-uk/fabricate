@@ -353,7 +353,7 @@
     min-height: 44px;
     padding: 12px 16px;
     border: 1px solid var(--fab-success-border);
-    border-radius: 9px;
+    border-radius: 11px;
     background: var(--fab-success-soft);
     color: var(--fab-success-text);
     font-size: 12.5px;

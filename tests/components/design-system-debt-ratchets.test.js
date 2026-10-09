@@ -74,8 +74,8 @@ const MODULE_SHEET = 'styles/fabricate.css';
 /** The class every Fabricate application root emits, and the root a module utility hangs from. */
 const MODULE_ROOT = '.fabricate';
 
-/** The sheet, the shared components and the manager; the player apps are a later pass's. */
-const SWEEP_SCOPE = /^(?:styles\/|src\/ui\/svelte\/(?:components|apps\/manager)\/)/u;
+/** The sheet and every Svelte scoped block: the components, the manager and the player apps. */
+const SWEEP_SCOPE = /^(?:styles\/|src\/ui\/svelte\/)/u;
 
 test('both stylesheet corpora are still being read', () => {
   // A TOTAL HAS SLACK AND CANNOT SEE A PARTIAL LOSS. Break the `<style>` extractor and 195 files
@@ -574,7 +574,7 @@ test('no viewport breakpoint or unnamed container is introduced, and preferences
 
 // Absolute, not against the base: the swept scope asks no viewport query, names every container
 // and breaks an app container on its published ladder.
-test('the sheet, components and manager ask no viewport, name every container and keep the ladder', () => {
+test('the sheet and every scoped block ask no viewport, name every container and keep the ladder', () => {
   const corpus = treeStyles();
   const inScope = (entry) => SWEEP_SCOPE.test(entry.file);
   const site = (entry) => `${entry.file}:${entry.line} ${entry.query}`;
@@ -621,7 +621,10 @@ test('the option host is the manager root, the modifier catalogue card and the t
     'the 620 option-card reflow answers these hosts; a player app root must not carry the name'
   );
   assert.deepEqual(
-    hosts.filter((host) => !SWEEP_SCOPE.test(host) || /\.fabricate-app\b/u.test(host)),
+    hosts.filter(
+      (host) =>
+        /^src\/ui\/svelte\/apps\/(?!manager\/)/u.test(host) || /\.fabricate-app\b/u.test(host)
+    ),
     [],
     'a player app root carries `fabricate-option-host`, so the manager reflow reaches the player'
   );
@@ -818,7 +821,7 @@ const unmarkedInScope = (corpus) => (d) =>
 const scopeSite = (d) => `${d.file}: ${d.selector} | ${d.value}`;
 
 // Absolute, not against the base: the swept scope holds no off-ramp weight and no heavy mono.
-test('no weight in the sheet, components and manager leaves the ramp or the mono face', () => {
+test('no weight in the sheet and every scoped block leaves the ramp or the mono face', () => {
   const corpus = treeStyles();
   const unmarked = unmarkedInScope(corpus);
   const weights = fontWeights(corpus).filter(unmarked);
@@ -946,7 +949,7 @@ test('no box-shadow is written outside the published elevation set', (t) => {
 });
 
 // Absolute, not against the base: the swept scope draws no shadow outside the allowance.
-test('no shadow in the sheet, components and manager leaves the allowance', () => {
+test('no shadow in the sheet and every scoped block leaves the allowance', () => {
   const corpus = treeStyles();
   const shadows = shadowsOf(corpus).filter(unmarkedInScope(corpus));
   assert.ok(shadows.length >= 80, `only ${shadows.length} in-scope shadows were read`);
@@ -1008,7 +1011,7 @@ const inThemeBlock = (d) =>
   d.file === MODULE_SHEET && splitSelectorList(d.selector).every((item) => THEME_BLOCK.test(item));
 
 // Absolute: a filter, a text shadow or a re-declared token draws depth the gate above never reads.
-test('no rule in the sheet, components and manager draws depth through another channel', () => {
+test('no rule in the sheet and every scoped block draws depth through another channel', () => {
   const corpus = treeStyles();
   const declarations = corpus.declarations
     .filter(unmarkedInScope(corpus))
@@ -1425,6 +1428,36 @@ const STATE_TINTS = Object.freeze([
     'var(--fab-bg-3)',
     'the feature’s icon well, filled when on: a mark inside the tile',
   ],
+  [
+    'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+    '.modifier-choice.is-chosen',
+    'var(--fab-accent-soft)',
+    'the chosen modifier chip’s face, `.k-chip.sel` (library.html:191)',
+  ],
+  [
+    'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+    ".modifier-choice input[type='radio']:checked",
+    'var(--fab-accent)',
+    'the checked radio’s dot, a mark inside the chip',
+  ],
+  [
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
+    '.bulk-remove:hover',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    '.inventory-detail-learn-btn:hover:not(:disabled), .inventory-detail-craft-btn:hover:not(:disabled)',
+    'var(--fab-accent)',
+    'an accent verb resting on its soft fill deepens in its own family',
+  ],
+  [
+    'src/ui/svelte/apps/journal/StepTimeline.svelte',
+    '.journal-step-node.is-current .journal-step-node-marker',
+    'var(--fab-accent-soft)',
+    'the current step’s marker, a mark inside the timeline',
+  ],
   // A flag that is on is a status reading, not a selection: `.k-status.on` (library.html:200).
   ...[
     [
@@ -1538,7 +1571,7 @@ const pinnedSites = (pins) =>
   pins.map(([file, selector, value]) => `${file}: ${selector} | ${value}`).sort(byCodePoint);
 
 // Absolute and pinned: rest, then `raised` under the pointer, then `active` once chosen.
-test('no state fill in the sheet, components and manager leaves its rung unlisted', () => {
+test('no state fill in the sheet and every scoped block leaves its rung unlisted', () => {
   const corpus = treeStyles();
   const read = stateFills(corpus).length;
   assert.ok(read >= 140, `only ${read} in-scope state fills were read`);
@@ -1593,7 +1626,7 @@ const mixedFamilies = (corpus) =>
   });
 
 // A state draws one family whole: a success fill under an accent edge is two answers at once.
-test('no state rule in the sheet, components and manager mixes two tint families', () => {
+test('no state rule in the sheet and every scoped block mixes two tint families', () => {
   const corpus = treeStyles();
   const read = stateRules(corpus).length;
   assert.ok(read >= 200, `only ${read} in-scope state rules were read`);
@@ -1635,7 +1668,7 @@ const tintedHoverEdges = (corpus) =>
     .sort(byCodePoint);
 
 // Decision 5's rule: a neutral hover fill under a tinted edge reads as a site tint.
-test('no hover in the sheet, components and manager tints its edge over a rung fill unlisted', () => {
+test('no hover in the sheet and every scoped block tints its edge over a rung fill unlisted', () => {
   assert.deepEqual(
     tintedHoverEdges(treeStyles()),
     pinnedSites(HOVER_EDGE_TINTS),
@@ -2081,11 +2114,6 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
     "the library's DiceTiles specimen: 44 high at radius 9",
   ],
   [
-    'styles/fabricate.css: .fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item',
-    ['6px'],
-    "an item takes its action menu's inner rung; the panel is issue 2257",
-  ],
-  [
     'styles/fabricate.css: .fabricate-manager .manager-tools-authority-segments label',
     ['6px'],
     "a segment takes its track's inner rung",
@@ -2196,7 +2224,7 @@ const tally = (keys) =>
   keys.reduce((counts, key) => counts.set(key, (counts.get(key) ?? 0) + 1), new Map());
 
 // Absolute, not against the base: a 38px box at 6px is on the ladder, so gate 6 passes it.
-test('every sized box in the sheet, components and manager takes its size band’s corner', () => {
+test('every sized box in the sheet and every scoped block takes its size band’s corner', () => {
   const corpus = treeStyles();
   const { found, evaluated } = offBandCorners(corpus);
   // Non-vacuity first, so a scan that stopped reading reports as broken rather than as rot.

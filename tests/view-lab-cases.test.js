@@ -740,9 +740,16 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
-// The measured controls that are not verbs: the `rule` fact row's subtitle ink, and the On craft
-// primer's item list offset and lead (issue 1521).
+// The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
+// primer's item list offset and lead (issue 1521), and each open action menu's panel and item
+// corners (issue 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
+/** An open action menu's panel at 11 and the named item at 7. */
+const menuCorners = (panel, item) => [
+  { selector: panel, styles: 'border-radius: 11px' },
+  { selector: item, styles: 'border-radius: 7px' },
+];
+const OR_MENU = '.manager-recipe-or-menu';
 const NON_VERB_CONTROLS = Object.freeze({
   'world-essence-catalogue': [
     {
@@ -757,6 +764,26 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'color: var(--fab-text); font-weight: 600',
     },
   ],
+  'manager-systems-row-menu-open': menuCorners(
+    '.fabricate-action-menu-panel',
+    '.fabricate-action-menu-panel button.manager-action-menu-item:first-child'
+  ),
+  'manager-recipe-edit-ingredients-or-menu': menuCorners(
+    OR_MENU,
+    `${OR_MENU} [data-recipe-add="alternative-component"]`
+  ),
+  'manager-recipe-edit-choice-group-menu': menuCorners(
+    OR_MENU,
+    `${OR_MENU} [data-recipe-add="alternative-tag"]`
+  ),
+  'manager-environment-edit-automatic-force-add': menuCorners(
+    '.fabricate-action-menu-panel',
+    '.fabricate-action-menu-panel [data-action="force-include"]'
+  ),
+  'manager-recipe-edit-results-adder-menu': menuCorners(
+    '.manager-recipe-result-menu',
+    '.manager-recipe-result-menu [data-recipe-add="result-currency"]'
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -765,7 +792,9 @@ const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
 const CONTROL_LAYOUT_CASE_IDS = [
   ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
 ];
-const LAYOUT_CASE_IDS = [
+// A case may sit in two groups only where the first assertion below names it: the result adder's
+// menu measures its rows and its corners (issue 2257).
+const LAYOUT_CASE_REGISTRATIONS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...CONTROL_LAYOUT_CASE_IDS,
@@ -777,13 +806,23 @@ const LAYOUT_CASE_IDS = [
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
+const LAYOUT_CASE_IDS = [...new Set(LAYOUT_CASE_REGISTRATIONS)];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 test('exactly the declared layout cases carry complete layout expectations', () => {
+  assert.deepEqual(
+    LAYOUT_CASE_REGISTRATIONS.filter(
+      (id, index) => LAYOUT_CASE_REGISTRATIONS.indexOf(id) !== index
+    ),
+    ['manager-recipe-edit-results-adder-menu'],
+    "only the result adder's menu sits in two layout groups, row geometry and controls"
+  );
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
-    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id)) continue;
+    const rowGeometry = ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id);
+    // A row-geometry case that also measures controls keeps its row checks below.
+    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id) && !rowGeometry) continue;
     if (
       viewCase.query?.journalCaseState === 'wide' ||
       viewCase.query?.journalCaseState === 'narrow'
@@ -794,7 +833,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
       continue;
     }
-    if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+    if (rowGeometry) {
       assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
       assert.equal(typeof viewCase.expectLayout.containerSelector, 'string', 'but a container');
       const { oneLineRows, wrappedRows } = viewCase.expectLayout;
@@ -902,7 +941,7 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
   }
 });
 
-test('the subtitle ink and the primer items are measured by the cases that draw them', () => {
+test('the non-verb controls are measured by the cases that draw them', () => {
   for (const [caseId, expected] of Object.entries(NON_VERB_CONTROLS)) {
     assert.deepEqual(
       getCaseById(caseId).expectLayout.controls.filter((candidate) => !isVerbControl(candidate)),
@@ -2285,16 +2324,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     '[data-lab-companion-scroll]',
     'the companion owns the scrolling, which is only reachable at the full panel height'
   );
-  assert.ok(
-    premium.expectVisible.includes(lang.FABRICATE.Admin.Manager.Titlebar.Premium),
-    'the badge caption is the shipped titlebar premium mark'
+  assert.equal(
+    premium.expectVisible,
+    `[data-manager-titlebar-premium] > [aria-hidden="true"]:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.Premium}")`,
+    'the visible badge caption is the shipped premium mark, not the hidden name that contains it'
   );
   const premiumAttribute = (selector, name) =>
     premium.expectAttributes.find((entry) => entry.selector === selector && entry.name === name)
       ?.value;
-  assert.equal(
+  assert.strictEqual(
     premiumAttribute('[data-manager-titlebar-premium]', 'aria-label'),
-    lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus
+    null,
+    'the frame proves the badge carries no aria-label (issue 2257 D4)'
+  );
+  assert.strictEqual(
+    premiumAttribute(
+      `[data-manager-titlebar-premium] > .visually-hidden:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus}")`,
+      'aria-hidden'
+    ),
+    null,
+    'and that its name is the shipped status string, read as visually hidden text'
   );
   assert.equal(
     premiumAttribute('#manager-world-nav-downtime', 'title'),
@@ -2539,8 +2588,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    134,
-    `expected the 134 crafting-path cases to be examined, saw ${examined.length}`
+    135,
+    `expected the 135 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>

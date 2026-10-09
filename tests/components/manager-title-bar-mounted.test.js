@@ -58,6 +58,18 @@ function text(key, fallback) {
 
 const titleBarOf = (root) => root.querySelector('.manager-titlebar[data-manager-titlebar]');
 const statusOf = (root) => root.querySelector('[data-manager-titlebar-status]');
+const titlebar = lang.FABRICATE.Admin.Manager.Titlebar;
+
+/** A node's name is its visually hidden text, so no node in the band carries `aria-label` (issue 2257 D4). */
+function assertNoAriaLabel(root) {
+  const labelled = [...titleBarOf(root).querySelectorAll('[aria-label]')];
+  assert.deepEqual(
+    labelled.map((node) => node.className),
+    [],
+    'no title-bar node carries aria-label'
+  );
+  assert.ok(!titleBarOf(root).hasAttribute('aria-label'), 'nor does the bar itself');
+}
 
 describe('ManagerTitleBar', () => {
   before(() => harness.setup());
@@ -69,7 +81,7 @@ describe('ManagerTitleBar', () => {
     const bar = titleBarOf(root);
     assert.ok(Boolean(bar), 'the strip renders with its class and hook');
     assert.equal(bar.parentElement, root, 'it is a direct child of the manager root');
-    assert.equal(bar.getAttribute('aria-label'), 'Crafting manager');
+    assertNoAriaLabel(root);
     assert.ok(!root.querySelector('[data-manager-titlebar-premium]'), 'no premium mark');
     assert.ok(!statusOf(root), 'no status line without a selected system');
   });
@@ -80,21 +92,33 @@ describe('ManagerTitleBar', () => {
     assert.equal(badge.tagName, 'SPAN', 'the mark is a bare span, not a Chip');
     assert.ok(badge.classList.contains('manager-titlebar-badge'), 'it rides the gold badge rule');
     assert.equal(badge.parentElement, titleBarOf(root));
-    assert.equal(badge.textContent.trim(), 'PREMIUM');
-    const status = 'Fabricate Premium is installed and connected';
-    assert.equal(badge.getAttribute('aria-label'), status);
-    assert.equal(badge.getAttribute('title'), status);
+    assert.equal(badge.children.length, 2, 'the mark and its hidden name, nothing else');
+    const [mark, name] = badge.children;
+    assert.equal(mark.textContent, titlebar.Premium);
+    assert.equal(mark.getAttribute('aria-hidden'), 'true', 'the visible mark is not read');
+    assert.ok(name.classList.contains('visually-hidden'), 'the read name is hidden text');
+    assert.ok(!name.hasAttribute('aria-hidden'), 'and is read');
+    assert.equal(name.textContent, titlebar.PremiumStatus);
+    assert.equal(badge.getAttribute('title'), titlebar.PremiumStatus);
+    assertNoAriaLabel(root);
   });
 
   it('summarises the selected system as its resolution mode alone when it has no tiers', async () => {
     const root = await harness.mount({ text, modeLabel: 'Routed by check', outcomeTierCount: 0 });
     const status = statusOf(root);
     assert.ok(status.classList.contains('manager-titlebar-status'));
-    assert.equal(status.getAttribute('aria-label'), 'Selected system resolution');
+    const prefix = status.firstElementChild;
+    assert.ok(prefix.classList.contains('visually-hidden'), 'the status is named by hidden text');
+    assert.equal(prefix.textContent, titlebar.Status, 'read before the visible value');
+    assertNoAriaLabel(root);
     assert.equal(status.getAttribute('title'), 'Routed by check');
     assert.equal(
       status.querySelector('.manager-titlebar-status-text').textContent,
       'Routed by check'
+    );
+    assert.ok(
+      !status.querySelector('.manager-titlebar-status-text').closest('[aria-hidden]'),
+      'the value is read after the prefix'
     );
     const icon = status.querySelector('i.manager-titlebar-status-icon');
     assert.ok(icon.classList.contains('fa-circle-info'), 'an information glyph, not a die');

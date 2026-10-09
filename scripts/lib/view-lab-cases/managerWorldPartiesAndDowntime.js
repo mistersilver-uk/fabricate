@@ -575,10 +575,13 @@ export const CASES = Object.freeze([
     expectSelector:
       '.manager-body:not(.is-rail-collapsed) [data-manager-rail-toggle][disabled][aria-pressed="false"]',
     expectAttributes: [
+      // The badge is named by visually hidden text and carries no `aria-label` (issue 2257 D4).
+      { selector: '[data-manager-titlebar-premium]', name: 'aria-label', value: null },
       {
-        selector: '[data-manager-titlebar-premium]',
-        name: 'aria-label',
-        value: 'Fabricate Premium is installed and connected',
+        selector:
+          '[data-manager-titlebar-premium] > .visually-hidden:text-is("Fabricate Premium is installed and connected")',
+        name: 'aria-hidden',
+        value: null,
       },
       {
         selector: '#manager-world-nav-downtime',
@@ -616,7 +619,7 @@ export const CASES = Object.freeze([
       },
     ],
     // The title bar carries the loud signal and the rail chip is muted, with the provider's three tabs rather than Core's four.
-    expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
+    expectVisible: '[data-manager-titlebar-premium] > [aria-hidden="true"]:text-is("PREMIUM")',
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },

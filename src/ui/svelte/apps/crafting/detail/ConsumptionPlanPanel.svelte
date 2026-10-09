@@ -136,7 +136,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border-strong);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
   }
 
@@ -203,7 +203,7 @@
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-muted);
   }

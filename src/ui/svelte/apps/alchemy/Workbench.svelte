@@ -200,20 +200,8 @@
   >
     {#if benchEmpty}
       <!--
-        THE BENCH'S OWN EMPTY IS DEFERRED, and this one was converted and then measured back
-        out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
-
-        The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
-        var(--fab-border-strong)` at `border-radius: 14px`, and `.is-empty` insets it a
-        further `40px 20px`. Every `EmptyState` variant that CENTRES its stack also keeps a
-        box — base, `compact` and `inline` all draw the dashed panel, and only `note`
-        releases it, at the price of `place-items: start` and a left-aligned 10px line. So the
-        base panel measured 478x203.25 at `1.5px dashed` r12 sitting inside 520x285.25 at
-        `1.5px dashed` r14: two concentric dashed rounded boxes 40px apart, and the bench
-        grew 121.25 to 203.25. That is the exact shape `EmptyState.svelte:275-282` refuses for
-        the popover — "a second bordered box drawn inside it reads as a card the GM might be
-        able to act on" — and here the outer box is a DROP AFFORDANCE whose `is-dragover` cue
-        is that same border thickening, so it cannot be given up to the panel either.
+        The bench's own empty stays hand-drawn (issue 1514): `.alchemy-bench` is already the
+        dashed drop zone, and every centring `EmptyState` variant draws a second box inside it.
       -->
       <div class="alchemy-bench-empty">
         <span class="alchemy-bench-empty-icon"
@@ -245,7 +233,7 @@
           >
             <button
               type="button"
-              class="alchemy-chip-remove-one"
+              class="alchemy-chip-remove-one fab-hit-area"
               data-alchemy-chip-remove-one={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveOneComponent', { name: chip.name })}
               onclick={(event) => {
@@ -257,7 +245,7 @@
             </button>
             <button
               type="button"
-              class="alchemy-chip-remove"
+              class="alchemy-chip-remove fab-hit-area"
               data-alchemy-chip-remove={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveAllComponent', { name: chip.name })}
               onclick={(event) => {
@@ -270,8 +258,8 @@
             <Medallion
               art={chip.img}
               alt=""
-              size={40}
-              glyph={16}
+              size={38}
+              glyph={15}
               tint="peach"
               icon="fas fa-flask"
             />
@@ -334,7 +322,7 @@
   </div>
   {#if showResult}
     <div class="alchemy-result" class:is-ready={mode === 'ready'} data-alchemy-result>
-      <Medallion art={result.img} alt="" size={46} glyph={19} tint="peach" icon="fas fa-flask" />
+      <Medallion art={result.img} alt="" size={38} glyph={15} tint="peach" icon="fas fa-flask" />
       <div class="alchemy-result-meta">
         <div class="alchemy-result-name">{result.name}</div>
         {#if result.essences?.length}
@@ -424,7 +412,7 @@
     overflow-y: auto;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     color: var(--fab-text);
   }
 
@@ -463,7 +451,7 @@
 
   .alchemy-bench {
     border: 1.5px dashed var(--fab-border-strong);
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
     padding: 16px;
     margin-bottom: 14px;
@@ -490,7 +478,7 @@
   .alchemy-bench-empty-icon {
     width: 52px;
     height: 52px;
-    border-radius: 13px;
+    border-radius: 11px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
@@ -532,7 +520,7 @@
   }
 
   .alchemy-chip:hover {
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .alchemy-chip:focus-visible {
@@ -633,7 +621,7 @@
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    border-radius: 10px;
+    border-radius: 11px;
     font-size: 12px;
     font-weight: 600;
     border: 1px solid var(--fab-border);
@@ -676,7 +664,7 @@
     align-items: center;
     gap: 14px;
     padding: 16px 18px;
-    border-radius: 12px;
+    border-radius: 11px;
     border: 1px solid var(--fab-accent-border);
     background: var(--fab-surface-soft);
   }
@@ -711,22 +699,22 @@
     align-items: center;
     gap: 14px;
     padding: 16px 18px;
-    border-radius: 12px;
+    border-radius: 11px;
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
   }
 
   .alchemy-unknown-icon {
-    width: 46px;
-    height: 46px;
+    width: 38px;
+    height: 38px;
     flex: 0 0 auto;
-    border-radius: 11px;
+    border-radius: 9px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--fab-warning-text);
-    font-size: 20px;
+    font-size: 15px;
   }
 
   .alchemy-unknown-title {
@@ -746,7 +734,7 @@
   .alchemy-missing {
     margin-top: 10px;
     padding: 11px 13px;
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-info-soft);
     border: 1px solid var(--fab-info-border);
   }

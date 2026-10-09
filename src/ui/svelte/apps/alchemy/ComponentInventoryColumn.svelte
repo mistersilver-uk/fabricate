@@ -156,9 +156,9 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-    background: var(--fab-surface-raised);
+    background: var(--fab-surface-soft);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     overflow: hidden;
   }
 

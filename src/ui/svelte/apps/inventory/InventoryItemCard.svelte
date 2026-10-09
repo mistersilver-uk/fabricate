@@ -278,7 +278,7 @@
     display: block;
     width: 100%;
     aspect-ratio: 1 / 1;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-3);
     overflow: hidden;
   }
@@ -376,7 +376,7 @@
     justify-content: center;
     width: 18px;
     height: 18px;
-    border-radius: 5px;
+    border-radius: 6px;
     border: 1px solid var(--fab-border-strong);
     background: var(--fab-surface-active);
     color: var(--fab-text-secondary);

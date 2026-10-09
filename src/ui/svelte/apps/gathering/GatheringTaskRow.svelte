@@ -220,7 +220,7 @@
     display: block;
     width: 56px;
     height: 56px;
-    border-radius: 6px;
+    border-radius: 9px;
     object-fit: cover;
     background: var(--fab-surface-raised);
   }
@@ -241,7 +241,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-overlay-dark-48);
     color: var(--fab-overlay-light-96);
   }

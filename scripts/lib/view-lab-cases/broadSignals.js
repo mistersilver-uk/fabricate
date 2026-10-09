@@ -383,6 +383,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-systems-row-menu-open',
     'manager-recipe-edit-ingredients-or-menu',
     'manager-recipe-edit-choice-group-menu',
+    'manager-recipe-edit-results-adder-menu',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
