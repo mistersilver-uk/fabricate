@@ -410,7 +410,7 @@
             )}
             rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
             resolveColor={toolBreakageChanceColor}
-            trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)"
+            trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)" // ratchet-exempt(design-system): drawn only under `.fabricate-manager`; flat-ui-style-contract keeps the gradient in the sheet
             controlClass="manager-tool-breakage-chance-control"
             numberInputProps={{
               'data-tool-breakage-chance-input': '',

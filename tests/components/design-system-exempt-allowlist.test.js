@@ -195,6 +195,13 @@ const ALLOWLIST = Object.freeze([
     "per-item props carry the caller's data-* hook onto the row",
     ['src/ui/svelte/components/OutcomeLadder.svelte'],
   ],
+  [
+    'drawn only under `.fabricate-manager`; flat-ui-style-contract keeps the gradient in the sheet',
+    [
+      'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
+      'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
+    ],
+  ],
   ['a one-shot GM pick that gates the drop; DialogV2', ['src/canvas/environmentDialog.js']],
   [
     "a one-shot pick from core's Compendium directory menu;",
