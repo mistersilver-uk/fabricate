@@ -2114,11 +2114,6 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
     "the library's DiceTiles specimen: 44 high at radius 9",
   ],
   [
-    'styles/fabricate.css: .fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item',
-    ['6px'],
-    "an item takes its action menu's inner rung; the panel is issue 2257",
-  ],
-  [
     'styles/fabricate.css: .fabricate-manager .manager-tools-authority-segments label',
     ['6px'],
     "a segment takes its track's inner rung",

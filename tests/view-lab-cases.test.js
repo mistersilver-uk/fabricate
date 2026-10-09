@@ -740,9 +740,16 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
-// The measured controls that are not verbs: the `rule` fact row's subtitle ink, and the On craft
-// primer's item list offset and lead (issue 1521).
+// The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
+// primer's item list offset and lead (issue 1521), and each open action menu's panel and item
+// corners (issue 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
+/** An open action menu's panel at 11 and the named item at 7. */
+const menuCorners = (panel, item) => [
+  { selector: panel, styles: 'border-radius: 11px' },
+  { selector: item, styles: 'border-radius: 7px' },
+];
+const OR_MENU = '.manager-recipe-or-menu';
 const NON_VERB_CONTROLS = Object.freeze({
   'world-essence-catalogue': [
     {
@@ -757,6 +764,22 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'color: var(--fab-text); font-weight: 600',
     },
   ],
+  'manager-systems-row-menu-open': menuCorners(
+    '.fabricate-action-menu-panel',
+    '.fabricate-action-menu-panel button.manager-action-menu-item:first-child'
+  ),
+  'manager-recipe-edit-ingredients-or-menu': menuCorners(
+    OR_MENU,
+    `${OR_MENU} [data-recipe-add="alternative-component"]`
+  ),
+  'manager-recipe-edit-choice-group-menu': menuCorners(
+    OR_MENU,
+    `${OR_MENU} [data-recipe-add="alternative-tag"]`
+  ),
+  'manager-environment-edit-automatic-force-add': menuCorners(
+    '.fabricate-action-menu-panel',
+    '.fabricate-action-menu-panel [data-action="force-include"]'
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -902,7 +925,7 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
   }
 });
 
-test('the subtitle ink and the primer items are measured by the cases that draw them', () => {
+test('the non-verb controls are measured by the cases that draw them', () => {
   for (const [caseId, expected] of Object.entries(NON_VERB_CONTROLS)) {
     assert.deepEqual(
       getCaseById(caseId).expectLayout.controls.filter((candidate) => !isVerbControl(candidate)),
