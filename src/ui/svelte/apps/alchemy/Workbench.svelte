@@ -270,8 +270,8 @@
             <Medallion
               art={chip.img}
               alt=""
-              size={40}
-              glyph={16}
+              size={38}
+              glyph={15}
               tint="peach"
               icon="fas fa-flask"
             />
@@ -334,7 +334,7 @@
   </div>
   {#if showResult}
     <div class="alchemy-result" class:is-ready={mode === 'ready'} data-alchemy-result>
-      <Medallion art={result.img} alt="" size={46} glyph={19} tint="peach" icon="fas fa-flask" />
+      <Medallion art={result.img} alt="" size={38} glyph={15} tint="peach" icon="fas fa-flask" />
       <div class="alchemy-result-meta">
         <div class="alchemy-result-name">{result.name}</div>
         {#if result.essences?.length}

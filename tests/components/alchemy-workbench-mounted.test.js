@@ -367,7 +367,7 @@ describe('Workbench primitive adoption (issue 1514)', () => {
 
   const MISSING = [{ componentId: 'ash', name: 'Ashroot', need: 2 }];
 
-  it('draws the bench chip and the result tile at the sizes their rules drew, glyph and ink carried', async () => {
+  it('draws the bench chip and the result tile on the 38px art rung, glyph and ink carried', async () => {
     const target = await harness.mount({
       mode: 'ready',
       targetName: 'Elixir',
@@ -385,8 +385,8 @@ describe('Workbench primitive adoption (issue 1514)', () => {
         chip: /width:\s*(\d+)px/.exec(tiles.chip.getAttribute('style'))?.[1],
         result: /width:\s*(\d+)px/.exec(tiles.result.getAttribute('style'))?.[1]
       },
-      { chip: '40', result: '46' },
-      'the 40px bench chip and the 46px result tile keep the boxes their own rules drew'
+      { chip: '38', result: '38' },
+      "the bench chip and the result tile sit on the art ladder's 38px rung"
     );
     for (const [name, tile] of Object.entries(tiles)) {
       assert.equal(tile.getAttribute('data-medallion-tint'), 'peach', `${name} keeps the peach ink`);
@@ -394,8 +394,8 @@ describe('Workbench primitive adoption (issue 1514)', () => {
     }
     assert.match(
       tiles.result.getAttribute('style'),
-      /--fab-medallion-glyph:\s*19px/,
-      "the result tile keeps its rule's 19px glyph rather than the tile's 0.9rem default"
+      /--fab-medallion-glyph:\s*15px/,
+      "the result tile takes the 38px rung's 15px glyph rather than the tile's 0.9rem default"
     );
   });
 

@@ -408,7 +408,7 @@
             <li class="inventory-detail-row">
               <!-- THE SHARED `Avatar` (issue 1514), and `shape` is not optional here: the
                    component defaults to `round`, which draws a 999px person mark, and this is a
-                   SOURCE ACTOR's portrait in a square 40px well beside six converted record
+                   SOURCE ACTOR's portrait in a square 32px well beside six converted record
                    tiles. `alt=""` because the actor's name is rendered as adjacent text on the
                    next line, so alt text would be a second reading of the same word — the
                    decision is taken rather than left silent, which is what
@@ -420,7 +420,7 @@
                 name={source.actorName}
                 alt=""
                 shape="square"
-                size={40}
+                size={32}
               />
               <span class="inventory-detail-row-name">{source.actorName}</span>
               <span class="inventory-detail-row-qty" data-inventory-source-qty
@@ -451,7 +451,7 @@
                   class="inventory-detail-row"
                   data-inventory-contributor={contributor.componentId}
                 >
-                  <Medallion {...resolveCraftingArt(contributor.img ?? '')} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(contributor.img ?? '')} alt="" size={38} />
                   <span class="inventory-detail-row-name">{contributor.name}</span>
                   <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
                 </li>
@@ -489,7 +489,7 @@
                     data-inventory-used-by={use.recipeId}
                     onclick={() => openRecipe(use.recipeId)}
                   >
-                    <Medallion {...resolveCraftingArt(use.recipeImg ?? '')} alt="" size={40} />
+                    <Medallion {...resolveCraftingArt(use.recipeImg ?? '')} alt="" size={38} />
                     <span class="inventory-detail-row-name">{use.recipeName}</span>
                     <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
                   </button>
@@ -526,13 +526,13 @@
                       data-inventory-required-for={req.recipeId}
                       onclick={() => openRecipe(req.recipeId)}
                     >
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={38} />
                       <span class="inventory-detail-row-name">{req.name}</span>
                       <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
                     </button>
                   {:else}
                     <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={38} />
                       <span class="inventory-detail-row-name">{req.name}</span>
                       <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
                     </div>
@@ -571,7 +571,7 @@
                       data-inventory-produced-by={producer.recipeId}
                       onclick={() => openRecipe(producer.recipeId)}
                     >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={38} />
                       <span class="inventory-detail-row-name">{producer.name}</span>
                       <span class="inventory-chip inventory-chip-role"
                         >{kindLabel(producer.kind)}</span
@@ -582,7 +582,7 @@
                       class="inventory-detail-row"
                       data-inventory-produced-by-kind={producer.kind}
                     >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
+                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={38} />
                       <span class="inventory-detail-row-name">{producer.name}</span>
                       <span class="inventory-chip inventory-chip-role"
                         >{kindLabel(producer.kind)}</span

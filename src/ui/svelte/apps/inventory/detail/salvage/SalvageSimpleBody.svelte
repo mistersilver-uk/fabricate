@@ -68,7 +68,7 @@
           <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: a result whose
                component has no authored art renders the house fallback rather than a
                broken-image glyph. -->
-          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={24} />
+          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={22} />
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}

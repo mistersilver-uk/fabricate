@@ -170,8 +170,8 @@
             <Medallion
               {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
               alt=""
-              size={24}
-              glyph={10.8}
+              size={22}
+              glyph={10}
             />
             <span class="essence-pool-picked-name">{carrier.name}</span>
             <span class="essence-pool-picked-count">×{carrier.allocatedUnits}</span>

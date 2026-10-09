@@ -98,7 +98,7 @@
                 data-gathering-tool
                 data-tool-state={tool.state}
               >
-                <Medallion art={tool.img || DEFAULT_TOOL_IMG} alt="" size={40} />
+                <Medallion art={tool.img || DEFAULT_TOOL_IMG} alt="" size={38} />
                 <span class="gathering-task-tool-copy">
                   <span class="gathering-task-tool-name" title={tool.name}>{tool.name}</span>
                   <span class="gathering-task-tool-state">{toolStateLabel(tool.state)}</span>

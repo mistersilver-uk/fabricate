@@ -109,6 +109,7 @@
           <li class="salvage-summary-award">
             <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: missing art
                  gets the house fallback rather than a broken-image glyph. -->
+            <!-- ratchet-exempt(design-system): a 14px inline mark inside a 20px text pill, not a record tile; the art ladder's 22 would grow every pill -->
             <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={14} />
             <span>{entry.name}</span>
           </li>

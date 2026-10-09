@@ -26,11 +26,11 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // ChoiceOptionList's one site. Issue 1778: ListRow's mark +3, one literal tag per art rung (22,
 // 26, 30, 38); RunCard's tile -1, now that row's 30px mark; the ingredient routes' product tile -1,
 // now the dense row's 22px mark; the alchemy known-recipe and discipline card tiles -2, now that
-// row's 38px mark.
-const MEDALLION_SITES = 71;
+// row's 38px mark. Issue 1523: AwardPill's tile +1, one literal tag per rung (22, 30).
+const MEDALLION_SITES = 72;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 54;
+const ART_BEARING_SITES = 55;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

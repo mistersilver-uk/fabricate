@@ -17,13 +17,11 @@
       base: 'crafting-io-output',
       name: 'crafting-io-output-name',
       qty: 'crafting-io-output-qty',
-      size: 32,
     },
     roll: {
       base: 'crafting-roll-award',
       name: 'crafting-roll-award-name',
       qty: 'crafting-roll-award-qty',
-      size: 24,
     },
   });
 
@@ -39,8 +37,8 @@
   data-award-kind={kind}
   data-io-output={variant === 'output' ? kind : undefined}
 >
-  <!-- ratchet-exempt(design-system): the two hosts' sizes moved here unchanged (32, 24); the geometry sweep owns their rungs -->
-  <Medallion art={artwork.art} icon={artwork.icon} alt="" size={shape.size} />
+  {#if variant === 'roll'}<Medallion art={artwork.art} icon={artwork.icon} alt="" size={22} />
+  {:else}<Medallion art={artwork.art} icon={artwork.icon} alt="" size={30} />{/if}
   <span class={shape.name}>{item?.name}</span>
   <span class={shape.qty}>{item?.amountText ?? `×${item?.qty ?? 1}`}</span>
 </li>
