@@ -39,15 +39,9 @@
   let {
     colorToken = 'sage',
     customColor = '',
-    presetGridLabel = localizeOr(
-      'FABRICATE.Admin.Manager.Environment.Vocabularies.ColorPresets',
-      'Colour presets'
-    ),
-    customHexLabel = localizeOr(
-      'FABRICATE.Admin.Manager.Environment.Vocabularies.CustomHex',
-      'Custom hex'
-    ),
-    noneLabel = localizeOr('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour'),
+    presetGridLabel = localizeOr('FABRICATE.Common.TintPicker.Presets', 'Colour presets'),
+    customHexLabel = localizeOr('FABRICATE.Common.TintPicker.CustomHex', 'Custom hex'),
+    noneLabel = localizeOr('FABRICATE.Common.TintPicker.None', 'No colour'),
     allowCustom = true,
     unset = false,
     layout = 'popover',
@@ -101,7 +95,7 @@
   data-manager-color-layout={layout === 'inline' ? 'inline' : undefined}
   use:dismissOnOutsideClick={{ enabled: manageDismiss, onDismiss }}
 >
-  <span class="manager-color-preset-grid" role="group" aria-label={presetGridLabel}>
+  <span class="manager-color-preset-grid" role="group" aria-label={presetGridLabel || undefined}>
     {#if showNoColour}
       <button
         type="button"

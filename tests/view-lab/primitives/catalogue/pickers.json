@@ -207,8 +207,10 @@
     "cap": "inline — a 28px strip in the editor’s column",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
+    "partial": "presets only",
+    "note": "The No-colour cell renders only with an `onClear` handler, which plain JSON cannot carry, so the live strip draws the eight presets, none pressed, as `unset` leaves them.",
     "props": {
-      "colorToken": "lavender",
+      "unset": true,
       "layout": "inline",
       "allowCustom": false
     }

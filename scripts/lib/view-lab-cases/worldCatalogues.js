@@ -788,7 +788,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
-    // The palette cell the last step chose is the one pressed (issue 2257).
+    // The entry's sage cell is pressed (issue 2257).
     expectAttributes: [
       {
         selector: '[data-scoped-entry-colour] [data-manager-color-token="sage"]',

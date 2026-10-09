@@ -288,7 +288,7 @@ export const CASES = Object.freeze([
     ],
   }),
   // The New-biome colour palette open (issue 2257): the shared palette as a popover, its default
-  // cell pressed. A biome row's own palette opens on a right-click, which a step cannot press.
+  // cell pressed.
   managerCase({
     id: 'manager-gathering-biome-colour-popover',
     label: 'Manager — Gathering settings New-biome colour palette open',
