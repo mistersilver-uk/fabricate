@@ -176,15 +176,15 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
   }
 
   .gathering-task-callout {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
@@ -227,7 +227,7 @@
 
   .gathering-task-thumb.is-fallback {
     object-fit: contain;
-    padding: 8px;
+    padding: var(--fab-space-2);
     box-sizing: border-box;
   }
 
@@ -254,14 +254,14 @@
   .gathering-task-economy {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-economy-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 0 6px;
+    gap: var(--fab-space-1);
+    padding: 0 var(--fab-space-chip);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;

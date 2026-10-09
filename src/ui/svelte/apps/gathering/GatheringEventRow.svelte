@@ -126,7 +126,7 @@
 
   .gathering-event-thumb.is-fallback {
     object-fit: contain;
-    padding: 8px;
+    padding: var(--fab-space-2);
     box-sizing: border-box;
   }
 
@@ -135,7 +135,7 @@
   .gathering-event-danger {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--fab-space-1);
     font-size: 12px;
     color: var(--fab-text-muted);
   }
