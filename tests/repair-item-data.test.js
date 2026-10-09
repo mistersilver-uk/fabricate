@@ -316,6 +316,23 @@ test('repair — expands the shared dnd5e inline embed from a LOCKED compendium 
   assert.equal(second.descriptions.unchanged, 1, 'the resolved snapshot survives the next repair');
 });
 
+test('repair — resolves an embedded text Journal page in the Item description', async (t) => {
+  const pageUuid = 'Compendium.world.notes.JournalEntry.book.JournalEntryPage.page';
+  const { component, run } = buildDescriptionRepairManager({
+    sourceDescription: 'Journal: @Embed[' + pageUuid + ' inline]',
+  });
+  const originalResolver = globalThis.fromUuid;
+  globalThis.fromUuid = async (uuid, options) =>
+    uuid === pageUuid
+      ? { uuid, name: 'Rules Page', text: { content: '<p>Journal instructions.</p>' } }
+      : originalResolver(uuid, options);
+  t.after(() => { globalThis.fromUuid = originalResolver; });
+
+  const summary = await run();
+  assert.equal(component.description, 'Journal: Journal instructions.');
+  assert.equal(summary.descriptions.refreshed, 1);
+});
+
 test('repair — a source that RESOLVES but is BLANK never wipes the stored description', async () => {
   // The data-loss guard, pinned. This is the only thing between a GM's Repair click and the silent
   // destruction of every description whose source item happens to carry no prose of its own — and
