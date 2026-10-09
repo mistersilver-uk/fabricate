@@ -559,11 +559,11 @@
   .inventory-detail-accordion-toggle:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 9px;
   }
 
   .inventory-detail-accordion-body {
     padding: 0 var(--fab-space-2) var(--fab-space-2)
-      calc(40px + var(--fab-space-2) + var(--fab-space-3));
+      calc(38px + var(--fab-space-2) + var(--fab-space-3));
   }
 </style>

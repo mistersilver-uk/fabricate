@@ -44,8 +44,7 @@
 </li>
 
 <style>
-  /* Each variant keeps the geometry its host drew before the pill was shared: a rounded rectangle
-     matching the rounded-square art it wraps, and the roll result's single-line capsule. */
+  /* The output pill is a rounded rectangle around its square art; the roll pill is a single line. */
   .crafting-io-output {
     display: inline-flex;
     align-items: center;
@@ -71,7 +70,7 @@
     gap: 5px;
     padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    border-radius: 7px;
     background: var(--fab-surface);
     font-size: 12px;
   }

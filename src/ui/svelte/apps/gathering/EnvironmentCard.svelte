@@ -203,7 +203,7 @@
     display: block;
     width: 64px;
     height: 64px;
-    border-radius: 6px;
+    border-radius: 9px;
     object-fit: cover;
     background: var(--fab-surface-raised);
   }
@@ -225,7 +225,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 9px;
     /* Theme-aware dark scrim + near-white icon via base overlay tokens. */
     background: var(--fab-overlay-dark-48);
     color: var(--fab-overlay-light-96);

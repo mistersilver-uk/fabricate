@@ -418,7 +418,7 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
       stages,
       /\.crafting-stage-row\.is-stacked \.crafting-stage-img \{[\s\S]*?border-radius: 7px;/u,
       'and the SECOND blocker, independent of the first: the stacked row re-sizes the tile from ' +
-        '24px at 6px to 30px at 7px, the corner band of each size, which a single `size` cannot ' +
+        '22px at 6px to 30px at 7px, the corner band of each size, which a single `size` cannot ' +
         'express'
     );
   });

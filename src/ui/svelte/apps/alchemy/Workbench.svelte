@@ -200,20 +200,8 @@
   >
     {#if benchEmpty}
       <!--
-        THE BENCH'S OWN EMPTY IS DEFERRED, and this one was converted and then measured back
-        out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
-
-        The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
-        var(--fab-border-strong)` at `border-radius: 11px`, and `.is-empty` insets it a
-        further `40px 20px`. Every `EmptyState` variant that CENTRES its stack also keeps a
-        box — base, `compact` and `inline` all draw the dashed panel, and only `note`
-        releases it, at the price of `place-items: start` and a left-aligned 10px line. So the
-        base panel measured 478x203.25 at `1.5px dashed` r12 sitting inside 520x285.25 at
-        `1.5px dashed` r14: two concentric dashed rounded boxes 40px apart, and the bench
-        grew 121.25 to 203.25. That is the exact shape `EmptyState.svelte:275-282` refuses for
-        the popover — "a second bordered box drawn inside it reads as a card the GM might be
-        able to act on" — and here the outer box is a DROP AFFORDANCE whose `is-dragover` cue
-        is that same border thickening, so it cannot be given up to the panel either.
+        The bench's own empty stays hand-drawn (issue 1514): `.alchemy-bench` is already the
+        dashed drop zone, and every centring `EmptyState` variant draws a second box inside it.
       -->
       <div class="alchemy-bench-empty">
         <span class="alchemy-bench-empty-icon"
@@ -717,16 +705,16 @@
   }
 
   .alchemy-unknown-icon {
-    width: 46px;
-    height: 46px;
+    width: 38px;
+    height: 38px;
     flex: 0 0 auto;
-    border-radius: 11px;
+    border-radius: 9px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--fab-warning-text);
-    font-size: 20px;
+    font-size: 15px;
   }
 
   .alchemy-unknown-title {

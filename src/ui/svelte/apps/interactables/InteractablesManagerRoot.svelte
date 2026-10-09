@@ -627,16 +627,15 @@
     gap: var(--fab-space-2);
   }
 
-  /* 6px, not 4: 4 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this row is under the
-     24px band the 6px rung is published for. `--fab-border` is the same hairline every shared
-     primitive in this window draws. */
+  /* A row takes the radius ladder's 9px rung (0, 6, 7, 9, 11, 999, 50%). `--fab-border` is the
+     same hairline every shared primitive in this window draws. */
   .fab-im-row {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
   }
 
   .fab-im-row-main {

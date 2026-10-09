@@ -434,7 +434,7 @@
     gap: 8px;
     padding: 0 6px 0 0;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
   }
 
@@ -533,7 +533,7 @@
     gap: 8px;
     padding: 4px 6px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
   }
 

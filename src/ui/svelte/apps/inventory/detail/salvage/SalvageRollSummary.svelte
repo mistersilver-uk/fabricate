@@ -204,7 +204,7 @@
     gap: 5px;
     padding: 2px 8px;
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    border-radius: 6px;
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font-size: 11px;

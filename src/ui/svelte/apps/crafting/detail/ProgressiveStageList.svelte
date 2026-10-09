@@ -656,8 +656,8 @@
   }
 
   .crafting-stage-img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border: 0;
     border-radius: 6px;
     object-fit: cover;

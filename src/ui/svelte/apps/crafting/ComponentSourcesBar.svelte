@@ -134,8 +134,9 @@
       emptyLabel={localize('FABRICATE.App.Crafting.Sources.Empty')}
       onChange={toggleSource}
     >
-      <!-- The dashed 32px `+` well is sized to the portraits beside it, so it is this file's own
-           button; `aria-label` and `title` come before the spread, which omits undefined keys. -->
+      <!-- The dashed `+` well is a 34px control beside the 32px portraits, so it is this
+           file's own button; `aria-label` and `title` come before the spread, which omits
+           undefined keys. -->
       {#snippet trigger({ attributes })}
         <button
           class="crafting-sources-add"
@@ -223,9 +224,8 @@
   }
 
   /* An `outline` at a NEGATIVE offset, which paints exactly over the tile's own 1px border
-     rather than beside it — so the required actor still reads as one accent ring and the row
-     still measures 32px. A `border-color` cannot do this any more: the border it recoloured
-     belongs to the nested tile, and a caller cannot reach it. */
+     rather than beside it — so the required actor still reads as one accent ring and the
+     portrait still measures 32px. */
   .crafting-source-avatar.is-required {
     outline: 1px solid var(--fab-accent);
     outline-offset: -1px;
@@ -328,11 +328,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    /* ratchet-exempt(design-system): the add well in the portrait row, at the 32px of the portraits it adds; 30 or 34 would break the row */
-    height: 32px;
-    /* ratchet-exempt(design-system): the add well in the portrait row, at the 32px of the portraits it adds; 30 or 34 would break the row */
-    min-height: 32px;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
     padding: 0;
     border: 1px dashed var(--fab-border);
     border-radius: 9px;
