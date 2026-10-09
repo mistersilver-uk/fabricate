@@ -315,6 +315,24 @@ describe('ComponentSourcesBar mounted behavior', () => {
       '`shape="square"` is mandatory here: the component defaults to `round`, which renders a ' +
         '999px person mark where this bar has always drawn a rounded square'
     );
+    assert.ok(
+      tiles.every((tile) => tile.style.width === '32px' && tile.style.height === '32px'),
+      'the bar portraits sit at 32px, the portrait ladder`s single mark'
+    );
+    const box = (node) => {
+      const { width, height, minHeight } = globalThis.getComputedStyle(node);
+      return { width, height, minHeight };
+    };
+    assert.deepEqual(
+      [...target.querySelectorAll('.crafting-source-avatar')].map(box),
+      [32, 32].map((px) => ({ width: `${px}px`, height: `${px}px`, minHeight: `${px}px` })),
+      'each portrait button is the 32px box of the tile it wraps'
+    );
+    assert.deepEqual(
+      box(target.querySelector('[data-crafting-sources-add]')),
+      { width: '34px', height: '34px', minHeight: '34px' },
+      'and the add well is a 34px control: the retired 32px control height is not reintroduced'
+    );
 
     const withArt = target.querySelector('[data-source-id="a"] [data-avatar]');
     assert.equal(withArt.getAttribute('data-avatar'), 'image', 'the actor with a portrait draws it');

@@ -72,12 +72,17 @@ const STAGED = `<ul class="fab-bulk-book-staged"><li class="fab-bulk-book-staged
   <button type="button" class="fab-bulk-book-unstage fab-hit-area" aria-label="Unstage">${GLYPH}</button>
   </li></ul>`;
 
-const BENCH_CHIP = `<div class="alchemy-bench-grid"><div class="alchemy-chip" role="button" tabindex="0">
+/** Two bench chips side by side, so each remove's target can be held inside its OWN chip. */
+const BENCH_CHIP = `<div class="alchemy-bench-grid">${['Emberroot', 'Frostcap']
+  .map(
+    (name) => `<div class="alchemy-chip" role="button" tabindex="0">
   <button type="button" class="alchemy-chip-remove-one fab-hit-area" aria-label="Remove one">${GLYPH}</button>
   <button type="button" class="alchemy-chip-remove fab-hit-area" aria-label="Remove all">${GLYPH}</button>
   <span style="display:block;width:38px;height:38px"></span>
-  <div class="alchemy-chip-name">Emberroot</div><span class="alchemy-chip-qty">×2</span>
-  </div></div>`;
+  <div class="alchemy-chip-name">${name}</div><span class="alchemy-chip-qty">×2</span>
+  </div>`
+  )
+  .join('')}</div>`;
 
 /** A queue row: `InventoryBulkRow`'s box and trailing group around the panel's own remove. */
 const BULK_ROW = (row, panel) => `<ul style="list-style:none;margin:0;padding:0">
@@ -624,6 +629,48 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
       for (const gap of real.gaps) assert.ok(reach <= gap, `${caseId}: gap ${gap} under ${reach}`);
     });
   }
+
+  it('keeps each bench chip remove absolute, 6px into its own chip, its target inside it', async () => {
+    const removes = await tab.evaluate(() =>
+      [...document.querySelectorAll('[data-case="benchChip"] .alchemy-chip')].flatMap((chip) => {
+        const c = chip.getBoundingClientRect();
+        const edge = getComputedStyle(chip);
+        const pad = {
+          top: c.top + Number.parseFloat(edge.borderTopWidth),
+          left: c.left + Number.parseFloat(edge.borderLeftWidth),
+          right: c.right - Number.parseFloat(edge.borderRightWidth),
+        };
+        return ['.alchemy-chip-remove-one', '.alchemy-chip-remove'].map((selector) => {
+          const button = chip.querySelector(selector);
+          const b = button.getBoundingClientRect();
+          const pseudo = getComputedStyle(button, '::before');
+          const w = Math.max(b.width, Number.parseFloat(pseudo.width) || 0);
+          const h = Math.max(b.height, Number.parseFloat(pseudo.height) || 0);
+          const cx = b.left + b.width / 2;
+          const cy = b.top + b.height / 2;
+          return {
+            selector,
+            position: getComputedStyle(button).position,
+            target: { width: w, height: h },
+            inside:
+              cx - w / 2 >= c.left - 0.01 &&
+              cx + w / 2 <= c.right + 0.01 &&
+              cy - h / 2 >= c.top - 0.01 &&
+              cy + h / 2 <= c.bottom + 0.01,
+            top: b.top - pad.top,
+            side: selector === '.alchemy-chip-remove' ? pad.right - b.right : b.left - pad.left,
+          };
+        });
+      })
+    );
+    assert.equal(removes.length, 4, 'two chips, two removes each');
+    for (const { selector, position, target, inside, top, side } of removes) {
+      assert.equal(position, 'absolute', `${selector}: the hit-area class moved it into flow`);
+      assert.ok(target.width >= 24 && target.height >= 24, JSON.stringify(target));
+      assert.ok(inside, `${selector}: the target leaves its own chip`);
+      assert.deepEqual({ top, side }, { top: 6, side: 6 }, `${selector}: the painted inset`);
+    }
+  });
 
   // The stacked pair paints 22px each, 2px apart, and each target reaches 1px into that gap. Swept a
   // pixel row at a time, each owns at least 24 rows, contiguous, and neither takes a painted row
