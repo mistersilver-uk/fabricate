@@ -16,13 +16,14 @@ import {
   templatesOf,
   workingTree,
 } from '../helpers/designSystemRatchet.js';
+import { walkNodes } from '../helpers/moduleAst.js';
 import { declarationsIn, varReferencesIn } from '../helpers/styleBlockScan.js';
-import { lineOf, walkNodes } from '../helpers/svelteTemplateScan.js';
+import { lineOf } from '../helpers/svelteTemplateScan.js';
 
 import { SCANNED_SPACING_PROPERTIES, SPACING_SCALE_PREFIX } from './spacing-known-literals.js';
 import { inSvelteScope, offScaleLengthsIn, spacingContext } from './spacing-scale-classifier.js';
 
-/** 36 markup style sites when chosen, 26 of them in the manager and components. */
+/** 37 markup style sites when chosen, 27 of them in the manager and components. */
 const MARKUP_SITE_FLOOR = 30;
 
 const SCANNED_SPACING = new Set(SCANNED_SPACING_PROPERTIES);
@@ -85,14 +86,15 @@ function propertyOf(element, attribute) {
 function markupStyles(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
-    walkNodes(ast.fragment, STYLED_NODE, (element) => {
+    for (const element of walkNodes(ast.fragment)) {
+      if (!STYLED_NODE.has(element.type)) continue;
       for (const attribute of element.attributes ?? []) {
         const property = propertyOf(element, attribute);
         if (property === null) continue;
         const line = lineOf(source, attribute.start);
         found.push({ file, line, property, texts: valueTexts(attribute.value) });
       }
-    });
+    }
   }
   return found;
 }

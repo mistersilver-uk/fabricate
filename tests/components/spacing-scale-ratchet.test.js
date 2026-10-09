@@ -458,7 +458,7 @@ const ABSOLUTE_SCOPES = Object.freeze([
     label: 'Svelte',
     includes: inSvelteScope,
     player: [],
-    floors: { spacing: SVELTE_SPACING_DECLARATION_FLOOR, offsets: 40, sizes: 1350 },
+    floors: { spacing: SVELTE_SPACING_DECLARATION_FLOOR, offsets: 32, sizes: 1350 },
   },
 ]);
 
@@ -709,7 +709,9 @@ test('the Svelte scope reads manager, components and every player app', (t) => {
     fails('src/ui/svelte/apps/manager/Probe.svelte'),
     fails('src/ui/svelte/apps/manager/new-area/Probe.svelte'),
     fails('src/ui/svelte/components/Probe.svelte'),
-    fails('src/ui/svelte/apps/crafting/Probe.svelte'),
+    ...['crafting', 'gathering', 'alchemy', 'inventory', 'journal', 'interactables'].map((app) =>
+      fails(`src/ui/svelte/apps/${app}/Probe.svelte`)
+    ),
     fails('src/ui/svelte/apps/InteractableProbe.svelte'),
   ]);
 });

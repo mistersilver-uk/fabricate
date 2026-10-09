@@ -57,16 +57,6 @@ export function walkElements(node, visit, inForm = false, seen = new Set()) {
   }
 }
 
-/** Visit every node whose `type` is in `types` in a parsed template. */
-export function walkNodes(node, types, visit, seen = new Set()) {
-  if (!node || typeof node !== 'object' || seen.has(node)) return;
-  seen.add(node);
-  if (types.has(node.type)) visit(node);
-  for (const [key, child] of Object.entries(node)) {
-    if (key !== 'parent') walkNodes(child, types, visit, seen);
-  }
-}
-
 /**
  * Every UI template, parsed once, as `{ file, source, ast }`.
  *
