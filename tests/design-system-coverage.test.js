@@ -208,7 +208,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppTitleBar',
-  'TierTrack', 'ViewToggle', 'XrefList',
+  'TierTrack', 'ViewToggle',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -642,6 +642,11 @@ const MERGED_BY_1777 = ['AppRail'];
 
 /** Names issue 1778 merged away (decision D2): a browse card is ListRow's card layout. */
 const MERGED_BY_1778 = ['BrowseCard'];
+
+test('XrefList, which issue 2321 built, reads shipped in the library', () => {
+  // A non-member row: the status clause above reads member rows only, so this one is pinned here.
+  assert.equal(PER_NAME_STATUS.get('XrefList'), 'shipped');
+});
 
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {

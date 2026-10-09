@@ -81,6 +81,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-component-tag-suggestions',
     'manager-gathering-task-drop-modifier-suggestions',
   ]),
+  // The cross-reference list (issue 2321): the inventory inspector, a tool's Required for and an
+  // essence's Contributing.
+  'src/ui/svelte/components/XrefList.svelte': Object.freeze([
+    'player-inventory',
+    'player-inventory-xref-tool',
+    'player-inventory-xref-essence',
+  ]),
   // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
   'src/ui/svelte/components/LogList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-finished-failure',

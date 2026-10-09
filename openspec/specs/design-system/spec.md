@@ -46,6 +46,8 @@ The button is named by the item's name followed by each state the row shows only
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
 `<BrowseCard>` is merged into ListRow's `layout="card"`, which a browse card MUST render through.
 A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
+The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
+The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
@@ -74,6 +76,42 @@ The inventory grid's cards render through ListRow's card layout and keep Shift s
 - **WHEN** the player Shift-clicks an inventory card, or presses Shift+Enter or Shift+Space on it
 - **THEN** the card joins or leaves the bulk selection and does not become the inspected card
 - **AND** while the bulk selection is open, each bulk-selected card is pressed, and the inspected card is pressed only if it is bulk-selected too
+
+### Requirement: A player-facing cross-reference list renders through XrefList
+
+A cross-reference list is a read-only list that states which records a record relates to: what uses it, what produces it, what it is required for, who holds it or what contributes to it.
+It is not import-export's stored cross-reference, which is a persisted reference between documents.
+A list whose rows carry actions, or open a body in place, is not a cross-reference list.
+A player-facing cross-reference list MUST render through `XrefList`, whose every row is `ListRow`'s dense row, or its selectable dense form for a row that opens, composed rather than restated.
+`XrefList` names its list by its own visible `label`, drawn as a `Kicker`.
+With zero items it draws the label and no list, and the caller owns the empty state and the pager beneath it.
+Each item carries a name, a mark, an optional caller-formatted `quantity` and an optional caller-formatted `detail`.
+A role or kind is `detail`, drawn at the row's trailing edge, and never `quantity`.
+Both are text, so neither a multiple nor a role is carried by colour or position alone.
+With `onOpen`, a row opens the item it names through `ListRow`'s one native button and is never pressed.
+Without `onOpen`, or for an item carrying `opens: false`, the row is not a control.
+Every row MUST stand one height whether it opens or not.
+A cross-reference list has no remove and no reorder.
+The player inventory inspector's Sources, Contributing, Used by, Required for and Produced by sections are its first callers (issue 2321).
+With one importer, `XrefList` is recorded as a non-member on the `LogList` and `StageNav` precedent.
+The manager's cross-reference lists are adoption debt under issue 2322.
+
+#### Scenario: A list mixes rows that open with rows that do not
+
+- **WHEN** a tool's Required for lists a recipe and a salvage
+- **THEN** the recipe row is a button that opens that recipe, and the salvage row is no control
+- **AND** both rows stand the same height
+
+#### Scenario: A cross-reference list is empty
+
+- **WHEN** a cross-reference section has no entries
+- **THEN** its label renders and no list element does
+- **AND** the caller's empty note follows it
+
+#### Scenario: A read-only cross-reference list
+
+- **WHEN** an `XrefList` is given no `onOpen`
+- **THEN** no row renders a button
 
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
@@ -253,6 +291,7 @@ The same issue adds `LogList`, which emits `fab-log-list` on its own root and th
 The same issue adds `DataTable`, which emits `fabricate-data-table` on its own root and the rest of its `fabricate-data-table-*` family beneath it, rooted in the module sheet, so the drop rules' column grid that was rooted at `.fabricate-manager` under `manager-gathering-task-drop-*` is retired for the rules the table writes; its table, head and rows double the root to clear core's element rules for tables, and the drop rules card keeps its frame and row height through its own card classes.
 The same issue gives `SearchField` a labelled form, which emits `fabricate-search-field` on the `Field` root it renders and keeps `fabricate-search` on the inner shell, while the bare form keeps `fabricate-search` on its own root; it portals nothing, so those two are its only roots.
 The same issue adds `Typeahead`, which emits `fabricate-typeahead` on its field's root and `fabricate-typeahead-list`, `-option` and `-note` on the list it floats to the application root, rooted in the module sheet, so the suggestion rules rooted at `.fabricate-manager` under `manager-tag-suggestion(s)` are re-rooted at an unchanged (0,2,0); the roll-data chips that borrowed the option's box keep it under their own class.
+Issue 2321 adds `XrefList`, which emits `fab-xref-list` on its own root, `fab-xref-list-label` on its label and `fab-xref-list-items` on its list, all painted from its own scoped block; its rows are `ListRow`'s, whose family it does not restate, and it portals nothing, so it needs one root.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -849,6 +888,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
+A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4).
 `TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
@@ -1052,6 +1092,7 @@ A state chip standing in an action cluster with 34px buttons MUST take it, becau
 
 A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehicle or a place — is an avatar, with `shape` CALLER-SUPPLIED because actor type is system-defined and eligibility comes from a GM world setting rather than a type map.
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
+A dense cross-reference list row is the one exception: its 22px mark is the record tile even for an actor, because the portrait ladder has no 22px rung, so an actor there falls back to a glyph.
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
 An on/off property of the record in its own editor, drawn as a card, is the toggle card — the settings-row toggle at card scale.

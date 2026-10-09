@@ -1224,6 +1224,8 @@ Brokenness is about **usability, not salvageability**, and MUST NOT gate the sal
   Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
   For a **tool-only** card the type chip reads **Tool**, and **Used by** and **Produced by** are OMITTED rather than rendered empty: a tool is neither consumed nor produced in that role, and "Not used by any known recipe" beneath a hammer several recipes require reads as a defect rather than as an empty state.
   A **Required for** entry is indexed against BOTH the Tool's own id and, when present, its linked component id, so the disclosure survives `componentId: null` on an item-sourced Tool (issue 1119).
+  Sources, Contributing, Used by, Required for and Produced by each render through the design-system `XrefList`: dense 22px rows of one line, the role or kind as the row's trailing detail, and Sources and Contributing their `×N` quantity.
+  An entry's kind is one of the closed set recipe, salvage and gathering; a recipe entry opens that recipe, and a salvage or gathering entry is not a control.
 - **Used-by reverse index composition.**
   The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
   Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.

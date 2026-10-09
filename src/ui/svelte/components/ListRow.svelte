@@ -1,7 +1,9 @@
 <!-- ListRow: the dense read-only row (issue 1648) and its selectable form (issue 1778). The caller
      supplies entitled display strings. With no form prop the dense output is unchanged; `onOpen`
      makes the content one native button, `openProps` alone an inert div, and `trailing` and
-     `aside` sit beside it. `class` and a rest spread land on the root; `data-list-row` wins. -->
+     `aside` sit beside it. `inset="row"` gives the dense selectable form the dense row's inset,
+     and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `class` and a
+     rest spread land on the root; `data-list-row` wins. -->
 <script>
   import Medallion from './Medallion.svelte';
 
@@ -33,6 +35,8 @@
     density = 'dense',
     layout = 'row',
     markSize = 22,
+    inset = 'form',
+    detailAlign = 'start',
     selected = undefined,
     disabled = false,
     onOpen = null,
@@ -56,6 +60,7 @@
       isDefault ||
       isCard
   );
+  const rowInset = $derived(inset === 'row' && form && !isDefault && !isCard);
   const mark = $derived(MARK_SIZES.has(markSize) ? markSize : 22);
   const describedBy = $derived(
     [
@@ -124,6 +129,8 @@
   class:is-form={form}
   class:is-default={isDefault}
   class:is-card={isCard}
+  class:is-row-inset={rowInset}
+  class:is-detail-end={detailAlign === 'end'}
   class:is-danger={tone === 'danger'}
   {...rest}
   data-list-row={isDefault ? 'default' : 'dense'}

@@ -180,22 +180,10 @@
     gap: var(--fab-space-2);
   }
 
-  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale).
-
-     HAND-ROLLED, AND REFUSED AS A FAMILY (issue 1514). This is a `:global(:where())` leaf with
-     eight markup consumers across three files, so it converts together or not at all — a rule
-     that outlives its markup paints nothing and markup that outlives its rule loses its type.
-     One of the eight cannot convert: `InventoryBulkSection` renders it with
-     `class:has-trailing` and declares `.inventory-detail-section-title.has-trailing { display:
-     flex; align-items: baseline; gap }` so the complication count sits on the eyebrow's own
-     line. `Kicker` forwards no `class` and no `style`, and its documented answer — keep your own
-     wrapper and nest the kicker inside it — cannot be taken here without changing the ELEMENT
-     the seven other consumers write, which is the whole point of a published family.
-
-     So the family stays, and it goes to the register with that measurement. A `class`
-     passthrough is not the answer (the primitive refuses one by design); what would close it is
-     converting the seven plain consumers and giving the bulk section its own wrapper in the same
-     change, which is a markup move in three files rather than a conversion. */
+  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale). The bulk inspector's
+     `InventoryBulkSection` is the one remaining consumer, the component and book bodies drawing
+     `Kicker` (issue 2321): it writes `class:has-trailing` on the eyebrow to hold its count on the
+     same line, and `Kicker` forwards no `class`, so it converts only with a wrapper of its own. */
   :global(:where(.inventory-detail) .inventory-detail-section-title) {
     margin: 0;
     font-size: 10px;

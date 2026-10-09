@@ -214,6 +214,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
   // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
   'src/ui/svelte/components/WorldClockChip.svelte',
+  // Issue 2321: the cross-reference list, on the inventory inspector, a tool's Required for and an
+  // essence's Contributing.
+  'src/ui/svelte/components/XrefList.svelte',
   'src/ui/svelte/components/YieldScale.svelte',
   'styles/fabricate.css',
 ];
@@ -522,6 +525,19 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
     'world-component-entry-systems',
   ]) {
     assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
+  }
+});
+
+test('(a) an XrefList change publishes the inspector and its two cross-reference frames', () => {
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/XrefList.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const caseId of [
+    'player-inventory',
+    'player-inventory-xref-tool',
+    'player-inventory-xref-essence',
+  ]) {
+    assert.ok(selected.includes(caseId), `an XrefList change does not select '${caseId}'`);
   }
 });
 

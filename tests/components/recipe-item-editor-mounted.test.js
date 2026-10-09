@@ -104,6 +104,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     // The multi-system participation selector InventoryComponentDetail imports (issue 766).
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    // The inspector's cross-reference lists (issue 2321).
+    'src/ui/svelte/components/XrefList.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     // The book's recipe search (issue 1518).
     'src/ui/svelte/components/SearchField.svelte',

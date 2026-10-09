@@ -12,17 +12,17 @@
   salvage panel, whose one-shot action is the header's primary while that tab is open.
 
   Extracted from the former double-duty `InventoryDetail.svelte` (issue 675),
-  which now routes here. Each list paginates independently through the shared
-  `InventoryDetailPager`.
+  which now routes here. Each cross-reference list draws through `XrefList` and
+  paginates independently through the shared `InventoryDetailPager`.
 
   Prop-driven; navigation routes back through the store seams.
 -->
 <script>
-  import Avatar from '../../../components/Avatar.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import Notice from '../../../components/Notice.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import XrefList from '../../../components/XrefList.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
@@ -178,6 +178,69 @@
   function openRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
+  const openItem = (entry) => openRecipe(entry.recipeId);
+
+  // The cross-reference rows of the current page of each list, as `XrefList` items.
+  const sourceRows = $derived(
+    sliceOf(sources, 'sources').map((source) => ({
+      id: source.actorId,
+      name: source.actorName,
+      art: hasImg(source.actorImg) ? source.actorImg : '',
+      icon: 'fas fa-user',
+      quantity: `×${source.quantity}`,
+      attrs: { 'data-inventory-source': source.actorId },
+    }))
+  );
+  const contributorRows = $derived(
+    sliceOf(contributors, 'contributors').map((contributor) => ({
+      id: contributor.componentId,
+      name: contributor.name,
+      ...resolveCraftingArt(contributor.img ?? ''),
+      quantity: `×${contributor.quantity}`,
+      attrs: { 'data-inventory-contributor': contributor.componentId },
+    }))
+  );
+  const usedByRows = $derived(
+    sliceOf(usedBy, 'used').map((use) => ({
+      id: `${use.recipeId}:${use.role}`,
+      name: use.recipeName,
+      ...resolveCraftingArt(use.recipeImg ?? ''),
+      detail: roleLabel(use.role),
+      recipeId: use.recipeId,
+      attrs: { 'data-inventory-used-by': use.recipeId },
+    }))
+  );
+  // A recipe entry opens its recipe; a salvage or gathering entry is no control.
+  function kindRows(list, key, recipeHook, kindHook) {
+    return sliceOf(list, key).map((entry, index) => {
+      const opens = entry.kind === 'recipe' && Boolean(entry.recipeId);
+      return {
+        id: `${entry.kind}:${entry.recipeId ?? entry.name}:${index}`,
+        name: entry.name,
+        ...resolveCraftingArt(entry.img ?? ''),
+        detail: kindLabel(entry.kind),
+        recipeId: entry.recipeId,
+        opens,
+        attrs: opens ? { [recipeHook]: entry.recipeId } : { [kindHook]: entry.kind },
+      };
+    });
+  }
+  const requiredForRows = $derived(
+    kindRows(
+      requiredFor,
+      'required',
+      'data-inventory-required-for',
+      'data-inventory-required-for-kind'
+    )
+  );
+  const producedByRows = $derived(
+    kindRows(
+      producedBy,
+      'produced',
+      'data-inventory-produced-by',
+      'data-inventory-produced-by-kind'
+    )
+  );
 
   // --- Info | Salvage ---------------------------------------------------------
   // The strip renders only when the row is salvageable — INCLUDING when the item is a
@@ -378,9 +441,7 @@
 
       {#if essences.length > 0}
         <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}
-          </p>
+          <Kicker>{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</Kicker>
           <div class="inventory-detail-essences">
             {#each essences as essence (essence.id)}
               {@const tint = essenceTintToken(essence.colorToken)}
@@ -399,208 +460,83 @@
         </section>
       {/if}
 
-      <section class="inventory-detail-section">
-        <p class="inventory-detail-section-title">
-          {localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}
-        </p>
-        <ul class="inventory-detail-list">
-          {#each sliceOf(sources, 'sources') as source (source.actorId)}
-            <li class="inventory-detail-row">
-              <!-- `shape="square"`: the default `round` is a person mark, and this is an actor's
-                   portrait in a square well. `alt=""` because the name follows as text. -->
-              <Avatar
-                art={hasImg(source.actorImg) ? source.actorImg : ''}
-                name={source.actorName}
-                alt=""
-                shape="square"
-                size={32}
-              />
-              <span class="inventory-detail-row-name">{source.actorName}</span>
-              <span class="inventory-detail-row-qty" data-inventory-source-qty
-                >×{source.quantity}</span
-              >
-            </li>
-          {/each}
-        </ul>
-        <InventoryDetailPager
-          list={sources}
-          sectionKey="sources"
-          ariaLabel={localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}
-          page={pageOf(sources, 'sources')}
-          pageSize={PAGE_SIZE}
-          onPage={(value) => setPage('sources', value)}
-        />
-      </section>
+      <!-- No empty note: a listed row is built from held documents, so it has a source. -->
+      {@render xrefSection(
+        'sources',
+        localize('FABRICATE.App.Inventory.Detail.SourcesTitle'),
+        sources,
+        sourceRows
+      )}
 
       {#if isEssence}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}
-          </p>
-          {#if contributors.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(contributors, 'contributors') as contributor (contributor.componentId)}
-                <li
-                  class="inventory-detail-row"
-                  data-inventory-contributor={contributor.componentId}
-                >
-                  <Medallion {...resolveCraftingArt(contributor.img ?? '')} alt="" size={38} />
-                  <span class="inventory-detail-row-name">{contributor.name}</span>
-                  <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={contributors}
-              sectionKey="contributors"
-              ariaLabel={localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}
-              page={pageOf(contributors, 'contributors')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('contributors', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'contributors',
+          localize('FABRICATE.App.Inventory.Detail.ContributingTitle'),
+          contributors,
+          contributorRows,
+          localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')
+        )}
       {/if}
 
       <!-- Omitted for a tool-only card: a tool is never consumed in that role, and
            "Not used by any known recipe" under a hammer six recipes require reads as a
            defect rather than as an empty state (issue 1119). -->
       {#if !isToolOnly}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
-          </p>
-          {#if usedBy.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
-                <li>
-                  <button
-                    type="button"
-                    class="inventory-detail-recipe"
-                    data-inventory-used-by={use.recipeId}
-                    onclick={() => openRecipe(use.recipeId)}
-                  >
-                    <Medallion {...resolveCraftingArt(use.recipeImg ?? '')} alt="" size={38} />
-                    <span class="inventory-detail-row-name">{use.recipeName}</span>
-                    <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={usedBy}
-              sectionKey="used"
-              ariaLabel={localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
-              page={pageOf(usedBy, 'used')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('used', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'used',
+          localize('FABRICATE.App.Inventory.Detail.UsedByTitle'),
+          usedBy,
+          usedByRows,
+          localize('FABRICATE.App.Inventory.Detail.UsedByEmpty'),
+          openItem
+        )}
       {/if}
 
       {#if isTool}
-        <section class="inventory-detail-section" data-inventory-section="required">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}
-          </p>
-          {#if requiredFor.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(requiredFor, 'required') as req, index (req.kind + ':' + (req.recipeId ?? req.name) + ':' + index)}
-                <li>
-                  {#if req.kind === 'recipe' && req.recipeId}
-                    <button
-                      type="button"
-                      class="inventory-detail-recipe"
-                      data-inventory-required-for={req.recipeId}
-                      onclick={() => openRecipe(req.recipeId)}
-                    >
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={38} />
-                      <span class="inventory-detail-row-name">{req.name}</span>
-                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
-                    </button>
-                  {:else}
-                    <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={38} />
-                      <span class="inventory-detail-row-name">{req.name}</span>
-                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
-                    </div>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={requiredFor}
-              sectionKey="required"
-              ariaLabel={localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}
-              page={pageOf(requiredFor, 'required')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('required', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'required',
+          localize('FABRICATE.App.Inventory.Detail.RequiredForTitle'),
+          requiredFor,
+          requiredForRows,
+          localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty'),
+          openItem
+        )}
       {/if}
 
       <!-- Also omitted for a tool-only card: nothing produces a tool IN ITS TOOL ROLE. -->
       {#if !isEssence && !isToolOnly}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}
-          </p>
-          {#if producedBy.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(producedBy, 'produced') as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
-                <li>
-                  {#if producer.kind === 'recipe' && producer.recipeId}
-                    <button
-                      type="button"
-                      class="inventory-detail-recipe"
-                      data-inventory-produced-by={producer.recipeId}
-                      onclick={() => openRecipe(producer.recipeId)}
-                    >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={38} />
-                      <span class="inventory-detail-row-name">{producer.name}</span>
-                      <span class="inventory-chip inventory-chip-role"
-                        >{kindLabel(producer.kind)}</span
-                      >
-                    </button>
-                  {:else}
-                    <div
-                      class="inventory-detail-row"
-                      data-inventory-produced-by-kind={producer.kind}
-                    >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={38} />
-                      <span class="inventory-detail-row-name">{producer.name}</span>
-                      <span class="inventory-chip inventory-chip-role"
-                        >{kindLabel(producer.kind)}</span
-                      >
-                    </div>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={producedBy}
-              sectionKey="produced"
-              ariaLabel={localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}
-              page={pageOf(producedBy, 'produced')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('produced', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'produced',
+          localize('FABRICATE.App.Inventory.Detail.ProducedByTitle'),
+          producedBy,
+          producedByRows,
+          localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty'),
+          openItem
+        )}
       {/if}
     </div>
   {/if}
 </InventoryDetailHeader>
+
+<!-- The page and pager key is the section id. The caller's empty note and pager sit after the
+     list, at the section's own gap. -->
+{#snippet xrefSection(section, label, list, items, emptyHint = '', onOpen = null)}
+  <section class="inventory-detail-section" data-inventory-section={section}>
+    <XrefList {label} {items} {onOpen} />
+    {#if list.length > 0}
+      <InventoryDetailPager
+        {list}
+        sectionKey={section}
+        ariaLabel={label}
+        page={pageOf(list, section)}
+        pageSize={PAGE_SIZE}
+        onPage={(value) => setPage(section, value)}
+      />
+    {:else if emptyHint}
+      <EmptyState note hint={emptyHint} />
+    {/if}
+  </section>
+{/snippet}
 
 <style>
   /* The panel is a transparent pass-through: the sections keep the detail column's
@@ -634,60 +570,6 @@
      scrolling column. */
   .inventory-detail-broken-slot {
     flex-shrink: 0;
-  }
-
-  .inventory-detail-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-  }
-
-  /* Row height + padding mirror the Crafting browser's RecipeListRow so the
-     thumbnail sits framed with vertical breathing room rather than edge-to-edge. */
-  .inventory-detail-row,
-  .inventory-detail-recipe {
-    box-sizing: border-box;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2);
-    min-height: 56px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    text-align: left;
-  }
-
-  .inventory-detail-recipe {
-    cursor: pointer;
-  }
-
-  .inventory-detail-recipe:hover {
-    background: var(--fab-surface-raised);
-    border-color: var(--fab-border-strong);
-  }
-
-  .inventory-detail-recipe:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-row-qty {
-    flex: 0 0 auto;
-    font-family: var(--fab-font-mono);
-    font-size: 12px;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text);
-  }
-
-  .inventory-chip-role {
-    flex: 0 0 auto;
   }
 
   .inventory-detail-essences {

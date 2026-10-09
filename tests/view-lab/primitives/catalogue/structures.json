@@ -444,25 +444,26 @@
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "dense — the cross-reference and result form",
-    "draws": ".k-row.dense",
-    "path": "src/ui/svelte/components/ListRow.svelte",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/XrefList.svelte",
     "props": {
-      "name": "Karrun Warblade",
-      "icon": "fas fa-hammer",
-      "tint": "mist",
-      "quantity": "×2"
-    }
-  },
-  {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
-    "cap": "dense — the cross-reference and result form",
-    "draws": ".k-row.dense",
-    "path": "src/ui/svelte/components/ListRow.svelte",
-    "props": {
-      "name": "Ironvale Plate",
-      "icon": "fas fa-hammer",
-      "tint": "mist",
-      "quantity": "×4"
+      "label": "Appears in",
+      "items": [
+        {
+          "id": "karrun-warblade",
+          "name": "Karrun Warblade",
+          "icon": "fas fa-hammer",
+          "tint": "mist",
+          "quantity": "×2"
+        },
+        {
+          "id": "ironvale-plate",
+          "name": "Ironvale Plate",
+          "icon": "fas fa-hammer",
+          "tint": "mist",
+          "quantity": "×4"
+        }
+      ]
     }
   },
   {

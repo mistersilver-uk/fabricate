@@ -51,6 +51,24 @@ const CASES = Object.freeze({
     onOpen: open,
     badges: snippet(`<span class="probe-badges">${'<span></span>'.repeat(3)}</span>`),
   },
+  // Issue 2321: a read-only row and an opening one, side by side in one cross-reference list.
+  still: { name: 'Carve Bone Idol', detail: 'Recipe', truncateName: true, detailAlign: 'end' },
+  opening: {
+    name: 'Carve Bone Idol',
+    detail: 'Recipe',
+    truncateName: true,
+    detailAlign: 'end',
+    onOpen: open,
+    inset: 'row',
+  },
+  longDetail: {
+    name: 'Harvest Beast',
+    detail: 'A gathering task drawn from the deep seam of the northern ridge',
+    truncateName: true,
+    detailAlign: 'end',
+    onOpen: open,
+    inset: 'row',
+  },
 });
 
 /**
@@ -71,6 +89,9 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
   <div data-case="scroller" style="overflow-y:auto;width:320px;height:120px">${markup.focus}</div>
   <div data-case="narrow" style="width:220px">${markup.floor}</div>
   <div data-case="wide" style="width:360px">${markup.floor}</div>
+  <div data-case="still" style="width:320px">${markup.still}</div>
+  <div data-case="opening" style="width:320px">${markup.opening}</div>
+  <div data-case="long-detail" style="width:320px">${markup.longDetail}</div>
 </div></body></html>`;
 
 let browser;
@@ -212,5 +233,51 @@ describe('ListRow selectable form, rendered (issue 1778)', () => {
     assert.ok(narrow.overflow <= 0, `the head overflows the row by ${narrow.overflow}px`);
     assert.equal(wide.badgesBelow, false, 'where the line has room, the badges stay beside it');
     assert.ok(wide.nameWidth >= wide.sixCh - 0.01);
+  });
+});
+
+describe('ListRow inset and detailAlign, rendered (issue 2321)', () => {
+  /** A row's border box and the right edge of its content box. */
+  const rowBox = (caseId) =>
+    tab.evaluate((id) => {
+      const row = document.querySelector(`[data-case="${id}"] .fabricate-list-row`);
+      const box = row.getBoundingClientRect();
+      const paddingRight = Number.parseFloat(getComputedStyle(row).paddingRight);
+      const detail = row.querySelector('.fabricate-list-row-detail');
+      const area = detail.parentElement.getBoundingClientRect();
+      return {
+        height: box.height,
+        contentRight: box.left + row.clientLeft + row.clientWidth - paddingRight,
+        detailRight: detail.getBoundingClientRect().right,
+        detailWidth: detail.getBoundingClientRect().width,
+        areaWidth: area.width,
+        clipped: detail.scrollWidth > detail.clientWidth,
+      };
+    }, caseId);
+
+  it('stands a dense form given `inset="row"` the height of a read-only dense row', async () => {
+    const still = await rowBox('still');
+    const opening = await rowBox('opening');
+    assert.ok(still.height > 0, 'the read-only row measured nothing');
+    assert.ok(
+      Math.abs(opening.height - still.height) < 0.01,
+      `the opening row is ${opening.height}px against the read-only ${still.height}px`
+    );
+  });
+
+  it("holds an end-aligned detail at the row's content edge, ellipsizing at 40%", async () => {
+    for (const id of ['still', 'opening', 'long-detail']) {
+      const row = await rowBox(id);
+      assert.ok(
+        Math.abs(row.detailRight - row.contentRight) < 0.5,
+        `${id}: the detail ends at ${row.detailRight}px, the content edge at ${row.contentRight}px`
+      );
+    }
+    const long = await rowBox('long-detail');
+    assert.equal(long.clipped, true, 'the long detail ellipsizes');
+    assert.ok(
+      Math.abs(long.detailWidth - long.areaWidth * 0.4) < 0.5,
+      `the clipped detail is ${long.detailWidth}px of ${long.areaWidth}px`
+    );
   });
 });

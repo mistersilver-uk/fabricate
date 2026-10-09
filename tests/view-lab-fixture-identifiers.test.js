@@ -159,6 +159,9 @@ const IDENTITY_SOURCES = {
       ...(system.components ?? []).map((component) => `${system.id}:${component.id}`),
       // `InventoryListingBuilder` keys a held recipe item `recipeitem:<system>:<definition>`.
       ...(system.recipeItemDefinitions ?? []).map((entry) => `recipeitem:${system.id}:${entry.id}`),
+      // An essence row `essence:<system>:<essence>`, and a tool card `tool:<system>:<tool>`.
+      ...(system.essenceDefinitions ?? []).map((entry) => `essence:${system.id}:${entry.id}`),
+      ...(system.tools ?? []).map((entry) => `tool:${system.id}:${entry.id}`),
     ])
   ),
   // The carrier's key is `item.uuid || item.id`, and an owned item's uuid is the component's

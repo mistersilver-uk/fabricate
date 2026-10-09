@@ -26,11 +26,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // ChoiceOptionList's one site. Issue 1778: ListRow's mark +3, one literal tag per art rung (22,
 // 26, 30, 38); RunCard's tile -1, now that row's 30px mark; the ingredient routes' product tile -1,
 // now the dense row's 22px mark; the alchemy known-recipe and discipline card tiles -2, now that
-// row's 38px mark. The count is every `<Medallion` opening tag in `src/`; a branched pair is two.
-const MEDALLION_SITES = 72;
+// row's 38px mark. Issue 2321: the inventory inspector's cross-reference tiles -6, now
+// `XrefList`'s rows. The count is every `<Medallion` opening tag in `src/`; a branched pair is two.
+const MEDALLION_SITES = 66;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 55;
+const ART_BEARING_SITES = 49;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
@@ -66,8 +67,8 @@ describe('1506 the medallion art contract — its domain', () => {
     assert.equal(
       TAGS.length,
       MEDALLION_SITES,
-      'the medallion render-site census moved. That is not itself wrong — this change converted ' +
-        'two retired crafting tiles into it — but the count is what keeps the negative clauses ' +
+      'the medallion render-site census moved. That is not itself wrong — a change converts ' +
+        'tiles into it or composes it through a shared row — but the count is what keeps the negative clauses ' +
         'below honest, so it is re-measured deliberately rather than left to drift.'
     );
     assert.equal(

@@ -239,6 +239,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    // The inspector's cross-reference lists (issue 2321).
+    'src/ui/svelte/components/XrefList.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
