@@ -217,10 +217,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { formlessButtons } = focusPopulations();
     const undeclared = undeclaredIn(formlessButtons);
 
-    // 198 at issue 1777, which moved the manager trail's 22 crumb buttons into `PageHeader`, then
-    // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`, then
-    // 159 at issue 1778, when the inventory card's own button became ListRow's, then 157 at
-    // issue 2257, when the environment mode controls became SegmentedControl radios.
+    // A floor on the walk's reach: lower it only by the formless buttons a change deletes.
     assert.ok(
       formlessButtons.length >= 157,
       `only ${formlessButtons.length} buttons outside a form reached the walk, against the 157 ` +
