@@ -207,7 +207,7 @@
     color: var(--fab-text-muted);
     font-size: 10px;
     font-family: var(--fab-font-mono);
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     letter-spacing: normal;
     text-transform: none;

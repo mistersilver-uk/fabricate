@@ -572,7 +572,7 @@
   .bulk-progress-label {
     margin: 0;
     font-size: 11.5px;
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     font-family: var(--fab-font-mono);
     color: var(--fab-text-secondary);
@@ -620,7 +620,7 @@
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--fab-text-secondary);
   }
 
@@ -628,7 +628,7 @@
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--fab-text-subtle);
   }
 

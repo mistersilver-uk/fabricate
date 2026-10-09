@@ -116,7 +116,7 @@
   .salvage-dc {
     font-family: var(--fab-font-mono);
     font-size: 8.5px;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 0;
     color: var(--fab-text-secondary);
   }
@@ -160,7 +160,7 @@
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-secondary);
   }

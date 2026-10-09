@@ -227,7 +227,7 @@
   .essence-pool-picked-count {
     font-family: var(--fab-font-mono);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-muted);
   }
