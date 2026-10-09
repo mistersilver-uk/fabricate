@@ -276,6 +276,11 @@
     display: grid;
     gap: var(--fab-space-2);
   }
+  /* The host's UI face (V14 `--font-body`, V13 `--font-primary`), so the kicker of a list drawn
+     in a notice's mono evidence is not faux-bold mono. */
+  .journal-history-items {
+    font-family: var(--font-body, var(--font-primary));
+  }
   .journal-history-results {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -425,7 +425,7 @@
     gap: var(--fab-space-chip);
     padding: var(--fab-space-1) var(--fab-space-3);
     border: 1px solid var(--fab-accent);
-    border-radius: 7px;
+    border-radius: 6px;
     background: var(--fab-accent-soft);
     color: var(--fab-accent);
     font-size: 12px;
