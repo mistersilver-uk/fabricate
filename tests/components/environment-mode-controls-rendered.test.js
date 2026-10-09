@@ -1,16 +1,14 @@
 /* The environment editor's two mode controls are native radio groups (issue 2257, D5). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { borrowBrowser } from '../helpers/layout-harness.js';
-import { collectScopedCss, managerShellPage } from '../helpers/renderedManagerShell.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const componentPath = 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
@@ -121,79 +119,115 @@ describe('the environment mode controls are native radio groups', () => {
 });
 
 describe('the environment mode controls in Chromium', () => {
-  const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-  let markup = '';
-  let browser;
-  let page;
+  const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@manager-select-styles/' });
 
-  before(async () => {
-    await harness.setup();
-    try {
-      const target = await mountOverview([]);
-      // Svelte sets `checked` as a property, which `innerHTML` does not serialise.
-      for (const input of target.querySelectorAll('input:checked'))
-        input.setAttribute('checked', '');
-      markup = target.innerHTML;
-    } finally {
-      harness.teardown();
-    }
-    const { css } = collectScopedCss({ repoRoot, compiledModules });
-    browser = await borrowBrowser();
-    page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    const productMarkup = `<main class="manager-main">${markup}</main>`;
-    await page.setContent(
-      managerShellPage({ fabricateCss, view: 'environment-edit', productMarkup, scopedCss: css }),
-      { waitUntil: 'load' }
-    );
+  before(() => fixtureServer.start());
+  after(() => fixtureServer.stop());
+
+  /** The real overview, its two controls started on `modes`, with nothing reported yet. */
+  async function openOverview(modes = {}) {
+    const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 900 } });
+    const query = new URLSearchParams({ subject: 'environment-overview', ...modes });
+    await page.goto(fixtureServer.url(`/tests/fixtures/manager-select/index.html?${query}`), {
+      waitUntil: 'load',
+    });
+    await page.waitForFunction(() => globalThis.__managerSelectFixtureReady === true);
+    return page;
+  }
+
+  const hostCalls = (page) => page.evaluate(() => globalThis.__fixtureCalls ?? []);
+
+  const KEYBOARD_LEGS = [
+    {
+      section: 'player',
+      param: 'selectionMode',
+      values: ['targeted', 'blind'],
+      report: (mode) => ['update', { selectionMode: mode }],
+    },
+    {
+      section: 'composition',
+      param: 'compositionMode',
+      values: ['automatic', 'manual'],
+      report: (mode) => ['composition', mode],
+    },
+  ].flatMap(({ section, param, values, report }) => {
+    const [first, second] = values;
+    return [
+      {
+        section,
+        modes: {},
+        checked: first,
+        key: 'ArrowRight',
+        next: second,
+        report: report(second),
+      },
+      {
+        section,
+        modes: { [param]: second },
+        checked: second,
+        key: 'ArrowLeft',
+        next: first,
+        report: report(first),
+      },
+    ];
   });
 
-  after(() => browser?.close());
-
-  for (const { section, checked, other } of CONTROLS) {
-    it(`${section}: one Tab lands on the checked radio, ArrowRight checks and reports the other`, async () => {
-      // A focused button just before the group, so one Tab is all that separates them; the group
-      // records each `change` it hears on its own dataset.
-      await page.evaluate((sectionName) => {
-        const group = document.querySelector(
-          `[data-overview-section="${sectionName}"] [role="radiogroup"]`
-        );
-        const start = document.createElement('button');
-        group.before(start);
-        group.dataset.probeChanges = '';
-        group.addEventListener('change', (event) => {
-          group.dataset.probeChanges += `${event.target.value};`;
-        });
-        start.focus();
-      }, section);
-      const focused = () =>
-        page.evaluate((sectionName) => {
-          const active = document.activeElement;
-          const group = document.querySelector(
-            `[data-overview-section="${sectionName}"] [role="radiogroup"]`
-          );
-          return {
-            value: active.value ?? null,
-            inGroup: group.contains(active),
-            checked: active.checked ?? null,
-            changes: group.dataset.probeChanges,
-          };
+  for (const { section, modes, checked, key, next, report } of KEYBOARD_LEGS) {
+    it(`${section}: one Tab lands on ${checked}, the checked radio, and ${key} reports ${next}`, async () => {
+      const page = await openOverview(modes);
+      try {
+        // A focused button just before the group, so one Tab is all that separates them.
+        await page.evaluate((sectionName) => {
+          const start = document.createElement('button');
+          document
+            .querySelector(`[data-overview-section="${sectionName}"] [role="radiogroup"]`)
+            .before(start);
+          start.focus();
         }, section);
-      await page.keyboard.press('Tab');
-      assert.deepEqual(await focused(), {
-        value: checked,
-        inGroup: true,
-        checked: true,
-        changes: '',
-      });
-      await page.keyboard.press('ArrowRight');
-      assert.deepEqual(await focused(), {
-        value: other,
-        inGroup: true,
-        checked: true,
-        changes: `${other};`,
-      });
-      await page.keyboard.press('Tab');
-      assert.equal((await focused()).inGroup, false, 'the next Tab leaves the group');
+        const focused = () =>
+          page.evaluate((sectionName) => {
+            const active = document.activeElement;
+            const group = document.querySelector(
+              `[data-overview-section="${sectionName}"] [role="radiogroup"]`
+            );
+            return { value: active.value ?? null, inGroup: group.contains(active) };
+          }, section);
+        await page.keyboard.press('Tab');
+        assert.deepEqual(await focused(), { value: checked, inGroup: true });
+        assert.deepEqual(await hostCalls(page), [], 'focusing the checked radio reports nothing');
+        await page.keyboard.press(key);
+        assert.deepEqual(await focused(), { value: next, inGroup: true });
+        assert.deepEqual(await hostCalls(page), [report]);
+        await page.keyboard.press('Tab');
+        assert.equal((await focused()).inGroup, false, 'the next Tab leaves the group');
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  for (const { section, hook, other, report } of [
+    {
+      section: 'player',
+      hook: 'data-selection-mode-option',
+      other: 'blind',
+      report: ['update', { selectionMode: 'blind' }],
+    },
+    {
+      section: 'composition',
+      hook: 'data-composition-mode-option',
+      other: 'manual',
+      report: ['composition', 'manual'],
+    },
+  ]) {
+    it(`${section}: a pointer click on the ${other} segment reports it`, async () => {
+      const page = await openOverview();
+      try {
+        await page.click(`[data-overview-section="${section}"] [${hook}="${other}"]`);
+        assert.deepEqual(await hostCalls(page), [report]);
+      } finally {
+        await page.close();
+      }
     });
   }
 });

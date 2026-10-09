@@ -385,6 +385,10 @@ function railColumn() {
   return rail;
 }
 
+/** What a subject reported to its host, in order, for a suite to read as `__fixtureCalls`. */
+const hostCalls = [];
+Object.defineProperty(globalThis, '__fixtureCalls', { value: hostCalls });
+
 const SUBJECTS = {
   prerequisites: () =>
     mount(CharacterPrerequisitesCard, {
@@ -496,6 +500,7 @@ const SUBJECTS = {
       },
     }),
   // The overview's three: two add controls measurable only at their sentinel, and the ceiling.
+  // Its two mode controls start on `?selectionMode=` / `?compositionMode=` and record each report.
   'environment-overview': () =>
     mount(EnvironmentOverviewTab, {
       target: mountPoint,
@@ -509,11 +514,19 @@ const SUBJECTS = {
           dangerLevel: OVERVIEW_DANGERS.some((entry) => entry.id === startValue)
             ? startValue
             : 'safe',
+          selectionMode: params.get('selectionMode') ?? undefined,
+          compositionMode: params.get('compositionMode') ?? undefined,
         },
         realmsEnabled: true,
         realmRecords: OVERVIEW_REALMS,
         biomeOptions: OVERVIEW_BIOMES,
         dangerOptions: OVERVIEW_DANGERS,
+        onUpdate: (patch) => {
+          hostCalls.push(['update', patch]);
+        },
+        onSetCompositionMode: (mode) => {
+          hostCalls.push(['composition', mode]);
+        },
       },
     }),
   // The three browse toolbars, whose filter values are component state rather than props: each is

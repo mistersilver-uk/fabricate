@@ -752,6 +752,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:EnvironmentOverviewTab|CompositionModeControl)\.svelte$/,
       GATHERING_ROUTE_MODEL_PATTERN,
     ],
   }),
