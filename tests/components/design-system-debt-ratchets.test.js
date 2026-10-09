@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { bandCorner } from '../../scripts/lib/radiusLadder.js';
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
 import { censusRules, selectorAppearances } from '../../scripts/lib/stylesheetSelectorCensus.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
@@ -2042,10 +2043,8 @@ test('no corner radius leaves the published ladder', (t) => {
 
 /** The band a box of `px` takes on the radius ladder, or `null` for a size the spec gives none. */
 function cornerBand(px) {
-  if (px <= 24) return '6px';
-  if (px >= 26 && px <= 32) return '7px';
-  if (px >= 34 && px <= 38) return '9px';
-  return px === 44 ? '11px' : null;
+  const corner = bandCorner(px);
+  return corner === null ? null : `${corner}px`;
 }
 
 /** A corner that names a shape rather than a band: square, a pill or track, a circle. */

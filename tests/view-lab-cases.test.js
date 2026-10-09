@@ -3437,6 +3437,7 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'scripts/lib/viewLabRenderPool.js',
     'scripts/lib/viewLabShards.js',
     'scripts/lib/viewLabComputedCensus.js',
+    'scripts/lib/radiusLadder.js',
     'scripts/view-lab-shards.mjs',
   ]) {
     assert.deepEqual(

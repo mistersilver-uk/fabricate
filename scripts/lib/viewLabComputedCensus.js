@@ -3,6 +3,7 @@
  * control or art tile at a ladder height draws its band's corner, and no mono text computes above
  * 500. It reads what the browser resolved, so an inherited weight or a host rule is judged too.
  */
+import { bandCorner } from './radiusLadder.js';
 
 /** The controls and art tiles judged; rows, wells, chips, cards and panels take corners by kind. */
 const JUDGED_BOXES =
@@ -10,46 +11,59 @@ const JUDGED_BOXES =
   '[role="checkbox"], [role="switch"], [role="option"], [role="menuitem"], .fab-medallion, ' +
   '.fab-avatar';
 
-/** The mount points a companion draws its own DOM into, which Fabricate does not style. */
-const COMPANION_TARGETS = '.player-extension-target, .downtime-extension-target';
+/** Foundry's own window chrome, and the mount points a companion draws its own DOM into. */
+const SKIPPED_SUBTREES = '.window-header, .player-extension-target, .downtime-extension-target';
 
-/** The heights judged: the control and art ladders, the chip's 24 and the retired 32, 36, 40. */
-const JUDGED_HEIGHTS = new Set([22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 44]);
+/** The ladder heights judged, the retired 32 and 36 included; 40 has no band (`radiusLadder.js`). */
+const JUDGED_HEIGHTS = new Set([22, 24, 26, 28, 30, 32, 34, 36, 38, 44]);
 
 /**
- * Controls a ruling or a site marker rounds off their height band: the classes the control or its
- * host carries, all of which must match, the corner it draws, and why.
+ * The boxes a ruling rounds off their band: the selector the box itself matches, the heights it
+ * draws (one rung, or a wrapped row's two-line heights) and its corner there, and the reason its
+ * site marker states (`design-system-exempt-allowlist`).
  */
-const RULED_KINDS = Object.freeze([
-  [['fabricate-search', 'is-compact'], 6, "the compact search's ruled box"],
-  [['fab-stepper-adjunct'], 7, "the 22px adjunct's 6 outset by its 1px hit-area padding"],
-  [['manager-nav-subitem'], 7, "a nav row keeps its rung's corner when a long label wraps it"],
+export const RULED_KINDS = Object.freeze([
+  Object.freeze({
+    selector: '.fab-avatar',
+    heights: [32],
+    corner: 9,
+    reason: "an actor portrait, the portrait ladder's 32 single mark, not a control",
+  }),
+  Object.freeze({
+    selector: '.fabricate-search.is-compact input',
+    heights: [34],
+    corner: 6,
+    reason:
+      "the compact search's ruled box, 34 at radius 6, the geometry requirement's named " +
+      'exception rather than a rung',
+  }),
+  Object.freeze({
+    selector: '.fab-stepper-adjunct',
+    heights: [24],
+    corner: 7,
+    reason:
+      "the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box " +
+      'background still draws 6; retires if the adjunct moves to the ::before form or a hit-area ' +
+      'token lands',
+  }),
+  Object.freeze({
+    selector: '.manager-nav-subitem',
+    heights: [34, 36, 38],
+    corner: 7,
+    reason: "a nav row keeps its 30px rung's corner when a long label wraps it taller",
+  }),
 ]);
 
-/** The ladder's corner for a box `height` px tall (`design-system/spec.md`, "Geometry"). */
-export function bandCorner(height) {
-  if (height <= 24) return 6;
-  if (height <= 32) return 7;
-  if (height <= 40) return 9;
-  return 11;
-}
-
-/**
- * Why a painted box is off its band, or `null`. A square, round or pill corner passes, and so do
- * a row or well at 9 and a panel or card at 11 from the 34px band up, which the spec rounds by
- * kind rather than by height; the 32px portrait takes 9.
- */
-export function cornerVerdict({ height, radius, classes = [] }) {
+/** Why a painted box is off its band, or `null`; a square, round or pill corner passes. */
+export function cornerVerdict({ height, radius, kinds = [] }) {
   if (!JUDGED_HEIGHTS.has(height) || radius === 0 || radius * 2 >= height) return null;
-  const ruled = RULED_KINDS.some(
-    ([kind, corner]) => corner === radius && kind.every((name) => classes.includes(name))
-  );
-  if (ruled) return null;
   const band = bandCorner(height);
   if (radius === band) return null;
-  if (height >= 34 && (radius === 9 || radius === 11)) return null;
-  if (height === 32 && radius === 9) return null;
-  return `${height}px tall at radius ${radius}, where its band draws ${band}`;
+  const ruled = RULED_KINDS.some(
+    (kind) =>
+      kinds.includes(kind.selector) && kind.heights.includes(height) && kind.corner === radius
+  );
+  return ruled ? null : `${height}px tall at radius ${radius}, where its band draws ${band}`;
 }
 
 /** Why a mono text run is off the ramp's mono ceiling, or `null`. */
@@ -58,19 +72,20 @@ export function monoVerdict({ weight }) {
 }
 
 /**
- * Runs in the page: every painted `judged` box with four equal corners and every element holding
- * its own mono text, in the frame's window content outside `companions`. Self-contained, because
- * Playwright serialises it.
+ * Runs in the page over every element of the frame outside `skipped`: each painted `judged` box
+ * with four equal corners, with the `ruled` selectors it matches, and each element holding its
+ * own text in the mono face it resolves. Self-contained, because Playwright serialises it.
  */
-export function collectFrameCensus({ frameSelector, judged, companions }) {
+export function collectFrameCensus({ frameSelector, judged, skipped, ruled }) {
   const view = globalThis;
-  const firstFamily = (family) =>
-    String(family).split(',', 1)[0].replaceAll(/["']/g, '').trim().toLowerCase();
   const root = view.document.querySelector(frameSelector);
-  const content = root?.querySelector('.window-content') ?? root;
-  const mono = firstFamily(
-    view.getComputedStyle(view.document.documentElement).getPropertyValue('--fab-font-mono')
-  );
+  const census = { found: Boolean(root), monoResolved: false, boxes: [], texts: [] };
+  const firstFamily = (family) =>
+    String(family ?? '')
+      .split(',', 1)[0]
+      .replaceAll(/["']/g, '')
+      .trim()
+      .toLowerCase();
   const sides = ['Top', 'Right', 'Bottom', 'Left'];
   const clear = (colour) => colour === 'transparent' || colour === 'rgba(0, 0, 0, 0)';
   const painted = (style) =>
@@ -92,34 +107,37 @@ export function collectFrameCensus({ frameSelector, judged, companions }) {
     const [corner] = corners;
     return corners.size === 1 && /^[\d.]+px$/.test(corner) ? Number.parseFloat(corner) : null;
   };
-  const classesOf = (element) =>
-    [...(element?.classList ?? [])].filter((name) => !name.startsWith('svelte-'));
   const label = (element) =>
-    [element.tagName.toLowerCase(), ...classesOf(element)].slice(0, 4).join('.');
+    [
+      element.tagName.toLowerCase(),
+      ...[...element.classList].filter((name) => !name.startsWith('svelte-')),
+    ]
+      .slice(0, 4)
+      .join('.');
+  const nameOf = (element) =>
+    `${element.parentElement ? `${label(element.parentElement)} > ` : ''}${label(element)}`;
   const ownsText = (element) =>
     [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim() !== '');
-  const boxes = [];
-  const texts = [];
-  for (const element of content ? content.querySelectorAll('*') : []) {
-    if (element.closest(companions)) continue;
+  for (const element of root ? root.querySelectorAll('*') : []) {
+    if (element.closest(skipped)) continue;
     const style = view.getComputedStyle(element);
+    const mono = firstFamily(style.getPropertyValue('--fab-font-mono'));
+    census.monoResolved ||= mono !== '';
     const rect = element.getBoundingClientRect();
     if (style.display === 'none' || style.visibility !== 'visible' || rect.width < 1) continue;
-    const host = element.parentElement;
-    const name = `${host ? `${label(host)} > ` : ''}${label(element)}`;
-    if (ownsText(element) && firstFamily(style.fontFamily) === mono) {
-      texts.push({ element: name, weight: Number(style.fontWeight) });
+    if (mono !== '' && ownsText(element) && firstFamily(style.fontFamily) === mono) {
+      census.texts.push({ element: nameOf(element), weight: Number(style.fontWeight) });
     }
     const radius = element.matches(judged) && painted(style) ? cornerOf(style) : null;
     if (radius === null || rect.height < 1) continue;
-    boxes.push({
-      element: name,
-      classes: [...classesOf(element), ...classesOf(host)],
+    census.boxes.push({
+      element: nameOf(element),
+      kinds: ruled.filter((selector) => element.matches(selector)),
       height: Math.round(rect.height),
       radius: Math.round(radius),
     });
   }
-  return { boxes, texts };
+  return census;
 }
 
 /** The census findings of one collected frame, each a line naming the element and the rule. */
@@ -136,13 +154,24 @@ export function censusFindings({ boxes = [], texts = [] }) {
   return [...new Set(findings)];
 }
 
-/** Collect and judge one frame, throwing with every finding when any box or text is off. */
+/**
+ * Collect and judge one frame, throwing with every finding when any box or text is off, and when
+ * the frame or its mono token is missing, since either would make a clean census vacuous.
+ */
 export async function assertComputedCensus(page, appId, label) {
+  const frameSelector = `[data-view-lab-frame="${appId}"]`;
   const census = await page.evaluate(collectFrameCensus, {
-    frameSelector: `[data-view-lab-frame="${appId}"]`,
+    frameSelector,
     judged: JUDGED_BOXES,
-    companions: COMPANION_TARGETS,
+    skipped: SKIPPED_SUBTREES,
+    ruled: RULED_KINDS.map(({ selector }) => selector),
   });
+  if (!census.found) throw new Error(`${label}: the computed census found no ${frameSelector}.`);
+  if (!census.monoResolved) {
+    throw new Error(
+      `${label}: --fab-font-mono resolved on no element, so no mono text was judged.`
+    );
+  }
   const findings = censusFindings(census);
   if (findings.length > 0) {
     throw new Error(

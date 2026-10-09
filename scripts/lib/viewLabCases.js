@@ -56,11 +56,11 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
- * the Foundry shim it renders against, its capture, layout and census helpers, this index and
- * the case files it reads.
+ * the Foundry shim it renders against, its capture, layout and census helpers and the radius
+ * ladder the census reads, this index and the case files it reads.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/(?:foundryChromeSpec|radiusLadder)\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
 
 /** The helper that enforces the opt-in responsive layout contract. */
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
