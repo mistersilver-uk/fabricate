@@ -745,9 +745,12 @@ A pill that CONTAINS a square element — an icon chip, a thumbnail — takes th
 `tests/components/design-system-debt-ratchets.test.js` holds the RADIUS ladder over both stylesheet corpora, resolving a `var()` token to its definitions first so that moving a banned value into a custom property does not pay the debt down.
 `tests/components/control-height-ladder.test.js` holds the control-height ladder the same way.
 Heights, radii, art and portraits MUST hold zero unmarked off-ladder sites, the books pair included.
-Each surviving off-ladder site carries a reasoned `ratchet-exempt(design-system)` marker naming its library specimen, issue 2257 where a specimen and its shipped geometry are still to converge, or why the site is not a control or a record tile.
-`tests/components/design-system-exempt-allowlist.test.js` pins every `ratchet-exempt(design-system)` marker under `src/` and `styles/` with its reason, so a marker added, dropped or reworded without its allowlist entry fails.
-The View Lab capture measures what the browser resolved on every frame it renders (`scripts/lib/viewLabComputedCensus.js`), over the whole frame, portaled overlays included, bar Foundry's window header and the companion mount points: a painted control or art tile at a ladder height whose computed corner is off that height's band (`scripts/lib/radiusLadder.js`, which the stylesheet corner gate reads too, so the retired 40 has no band in either) fails the frame unless it matches a ruled kind at that kind's measured height and corner, and each ruled kind states the reason its site marker carries in the exempt allowlist.
+Each surviving off-ladder site carries a reasoned `ratchet-exempt(design-system)` marker stating its library specimen, issue 2257 where a specimen and its shipped geometry are still to converge, the compact search exception this requirement names, why the site is not a control or a record tile, or why its corner is not its height's band (a nav row a long label wraps taller keeps its 30px rung's corner, and the stepper adjunct's hit-area padding outsets its button's corner).
+`tests/components/design-system-exempt-allowlist.test.js` pins every `ratchet-exempt(design-system)` marker under `src/` and `styles/` by its reason and by how many times each file states that reason, so a marker added, dropped, reworded or copied to a second site without its allowlist entry fails.
+The View Lab capture measures what the browser resolved on every frame it renders (`scripts/lib/viewLabComputedCensus.js`), over the whole frame, portaled overlays included, bar Foundry's window header and the companion mount points.
+A painted control or art tile whose rendered height is 22 to 38 in steps of 2 or is 44, the retired 32 and 36 included, fails the frame when its computed corner is neither square, nor half its height or more, nor that height's band, unless it matches a ruled kind at that kind's measured height and corner.
+The bands are `scripts/lib/radiusLadder.js`, which the stylesheet corner gate reads too, so the retired 40 has no band in either and is held by the control-height gate instead.
+Each ruled kind states the reason its site marker carries, and the exempt allowlist fails a ruled kind whose reason no allowlisted marker states.
 Mono text computing above weight 500 fails the frame too, and so does a frame with no root or no resolved `--fab-font-mono`, because either would make a clean census an empty one.
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
@@ -763,7 +766,7 @@ Type follows the ladder in `ui-visual-style`: the serif face names things, the m
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.
 Emphasis in mono comes from size and ink.
 `tests/components/design-system-debt-ratchets.test.js` holds both halves of the weight rule: that no `font-weight` anywhere leaves the 400/500/600/700 ramp, and that no rule setting `var(--fab-font-mono)` asks for a weight above 500.
-It joins a rule to a same-selector twin elsewhere in the same file, because the corpus repeatedly sets the family in a base rule and the weight in a `@media`-nested copy, and a rule-local reading would exempt every one of those.
+It joins a rule to a same-selector twin elsewhere in the same file, so a family set in one rule and a weight set in another rule for the same selector, such as an at-rule-nested copy, is read as one mono rule rather than exempted by a rule-local reading.
 
 #### Scenario: A geometry falls between two rungs
 
