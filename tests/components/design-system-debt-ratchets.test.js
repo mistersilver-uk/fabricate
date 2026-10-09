@@ -2534,44 +2534,16 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at eighteen carriers of the target tuple: seven are PINNED by a test or a script ' +
-      'that reads their selectors, four are recorded non-adopters and seven are unpinned. The ' +
-      'corners-by-kind pass added three pinned carriers when it put the ingredient set name, the ' +
-      'condition pill and the pill-select menu button on 9, and took the portaled hex input, a ' +
-      'non-adopter, off the tuple at its 28px rung. The ' +
-      'radius sweep added four when it put rows and wells on 9: the requirement option ' +
-      'row, pinned by the picker-row and studio font-size suites, and the unpinned recipe flow ' +
-      'row, Tool system label and Tool required row. Issue ' +
-      "1777 deleted the sixth non-adopter, the manager's element-level `select` baseline, with " +
-      'the last native select a template rendered. Issue ' +
-      "2005's Studio parity pass added the outcome tier row, pinned by the Checks mounted suite, " +
-      "and took the config option card's glyph tile off the tuple, its border now transparent " +
-      "as the library's icon chip draws it. The " +
-      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the four ' +
-      'carriers that left are select skins issue 1510 took — the recipe overview cells, the ' +
-      "recipe, component and essence browse toolbars' shared select skin and the vocabulary " +
-      "panel's sort skin, each deleted when its selects became the shared `<Select>`, and the " +
-      "Tool rails' `Preview as` actor " +
-      'picker, whose rule survives as a width counterpart while the `toolbar` rung paints the ' +
-      "tuple; the pinned carrier that arrived is issue 1512's ordered row, " +
-      '`.fabricate-sortable-list-row`, which takes the tuple from the `<SortableList>` specimen. Issue ' +
-      '1501 measured ONE unpinned carrier and withdrew the class under the two-adopter floor; ' +
-      "issue 1371's catalogue, entry and salvage screens then landed four more beneath it, so " +
-      'the floor is met and what defers the class now is the work rather than the population — ' +
-      "each adoption owes criterion 5's scoped blocker walk over the interval between the " +
-      'module root and its own donor, published with both specificities',
+      'withdrawn and not shipped (issue 1523, decision D4): its border, radius and fill tuple ' +
+      'is carried by blocks that are pinned by a test or script reading their selectors, are ' +
+      'keyed on an ancestor chain or a rule-level guard a stamped class cannot express, or ' +
+      'would repaint nothing by adopting it, so each block keeps its own declarations',
   },
   {
     name: 'fab-card-skin',
     why:
-      'three blocks carry the proposed border, radius and fill five-tuple, up from the one ' +
-      "issue 1501 measured — issue 1371's component entry card and component rules card are " +
-      'the two new carriers — so this class too is deferred for its per-adoption blocker walk ' +
-      'rather than for want of carriers; of the nine 11px border-and-fill blocks the fills are ' +
-      '`--fab-bg-2` at three (the proposed one), `--fab-info-soft` at two — `:2709-2711` and ' +
-      '`:18420-18422` carry an identical `1px solid var(--fab-info-border)` five-tuple, a second ' +
-      'candidate skin for issue 1523 rather than this one — `--fab-bg-1` at two behind two ' +
-      'DIFFERENT hairlines, and `--fab-surface-soft` and `--fab-bg-3` at one each',
+      'withdrawn and not shipped (issue 1523, decision D4): the 11px border-and-fill card ' +
+      'blocks split across five fills, so no five-tuple is a treatment the cards share',
   },
 ]);
 
@@ -2756,82 +2728,16 @@ test('every root ringing bare elements on `:focus-visible` is a named one', () =
   );
 });
 
-test('a withdrawn utility or skin class is not declared, and issue 1523 owns each one', () => {
+test('a withdrawn utility or skin class is not declared', () => {
   // NON-VACUITY IS THE CLAUSE ABOVE. An absence check over an empty sheet passes forever.
   for (const { name, why } of WITHDRAWN_UTILITIES) {
     assert.deepEqual(
       rulesNamingClass(name).map((rule) => `${MODULE_SHEET}:${rule.line}`),
       [],
-      `\`.${name}\` must not be declared: ${why}. Issue 1523 is the change expected to REMOVE ` +
-        'this class, not the change that adds it — declaring one here reopens the measurement ' +
+      `\`.${name}\` must not be declared: ${why}. Declaring one reopens the measurement ` +
         'that withdrew it, so re-run that measurement and publish it rather than adding the rule.'
     );
   }
-});
-
-/** The border, radius and fill tuple the withdrawn `.fab-field-skin` would have carried. */
-const SKIN_CENSUS_TUPLE = Object.freeze({
-  border: '1px solid var(--fab-border)',
-  'border-radius': '9px',
-  background: 'var(--fab-bg-1)',
-});
-
-/** The comment every carrier of that tuple publishes, and the string this clause looks for. */
-const SKIN_CENSUS_MARKER = 'skin census (issue 1523)';
-
-/** The module sheet as it is WRITTEN, comments intact. */
-let cachedSheetText = null;
-function sheetText() {
-  if (cachedSheetText === null) {
-    const text = collectWorkingTreeSources(['styles'], ['.css'])[MODULE_SHEET];
-    if (text === undefined) {
-      throw new Error(
-        `${MODULE_SHEET} is not in the working-tree style scan, so every carrier below would ` +
-          'report an absent marker as a present one and the clause would pass on an empty read.'
-      );
-    }
-    cachedSheetText = text;
-  }
-  return cachedSheetText;
-}
-
-/** The comment block written IMMEDIATELY above `line`, or `''` when the rule opens without one. */
-function commentAbove(line) {
-  const lines = sheetText().split('\n');
-  const end = line - 2;
-  if (end < 0 || !lines[end].trimEnd().endsWith('*/')) return '';
-  let start = end;
-  while (start >= 0 && !lines[start].includes('/*')) start -= 1;
-  return start < 0 ? '' : lines.slice(start, end + 1).join('\n');
-}
-
-test('every carrier of the withdrawn skin tuple carries its census marker', () => {
-  // THE WITHDRAWAL ABOVE STATES A POPULATION AND A SPLIT.
-  const carriers = sheetRules().filter((rule) => {
-    const declarations = declarationMap(rule);
-    return Object.entries(SKIN_CENSUS_TUPLE).every(
-      ([property, value]) => declarations[property] === value
-    );
-  });
-
-  assert.equal(
-    carriers.length,
-    18,
-    'the census is eighteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its seven-pinned / four-non-adopter / seven-unpinned split as prose, so a carrier arriving ' +
-      'or ' +
-      'leaving means re-deriving that `why` text with it rather than moving this number alone.'
-  );
-  assert.deepEqual(
-    carriers
-      .filter((rule) => !commentAbove(rule.line).includes(SKIN_CENSUS_MARKER))
-      .map((rule) => `${MODULE_SHEET}:${rule.line}`),
-    [],
-    `a carrier of the withdrawn skin tuple must carry a \`${SKIN_CENSUS_MARKER}\` comment ` +
-      'immediately above its rule, saying whether it is pinned, an unpinned carrier or not an ' +
-      'adopter and naming what pins it. That comment is the record issue 1523 reads to decide the ' +
-      'class, and a carrier missing from it is a shared treatment the decision cannot see.'
-  );
 });
 
 /* ─────────────── gate 8: cross-list selector repetition in the module sheet ─────────────── */
