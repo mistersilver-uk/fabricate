@@ -1611,8 +1611,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     ],
     // The compact chip scale used to be a fourth entry here.
     [
-      // The Knowledge row actions and reset cluster share one 34px rule; the Tool Studio
-      // editor's cluster left it for the page header's 38 (issue 2257 D10).
+      // The Knowledge row actions and reset cluster share one 34px rule (issue 2257 D10).
       '.fabricate-manager .manager-knowledge-row-actions .fabricate-button,\n' +
         '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button {',
       '.manager-knowledge-reset-actions .fabricate-button {',

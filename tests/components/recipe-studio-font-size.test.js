@@ -15,11 +15,13 @@ const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="recipe-edit">
+        <header class="fabricate-page-header manager-header"><div class="manager-heading">
         <div class="manager-recipe-edit-heading-copy">
           <h1 class="manager-title" data-m="title">Craft Acid-Bite Arrows</h1>
           <p class="manager-subtitle" data-m="subtitle">Ammunition · Routed by check · DC 10</p>
         </div>
-        <div class="manager-header-actions">
+        </div>
+        <div class="manager-header-actions" role="group" aria-label="Actions">
           <!-- Carries fab-manager-button because the shipped Back button does (issue 1118).
                The number below does not move: .manager-header-actions .fabricate-button and the
                primitive both state 0.72rem, which is exactly why the header rule's type scale
@@ -28,8 +30,8 @@ const FIXTURE = `
                BORDER moved too: .manager-header-actions .fabricate-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
-          <button class="fabricate-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
-        </div>
+          <button class="fabricate-button fab-manager-button is-size-38 is-ghost" data-m="header-button"><span>Back</span></button>
+        </div></header>
         <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
             <span class="manager-chip is-neutral manager-editor-tab-badge" data-m="tab-badge">4</span>
@@ -301,8 +303,8 @@ function page() {
 
 // px at the 16px root: rem * 16.
 const EXPECTED = {
-  title: 20, // 1.25rem  (recipe editor title)
-  subtitle: 11.52, // 0.72rem
+  title: 22, // 1.375rem — the page header specimen's title (issue 2257 D2)
+  subtitle: 12,
   'header-button': 11.52, // 0.72rem
   'tab-label': 12.48, // 0.78rem
   'tab-badge': 8.96, // 0.56rem

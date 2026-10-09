@@ -1109,7 +1109,7 @@
   white-space: nowrap;
 }
 
-/* THE PAGE HEADER'S FAMILY IS ROOTED AT `PageHeader`'s OWN CLASS (issue 1777), doubled to keep the (0,2,0) it had under `.fabricate-manager`: the title and subtitle keep both roots because the rail and the scoped cards spell them too. The specimen's frame (issue 2257 E4, D1, D2): the trail spans the first row, the heading and the actions share the second, top-aligned; the specimen's 10px under the trail snaps to the scale's 8. */
+/* The page header's family is rooted at PageHeader's own class (issue 1777), doubled to keep (0,2,0); the title and subtitle keep both roots because the rail and scoped cards spell them too. The trail spans the first row; the heading and actions share the second, top-aligned (issue 2257). */
 .fabricate-page-header.fabricate-page-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1256,9 +1256,10 @@
   margin-top: var(--fab-space-chip);
   font-size: 12px;
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
-/* THE ACTION CLUSTER IS NEVER THE THING THAT GIVES: the page header gives it an `auto` track beside the heading's `minmax(0, 1fr)`, and `flex: 0 0 auto` holds it in a flex row, because a squeezed cluster wraps `Save` under `Delete` rather than overflowing (`manager-header-geometry.test.js`). */
+/* The action cluster never gives: the page header gives it an `auto` track beside the heading's `minmax(0, 1fr)`, and `flex: 0 0 auto` holds it in a flex row, because a squeezed cluster wraps `Save` under `Delete` rather than overflowing (`manager-header-geometry.test.js`). */
 .fabricate-manager .manager-header-actions,
 .fabricate-manager .manager-action-group {
   display: inline-flex;
@@ -13861,7 +13862,7 @@
   overflow: hidden;
 }
 
-/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373): its fill and its place in the editor grid; `PageHeader` draws the rest (issue 2257). */
+/* The Tool editor's header keeps only its fill and grid placement; PageHeader draws the rest (issues 1373, 2257). */
 .fabricate-manager .manager-tool-edit-header {
   background: var(--fab-bg-0);
   grid-column: 1 / -1;
@@ -13909,7 +13910,7 @@
   justify-content: flex-end;
 }
 
-/* The GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its per-character reset cluster stand on the 34px rung the page header's actions left for 38 (issues 1118, 2257). */
+/* Knowledge row and reset actions stand on the 34px rung (issues 1118, 2257 D10). */
 .fabricate-manager .manager-knowledge-row-actions .fabricate-button,
 .fabricate-manager .manager-knowledge-reset-actions .fabricate-button {
   min-height: 34px;
@@ -15537,7 +15538,6 @@
 
 /* THE SUBTITLE IS CLAMPED THE WAY THE TITLE ABOVE IT ALREADY WAS. The global `.manager-subtitle` sets `overflow-wrap: anywhere`, which is right for a route whose subline is a short measure — `Training · 8 days total` — and wrong for one carrying a document's own prose. */
 .fabricate-manager .manager-recipe-edit-heading-copy .manager-subtitle {
-  max-width: 62ch;
   overflow: hidden;
   overflow-wrap: normal;
   text-overflow: ellipsis;

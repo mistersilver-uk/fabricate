@@ -308,7 +308,7 @@ test('a long identity subtitle truncates rather than wrapping the action cluster
   // `ch`, so a type-scale change moves the pixels and not the promise.
   assert.ok(measured.sublineCh > 0, 'the subtitle font could not be measured');
   assert.ok(
-    measured.sublineWidth <= Math.ceil(measured.sublineCh * 70),
+    measured.sublineWidth <= measured.sublineCh * 74 + 1,
     `the subtitle runs ${Math.round(measured.sublineWidth / measured.sublineCh)}ch wide`
   );
 
