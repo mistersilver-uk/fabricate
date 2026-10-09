@@ -408,7 +408,7 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-    padding: 22px 24px;
+    padding: var(--fab-space-6);
     overflow-y: auto;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
@@ -420,13 +420,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: var(--fab-space-1);
   }
 
   .alchemy-workbench-title {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: var(--fab-space-2);
   }
 
   .alchemy-workbench-title i {
@@ -444,7 +444,7 @@
   }
 
   .alchemy-workbench-intro {
-    margin: 0 0 16px;
+    margin: 0 0 var(--fab-space-4);
     font-size: 11.5px;
     color: var(--fab-text-muted);
   }
@@ -453,12 +453,12 @@
     border: 1.5px dashed var(--fab-border-strong);
     border-radius: 11px;
     background: var(--fab-surface-soft);
-    padding: 16px;
-    margin-bottom: 14px;
+    padding: var(--fab-space-4);
+    margin-bottom: var(--fab-space-4);
   }
 
   .alchemy-bench.is-empty {
-    padding: 40px 20px;
+    padding: 40px var(--fab-space-5);
   }
 
   .alchemy-bench.is-dragover {
@@ -471,7 +471,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
     text-align: center;
   }
 
@@ -503,7 +503,7 @@
   .alchemy-bench-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .alchemy-chip {
@@ -511,11 +511,11 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface);
-    padding: 12px 10px;
+    padding: var(--fab-space-3);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-2);
     cursor: pointer;
   }
 
@@ -590,16 +590,16 @@
   }
 
   .alchemy-result-meta :global([data-alchemy-essences]) {
-    margin-top: 5px;
+    margin-top: var(--fab-space-1);
   }
 
   .alchemy-signature {
-    margin-top: 14px;
-    padding-top: 12px;
+    margin-top: var(--fab-space-4);
+    padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .alchemy-signature-text {
@@ -609,18 +609,18 @@
   }
 
   .alchemy-bench-essences {
-    margin-top: 9px;
+    margin-top: var(--fab-space-2);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     flex-wrap: wrap;
   }
 
   .alchemy-status {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3) var(--fab-space-4);
     border-radius: 11px;
     font-size: 12px;
     font-weight: 600;
@@ -656,14 +656,14 @@
   /* The ONE property the deleted `.alchemy-produces-label` rule declared that `Kicker`
      cannot carry. See the markup comment. */
   .alchemy-produces-slot {
-    margin: 18px 0 10px;
+    margin: var(--fab-space-5) 0 var(--fab-space-3);
   }
 
   .alchemy-result {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4) var(--fab-space-5);
     border-radius: 11px;
     border: 1px solid var(--fab-accent-border);
     background: var(--fab-surface-soft);
@@ -697,8 +697,8 @@
   .alchemy-unknown {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4) var(--fab-space-5);
     border-radius: 11px;
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
@@ -728,12 +728,12 @@
     font-size: 11px;
     line-height: 1.45;
     color: var(--fab-text-muted);
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
   }
 
   .alchemy-missing {
-    margin-top: 10px;
-    padding: 11px 13px;
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-3);
     border-radius: 11px;
     background: var(--fab-info-soft);
     border: 1px solid var(--fab-info-border);
@@ -745,20 +745,20 @@
     text-transform: uppercase;
     color: var(--fab-info);
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: var(--fab-space-2);
   }
 
   .alchemy-missing-rows {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .alchemy-missing-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 9px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1) var(--fab-space-2);
     border-radius: 999px;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
@@ -769,7 +769,7 @@
 
   .alchemy-brew-area {
     margin-top: auto;
-    padding-top: 18px;
+    padding-top: var(--fab-space-5);
   }
 
   /* Stripped to the one property that is this caller's LAYOUT (issue 1505). The tint,
@@ -777,6 +777,6 @@
      are now the primitive's; what is left is the separation between this banner and the
      Brew button, which `.alchemy-brew-area` does not provide. */
   .alchemy-banner {
-    margin-bottom: 12px;
+    margin-bottom: var(--fab-space-3);
   }
 </style>

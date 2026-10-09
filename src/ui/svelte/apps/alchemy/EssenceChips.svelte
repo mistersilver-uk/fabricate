@@ -76,7 +76,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
@@ -88,8 +88,8 @@
   .alchemy-essence-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 1px 5px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-1);
     border-radius: 999px;
     background: var(--fab-accent-soft);
     border: 1px solid var(--fab-accent-border);
@@ -115,7 +115,7 @@
 
   .alchemy-essences-md .alchemy-essence-chip {
     font-size: 10px;
-    padding: 2px 7px;
+    padding: var(--fab-space-2xs) var(--fab-space-chip);
   }
 
   .alchemy-essence-chip i {

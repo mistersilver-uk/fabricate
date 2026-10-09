@@ -88,7 +88,7 @@
     justify-content: center;
     height: 100%;
     overflow-y: auto;
-    padding: 64px 24px;
+    padding: var(--fab-space-6);
     background: var(--fab-surface);
     color: var(--fab-text);
     container: fabricate-alchemy-chooser / inline-size;
@@ -105,7 +105,7 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: var(--fab-space-6);
   }
 
   .alchemy-chooser-mark {
@@ -114,7 +114,7 @@
     justify-content: center;
     width: 52px;
     height: 52px;
-    margin-bottom: 14px;
+    margin-bottom: var(--fab-space-4);
     border-radius: 11px;
     background: var(--fab-accent-soft);
     border: 1px solid var(--fab-accent-border);
@@ -134,7 +134,7 @@
   }
 
   .alchemy-chooser-hint {
-    margin: 8px 0 0;
+    margin: var(--fab-space-2) 0 0;
     max-width: 42ch;
     font-size: 13px;
     line-height: 1.5;
@@ -144,7 +144,7 @@
   .alchemy-chooser-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--fab-space-4);
   }
 
   @container fabricate-alchemy-chooser (max-width: 520px) {
@@ -174,7 +174,7 @@
   .alchemy-chooser-card-enter {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     margin-top: var(--fab-space-2);
     font-size: 12px;
     font-weight: 600;
