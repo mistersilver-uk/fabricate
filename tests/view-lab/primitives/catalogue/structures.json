@@ -341,7 +341,7 @@
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
-    "cap": "default — 38px chip, serif name",
+    "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "partial": "badges and trailing controls stay drawn",
@@ -399,7 +399,7 @@
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
-    "cap": "default — 38px chip, serif name",
+    "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "partial": "badges and trailing controls stay drawn",

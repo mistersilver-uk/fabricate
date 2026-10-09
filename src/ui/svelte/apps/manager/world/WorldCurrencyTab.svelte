@@ -511,7 +511,7 @@
                The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
                12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
                (3.71:1). The library's `k-hint` is the authority for that treatment and the token
-               question belongs to issue 1523's geometry and token sweep, not here —
+               question belongs to issue 2257's specimen convergence, not here —
                consistency inside the card is what this change owes. -->
           <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
             >{currencySpendStrategyHint()}</span
