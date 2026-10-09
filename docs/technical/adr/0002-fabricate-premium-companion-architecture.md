@@ -764,6 +764,7 @@ The residual risk sits in specific design choices rather than in the concept, ra
    This is a shipped defect, not a design trade.
    `CraftingSystemManagerRoot.svelte` derives `premiumInstalled` from `registeredSurfaceIds.length > 0`, and `ui-extension-points/spec.md` codifies it: the title-bar badge lights "when, and only when, at least one provider is registered on ANY surface id".
    The badge's `title` and `aria-label` both read **"Fabricate Premium is installed and connected"**, from `FABRICATE.Admin.Manager.Titlebar.PremiumStatus`.
+   *Note, 2026-10 (issue 2257): the badge no longer carries an `aria-label`; the same `PremiumStatus` text is now exposed to assistive technology as visually hidden text inside the badge.*
    But the registry inspects nothing about who is calling, and D3 deliberately permits a **free** third-party companion.
    So a free third-party companion makes the free module display a false statement about a paid product relationship — and silently annexes that third party's work to the maintainer's paid line, which sharpens item 4 above from a fair-play criticism into a concrete one.
    The cause is exactly the missing **Companion Identity** described under D5: there is no caller identity to key on.
