@@ -384,17 +384,6 @@ test('no raw spacing literal has been laundered into a private token', () => {
 
 const SHEET = 'styles/fabricate.css';
 
-/** One declaration's identity for the player list: its at-rule context, selector and property. */
-const playerKey = ({ context, selector, property }) =>
-  `${context === undefined || context === '' ? '' : `${context} `}${selector} { ${property} }`;
-
-/**
- * Sheet declarations the absolute check reads past, each by at-rule context, selector and
- * property, so the same rule under an `@media` is a different key and fails. An entry that no
- * longer carries an off-scale length is stale and fails, and a test below pins the list empty.
- */
-const PLAYER_SHEET_RULES = Object.freeze([]);
-
 /** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
 const POSITION_OFFSET =
   /^(?:top|right|bottom|left|inset(?:-(?:block|inline)(?:-(?:start|end))?)?)$/iu;
@@ -451,13 +440,11 @@ const ABSOLUTE_SCOPES = Object.freeze([
   {
     label: SHEET,
     includes: (file) => file === SHEET,
-    player: PLAYER_SHEET_RULES,
     floors: { spacing: STYLESHEET_SPACING_DECLARATION_FLOOR, offsets: 40, sizes: 400 },
   },
   {
     label: 'Svelte',
     includes: inSvelteScope,
-    player: [],
     floors: { spacing: SVELTE_SPACING_DECLARATION_FLOOR, offsets: 32, sizes: 1350 },
   },
 ]);
@@ -471,10 +458,7 @@ const scopeDeclarations = (styleCorpus, scope, properties) =>
 
 const SCANNED_SPACING = new Set(SCANNED_SPACING_PROPERTIES);
 
-/**
- * One scope's unmarked spacing declarations, those off the scale with their lengths, and the
- * player keys that matched.
- */
+/** One scope's unmarked spacing declarations, and those off the scale with their lengths. */
 function offScaleSpacing(styleCorpus, scope) {
   const { definitions, scale } = spacingContext(styleCorpus);
   const declarations = scopeDeclarations(styleCorpus, scope, (property) =>
@@ -484,20 +468,16 @@ function offScaleSpacing(styleCorpus, scope) {
       !exemptAt(declaration.file, styleCorpus.sources[declaration.file], declaration.at)
   );
   const offScale = [];
-  const playerResidue = new Set();
   for (const declaration of declarations) {
     const lengths = offScaleLengthsIn(declaration.value, definitions, scale);
-    if (lengths.length === 0) continue;
-    const key = playerKey(declaration);
-    if (scope.player.includes(key)) playerResidue.add(key);
-    else offScale.push({ ...declaration, lengths });
+    if (lengths.length > 0) offScale.push({ ...declaration, lengths });
   }
-  return { declarations, offScale, playerResidue };
+  return { declarations, offScale };
 }
 
 for (const scope of ABSOLUTE_SCOPES) {
-  test(`no spacing length in ${scope.label} is off the scale, outside its player rules`, () => {
-    const { declarations, offScale, playerResidue } = offScaleSpacing(scan().styleCorpus, scope);
+  test(`no spacing length in ${scope.label} is off the scale`, () => {
+    const { declarations, offScale } = offScaleSpacing(scan().styleCorpus, scope);
     assert.ok(
       declarations.length >= scope.floors.spacing,
       `only ${declarations.length} spacing declarations read in ${scope.label}, so this check ` +
@@ -517,30 +497,12 @@ for (const scope of ABSOLUTE_SCOPES) {
         'cannot snap carries a reasoned `ratchet-exempt(design-system)` marker:\n  ' +
         failures.join('\n  ')
     );
-    assert.deepEqual(
-      scope.player.filter((selector) => !playerResidue.has(selector)),
-      [],
-      'a PLAYER_SHEET_RULES entry no longer carries an off-scale length (or its selector, ' +
-        'property or at-rule changed); delete the entry so the list cannot exempt what replaces it'
-    );
   });
 }
-
-test('the player list is pinned, so growing it is a reviewed edit of this pin', () => {
-  assert.deepEqual(
-    [...PLAYER_SHEET_RULES],
-    [],
-    'PLAYER_SHEET_RULES changed. It exempts declarations from the scale and is empty now the ' +
-      'player apps are on it, so an addition must edit this pin on purpose'
-  );
-});
 
 /** The sizing properties, which MUST NOT derive from the spacing scale (ui-visual-style spec). */
 const SIZE_PROPERTY =
   /^(?:width|height|inline-size|block-size|(?:min|max)-(?:width|height|inline-size|block-size)|flex-basis|flex)$/iu;
-
-/** The selector a player-list key names, for the offsets check, which reads a whole rule. */
-const selectorOfKey = (key) => key.replace(/^.*?(\.fabricate)/u, '$1').replace(/ \{.*$/u, '');
 
 /** Each declaration in `declarations` that reads a `--fab-space-*` token, as a failure line. */
 const readingScale = (declarations) =>
@@ -587,10 +549,7 @@ for (const scope of ABSOLUTE_SCOPES) {
       `only ${offsets.length} offsets read in ${scope.label}`
     );
 
-    const playerSelectors = new Set(scope.player.map(selectorOfKey));
-    const reading = readingScale(
-      offsets.filter((declaration) => !playerSelectors.has(declaration.selector))
-    );
+    const reading = readingScale(offsets);
     assert.deepEqual(
       reading,
       [],

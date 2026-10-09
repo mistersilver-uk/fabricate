@@ -458,7 +458,7 @@
   }
 
   .alchemy-bench.is-empty {
-    padding: 40px var(--fab-space-5);
+    padding: var(--fab-space-6) var(--fab-space-5);
   }
 
   .alchemy-bench.is-dragover {
