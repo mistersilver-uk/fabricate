@@ -30,6 +30,14 @@ export const RULED_KINDS = Object.freeze([
     reason: "an actor portrait, the portrait ladder's 32 single mark, not a control",
   }),
   Object.freeze({
+    selector: '.crafting-source-remove',
+    heights: [32],
+    corner: 9,
+    reason:
+      "the remove overlay covering a 32 portrait tile, drawn at the tile's 9 so no corner of " +
+      'the portrait shows past it',
+  }),
+  Object.freeze({
     selector: '.fabricate-search.is-compact input',
     heights: [34],
     corner: 6,

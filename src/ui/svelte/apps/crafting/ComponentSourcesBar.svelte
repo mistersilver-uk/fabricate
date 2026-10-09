@@ -304,6 +304,7 @@
     min-height: 0;
     padding: 0;
     border: none;
+    /* ratchet-exempt(design-system): the remove overlay covering a 32 portrait tile, drawn at the tile's 9 so no corner of the portrait shows past it */
     border-radius: 9px;
     background: var(--fab-overlay-dark-24);
     color: var(--fab-text);

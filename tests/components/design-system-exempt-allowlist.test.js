@@ -31,6 +31,11 @@ const ALLOWLIST = Object.freeze([
     },
   ],
   [
+    "the remove overlay covering a 32 portrait tile, drawn at the tile's 9 so no corner of the " +
+      'portrait shows past it',
+    { 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte': 1 },
+  ],
+  [
     "a tile, not a control: the portrait ladder's 32, the slot PartyTravelActorPanel fills with " +
       'an actor portrait on link',
     { 'src/ui/svelte/components/EmptyState.svelte': 1 },
