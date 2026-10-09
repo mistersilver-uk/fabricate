@@ -619,7 +619,7 @@ export const CASES = Object.freeze([
       },
     ],
     // The title bar carries the loud signal and the rail chip is muted, with the provider's three tabs rather than Core's four.
-    expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
+    expectVisible: '[data-manager-titlebar-premium] > [aria-hidden="true"]:text-is("PREMIUM")',
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },

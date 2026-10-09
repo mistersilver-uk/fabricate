@@ -80,6 +80,7 @@ export function registerDowntimeCases() {
     await settleBetweenTests();
   });
 
+
   it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
     const calls = [];
     const registry = createManagerExtensionsRegistry();
@@ -2549,8 +2550,7 @@ export function registerDowntimeCases() {
         await press(openToggle);
         await press(railToggleControl);
       },
-      'an unbadged companion with its group closed': () =>
-        mountBadgedDowntimeManager({ badges: {} }),
+      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
       'a badged companion with its group open on a collapsed rail': async () => {
         await mountBadgedDowntimeManager();
         await press(openToggle);

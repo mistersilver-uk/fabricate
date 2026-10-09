@@ -96,6 +96,7 @@ describe('ManagerTitleBar', () => {
     assert.equal(mark.textContent, titlebar.Premium);
     assert.equal(mark.getAttribute('aria-hidden'), 'true', 'the visible mark is not read');
     assert.ok(name.classList.contains('visually-hidden'), 'the read name is hidden text');
+    assert.ok(!name.hasAttribute('aria-hidden'), 'and is read');
     assert.equal(name.textContent, titlebar.PremiumStatus);
     assert.equal(badge.getAttribute('title'), titlebar.PremiumStatus);
     assertNoAriaLabel(root);
@@ -113,6 +114,10 @@ describe('ManagerTitleBar', () => {
     assert.equal(
       status.querySelector('.manager-titlebar-status-text').textContent,
       'Routed by check'
+    );
+    assert.ok(
+      !status.querySelector('.manager-titlebar-status-text').closest('[aria-hidden]'),
+      'the value is read after the prefix'
     );
     const icon = status.querySelector('i.manager-titlebar-status-icon');
     assert.ok(icon.classList.contains('fa-circle-info'), 'an information glyph, not a die');

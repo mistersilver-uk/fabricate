@@ -2324,9 +2324,10 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     '[data-lab-companion-scroll]',
     'the companion owns the scrolling, which is only reachable at the full panel height'
   );
-  assert.ok(
-    premium.expectVisible.includes(lang.FABRICATE.Admin.Manager.Titlebar.Premium),
-    'the badge caption is the shipped titlebar premium mark'
+  assert.equal(
+    premium.expectVisible,
+    `[data-manager-titlebar-premium] > [aria-hidden="true"]:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.Premium}")`,
+    'the visible badge caption is the shipped premium mark, not the hidden name that contains it'
   );
   const premiumAttribute = (selector, name) =>
     premium.expectAttributes.find((entry) => entry.selector === selector && entry.name === name)
