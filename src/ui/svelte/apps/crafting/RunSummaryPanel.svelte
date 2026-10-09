@@ -101,7 +101,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-run-title {
@@ -113,7 +113,7 @@
   .crafting-run-recipe {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .crafting-run-recipe-name {

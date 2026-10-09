@@ -76,7 +76,7 @@
   .crafting-progressive-hint {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0 0 var(--fab-space-3);
     font-size: 12px;
     color: var(--fab-text-muted);

@@ -223,7 +223,7 @@
   }
 
   .crafting-detail-mode-chip {
-    padding: 1px 8px;
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
@@ -237,8 +237,8 @@
   .crafting-detail-duration-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     font-family: var(--fab-font-mono);
@@ -263,7 +263,7 @@
   .crafting-detail-teaser {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border);

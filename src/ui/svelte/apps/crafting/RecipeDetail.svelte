@@ -165,7 +165,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 2px;
+    padding-right: var(--fab-space-2xs);
   }
 
   /* The caller-owned wrapper for the no-selection panel: the fill, the centring and the inset

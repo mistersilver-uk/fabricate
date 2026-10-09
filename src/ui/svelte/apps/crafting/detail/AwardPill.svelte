@@ -49,8 +49,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--fab-space-2);
-    /* ratchet-exempt(design-system): the 10px trailing inset moved unchanged from IoTable */
-    padding: var(--fab-space-1) 10px var(--fab-space-1) var(--fab-space-1);
+    padding: var(--fab-space-1) var(--fab-space-3) var(--fab-space-1) var(--fab-space-1);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-surface-soft);
@@ -66,8 +65,7 @@
     max-width: 100%;
     display: inline-flex;
     align-items: center;
-    /* ratchet-exempt(design-system): the 5px gap moved unchanged from RollResultBox */
-    gap: 5px;
+    gap: var(--fab-space-1);
     padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
     border-radius: 7px;

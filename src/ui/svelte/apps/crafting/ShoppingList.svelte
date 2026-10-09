@@ -375,7 +375,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-shopping-title {
@@ -411,7 +411,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
-    padding-right: 2px;
+    padding-right: var(--fab-space-2xs);
   }
 
   .crafting-shopping-queue,
@@ -421,7 +421,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   /* The row's own padding moved INSIDE the activation button, so the whole padded area
@@ -431,8 +431,8 @@
   .crafting-shopping-entry {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 0 6px 0 0;
+    gap: var(--fab-space-2);
+    padding: 0 var(--fab-space-chip) 0 0;
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-surface);
@@ -483,11 +483,11 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
+    gap: var(--fab-space-2);
     height: auto;
     min-height: 34px;
     margin: 0;
-    padding: 4px 6px;
+    padding: var(--fab-space-1) var(--fab-space-chip);
     border: 0;
     background: transparent;
     color: inherit;
@@ -530,8 +530,8 @@
   .crafting-shopping-acquire-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 6px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) var(--fab-space-chip);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-surface);
@@ -550,8 +550,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
