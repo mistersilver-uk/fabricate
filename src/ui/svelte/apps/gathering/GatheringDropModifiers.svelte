@@ -106,7 +106,7 @@
     background: var(--fab-surface);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-task-drop-modifier-list {
@@ -115,7 +115,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .gathering-task-drop-modifier {
@@ -129,7 +129,7 @@
   .gathering-task-drop-modifier-label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
     color: var(--fab-text);
   }

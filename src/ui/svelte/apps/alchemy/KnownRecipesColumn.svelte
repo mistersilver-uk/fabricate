@@ -198,7 +198,7 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-    padding: 16px;
+    padding: var(--fab-space-4);
     background: var(--fab-surface-soft);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
@@ -208,7 +208,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: var(--fab-space-3);
   }
 
   .alchemy-known-title {
@@ -229,8 +229,8 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: var(--fab-space-2);
+    margin-bottom: var(--fab-space-3);
   }
 
   .alchemy-known-system-name {
@@ -247,7 +247,7 @@
   .alchemy-known > :global(.alchemy-known-search) {
     flex: none;
     min-width: 0;
-    margin-bottom: 12px;
+    margin-bottom: var(--fab-space-3);
   }
 
   .alchemy-known-list {
@@ -256,10 +256,10 @@
     /* No negative horizontal margin here: `overflow-y: auto` coerces `overflow-x`
        to auto, which clips the first/last row's focus outline + border-radius at
        the top/bottom edge. Use padding + outline-offset room instead. */
-    padding: 2px 4px;
+    padding: var(--fab-space-2xs) var(--fab-space-1);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
     overflow-y: auto;
     min-height: 0;
     flex: 1 1 auto;
@@ -296,8 +296,8 @@
   .alchemy-recipe-result {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding-top: 9px;
+    gap: var(--fab-space-chip);
+    padding-top: var(--fab-space-2);
     border-top: 1px solid var(--fab-border);
     font-size: 10.5px;
     font-weight: 600;
@@ -321,6 +321,6 @@
      COLUMN's layout rather than the strip's own geometry. See the markup comment. */
   .alchemy-known-footer-slot {
     flex: 0 0 auto;
-    margin-top: 12px;
+    margin-top: var(--fab-space-3);
   }
 </style>

@@ -202,7 +202,7 @@
   .essence-pool-picked {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
     list-style: none;

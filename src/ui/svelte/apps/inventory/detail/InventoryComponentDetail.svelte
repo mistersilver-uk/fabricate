@@ -642,7 +642,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   /* Row height + padding mirror the Crafting browser's RecipeListRow so the
@@ -693,7 +693,7 @@
   .inventory-detail-essences {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .inventory-chip-essence i {

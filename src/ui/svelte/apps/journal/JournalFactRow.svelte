@@ -43,8 +43,8 @@
     display: grid;
     grid-template-columns: auto auto 1fr;
     align-items: baseline;
-    gap: 8px;
-    padding: 4px 0;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) 0;
     font-size: 10.5px;
     min-width: 0;
   }

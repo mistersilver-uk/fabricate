@@ -321,7 +321,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-4);
-    padding: 8px 12px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     min-height: 64px;
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
@@ -352,13 +352,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 10px;
+    gap: var(--fab-space-3);
     max-width: 260px;
     /* height:auto + min-height override Foundry's fixed global button height, so
        the 40px portrait is contained instead of overflowing a short button. */
     height: auto;
     min-height: 52px;
-    padding: 6px 12px;
+    padding: var(--fab-space-chip) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-surface);
@@ -423,7 +423,7 @@
   .actor-bar-condition {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
     font-size: 13px;
     color: var(--fab-text-muted);
@@ -455,7 +455,7 @@
      takes the accent pill treatment so it reads as the active session context. */
   .actor-bar-tool-chip {
     flex: 0 1 auto;
-    padding: 3px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     color: var(--fab-accent);
     background: var(--fab-accent-soft);
     border: 1px solid var(--fab-accent);
@@ -470,7 +470,7 @@
   .actor-bar-stamina {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     flex: 0 0 auto;
     font-size: 13px;
     color: var(--fab-text-muted);

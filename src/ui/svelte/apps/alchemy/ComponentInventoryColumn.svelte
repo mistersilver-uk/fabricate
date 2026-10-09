@@ -163,7 +163,7 @@
   }
 
   .alchemy-inventory-head {
-    padding: 16px 16px 10px;
+    padding: var(--fab-space-4) var(--fab-space-4) var(--fab-space-3);
     flex: 0 0 auto;
   }
 
@@ -177,14 +177,14 @@
   .alchemy-inventory-hint {
     font-size: 11px;
     color: var(--fab-text-subtle);
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
   }
 
   /* The field's family basis is a toolbar width, which in this column would be its height. */
   .alchemy-inventory > :global(.alchemy-inventory-search) {
     flex: none;
     min-width: 0;
-    margin: 0 12px 10px;
+    margin: 0 var(--fab-space-3) var(--fab-space-3);
   }
 
   .alchemy-inventory-list {
@@ -193,10 +193,10 @@
     /* No negative horizontal margin: it would coerce overflow-x to auto (with the
        vertical scroll) and clip the first/last row's focus outline + radius at the
        edges. Padding + outline-offset room keeps the rows uncut. */
-    padding: 2px 12px 14px;
+    padding: var(--fab-space-2xs) var(--fab-space-3) var(--fab-space-4);
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: var(--fab-space-2);
     overflow-y: auto;
     min-height: 0;
     flex: 1 1 auto;

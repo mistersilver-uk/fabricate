@@ -96,7 +96,7 @@
   .crafting-roll-head {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   :global(.crafting-roll-box.is-success) .crafting-roll-head i {
@@ -139,6 +139,6 @@
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 </style>

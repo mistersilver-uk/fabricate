@@ -225,7 +225,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   /* WRAPS rather than clipping. It is a whole sentence in a 300px column, and one

@@ -423,8 +423,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: var(--fab-space-chip);
+    padding: var(--fab-space-1) var(--fab-space-3);
     border: 1px solid var(--fab-accent);
     border-radius: 7px;
     background: var(--fab-accent-soft);
@@ -466,7 +466,7 @@
   .inventory-detail-requirements {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--fab-space-1);
     /* Full-width child of the scrolling flex column — keep its natural height
        (don't let the column squeeze the chip rows). */
     flex-shrink: 0;
@@ -509,7 +509,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .inventory-detail-accordion-item {
@@ -563,6 +563,7 @@
   }
 
   .inventory-detail-accordion-body {
+    /* ratchet-exempt(design-system): an alignment, not a step: the header's 8px inset, its 38px thumb and the thumb's 12px gap */
     padding: 0 var(--fab-space-2) var(--fab-space-2)
       calc(38px + var(--fab-space-2) + var(--fab-space-3));
   }

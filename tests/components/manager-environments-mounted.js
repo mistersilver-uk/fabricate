@@ -4222,7 +4222,7 @@ export function registerEnvironmentsCases() {
     assert.deepEqual(forced, [['event', 'event-off']]);
 
     await openEditorTab('overview');
-    target.querySelector('[data-composition-mode-option="manual"]').click();
+    target.querySelector(':scope [data-composition-mode-option="manual"] input').click();
     await tick();
     flushSync();
     assert.deepEqual(modes, ['manual'], 'clicking the switch asks the host for manual mode');

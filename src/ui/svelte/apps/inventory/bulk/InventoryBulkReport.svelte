@@ -333,7 +333,7 @@
   .bulk-report-error {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 11px;
     line-height: 1.5;
@@ -345,7 +345,7 @@
   .bulk-roll {
     display: inline-flex;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .bulk-roll-value {

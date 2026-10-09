@@ -416,18 +416,18 @@
   .fabricate-interactable-browser {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
     height: 100%;
     overflow-y: auto;
   }
 
   /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.fabricate-filter-bar`
      draws its own padding, a soft fill and a bottom rule — a divider that reads as a mistake when
-     it stops 0.75rem short of both edges. The pull is exactly this column's own inline padding,
+     it stops 12px (`--fab-space-3`) short of both edges. The pull is exactly this column's own inline padding,
      so the bar meets the window and the rows beneath it keep their inset. */
   .fabricate-interactable-browser :global(.fab-ib-controls) {
-    margin-inline: -0.75rem;
+    margin-inline: calc(-1 * var(--fab-space-3));
   }
 
   /* THE PICKER STATES ITS OWN WIDTH, for the reason `Select.svelte` records: the shared select
@@ -455,7 +455,7 @@
   .fab-ib-header {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--fab-space-1);
   }
 
   .fab-ib-title {
@@ -480,7 +480,7 @@
   .fab-ib-section {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: var(--fab-space-chip);
   }
 
   .fab-ib-list {
@@ -489,7 +489,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: var(--fab-space-1);
   }
 
   /* A row takes the radius ladder's 9px rung (0, 6, 7, 9, 11, 999, 50%). `--fab-border`
@@ -501,8 +501,8 @@
   .fab-ib-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.5rem;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     cursor: grab;
@@ -550,6 +550,6 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: var(--fab-space-1);
   }
 </style>

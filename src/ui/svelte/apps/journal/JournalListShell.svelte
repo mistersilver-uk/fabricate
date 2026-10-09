@@ -176,7 +176,7 @@
   }
 
   .journal-list-count {
-    margin-left: 6px;
+    margin-left: var(--fab-space-chip);
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-text-muted);
@@ -185,7 +185,7 @@
   .journal-sort {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     color: var(--fab-text-muted);
   }

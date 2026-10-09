@@ -195,7 +195,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 14px;
     font-weight: 600;
   }

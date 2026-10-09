@@ -158,7 +158,7 @@
   .consumption-plan-rows {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -221,14 +221,14 @@
   .consumption-plan-pending {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 11px;
     color: var(--fab-accent);
   }
 
   .consumption-plan-pending i {
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
     font-size: 10px;
   }
 </style>

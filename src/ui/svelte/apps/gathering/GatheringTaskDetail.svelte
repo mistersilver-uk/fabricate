@@ -309,7 +309,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: var(--fab-space-3);
     height: 100%;
     padding: var(--fab-space-4);
     box-sizing: border-box;
@@ -360,13 +360,13 @@
   .gathering-task-detail-economy {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-economy-line {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     color: var(--fab-text-muted);
   }
@@ -376,7 +376,7 @@
   }
 
   .gathering-economy-depleted {
-    padding: 0 6px;
+    padding: 0 var(--fab-space-chip);
     border-radius: 999px;
     font-weight: 600;
     background: var(--fab-warning-soft);

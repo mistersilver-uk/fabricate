@@ -263,8 +263,8 @@
   .journal-run-card-secret {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 6px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-chip);
     border: 1px solid var(--fab-warning);
     border-radius: 999px;
     font-size: 11px;
@@ -276,7 +276,7 @@
   .journal-run-card-countdown {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-family: var(--fab-font-mono);
     font-size: 10px;
     font-weight: 500;
