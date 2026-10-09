@@ -287,6 +287,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  // The New-biome colour palette open (issue 2257): the shared palette as a popover, its default
+  // cell pressed.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover',
+    label: 'Manager — Gathering settings New-biome colour palette open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
+    ],
+    expectView: 'environments',
+    expectSelector: '.fabricate-manager [data-manager-color-picker-popover] [role="group"]',
+    expectAttributes: [
+      {
+        selector: '[data-manager-color-picker-popover] [data-manager-color-token="sage"]',
+        name: 'aria-pressed',
+        value: 'true',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/],
+  }),
   // A Gathering Rules select open (issue 1777): the rewards rule, the card's first row, so the
   // ticked list drops below its trigger inside the inspector rail.
   managerCase({

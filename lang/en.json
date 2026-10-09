@@ -46,6 +46,11 @@
         "Generated": "rolled by an explosion",
         "More": "+{count} more",
         "LegendSeparator": " · "
+      },
+      "TintPicker": {
+        "Presets": "Colour presets",
+        "CustomHex": "Custom hex",
+        "None": "No colour"
       }
     },
     "Migration": {

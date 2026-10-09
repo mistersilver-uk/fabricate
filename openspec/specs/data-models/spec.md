@@ -4882,9 +4882,14 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material or Tool shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
+The cheap rule consults no Tool, so the summary phase asks the Tool owner (`RecipeManager`'s Tool matcher, over the same Active Canvas Tool the detail phase uses) which ingredient sets of the recipe's first execution step have every required Tool available.
+The material term is then the cheap rule over those sets alone, because exact craftability needs one set to hold both its Tools and its materials; no such set is a shortfall exactly as a material one is, so a recipe missing a required Tool MUST NOT list as available.
+The summary's own `availability` field stays the Tool-free cheap rule.
+That Tool answer is resolved once per system and Tool per pass, not once per row, and it stays an upper bound: a Tool held only as one of the set's ingredients still counts.
+A redacted teaser is never asked, since its status is `discovery` regardless.
 
 The browse status is a SHARED field, so the rule that derives it is one rule for both audiences.
 Its exhaustion INPUT is nevertheless empty for a GM, because a GM bypasses the knowledge gate that produces exhaustion at all; a GM-audience row is therefore never exhausted.

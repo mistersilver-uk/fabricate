@@ -229,6 +229,25 @@ describe('inventory cards, rendered (issue 1778)', () => {
     assert.ok(jig.accessibleName.startsWith(`${jig.title}, `), jig.accessibleName);
   });
 
+  it('centres a short name under its thumbnail', async () => {
+    const offsets = await tab.evaluate(() =>
+      [...document.querySelectorAll('[data-case="inspect"] [data-inventory-card]')].map((root) => {
+        const thumb = root.querySelector('.inventory-card-thumb').getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(root.querySelector('.inventory-card-name'));
+        const text = range.getBoundingClientRect();
+        return [
+          root.dataset.inventoryCard,
+          Math.abs((text.left + text.right) / 2 - (thumb.left + thumb.right) / 2),
+        ];
+      })
+    );
+    for (const [key, offset] of offsets) {
+      if (key === 'sys:jig') continue; // Its ellipsized name fills the card's width.
+      assert.ok(offset < 1, `${key}: its name sits ${offset}px off the thumbnail's centre`);
+    }
+  });
+
   it('opens a card from anywhere on it, its padding and the space under a short name included', async () => {
     const misses = await tab.evaluate(() =>
       [...document.querySelectorAll('[data-case="inspect"] [data-inventory-card]')].flatMap(

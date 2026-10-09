@@ -22,6 +22,15 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
 
 /** Deliberate visible states that a broad primitive's representative pair does not contain. */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // The tint palette's pressed cell (issue 2257): the New-biome popover its trigger opens, and the
+  // world essence entry's inline palette, which draws no trigger.
+  'src/ui/svelte/components/TintPicker.svelte': Object.freeze([
+    'manager-gathering-biome-colour-popover',
+    'world-essence-entry-dirty',
+  ]),
+  'src/ui/svelte/components/TintPickerButton.svelte': Object.freeze([
+    'manager-gathering-biome-colour-popover',
+  ]),
   // Issue 1648: each run control maps to a state that actually renders it.
   'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',

@@ -89,6 +89,7 @@ const harness = createMountedComponentHarness({
     'src/systems/salvageCheckUsability.js',
     'src/systems/stepRecipeView.js',
     'src/ui/presenters/summaryProjection.js',
+    'src/ui/presenters/summaryToolPresence.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/extensionRegistry.js',
     'src/ui/playerExtensions.js',
