@@ -491,6 +491,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // #1091's canonical summary, which reads held quantities from #1077's per-pass inventory
   // snapshot.
   'src/ui/presenters/summaryProjection.js',
+  'src/ui/presenters/summaryToolPresence.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',

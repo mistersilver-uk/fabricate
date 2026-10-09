@@ -73,6 +73,7 @@ import {
 import { heldToolBonus } from './heldToolBonus.js';
 import { resultOutputRows, resultSignature, taughtNameReader } from './resultOutputRows.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
+import { createToolReadySetsProbe } from './summaryToolPresence.js';
 
 /**
  * Resolution-mode → localization key map. Kept in lockstep with the GM manager's
@@ -217,14 +218,9 @@ export class CraftingListingBuilder {
         componentSourceActors: knowledgeSources,
       }) ?? [];
 
-    // ONE snapshot for the whole pass, discarded when this returns. Its per-system tallies
-    // are memoised inside it, so N summaries of one system walk the inventory once — the
-    // whole reason a summary may consult held quantities per row at all.
-    //
-    // The visible recipes are handed to it so the snapshot can carry their legacy book links
-    // (issue 1228). This pass never asks it for book candidates today, but it is now a
-    // COMPLETE pass snapshot rather than a tallies-only half of one, and a half would answer
-    // the visibility path with every held document unfiltered — silently.
+    // ONE snapshot for the pass, discarded on return: its per-system tallies are memoised, so
+    // N summaries of one system walk the inventory once. It carries the visible recipes' legacy
+    // book links (issue 1228) so it is a complete pass snapshot, never a tallies-only half.
     const snapshot = this._passSnapshot(
       craftingActor,
       knowledgeSources,
@@ -233,6 +229,11 @@ export class CraftingListingBuilder {
 
     const summaries = [];
     const readRollData = memoizedRollData(craftingActor);
+    const toolReadySetsOf = createToolReadySetsProbe({
+      recipeManager: this.recipeManager,
+      craftSources,
+      craftingActor,
+    });
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
@@ -246,6 +247,7 @@ export class CraftingListingBuilder {
           craftingActor,
           knowledgeSources,
           readRollData,
+          toolReadySetsOf,
         })
       );
     }
@@ -379,15 +381,9 @@ export class CraftingListingBuilder {
   /**
    * Project one visible recipe into its issue 1091 summary.
    *
-   * `exhausted` is skipped for a redacted teaser, matching the pre-split builder exactly:
-   * the teaser branch short-circuited before the exhaustion read, and asking for it here
-   * would add an inventory rescan for a row whose status is `discovery` regardless.
-   *
-   * `favourite` is always `false` and that is deliberate rather than a stub. Favourites are
-   * a per-VIEWER client setting the store reads and filters on directly
-   * (`craftingStore.favouriteIds`); this builder has no seam to that setting and inventing
-   * one would give the preference two owners. The manifest requires the key on a player
-   * summary, so it is emitted as its "not asserted here" value.
+   * A redacted teaser skips `exhausted` and Tools: its status is `discovery` regardless.
+   * `favourite` is always `false`: favourites are a per-viewer client setting the store
+   * filters on directly (`craftingStore.favouriteIds`), so this builder never asserts one.
    * @private
    */
   _buildRecipeSummary({
@@ -398,6 +394,7 @@ export class CraftingListingBuilder {
     craftingActor,
     knowledgeSources,
     readRollData,
+    toolReadySetsOf,
   }) {
     const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
@@ -412,6 +409,9 @@ export class CraftingListingBuilder {
         !redacted &&
         this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot),
       checkRefused: !redacted && craftingCheckRefuses(system, recipe, craftingActor, readRollData),
+      toolReadySets: redacted
+        ? null
+        : toolReadySetsOf(this._stepRecipeView(recipe, this._firstStep(recipe))),
       favourite: false,
       localize: this.localize,
     });
