@@ -159,7 +159,7 @@
   .inventory-filters {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* The field's family basis is a toolbar width, which in this column would be its height. */
@@ -172,13 +172,13 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .inventory-sort {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     flex: 0 0 auto;
   }
 

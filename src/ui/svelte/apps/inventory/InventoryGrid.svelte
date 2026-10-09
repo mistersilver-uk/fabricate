@@ -118,10 +118,10 @@
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
+    gap: var(--fab-space-3);
     align-content: start;
     overflow-y: auto;
-    padding-right: 2px;
+    padding-right: var(--fab-space-2xs);
   }
 
   .inventory-grid-empty {

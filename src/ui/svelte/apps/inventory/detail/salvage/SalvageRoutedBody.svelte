@@ -135,7 +135,7 @@
   .salvage-body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
@@ -152,7 +152,7 @@
   .salvage-body-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     line-height: 1;
   }

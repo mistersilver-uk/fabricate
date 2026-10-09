@@ -338,7 +338,7 @@
     right: 5px;
     z-index: 2;
     min-width: 20px;
-    padding: 2px 7px;
+    padding: var(--fab-space-2xs) var(--fab-space-chip);
     border-radius: 999px;
     border: 1px solid var(--fab-border);
     background: var(--fab-bg-0);
@@ -367,7 +367,7 @@
     z-index: 2;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--fab-space-1);
   }
 
   .inventory-card-badge {
@@ -406,7 +406,7 @@
     z-index: 2;
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
+    gap: var(--fab-space-1);
     max-width: calc(100% - 32px);
   }
 

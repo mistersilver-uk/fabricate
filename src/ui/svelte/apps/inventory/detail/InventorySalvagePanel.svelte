@@ -351,7 +351,7 @@
     box-sizing: border-box;
     margin: 0;
     min-height: 44px;
-    padding: 12px 16px;
+    padding: var(--fab-space-3) var(--fab-space-4);
     border: 1px solid var(--fab-success-border);
     border-radius: 11px;
     background: var(--fab-success-soft);
