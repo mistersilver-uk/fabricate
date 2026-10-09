@@ -297,7 +297,7 @@
   .crafting-browser-toggle.is-active {
     border-color: var(--fab-accent-border);
     background: var(--fab-surface-active);
-    color: var(--fab-accent);
+    color: var(--fab-text);
   }
 
   .crafting-browser-filter-system,

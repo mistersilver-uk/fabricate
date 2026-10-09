@@ -1112,7 +1112,7 @@
   .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
     border-color: var(--fab-accent);
     background: var(--fab-surface-active);
-    color: var(--fab-accent-strong);
+    color: var(--fab-text);
     font-weight: 600;
   }
 
