@@ -219,10 +219,11 @@ describe('design system: a programmatic focus target declares itself focused to 
 
     // 198 at issue 1777, which moved the manager trail's 22 crumb buttons into `PageHeader`, then
     // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`, then
-    // 159 at issue 1778, when the inventory card's own button became ListRow's.
+    // 159 at issue 1778, when the inventory card's own button became ListRow's, then 157 at
+    // issue 2257, when the environment mode controls became SegmentedControl radios.
     assert.ok(
-      formlessButtons.length >= 159,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 159 ` +
+      formlessButtons.length >= 157,
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 157 ` +
         'this tree holds'
     );
     assert.ok(
