@@ -788,6 +788,14 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
+    // The entry's sage cell is pressed (issue 2257).
+    expectAttributes: [
+      {
+        selector: '[data-scoped-entry-colour] [data-manager-color-token="sage"]',
+        name: 'aria-pressed',
+        value: 'true',
+      },
+    ],
     // The header pair, proved present and inside the band that owns it.
     expectContained: [
       {

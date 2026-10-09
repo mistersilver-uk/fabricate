@@ -10,7 +10,8 @@
   | `allowCustom` | boolean | `true` | Whether free-hex entry is offered beside the presets. A caller whose stored model has no `customColor` sibling sets it false: the palette is then the whole vocabulary, because a free hex cannot be guaranteed legible across all seven themes. |
   | `allowNone` / `unset` | booleans | `false` | `allowNone` adds a ninth NO-COLOUR cell, the only route this palette has ever had back to unset, off by default because the preset grid is `repeat(4, 1fr)`. `unset` is TRUE when the caller holds no authored colour: `normalizedToken` folds an absent value onto a preset, so without it the palette marks that preset selected for a model that has chosen nothing. |
   | `noneSelected` | boolean or `null` | `null` | Whether the No-colour cell is MARKED. `null` derives it from `unset`, which is what every popover caller wants. A bulk-edit STAGE has a third state this cannot otherwise express — "leave unchanged", "clear colour" or a token, where the first two are BOTH "no preset is marked" — so passing `false` marks nothing at all. |
-  | `onSelectNone` / `presetGridLabel` / `customHexLabel` / `noneLabel` | function / pre-localized strings | `undefined` / — | The No-colour cell's handler and the palette's accessible names. `onSelectNone` is separate from `onChange` because the two are different instructions, and folding "unset" into `onChange` as an empty token would make every existing consumer learn a new falsy case; a caller that does not pass it cannot show the cell. |
+  | `onClear` | function or `null` | `null` | The No-colour cell's handler, separate from `onChange` because the two are different instructions; a caller that does not pass it cannot show the cell. |
+  | `presetGridLabel` / `customHexLabel` / `noneLabel` | pre-localized strings | their English through `localizeOr` | The group's name, the hex field's caption and the No-colour cell's name (issue 2257). |
 
   Invariants:
   - THE NO-COLOUR CELL IS OFFERED ONLY WHEN BOTH THE GATE IS OPEN AND A HANDLER WAS SUPPLIED: a cell
@@ -21,10 +22,13 @@
   - EVERY CELL'S LABEL IS BOTH `aria-label` AND `title`, so it is the whole screen-reader surface of
     a colour cell. The palette itself is a shared constant, so this popover, its trigger and the
     editor's inline palette cannot drift in order, membership or naming.
+  - The cells sit in a `group` named by `presetGridLabel`, and only the selected cell is
+    `aria-pressed="true"`; its mark is the sheet's inset ring, never the focus outline (issue 2257).
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import {
     MANAGER_COLOR_TOKENS,
     managerColorTokenLabel,
@@ -35,9 +39,9 @@
   let {
     colorToken = 'sage',
     customColor = '',
-    presetGridLabel = 'Colour presets',
-    customHexLabel = 'Custom hex',
-    noneLabel = 'No colour',
+    presetGridLabel = localizeOr('FABRICATE.Common.TintPicker.Presets', 'Colour presets'),
+    customHexLabel = localizeOr('FABRICATE.Common.TintPicker.CustomHex', 'Custom hex'),
+    noneLabel = localizeOr('FABRICATE.Common.TintPicker.None', 'No colour'),
     allowCustom = true,
     unset = false,
     layout = 'popover',
@@ -62,6 +66,8 @@
   function normalizedToken(value) {
     return normalizeManagerColorToken(value);
   }
+
+  const isPresetSelected = (token) => !unset && normalizedToken(colorToken) === token;
 
   function selectPreset(token) {
     onChange({ colorToken: token, customColor });
@@ -89,12 +95,13 @@
   data-manager-color-layout={layout === 'inline' ? 'inline' : undefined}
   use:dismissOnOutsideClick={{ enabled: manageDismiss, onDismiss }}
 >
-  <span class="manager-color-preset-grid" aria-label={presetGridLabel}>
+  <span class="manager-color-preset-grid" role="group" aria-label={presetGridLabel || undefined}>
     {#if showNoColour}
       <button
         type="button"
         class={`manager-color-preset manager-color-preset-none ${noColourSelected ? 'is-selected' : ''}`}
         aria-label={noneLabel}
+        aria-pressed={noColourSelected ? 'true' : 'false'}
         title={noneLabel}
         data-manager-color-none
         onclick={() => onClear()}
@@ -107,8 +114,9 @@
     {#each presets as preset (preset.token)}
       <button
         type="button"
-        class={`manager-color-preset ${!unset && normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
+        class={`manager-color-preset ${isPresetSelected(preset.token) ? 'is-selected' : ''}`}
         aria-label={preset.label}
+        aria-pressed={isPresetSelected(preset.token) ? 'true' : 'false'}
         title={preset.label}
         data-manager-color-token={preset.token}
         style={tintSwatchStyle(preset.token, '')}

@@ -16,8 +16,9 @@
     colorToken = 'sage',
     customColor = '',
     ariaLabel = '',
-    presetGridLabel = 'Colour presets',
-    customHexLabel = 'Custom hex',
+    // Left unset, `TintPicker` names the palette in the localized default (issue 2257).
+    presetGridLabel = undefined,
+    customHexLabel = undefined,
     allowCustom = true,
     // TRUE when the caller's model holds no authored colour at all: `colorToken` normalizes an
     // absent value onto a preset, so without this the control would assert an authored choice

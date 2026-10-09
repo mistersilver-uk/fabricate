@@ -13166,8 +13166,13 @@
   border: 1px solid var(--fab-border);
 }
 
-.fabricate-color-picker-popover .manager-color-preset.is-selected {
-  border-color: var(--fab-accent);
+/* A selected swatch is an inset ring at 3:1 on its fill, apart from the outset focus ring (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
+.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
+}
+
+.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-text);
 }
 
 .fabricate-color-picker-popover .manager-color-custom {

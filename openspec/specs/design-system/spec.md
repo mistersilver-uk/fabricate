@@ -806,6 +806,7 @@ The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and 
 The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
 
 A SELECTED face is a FILL and an EDGE.
+A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while focus and hover keep the outset ring, and no tick is drawn (`TintPicker`, issue 2257 D3).
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
 So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
 Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
@@ -850,6 +851,7 @@ A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed 
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4).
+`TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -880,6 +882,12 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **WHEN** a primitive renders a control whose only visible content is a glyph
 - **THEN** its accessible name is a required prop
 - **AND** its hit area is at least 24 by 24 pixels
+
+#### Scenario: A screen reader reaches a palette cell
+
+- **WHEN** a screen reader reaches a palette cell
+- **THEN** it announces the colour's name and pressed state
+- **AND** only the selected cell announces pressed
 
 ### Requirement: Shared primitives share one API convention
 
