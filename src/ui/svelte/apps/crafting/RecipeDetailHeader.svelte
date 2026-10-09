@@ -242,7 +242,7 @@
     border-radius: 999px;
     font-size: 11px;
     font-family: var(--fab-font-mono);
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-raised);
@@ -267,7 +267,7 @@
     margin: 0;
     padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     font-size: 13px;
     font-style: italic;
     color: var(--fab-text-muted);

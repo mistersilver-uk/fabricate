@@ -147,7 +147,7 @@ describe('ShoppingList mounted behavior', () => {
     // face, so it is read by that tile's own hook rather than by a retired class.
     const thumb = card.querySelector('[data-medallion="glyph"]');
     assert.ok(thumb, 'essence icon tile rendered');
-    assert.match(thumb.getAttribute('style'), /28px/, 'shopping glyph keeps 28px geometry');
+    assert.match(thumb.getAttribute('style'), /width: 26px; height: 26px; --fab-medallion-glyph: 11px;/, 'the 26px rung and its 11px glyph');
     assert.ok(thumb.querySelector('i').classList.contains('fa-fire'));
     assert.match(card.textContent, /"have":0,"need":2/, 'have/need remains visible');
     assert.equal(summaryCount(target, 'components'), '1');

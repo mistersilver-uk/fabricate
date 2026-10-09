@@ -396,7 +396,7 @@
   <span class="crafting-stage-move" class:is-stacked={stacked} data-progressive-stage-move>
     <button
       type="button"
-      class="crafting-stage-move-button"
+      class="crafting-stage-move-button fab-hit-area"
       data-progressive-stage-move-up
       aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')} — ${stageName(stage)}`}
       title={text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')}
@@ -405,7 +405,7 @@
     >
     <button
       type="button"
-      class="crafting-stage-move-button"
+      class="crafting-stage-move-button fab-hit-area"
       data-progressive-stage-move-down
       aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')} — ${stageName(stage)}`}
       title={text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')}
@@ -656,10 +656,10 @@
   }
 
   .crafting-stage-img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     object-fit: cover;
   }
 
@@ -731,14 +731,13 @@
     flex: 0 0 auto;
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 7px;
   }
 
   /* Stacked, the chevrons are a VERTICAL pair ENDING the row — the same stack the GM's
      component salvage editor uses, and the shape that costs a 300px column the least
-     width at the edge it sits on. Each keeps a 22px touch
-     target rather than the prototype's ~17px: HTML5 drag never fires on touch, so these
-     buttons are the only touch path to reordering and cannot shrink below usable. */
+     width at the edge it sits on. Each paints 22px and `fab-hit-area` makes its target 24:
+     HTML5 drag never fires on touch, so these are the only touch path to reordering. */
   .crafting-stage-move.is-stacked {
     flex-direction: column;
     gap: 2px;
@@ -747,6 +746,7 @@
   .crafting-stage-move.is-stacked .crafting-stage-move-button {
     width: 24px;
     min-height: 22px;
+    border-radius: 6px;
   }
 
   .crafting-stage-meta {
@@ -800,7 +800,7 @@
     min-height: 34px;
     padding: 0;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
     color: var(--fab-text);
     font: inherit;

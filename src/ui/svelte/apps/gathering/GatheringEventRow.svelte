@@ -119,7 +119,7 @@
     display: block;
     width: 56px;
     height: 56px;
-    border-radius: 6px;
+    border-radius: 9px;
     object-fit: cover;
     background: var(--fab-surface-raised);
   }

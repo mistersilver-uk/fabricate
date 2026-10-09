@@ -1225,8 +1225,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(Boolean(tile), 'the tool thumbnail is the shared art tile');
     assert.match(
       tile.getAttribute('style'),
-      /width:\s*40px;\s*height:\s*40px/,
-      'at the 40px it already rendered'
+      /width:\s*38px;\s*height:\s*38px/,
+      'at the art ladder`s 38px rung'
     );
   });
 

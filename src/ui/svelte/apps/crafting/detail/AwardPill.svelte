@@ -17,13 +17,11 @@
       base: 'crafting-io-output',
       name: 'crafting-io-output-name',
       qty: 'crafting-io-output-qty',
-      size: 32,
     },
     roll: {
       base: 'crafting-roll-award',
       name: 'crafting-roll-award-name',
       qty: 'crafting-roll-award-qty',
-      size: 24,
     },
   });
 
@@ -39,15 +37,14 @@
   data-award-kind={kind}
   data-io-output={variant === 'output' ? kind : undefined}
 >
-  <!-- ratchet-exempt(design-system): the two hosts' sizes moved here unchanged (32, 24); the geometry sweep owns their rungs -->
-  <Medallion art={artwork.art} icon={artwork.icon} alt="" size={shape.size} />
+  {#if variant === 'roll'}<Medallion art={artwork.art} icon={artwork.icon} alt="" size={22} />
+  {:else}<Medallion art={artwork.art} icon={artwork.icon} alt="" size={30} />{/if}
   <span class={shape.name}>{item?.name}</span>
   <span class={shape.qty}>{item?.amountText ?? `×${item?.qty ?? 1}`}</span>
 </li>
 
 <style>
-  /* Each variant keeps the geometry its host drew before the pill was shared: a rounded rectangle
-     matching the rounded-square art it wraps, and the roll result's single-line capsule. */
+  /* The output pill is a rounded rectangle around its square art; the roll pill is a single line. */
   .crafting-io-output {
     display: inline-flex;
     align-items: center;
@@ -55,8 +52,7 @@
     /* ratchet-exempt(design-system): the 10px trailing inset moved unchanged from IoTable */
     padding: var(--fab-space-1) 10px var(--fab-space-1) var(--fab-space-1);
     border: 1px solid var(--fab-border);
-    /* ratchet-exempt(design-system): moved unchanged from IoTable, which carried it at base */
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -74,7 +70,7 @@
     gap: 5px;
     padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
-    border-radius: 999px;
+    border-radius: 7px;
     background: var(--fab-surface);
     font-size: 12px;
   }

@@ -55,7 +55,7 @@
   </header>
 
   <div class="crafting-run-recipe">
-    <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={36} />
+    <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={38} />
     <span class="crafting-run-recipe-name" title={name}>{name}</span>
   </div>
 

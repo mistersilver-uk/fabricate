@@ -201,7 +201,7 @@
     padding: 16px;
     background: var(--fab-surface-soft);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
   }
 
   .alchemy-known-head {

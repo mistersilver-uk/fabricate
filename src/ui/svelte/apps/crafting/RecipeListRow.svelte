@@ -257,12 +257,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
     padding: 0;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
     color: var(--fab-text-muted);
     cursor: pointer;
@@ -280,10 +280,10 @@
     outline-offset: 2px;
   }
 
-  /* An active favourite reads as a filled gold star. */
+  /* An active favourite takes the selected face, keeping its gold edge and ink. */
   .crafting-recipe-row-fav.is-active {
     border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
+    background: var(--fab-surface-active);
     color: var(--fab-warning-text);
   }
 

@@ -43,7 +43,7 @@
         data-inventory-salvage-tool={tool.componentId ?? tool.name ?? ''}
         data-io-satisfied={tool.available ? 'true' : 'false'}
       >
-        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={24} />
+        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={22} />
         <span class="salvage-tools-name">{tool.name}</span>
         {#if tool.available}
           <Chip tone="positive" icon="fas fa-screwdriver-wrench"

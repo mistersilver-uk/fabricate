@@ -1018,7 +1018,7 @@
   }
 
   /* Collapse to a single column on a narrow panel so cells never overflow. */
-  @container (max-width: 22rem) {
+  @container fabricate-ic-facts (max-width: 22rem) {
     .fab-ic-fact-list,
     .fab-ic-fact-list.has-environment {
       grid-template-columns: minmax(0, 1fr);
@@ -1044,7 +1044,7 @@
   }
 
   .fab-ic-facts {
-    container-type: inline-size;
+    container: fabricate-ic-facts / inline-size;
   }
 
   .fab-ic-fact dd {
@@ -1111,8 +1111,8 @@
      any of the seven inherits the treatment instead of needing a rule of its own. */
   .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
     border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent-strong);
+    background: var(--fab-surface-active);
+    color: var(--fab-text);
     font-weight: 600;
   }
 

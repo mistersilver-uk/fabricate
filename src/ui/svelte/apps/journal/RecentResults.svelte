@@ -37,7 +37,7 @@
         {@const status = String(run.derivedStatus ?? '')}
         {@const runStatus = runStatusPresentation(status)}
         <li class="journal-recent-item" data-recent-run-id={run.id}>
-          <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={28} />
+          <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={26} />
           <span class="journal-recent-name" title={run.names?.title ?? ''}
             >{run.names?.title ?? ''}</span
           >

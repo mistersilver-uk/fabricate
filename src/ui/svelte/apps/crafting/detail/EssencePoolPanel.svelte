@@ -170,8 +170,8 @@
             <Medallion
               {...resolveCraftingArt(carrier.img, 'fa-solid fa-cube')}
               alt=""
-              size={24}
-              glyph={10.8}
+              size={22}
+              glyph={10}
             />
             <span class="essence-pool-picked-name">{carrier.name}</span>
             <span class="essence-pool-picked-count">×{carrier.allocatedUnits}</span>
@@ -227,7 +227,7 @@
   .essence-pool-picked-count {
     font-family: var(--fab-font-mono);
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-muted);
   }

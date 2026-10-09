@@ -987,6 +987,37 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  // Issue 1523: the browser's two selected faces, a favourited recipe's star and the pressed
+  // Favourites filter showing only that recipe.
+  playerCase({
+    id: 'player-crafting-favourites',
+    label: 'Player app — Crafting favourites filter on a favourited recipe',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [
+      {
+        selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"] .crafting-recipe-row-fav',
+      },
+      { selector: '[data-crafting-browser] .crafting-browser-toggle[data-filter="favourites"]' },
+    ],
+    position: { width: 1100, height: 760 },
+    expectTab: 'crafting',
+    expectSelector:
+      '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"] .crafting-recipe-row-fav.is-active',
+    expectAttributes: [
+      {
+        selector: '[data-crafting-browser] .crafting-browser-toggle[data-filter="favourites"]',
+        name: 'aria-pressed',
+        value: 'true',
+      },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/Recipe(?:Browser|ListRow)\.svelte$/,
+    ],
+  }),
   playerCase({
     id: 'player-crafting-sources-picker',
     label: 'Player app — Crafting component sources picker',

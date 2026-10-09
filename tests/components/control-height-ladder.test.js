@@ -234,27 +234,12 @@ test('no new retired control height has been introduced', (t) => {
   );
 });
 
-/** The player keys issue 1523's PR12 still owes; PR12 deletes each one as it snaps the site. */
-const PR12_PLAYER_KEYS = Object.freeze([
-  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: height 40px',
-  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: min-height 40px',
-  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: height 32px',
-  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: min-height 32px',
-  'src/ui/svelte/apps/crafting/ShoppingList.svelte: min-height 36px',
-  'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte: min-height 40px',
-]);
-
 // ABSOLUTE, not against the base: a site the base already carried passes the ratchet above.
-test('every retired height outside the PR12 player keys carries a reasoned marker', () => {
+test('every retired height carries a reasoned marker', () => {
   const { sources, retired } = scan();
   const unmarked = retired.occurrences
     .filter((record) => !exemptAt(record.file, sources[record.file], record.line))
-    .map((record) => ({
-      key: `${record.file}: ${record.property} ${record.value}px`,
-      line: record.line,
-    }))
-    .filter(({ key }) => !PR12_PLAYER_KEYS.includes(key))
-    .map(({ key, line }) => `${key} (line ${line})`);
+    .map((record) => `${record.file}: ${record.property} ${record.value}px (line ${record.line})`);
 
   assert.deepEqual(
     unmarked,

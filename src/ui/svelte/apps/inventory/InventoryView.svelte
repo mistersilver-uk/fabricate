@@ -396,7 +396,7 @@
 
   .inventory-view-column-right {
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
     overflow: hidden;
   }

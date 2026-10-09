@@ -276,7 +276,7 @@
     min-height: 30px;
     padding: 4px 10px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-muted);
     font-size: 12px;
@@ -296,8 +296,8 @@
 
   .crafting-browser-toggle.is-active {
     border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
+    background: var(--fab-surface-active);
+    color: var(--fab-text);
   }
 
   .crafting-browser-filter-system,

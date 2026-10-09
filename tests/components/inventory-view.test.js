@@ -3867,8 +3867,8 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     );
     assert.match(
       portrait.getAttribute('style').replaceAll(' ', ''),
-      /width:40px;height:40px/u,
-      'at the box it drew'
+      /width:32px;height:32px/u,
+      'at the portrait ladder`s single 32px mark'
     );
     assert.equal(
       portrait.getAttribute('data-avatar'),

@@ -360,7 +360,7 @@
     min-height: 52px;
     padding: 6px 12px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;

@@ -352,7 +352,7 @@
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--fab-text);
   }
 
@@ -360,7 +360,7 @@
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--fab-text-secondary);
   }
 </style>

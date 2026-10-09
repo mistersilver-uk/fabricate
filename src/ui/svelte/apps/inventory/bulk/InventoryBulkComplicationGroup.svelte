@@ -143,7 +143,7 @@
        is the shell's shared leaf, so the name reads exactly like the queue row's own name
        directly below the block. -->
   <div class="bulk-complication-head">
-    <Medallion {...resolveCraftingArt(img)} alt="" size={24} />
+    <Medallion {...resolveCraftingArt(img)} alt="" size={22} />
     <span class="bulk-complication-head-text">
       <span class="inventory-detail-row-name">{name}</span>
       {#if orderNoteKey}

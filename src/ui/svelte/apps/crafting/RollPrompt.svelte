@@ -289,7 +289,7 @@
     height: 44px;
     flex: none;
     border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
+    border-radius: 11px;
     background: var(--fab-bg-2);
     color: var(--fab-accent);
     font-size: 17px;

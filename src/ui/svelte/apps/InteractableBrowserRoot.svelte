@@ -492,19 +492,19 @@
     gap: 0.3rem;
   }
 
-  /* 6px, not 4: 4 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this row is under the
-     24px band the 6px rung is published for. `--fab-border` replaces the core Foundry
-     light-tertiary border variable this rule read, which is undefined in any host without core's
-     own sheet and carries none of this module's theming. (The variable is named here in prose
-     rather than written out: the change's acceptance greps `src/` for that token and expects
-     nothing back, and a mention is a hit a reviewer then has to adjudicate.) */
+  /* A row takes the radius ladder's 9px rung (0, 6, 7, 9, 11, 999, 50%). `--fab-border`
+     replaces the core Foundry light-tertiary border variable this rule read, which is undefined
+     in any host without core's own sheet and carries none of this module's theming. (The
+     variable is named here in prose rather than written out: the change's acceptance greps
+     `src/` for that token and expects nothing back, and a mention is a hit a reviewer then has
+     to adjudicate.) */
   .fab-ib-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     cursor: grab;
   }
 
@@ -529,7 +529,7 @@
     color: var(--fab-text-muted);
   }
 
-  /* 6px, not 3, for the ladder reason on `.fab-ib-row` above. */
+  /* A 24px thumbnail takes the ladder's 6px rung. */
   .fab-ib-row-thumb {
     flex: 0 0 auto;
     width: 1.5rem;
