@@ -23,7 +23,6 @@ const JUDGED_HEIGHTS = new Set([22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 44]);
 const RULED_KINDS = Object.freeze([
   [['fabricate-search', 'is-compact'], 6, "the compact search's ruled box"],
   [['fab-stepper-adjunct'], 7, "the 22px adjunct's 6 outset by its 1px hit-area padding"],
-  [['manager-environment-mode-option'], 6, "its mode control's inner rung, issue 2257's"],
   [['manager-nav-subitem'], 7, "a nav row keeps its rung's corner when a long label wraps it"],
 ]);
 
