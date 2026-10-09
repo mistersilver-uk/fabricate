@@ -12,6 +12,7 @@
  * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
 import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
+import { mapInPool } from '../../../scripts/lib/viewLabRenderPool.js';
 
 import { CATALOGUE } from './catalogue.js';
 import { MAX_APPLIED_RESIZES, createSizeGovernor, layoutFor } from './hostLayout.js';
@@ -27,7 +28,12 @@ import {
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
 import { armReadyWatchdog } from './specimenWatchdog.js';
-import { runBounded } from './standUpPool.js';
+
+/**
+ * How many specimens load at once. Each fetches dozens of modules, and standing up the whole
+ * catalogue together makes Chromium refuse hundreds with `net::ERR_INSUFFICIENT_RESOURCES`.
+ */
+const STAND_UP_POOL_SIZE = 12;
 
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
@@ -307,7 +313,7 @@ async function boot() {
   ]);
   const results = { mounted: 0 };
   // Every specimen settles before the report is published, a bounded few loading at a time.
-  await runBounded(slots, (slot) => standUpSpecimen(slot, problems, results));
+  await mapInPool(slots, STAND_UP_POOL_SIZE, (slot) => standUpSpecimen(slot, problems, results));
   // A late font or container query re-measures a specimen; ready must not precede that.
   await whenSizesAreQuiet();
 
