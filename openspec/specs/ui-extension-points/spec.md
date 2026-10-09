@@ -251,7 +251,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
   It is hidden in the dismissing GM's Manager the moment the GM dismisses it, on both screens, until that Manager closes, whether or not the write succeeds; a refused write is logged and raises nothing, so the advert returns the next time the Manager opens.
   Fabricate offers no control that clears the setting, and the setting silences this advert only.
 - It is the first thing in the header to give way: it compacts, then disappears, as the Manager narrows, and never wraps the action group or crowds the page title.
-  It is full at a Manager width above 1120px, compact — three icons and no line of copy — from 961px to 1120px, and not shown at 960px or less, so the page heading keeps at least 320px.
+  It is full at a Manager width above 1320px, compact — three icons and no line of copy — from 961px to 1320px, and not shown at 960px or less, so the page heading keeps at least 320px.
 - Its icons are bundled at 68px, about twice the 30px tile they fill, are referenced only by the module stylesheet, and are never offered as Item, component or essence art.
 - The advert is GM Manager only: §Player Navigation Extension's "no premium signal in any state" rule is unchanged.
 
