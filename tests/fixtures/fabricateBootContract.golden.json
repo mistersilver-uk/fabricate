@@ -1991,6 +1991,9 @@
       "get fabricate.gatheringConfig",
       "set fabricate.gatheringConfig {\"probe\":\"gatheringConfig\"}"
     ],
+    "heldRecipeIds": [
+      "probe-held-recipe"
+    ],
     "admits": {
       "activeGm": true,
       "assistantGm": true,

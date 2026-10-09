@@ -13,6 +13,7 @@ import { getSetting, setSetting } from '../config/settings.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { prepareForImport, validateImportData } from '../systems/CraftingSystemExporter.js';
+import { activeRunRecipeIds } from '../systems/runTerms.js';
 import { descriptionTextCandidate, plainTextDescription } from '../utils/plainTextDescription.js';
 
 import { choiceDialog, confirmDialog } from './foundryCompat.js';
@@ -496,6 +497,8 @@ async function runSystemImport({ file, conflictMode }) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
+      activeRunRecipeIds: () =>
+        activeRunRecipeIds(game.fabricate.getCraftingRunManager?.(), game.actors),
       // The importer fails closed on an absent seam, so a lazy lookup would make a broken
       // accessor present as a successful import that merged nothing (issue 1364).
       componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,

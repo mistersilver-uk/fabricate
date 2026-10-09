@@ -177,6 +177,7 @@ import {
   assertNativeEffectsUninvoked,
 } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
+import { resolveRunRecipe, snapshotRunTerms, withAcceptedCraftingCheck } from './runTerms.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   beginSalvageSettlement,
@@ -444,7 +445,7 @@ export class CraftingEngine {
         'STAGE_NOT_EXECUTABLE'
       );
     }
-    const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
+    const recipe = resolveRunRecipe(run, this.recipeManager);
     const stepIndex = Number(run.currentStepIndex);
     const step = this._executionSteps(recipe)[stepIndex];
     const lockedSelection = this._lockedStageSelection(run, stepIndex, selectionPlan);
@@ -767,6 +768,7 @@ export class CraftingEngine {
     const run = await runManager.createRun(actor, recipe, sourceActors, viewer?.id ?? null, {
       lifecycleVersion: 1,
       completionMode,
+      termsSnapshot: snapshotRunTerms(recipe, this._getRecipeSystem(recipe)),
     });
     const planned = await this._planFirstVersionedStage({
       actor,
@@ -942,7 +944,7 @@ export class CraftingEngine {
         'STALE_RUN_REVISION'
       );
     }
-    const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
+    const recipe = resolveRunRecipe(run, this.recipeManager);
     if (!recipe) return versionedFailure('The crafting recipe is unavailable.');
     const stepIndex = Number(run.currentStepIndex);
     const step = this._executionSteps(recipe)[stepIndex];
@@ -1077,7 +1079,7 @@ export class CraftingEngine {
       journal.effects.every((effect) => effect.phase !== 'applying');
     const run = resuming ? persisted : runManager.getActiveRun(actor, runId);
     if (!run) return versionedFailure('There is no in-progress craft to execute.');
-    const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
+    const recipe = resolveRunRecipe(run, this.recipeManager);
     if (!recipe) return versionedFailure('The crafting recipe is unavailable.');
     const stepIndex = resuming ? Number(journal.intent?.stepIndex) : Number(run.currentStepIndex);
     const step = this._executionSteps(recipe)[stepIndex];
@@ -4404,7 +4406,7 @@ export class CraftingEngine {
     let currencyAttempted = false;
     let currencyFailed = false;
     let refundedGroups = 0;
-    const recipe = this.recipeManager?.getRecipe?.(run?.recipeId) ?? {
+    const recipe = resolveRunRecipe(run, this.recipeManager) ?? {
       craftingSystemId: run?.craftingSystemId ?? null,
     };
     const steps = Array.isArray(run?.steps) ? run.steps : [];
@@ -5463,12 +5465,7 @@ export class CraftingEngine {
   }
 
   _getFailureConsumptionPolicy(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
-    }
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(systemId);
+    const system = recipe?.craftingSystemId ? this._getRecipeSystem(recipe) : null;
     if (!system) {
       return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }
@@ -5929,8 +5926,8 @@ export class CraftingEngine {
 
   /** The system for a recipe or a salvage synthetic recipe. */
   _getRecipeSystem(recipe) {
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    return systemManager?.getSystem(recipe?.craftingSystemId) ?? null;
+    const manager = game.fabricate?.getCraftingSystemManager?.();
+    return withAcceptedCraftingCheck(manager?.getSystem(recipe?.craftingSystemId) ?? null, recipe);
   }
 
   /** Whether the recipe's system applies time requirements; only an explicit `false` disables. */

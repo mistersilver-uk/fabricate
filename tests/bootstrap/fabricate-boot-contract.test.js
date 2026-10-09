@@ -674,6 +674,11 @@ test('the boot contract golden is not vacuous', () => {
     'set fabricate.gatheringConfig {"probe":"gatheringConfig"}',
   ]);
   assert.deepEqual(
+    golden.importerSeams.heldRecipeIds,
+    ['probe-held-recipe'],
+    'the prune asks the facade run manager which recipes active runs hold'
+  );
+  assert.deepEqual(
     golden.importerSeams.admits,
     { activeGm: true, assistantGm: true, player: false },
     'the importer is GM-gated, not single-writer'

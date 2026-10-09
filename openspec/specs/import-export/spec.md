@@ -410,6 +410,11 @@ Auto-pruning therefore takes effect from the first provenance-stamping reinstall
 Pruning MUST persist in the same single batched `recipes` write as the import (a prune-only reinstall still writes once), and the actor-flag cleanup following the prune MUST run as ONE bulk pass across affected actors, not once per pruned recipe.
 A copy-mode / fresh-system import mints a new system id and has no persisted recipes to overwrite, so it never enters the prune path.
 
+A provenance-matched orphan candidate that a begun crafting run still resolves against MUST NOT be pruned: it is preserved and reported with `reason: 'activeRuns'`, alongside `unprovenanced` and `foreignProvenance` above.
+The held set MUST be computed from every actor's active runs before pruning, over the same actor roster the run manager exposes, so the exception applies regardless of import mode wherever a run persists.
+This is a genuine exception, not a delay folded into the absent-set: the recipe IS in the absent-set (it is genuinely missing from the incoming payload), and it is spared anyway because a run resolves it through the accepted terms it captured at start (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms), and deleting the recipe out from under an in-progress craft would discard work the player already committed to.
+For example, a reinstall of a pack whose new payload no longer ships a recipe an actor's run is executing leaves that recipe in place, reported rather than removed, while the run resolves and completes against the terms it accepted at start; only once no active run references the recipe does a later import prune it under the rule above.
+
 ### Orphan reporting
 
 The import summary MUST include an `orphans[]` collection, each entry carrying the recipe id and name and a `disposition` (`pruned` for auto-removed provenance-matched recipes, `reported` for preserved orphan candidates), plus a `recipes.pruned` count.

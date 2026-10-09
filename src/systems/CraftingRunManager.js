@@ -124,6 +124,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
       ...lifecycleFields,
+      // The run's accepted terms (`runTerms.js`), kept only while it is active.
+      ...(lifecycle.termsSnapshot && { termsSnapshot: lifecycle.termsSnapshot }),
     };
 
     container.active[runId] = run;
@@ -333,10 +335,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         expectedRevision: options.expectedRevision ?? run.runRevision,
       });
     }
-    this._assertRunMutation(run, {
-      ...options,
-      allowPaused: status === 'cancelled',
-    });
+    this._assertRunMutation(run, { ...options, allowPaused: status === 'cancelled' });
 
     run.status = status;
     run.currentStepIndex = null;
@@ -345,6 +344,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     incrementRunRevision(run);
 
     delete container.active[run.id];
+    delete run.termsSnapshot;
     // A duplicate history id would crash the Journal's keyed each, so a run lingering in `active`
     // after its twin was recorded is never archived again.
     const alreadyArchived =

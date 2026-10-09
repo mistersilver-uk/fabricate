@@ -27,6 +27,7 @@ import {
   withCountBotch,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
+import { resolveRunRecipe } from '../../systems/runTerms.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
   STAGE_BLOCKERS,
@@ -404,7 +405,7 @@ export class RunJournalBuilder {
   }
 
   /**
-   * The recipe every non-fizzle crafting run in the pass resolves to, keyed by run id.
+   * The recipe every non-fizzle crafting run in the pass resolves to, its accepted terms first.
    *
    * Resolved once here instead of once inside each `_craftingRunModel`, because
    * {@link buildListing} needs the recipes up front to give the pass snapshot their legacy
@@ -417,10 +418,9 @@ export class RunJournalBuilder {
   _craftingRunRecipes(runs) {
     const byRunId = new Map();
     for (const run of runs) {
-      // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe, so
-      // resolving one for it here would add a lookup the pass does not make today.
+      // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe.
       if (!run?.id || run.isFizzle === true || byRunId.has(run.id)) continue;
-      const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
+      const recipe = resolveRunRecipe(run, this._recipeManager);
       if (recipe) byRunId.set(run.id, recipe);
     }
     return byRunId;
