@@ -297,14 +297,10 @@
     min-width: 0;
   }
 
-  /* EACH SECTION KEEPS THE CARD'S OWN RHYTHM, kicker to body, and its kicker the card's flush
-     edge, so no frame moves; chained through the card because `Rail` writes both elements. */
+  /* Each section keeps the card's rhythm, kicker to body; chained through the card because `Rail`
+     writes the section. */
   :global(.fabricate-card.manager-tool-browser-inspector > .fab-rail) {
     gap: inherit;
-  }
-
-  :global(.fabricate-card.manager-tool-browser-inspector > .fab-rail > .fab-rail-label) {
-    margin: 0;
   }
 
   .manager-tool-inspector-rules {
