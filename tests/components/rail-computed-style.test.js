@@ -16,6 +16,7 @@ const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Rail.svelte',
   'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
 const ALL_HASHES = SCOPED_COMPONENTS.map((component) => component.hashClass).join(' ');
 
@@ -47,13 +48,15 @@ const BARE = `<section class="fab-rail" role="group" aria-labelledby="bare" data
   <p class="fab-rail-label" id="bare" data-probe="bare-kicker">Source</p>
   <p data-probe="bare-body">Body</p>
 </section>
-<span data-probe="muted-ink" style="color: var(--fab-text-muted)"></span>`;
+<span data-probe="muted-ink" style="color: var(--fab-text-muted)"></span>
+<p class="fab-kicker" data-probe="kicker">Kicker</p>`;
 
 const RECIPE_ITEM = `<aside class="manager-recipe-item-editor-rail">
   <section class="fab-rail" role="group" aria-labelledby="ri" data-probe="ri">
     <p class="fab-rail-label" id="ri" data-probe="ri-kicker">How players see it</p>
   </section>
-</aside>`;
+</aside>
+<span data-probe="ri-muted" style="color: var(--fab-text-muted)"></span>`;
 
 let browser;
 before(async () => {
@@ -113,10 +116,20 @@ test('a bare rail is a flex column at 8px, shrinkable, with a 2px muted kicker f
 
 test("the recipe-item rail label is the primitive's kicker", async () => {
   const read = await measure(RECIPE_ITEM, {
-    'ri-kicker': ['fontSize', 'letterSpacing', 'marginTop', 'marginBottom'],
+    'ri-kicker': ['fontSize', 'letterSpacing', 'marginTop', 'marginBottom', 'color'],
+    'ri-muted': ['color'],
   });
   assert.equal(read['ri-kicker'].fontSize, '8.5px');
   assert.equal(read['ri-kicker'].letterSpacing, '0.935px', '0.11em at 8.5px');
   assert.equal(read['ri-kicker'].marginTop, '0px');
   assert.equal(read['ri-kicker'].marginBottom, '2px', 'the kicker foot is --fab-space-2xs');
+  assert.equal(read['ri-kicker'].color, read['ri-muted'].color, 'the kicker is --fab-text-muted');
+});
+
+test('the rail kicker is the Kicker primitive in ink, size, weight, tracking and case', async () => {
+  const properties = ['color', 'fontSize', 'fontWeight', 'letterSpacing', 'textTransform'];
+  const read = await measure(BARE, { 'bare-kicker': properties, kicker: properties });
+  for (const property of properties) {
+    assert.equal(read['bare-kicker'][property], read.kicker[property], property);
+  }
 });
