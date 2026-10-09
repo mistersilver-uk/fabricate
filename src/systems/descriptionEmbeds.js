@@ -23,9 +23,7 @@ function escapeHtml(text) {
 
 /** The UUID is the first option or the explicit uuid= value; inline is NOT part of it. */
 function parseEmbedConfig(raw) {
-  const explicit = /(?:^|\s)uuid=(?:"([^"]{1,1024})"|'([^']{1,1024})'|([^\s]{1,1024}))/i.exec(
-    raw
-  );
+  const explicit = /(?:^|\s)uuid=(?:"([^"]{1,1024})"|'([^']{1,1024})'|([^\s]{1,1024}))/i.exec(raw);
   const uuid = (
     explicit?.[1] ||
     explicit?.[2] ||

@@ -41,7 +41,10 @@ test('expands the real dnd5e inline spell-scroll syntax into the referenced Item
   const original = 'Before @Embed[' + SCROLL_UUID + ' inline] after.';
   const result = await expandDescriptionEmbeds(original, source, io);
 
-  assert.equal(plainTextDescription(result), 'Before A spell scroll bears the words of a single spell. after.');
+  assert.equal(
+    plainTextDescription(result),
+    'Before A spell scroll bears the words of a single spell. after.'
+  );
   assert.equal(result.includes('@Embed'), false);
   assert.deepEqual(calls, [{ uuid: SCROLL_UUID, relativeTo: source.uuid }]);
 });
@@ -82,11 +85,15 @@ test('honours authored captions for block embeds and omits them for inline embed
   });
 
   assert.equal(
-    plainTextDescription(await expandDescriptionEmbeds('@Embed[Item.page]{Custom heading}', source, io)),
+    plainTextDescription(
+      await expandDescriptionEmbeds('@Embed[Item.page]{Custom heading}', source, io)
+    ),
     'Custom heading Useful prose.'
   );
   assert.equal(
-    plainTextDescription(await expandDescriptionEmbeds('@Embed[Item.page caption=false]', source, io)),
+    plainTextDescription(
+      await expandDescriptionEmbeds('@Embed[Item.page caption=false]', source, io)
+    ),
     'Useful prose.'
   );
   assert.equal(
