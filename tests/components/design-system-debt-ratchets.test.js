@@ -2536,8 +2536,9 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-card-skin',
     why:
-      'withdrawn and not shipped (issue 1523, decision D4): the 11px border-and-fill card ' +
-      'blocks split across five fills, so no five-tuple is a treatment the cards share',
+      'withdrawn and not shipped (issue 1523, decision D4): the proposed `--fab-bg-2` tuple ' +
+      'and the info callout tuple each clear the two-adopter floor, but an adoption repaints ' +
+      'nothing and owes its own blocker walk, so each block keeps its own declarations',
   },
 ]);
 

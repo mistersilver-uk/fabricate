@@ -480,8 +480,9 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
         "shared <Select> on the form rung's own 12.5px, while the segments keep " +
         'SegmentedControl’s independent 0.72rem on the manager control-text scale. Equal ' +
         'numbers here mean one of the two was dragged onto the other — see the note beside ' +
-        '`bulk-segment-label`, and issue 2257, which owns collapsing the rung if it is to be ' +
-        `collapsed. Measured: select ${measured['bulk-select']}px, segment ` +
+        '`bulk-segment-label`. Issue 2257 ruled that `Select` keeps its rungs, the 34px ' +
+        '`toolbar` rung included, so neither is collapsed onto the other. Measured: select ' +
+        `${measured['bulk-select']}px, segment ` +
         `${measured['bulk-segment-label']}px.`
     );
   } finally {
