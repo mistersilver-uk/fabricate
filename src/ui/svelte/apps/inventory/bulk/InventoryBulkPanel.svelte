@@ -581,7 +581,7 @@
   /* HAND-ROLLED, AND DEFERRED (issue 1514). `FillBar` is the product's one horizontal fill
      bar and this is one, but the bar publishes two rungs — `sm` at 6px and `md` at 8px — and
      4px is neither. Converting would grow the running-batch track by half again, which is a
-     size move rather than a frame move, so it goes to the geometry sweep with the figure. */
+     size move rather than a frame move (issue 2294). */
   .bulk-progress-track {
     height: 4px;
     border-radius: 999px;
@@ -632,7 +632,7 @@
     color: var(--fab-text-subtle);
   }
 
-  /* STICKY, so the commit stays reachable below a long queue (issue 859). Its fill is the column's
+  /* Sticky, so the commit stays reachable below a long queue (issue 859). Its fill is the column's
      composite, an opaque `--fab-surface` that hides scrolled rows under the `::before`'s 5% soft
      layer (no gradient: `flat-ui-style-contract`). `.bulk-body`'s padding keeps it off the edge. */
   .bulk-footer {
@@ -685,7 +685,7 @@
   }
 
   /* Foundry's global `.app button` pins a fixed height and centres content, so a button that sets
-     only `min-height` is CROPPED; this reproduces only in real Foundry, not in a mounted test. */
+     only `min-height` is cropped; this reproduces only in real Foundry, not in a mounted test. */
   .bulk-remove {
     box-sizing: border-box;
     appearance: none;

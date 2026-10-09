@@ -280,7 +280,7 @@
     outline-offset: 2px;
   }
 
-  /* An active favourite reads as a filled gold star. */
+  /* An active favourite takes the selected face, keeping its gold edge and ink. */
   .crafting-recipe-row-fav.is-active {
     border-color: var(--fab-warning-border);
     background: var(--fab-surface-active);

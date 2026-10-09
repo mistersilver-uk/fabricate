@@ -406,15 +406,8 @@
         <ul class="inventory-detail-list">
           {#each sliceOf(sources, 'sources') as source (source.actorId)}
             <li class="inventory-detail-row">
-              <!-- THE SHARED `Avatar` (issue 1514), and `shape` is not optional here: the
-                   component defaults to `round`, which draws a 999px person mark, and this is a
-                   SOURCE ACTOR's portrait in a square 32px well beside six converted record
-                   tiles. `alt=""` because the actor's name is rendered as adjacent text on the
-                   next line, so alt text would be a second reading of the same word — the
-                   decision is taken rather than left silent, which is what
-                   `avatar-source-contract.test.js` polices. `name` is what makes the
-                   no-artwork state INITIALS rather than the `fa-user` glyph this markup drew:
-                   that is a content change, and it is the state the phase's frames record. -->
+              <!-- `shape="square"`: the default `round` is a person mark, and this is an actor's
+                   portrait in a square well. `alt=""` because the name follows as text. -->
               <Avatar
                 art={hasImg(source.actorImg) ? source.actorImg : ''}
                 name={source.actorName}
