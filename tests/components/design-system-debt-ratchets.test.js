@@ -2104,11 +2104,6 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
     "an option takes its 6px panel's inner rung",
   ],
   [
-    'styles/fabricate.css: .fabricate-manager .manager-environment-mode-option',
-    ['6px'],
-    "an option takes its mode control's inner rung; the container is issue 2257",
-  ],
-  [
     'styles/fabricate.css: .fabricate-dice-tiles__tile',
     ['9px'],
     "the library's DiceTiles specimen: 44 high at radius 9",

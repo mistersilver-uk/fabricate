@@ -747,6 +747,8 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'environment-edit',
+    // The unchecked composition segment owns its pointer target (issue 2257).
+    expectCenterHit: '[data-composition-mode-option="manual"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
