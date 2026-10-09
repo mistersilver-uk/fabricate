@@ -1,29 +1,8 @@
-import { getFabricateFlag } from '../config/flags.js';
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 
 import { findComponentByName } from './componentNameMatch.js';
+import { essencesOfItem } from './itemEssences.js';
 import { itemHasComponentIdentityFlag, resolveComponentForItem } from './sourceUuid.js';
-
-function normalizeEssences(essences = {}) {
-  const normalized = {};
-  if (!essences || typeof essences !== 'object') return normalized;
-
-  for (const [rawType, rawQuantity] of Object.entries(essences)) {
-    const type = String(rawType || '').trim();
-    if (!type) continue;
-
-    const quantity = Number(rawQuantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) continue;
-
-    normalized[type] = (normalized[type] || 0) + quantity;
-  }
-
-  return normalized;
-}
-
-function hasEssences(essences) {
-  return Object.keys(essences || {}).length > 0;
-}
 
 export function findMatchingComponent(item, components = [], systemId) {
   if (!item || !Array.isArray(components)) return null;
@@ -49,11 +28,7 @@ export function resolveItemEssences(
   systemId = null,
   resolveComponent = findMatchingComponent
 ) {
-  const flaggedEssences = normalizeEssences(getFabricateFlag(item, 'essences', {}));
-  if (hasEssences(flaggedEssences)) return flaggedEssences;
-
-  const component = resolveComponent(item, components, systemId);
-  return normalizeEssences(component?.essences || {});
+  return essencesOfItem(item, () => resolveComponent(item, components, systemId));
 }
 
 export function accumulateItemEssences(
@@ -91,14 +66,9 @@ export function accumulateSubmissionEssences(records = [], { components = [] } =
   }
 
   for (const record of records || []) {
-    const flaggedEssences = normalizeEssences(getFabricateFlag(record?.item, 'essences', {}));
-    let essences;
-    if (hasEssences(flaggedEssences)) {
-      essences = flaggedEssences;
-    } else {
-      const component = record?.componentId == null ? null : byId.get(record.componentId);
-      essences = normalizeEssences(component?.essences || {});
-    }
+    const essences = essencesOfItem(record?.item, () =>
+      record?.componentId == null ? null : byId.get(record.componentId)
+    );
 
     for (const [type, quantity] of Object.entries(essences)) {
       accumulated[type] = (accumulated[type] || 0) + quantity;

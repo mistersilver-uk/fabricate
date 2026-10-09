@@ -4863,6 +4863,8 @@ That is a finding rather than an omission: a later surface needing an audience-s
 
 One rule answers "does this actor plausibly have the materials for this recipe?", and both surfaces consume it rather than each deriving one.
 It reads the inventory snapshot's per-system component quantities, per-tag quantities and essence totals, and nothing else.
+An item's essences are counted by the engine's own rule: its own essences flag when that carries any, else its component's, so a flag-only carrier counts and a flagged item never counts its component's essences as well.
+Every requirement the totals can bound is held to them: a component option by its quantity, a tag option by its tag total, a set's essence cost and an ingredient group's essence option by the essence total against the amount, so a group whose only option is an essence its carriers cannot cover is a definitive negative.
 
 This is the same rule the inventory snapshot introduced as the **indexed availability projection**.
 "Cheap availability" and "indexed availability projection" name one rule with one implementation; a second name for it is not a second rule, and no surface may hold a second implementation.
