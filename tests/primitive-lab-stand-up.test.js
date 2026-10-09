@@ -110,3 +110,13 @@ test('a silent load after any specimen announced ready does not stop the rest', 
   assert.equal(run.loads.size, 6, 'every slot was handed a load');
   assert.deepEqual(run.problems, []);
 });
+
+test('an empty slot list settles with no load and no problem', async () => {
+  const run = stagedStandUp(0, 3);
+  const hung = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('an empty slot list never settled')), 1000).unref();
+  });
+  await Promise.race([run.done, hung]);
+  assert.deepEqual(run.events, []);
+  assert.deepEqual(run.problems, []);
+});
