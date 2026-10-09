@@ -42,7 +42,7 @@ game.fabricate.getRecipeManager()          // Recipe CRUD and queries
 game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
-game.fabricate.listCraftingForActor({ rememberedActorId, componentSourceActorIds }) // Player-visible crafting listing (summary phase)
+game.fabricate.listCraftingForActor({ rememberedActorId, componentSourceActorIds, presentTools }) // Player-visible crafting listing (summary phase)
 game.fabricate.hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds, presentTools }) // Exact detail model for one recipe (detail phase)
 game.fabricate.craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds, interactive, presentTools }) // Craft the selected recipe
 game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
@@ -167,12 +167,13 @@ Hooks.once('fabricate.ready', async () => {
 });
 ```
 
-- `listCraftingForActor({ rememberedActorId, componentSourceActorIds })` is the **summary phase**.
+- `listCraftingForActor({ rememberedActorId, componentSourceActorIds, presentTools })` is the **summary phase**.
   It returns cheap, redaction-safe summary rows for every recipe the viewer may see, projected without running exact craftability against the whole corpus.
   `rememberedActorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
   Each row's material verdict (its `browseStatus`) and the listing's own `counts.available` are **optimistic** — an upper bound read from an indexed availability snapshot, not exact evaluation.
   A recipe whose ingredient sets contend for the same held stacks can read available in the list and still refuse once hydrated or crafted.
   A row reporting unavailable is definitive; the optimism only ever runs in the makeable direction.
+  A recipe whose required Tools are not held — or supplied by `presentTools`, the Active Canvas Tool's payload — never reads available.
 - `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds, presentTools })` is the **detail phase**.
   It returns the exact rich model — per-set craftability, ingredient assignment, check resolution, outcome tiers, steps and progressive stages — for the one recipe the player has opened.
   `recipeId` arrives from a client and is not trusted: the recipe's visibility, its `enabled` flag, and its crafting system's blocked state are all re-evaluated from scratch rather than taken from the summary pass.

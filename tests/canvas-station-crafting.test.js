@@ -146,6 +146,12 @@ test('canvas stations reach the player crafting path', async (t) => {
       return { app, recipe, tool, activeCanvasTool, services: app._services, options: runOptions };
     }
 
+    // The browse row's status, through the same app seam the crafting store lists with.
+    const listedStatus = (services, recipe) =>
+      services
+        .listCraftingForActor({ rememberedActorId: actor.id, componentSourceActorIds: [actor.id] })
+        .summaries.find((summary) => summary.id === recipe.id)?.browseStatus;
+
     const activeRun = (recipe) => f.craftingRunManager.findActiveRunForRecipe(actor, recipe.id);
 
     async function journalEntry(services, run) {
@@ -198,6 +204,7 @@ test('canvas stations reach the player crafting path', async (t) => {
         assert.equal(detail.ingredientSets[0].craftability.toolStates[0].virtual, true);
         assert.equal(detail.ingredientSets[0].craftability.canCraft, true);
         assert.equal(detail.browseStatus, 'available');
+        assert.equal(listedStatus(services, recipe), 'available');
         const evaluated = services.evaluateSelectedSet({
           ...options,
           setId: recipe.ingredientSets[0].id,
@@ -266,6 +273,8 @@ test('canvas stations reach the player crafting path', async (t) => {
         const detail = services.hydrateCraftingRecipe(options);
         assert.equal(detail.ingredientSets[0].craftability.canCraft, false);
         assert.equal(detail.ingredientSets[0].craftability.toolStates[0].available, false);
+        assert.equal(detail.browseStatus, 'missingMaterials');
+        assert.equal(listedStatus(services, recipe), 'missingMaterials', 'the row agrees');
         const evaluated = services.evaluateSelectedSet({
           ...options,
           setId: recipe.ingredientSets[0].id,
@@ -276,17 +285,62 @@ test('canvas stations reach the player crafting path', async (t) => {
     });
 
     await t.test('disabled stations cannot satisfy a recipe requirement', () => {
-      const { services, options } = fixture({ enabled: false });
+      const { services, options, recipe } = fixture({ enabled: false });
       assert.equal(
         services.hydrateCraftingRecipe(options).ingredientSets[0].craftability.canCraft,
         false
       );
+      assert.equal(listedStatus(services, recipe), 'missingMaterials');
+    });
+
+    await t.test('without a station, an owned Tool alone lists the recipe available', async () => {
+      const { app, services, recipe } = fixture();
+      app._activeCanvasTool = null;
+      assert.equal(listedStatus(services, recipe), 'missingMaterials');
+      await withOwnedAnvil(async () => {
+        assert.equal(listedStatus(services, recipe), 'available');
+      });
+    });
+
+    await t.test("a routed set cannot lend its materials to another set's Tools", async () => {
+      const { app, services, options, recipe: stationOnly, tool } = fixture();
+      app._activeCanvasTool = null;
+      const ore = { match: { type: 'component', componentId: 'sm-iron-ore' }, quantity: 1 };
+      const ingots = { match: { type: 'component', componentId: 'sm-iron-ingot' }, quantity: 999 };
+      const set = (name, option, toolIds) => ({
+        id: `${stationOnly.id}-${name}`,
+        name,
+        toolIds,
+        ingredientGroups: [{ id: `${stationOnly.id}-${name}-group`, options: [option] }],
+      });
+      // "Forge" holds its materials but not its Tool; "Cold" needs no Tool but its materials.
+      const recipe = new Recipe({
+        ...stationOnly.toJSON(),
+        id: `${stationOnly.id}-routed`,
+        toolIds: [],
+        ingredientSets: [set('Forge', ore, [tool.id]), set('Cold', ingots, [])],
+      });
+      f.recipeManager.recipes.set(recipe.id, recipe);
+      options.recipeId = recipe.id;
+      const mode = system.resolutionMode;
+      system.resolutionMode = 'routedByIngredients';
+      try {
+        assert.equal(services.hydrateCraftingRecipe(options).browseStatus, 'missingMaterials');
+        assert.equal(listedStatus(services, recipe), 'missingMaterials', 'the row agrees');
+        await withOwnedAnvil(async () => {
+          assert.equal(listedStatus(services, recipe), 'available');
+        });
+      } finally {
+        system.resolutionMode = mode;
+        f.recipeManager.recipes.delete(recipe.id);
+      }
     });
 
     await t.test('multi-step details apply the station to every step requirement', () => {
       const { services, options, recipe } = fixture({ multiStep: true });
       const detail = services.hydrateCraftingRecipe(options);
       assert.equal(detail.steps.length, 2);
+      assert.equal(listedStatus(services, recipe), 'available');
       for (const step of detail.steps) {
         assert.equal(step.ingredientSets[0].craftability.canCraft, true);
         assert.equal(step.ingredientSets[0].craftability.toolStates[0].virtual, true);

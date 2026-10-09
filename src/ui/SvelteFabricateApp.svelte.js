@@ -247,7 +247,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       // Every Foundry-facing call routes through the `game.fabricate` facade, so stores stay
       // Foundry-free. That is the rule for every seam in this bag.
-      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(withStation(opts)) ?? null,
       // Synchronous, because the store's `selectedRecipe` $derived reads it without an async
       // round-trip; null when the facade is absent or the viewer may not see the recipe.
       hydrateCraftingRecipe: (opts = {}) =>

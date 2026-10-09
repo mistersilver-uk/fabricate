@@ -75,7 +75,8 @@ The player crafting read is TWO phases, because browsing and inspecting have dif
 and the browse half is the one that scales with the corpus.
 
 - **The listing seam returns cheap summary rows.**
-  `listCraftingForActor` answers `{ summaries, total, counts }`, where each summary is the
+  `listCraftingForActor({ rememberedActorId, componentSourceActorIds, presentTools })` answers
+  `{ summaries, total, counts }`, where each summary is the
   canonical recipe summary (`data-models/spec.md` § Summary Projections) for the viewer's
   audience.
   Search, the favourite / craftable / system / category filters, the A–Z sort and pagination
@@ -84,6 +85,8 @@ and the browse half is the one that scales with the corpus.
   A row's material verdict is the indexed availability projection over one per-pass inventory
   snapshot, and it is an UPPER BOUND: a positive answer means "looks makeable", never "you
   can make this".
+  A row whose required Tools are not available is never available, so the craftable filter
+  never keeps it (`data-models/spec.md` § Browse-status precedence).
   This MUST be asserted by an operation count rather than by review, and the count MUST be
   shown to be non-vacuous.
 - **The detail seam hydrates ONE recipe.**

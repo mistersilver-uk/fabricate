@@ -47,7 +47,7 @@ function createCraftingListingBuilder(facade, recipeManager) {
 }
 
 /** The cached builder, or one built for this call over the station's presence view. */
-function craftingDetailBuilder(facade, presentTools) {
+function craftingBuilderFor(facade, presentTools) {
   const recipeManager = withStationPresence(facade.recipeManager, presentTools);
   return recipeManager === facade.recipeManager
     ? facade._getCraftingListingBuilder()
@@ -81,11 +81,15 @@ export const craftingFacade = {
     return { craftingActor, componentSourceActors };
   },
 
-  /** The current user is always the viewer; the visibility service honours the GM bypass. */
-  listCraftingForActor(options = {}) {
+  /**
+   * The current user is always the viewer; the visibility service honours the GM bypass.
+   * `presentTools` is the Active Canvas Tool's payload, or null, so a row's Tool verdict agrees
+   * with `hydrateCraftingRecipe`'s.
+   */
+  listCraftingForActor({ presentTools = null, ...options } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
-    return this._getCraftingListingBuilder().buildListing({
+    return craftingBuilderFor(this, presentTools).buildListing({
       craftingActor,
       componentSourceActors,
       viewer: game.user,
@@ -109,7 +113,7 @@ export const craftingFacade = {
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
-    return craftingDetailBuilder(this, presentTools).buildRecipeDetail({
+    return craftingBuilderFor(this, presentTools).buildRecipeDetail({
       recipeId,
       craftingActor,
       componentSourceActors,
