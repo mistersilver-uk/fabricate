@@ -11,7 +11,8 @@ const PICKER = 'src/ui/svelte/components/TintPicker.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus[SHEET]));
 
-const SWATCH_RING = '.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch';
+const SWATCH_RING =
+  '.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch';
 const NONE_RING =
   '.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch';
 
@@ -21,13 +22,19 @@ function declared(file, selector, property) {
     .filter((rule) => splitSelectorList(rule.selector).includes(selector))
     .map((rule) => propertiesOf(rule).get(property))
     .filter(Boolean);
-  assert.equal(values.length, 1, `${file} declares ${property} on ${selector} ${values.length} times`);
+  assert.equal(
+    values.length,
+    1,
+    `${file} declares ${property} on ${selector} ${values.length} times`
+  );
   return values[0];
 }
 
 /** The token a selected cell's ring is inked in: a 2px inset ring, never an outline. */
 function ringInk(selector) {
-  const ink = declared(SHEET, selector, 'box-shadow').match(/^inset 0 0 0 2px var\((--fab-[\w-]+)\)$/u);
+  const ink = declared(SHEET, selector, 'box-shadow').match(
+    /^inset 0 0 0 2px var\((--fab-[\w-]+)\)$/u
+  );
   assert.ok(ink, `${selector} draws no 2px inset ring`);
   return ink[1];
 }
