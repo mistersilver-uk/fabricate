@@ -49,6 +49,9 @@
   --fab-space-2xs: 2px; /* fine: tokenizes hairline spacing, zero shift */
   --fab-space-chip: 6px; /* dense optical unit (icon+label gaps, chips), zero shift */
 
+  /* The one motion: a control's state change. `tests/components/motion-token-gate.test.js` fails any other duration or timing. */
+  --fab-motion-control: 140ms ease;
+
   /* The icon picker's chip and the row that has to contain it, declared together because the row height is DERIVED from the chip plus its own padding and border — `tests/components/icon-picker-layout.test.js` fails if that arithmetic breaks (issue 1280). */
   --fab-icon-picker-chip: 28px;
   --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
@@ -758,6 +761,32 @@
 .fabricate :where(.window-content) h6 {
   font-family: var(--font-primary);
   color: inherit;
+}
+
+/* THE ONE REDUCED-MOTION BLOCK. It reaches `.fabricate`, the root every Fabricate window and dialog emits, and the three surfaces drawn outside one: the chat cards, their dice tiles and the canvas prompt. A component writes no block of its own. No `animation` reset: none ships, and Foundry already stills `fa-spin`. See `design-system/spec.md`'s `Every interactive primitive declares its full state set`. */
+@media (prefers-reduced-motion: reduce) {
+  .fabricate,
+  .fabricate *,
+  .fabricate *::before,
+  .fabricate *::after,
+  .fabricate-craft-chat,
+  .fabricate-craft-chat *,
+  .fabricate-craft-chat *::before,
+  .fabricate-craft-chat *::after,
+  .fabricate-gather-chat,
+  .fabricate-gather-chat *,
+  .fabricate-gather-chat *::before,
+  .fabricate-gather-chat *::after,
+  .fabricate-dice-tiles,
+  .fabricate-dice-tiles *,
+  .fabricate-dice-tiles *::before,
+  .fabricate-dice-tiles *::after,
+  .fabricate-interaction-prompt,
+  .fabricate-interaction-prompt *,
+  .fabricate-interaction-prompt *::before,
+  .fabricate-interaction-prompt *::after {
+    transition: none !important;
+  }
 }
 
 /* ========================================== Unified Fabricate shell (4-tab window) ========================================== */
@@ -6196,7 +6225,7 @@
   border: 1px solid var(--fab-toggle-track-border);
   border-radius: 999px;
   background: var(--fab-toggle-track);
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: background-color var(--fab-motion-control), border-color var(--fab-motion-control);
 }
 
 .fabricate-toggle .manager-status-toggle-knob {
@@ -6207,7 +6236,7 @@
   height: 14px;
   border-radius: 50%;
   background: var(--fab-toggle-knob);
-  transition: transform 150ms ease, background-color 150ms ease;
+  transition: transform var(--fab-motion-control), background-color var(--fab-motion-control);
 }
 
 .fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob {
@@ -10219,7 +10248,11 @@
   border: 1px solid transparent;
   border-radius: 9px;
   font-size: 0.95rem;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+  transition:
+    background-color var(--fab-motion-control),
+    border-color var(--fab-motion-control),
+    color var(--fab-motion-control),
+    opacity var(--fab-motion-control);
 }
 
 .fabricate-manager .manager-feature-tile-icon.is-on {
@@ -12253,7 +12286,10 @@
   text-align: left;
   background: var(--fab-bg-2);
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+  transition:
+    border-color var(--fab-motion-control),
+    background-color var(--fab-motion-control),
+    transform var(--fab-motion-control);
 }
 
 .fabricate-manager .manager-task-required-tools-card-item:hover,
@@ -15186,7 +15222,7 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: border-color var(--fab-motion-control), background-color var(--fab-motion-control);
 }
 
 /* Selection moves the EDGE only: the fill is stated once, by the `.manager-tools-library-list > article.is-selected` rule that actually renders. */
@@ -17161,7 +17197,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-overlay-light-03);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: border-color var(--fab-motion-control);
 }
 
 /* Travel > Map Region Links: one row per Foundry Scene Region. */
@@ -17180,7 +17216,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-surface-soft);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition: border-color var(--fab-motion-control), background-color var(--fab-motion-control);
 }
 
 .fabricate-manager .manager-map-link-row:hover {

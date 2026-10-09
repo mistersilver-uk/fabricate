@@ -181,18 +181,7 @@
     color: var(--fab-accent);
   }
 
-  :global(.alchemy-chooser-card:hover) .alchemy-chooser-card-enter i {
-    transform: translateX(2px);
-  }
-
   .alchemy-chooser-card-enter i {
     font-size: 10px;
-    transition: transform 120ms ease;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .alchemy-chooser-card-enter i {
-      transition: none;
-    }
   }
 </style>
