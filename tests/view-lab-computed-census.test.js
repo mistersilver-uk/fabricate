@@ -167,7 +167,10 @@ function node(spec, children = []) {
       for (let at = element; at; at = at.parentElement) if (at.matches(selector)) return at;
       return null;
     },
-    querySelectorAll: () => children.flatMap((child) => [child, ...child.querySelectorAll('*')]),
+    querySelectorAll(selector) {
+      assert.equal(selector, '*', 'the census walks the whole frame, never a narrower scope');
+      return children.flatMap((child) => [child, ...child.querySelectorAll('*')]);
+    },
   };
   for (const child of children) child.parentElement = element;
   return element;
