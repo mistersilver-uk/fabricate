@@ -780,6 +780,10 @@ const NON_VERB_CONTROLS = Object.freeze({
     '.fabricate-action-menu-panel',
     '.fabricate-action-menu-panel [data-action="force-include"]'
   ),
+  'manager-recipe-edit-results-adder-menu': menuCorners(
+    '.manager-recipe-result-menu',
+    '.manager-recipe-result-menu [data-recipe-add="result-currency"]'
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -788,17 +792,20 @@ const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
 const CONTROL_LAYOUT_CASE_IDS = [
   ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
 ];
+// A case may sit in two groups (the result adder's menu measures rows and corners), so dedupe.
 const LAYOUT_CASE_IDS = [
-  ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
-  ...RESPONSIVE_LAYOUT_CASE_IDS,
-  ...CONTROL_LAYOUT_CASE_IDS,
-  ...FULL_WIDTH_LAYOUT_CASE_IDS,
-  ...FRAME_STACK_LAYOUT_CASE_IDS,
-  ...RAIL_FILL_LAYOUT_CASE_IDS,
-  ...BAND_LAYOUT_CASE_IDS,
-  ...HEADING_FLOOR_LAYOUT_CASE_IDS,
-  'fabricate-journal-lifecycle-narrow',
-  'fabricate-journal-lifecycle-wide',
+  ...new Set([
+    ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
+    ...RESPONSIVE_LAYOUT_CASE_IDS,
+    ...CONTROL_LAYOUT_CASE_IDS,
+    ...FULL_WIDTH_LAYOUT_CASE_IDS,
+    ...FRAME_STACK_LAYOUT_CASE_IDS,
+    ...RAIL_FILL_LAYOUT_CASE_IDS,
+    ...BAND_LAYOUT_CASE_IDS,
+    ...HEADING_FLOOR_LAYOUT_CASE_IDS,
+    'fabricate-journal-lifecycle-narrow',
+    'fabricate-journal-lifecycle-wide',
+  ]),
 ];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
@@ -806,7 +813,9 @@ test('exactly the declared layout cases carry complete layout expectations', () 
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
-    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id)) continue;
+    const rowGeometry = ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id);
+    // A row-geometry case that also measures controls keeps its row checks below.
+    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id) && !rowGeometry) continue;
     if (
       viewCase.query?.journalCaseState === 'wide' ||
       viewCase.query?.journalCaseState === 'narrow'
@@ -817,7 +826,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
       continue;
     }
-    if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+    if (rowGeometry) {
       assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
       assert.equal(typeof viewCase.expectLayout.containerSelector, 'string', 'but a container');
       const { oneLineRows, wrappedRows } = viewCase.expectLayout;

@@ -1104,6 +1104,14 @@ export const CASES = Object.freeze([
       containerSelector: '.manager-recipe-results-section',
       oneLineRows: `${RESULT_ROWS}:not(:has([data-recipe-reward-body], [data-recipe-knowledge-hint]))`,
       alignedLeft: '[data-recipe-add="result-item"], .manager-recipe-result-menu',
+      // The shared panel's 11 and items' 7, which the result menu inherits (issue 2257).
+      controls: [
+        { selector: '.manager-recipe-result-menu', styles: 'border-radius: 11px' },
+        {
+          selector: '.manager-recipe-result-menu [data-recipe-add="result-currency"]',
+          styles: 'border-radius: 7px',
+        },
+      ],
     },
     expectContained: [
       { container: '.manager-recipe-results-section', target: '.manager-recipe-result-menu' },
