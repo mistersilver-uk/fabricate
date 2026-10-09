@@ -672,6 +672,6 @@
      notice's own. */
   .fabricate-app-extension-fault {
     max-width: 560px;
-    margin: 20px;
+    margin: var(--fab-space-5);
   }
 </style>
