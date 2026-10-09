@@ -864,18 +864,17 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     for (const probe of ['kicker', 'section-kicker']) {
       assert.equal(measured[probe].fontSize, '8.5px', `${probe} is the design size`);
       assert.equal(measured[probe].fontWeight, '700', `${probe} is the design weight`);
-      assert.equal(measured[probe].color, resolved.subtle, `${probe} is the subtle ink`);
       assert.notEqual(measured[probe].letterSpacing, 'normal', `${probe} is tracked`);
     }
-    // A rail section keeps the card's own rhythm and a flush kicker (issue 1782).
-    // ITS KICKER IS THE MANAGER EYEBROW the panel's own head draws, property for property, so a
-    // converted kicker cannot drift from the `.manager-kicker` it replaced.
-    for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'color']) {
+    // The head `.manager-kicker` stays subtle; the Rail section kickers are muted (issue 2257 D11).
+    assert.equal(measured.kicker.color, resolved.subtle, 'the head kicker is the subtle ink');
+    assert.equal(measured['section-kicker'].color, resolved.muted, 'a section kicker is muted');
+    for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight']) {
       assert.equal(measured['section-kicker'][property], measured.kicker[property], property);
     }
     // The inspector's 14px gap snapped up to `--fab-space-4` (issue 1523).
     assert.equal(measured.section.rowGap, '16px', 'kicker to body at the card rhythm');
-    assert.equal(measured['section-kicker'].marginBottom, '0px', 'and its kicker sits flush');
+    assert.equal(measured['section-kicker'].marginBottom, '2px', 'the Rail foot, --fab-space-2xs');
 
     // `proto:2559-2562` — the rules inset RECESSES below the aside now that the aside has
     // moved up a rung. It had been painted lighter than its own container.

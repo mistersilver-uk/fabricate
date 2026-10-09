@@ -46,7 +46,8 @@ const documentFor = (body) => `<!doctype html>
 const BARE = `<section class="fab-rail" role="group" aria-labelledby="bare" data-probe="bare">
   <p class="fab-rail-label" id="bare" data-probe="bare-kicker">Source</p>
   <p data-probe="bare-body">Body</p>
-</section>`;
+</section>
+<span data-probe="muted-ink" style="color: var(--fab-text-muted)"></span>`;
 
 const RECIPE_ITEM = `<aside class="manager-recipe-item-editor-rail">
   <section class="fab-rail" role="group" aria-labelledby="ri" data-probe="ri">
@@ -81,10 +82,18 @@ async function measure(body, reads) {
   }
 }
 
-test('a bare rail is a flex column at 8px, shrinkable, with a 2px kicker foot', async () => {
+test('a bare rail is a flex column at 8px, shrinkable, with a 2px muted kicker foot', async () => {
   const read = await measure(BARE, {
     bare: ['display', 'flexDirection', 'rowGap', 'minWidth'],
-    'bare-kicker': ['marginTop', 'marginBottom', 'fontSize', 'letterSpacing', 'textTransform'],
+    'bare-kicker': [
+      'marginTop',
+      'marginBottom',
+      'fontSize',
+      'letterSpacing',
+      'textTransform',
+      'color',
+    ],
+    'muted-ink': ['color'],
   });
   assert.equal(read.bare.display, 'flex');
   assert.equal(read.bare.flexDirection, 'column');
@@ -95,14 +104,19 @@ test('a bare rail is a flex column at 8px, shrinkable, with a 2px kicker foot', 
   assert.equal(read['bare-kicker'].fontSize, '8.5px');
   assert.equal(read['bare-kicker'].letterSpacing, '0.935px', '0.11em at 8.5px');
   assert.equal(read['bare-kicker'].textTransform, 'uppercase');
+  assert.equal(
+    read['bare-kicker'].color,
+    read['muted-ink'].color,
+    'the kicker is --fab-text-muted'
+  );
 });
 
-test('the recipe-item rail label keeps its own size, tracking and flush foot', async () => {
+test("the recipe-item rail label is the primitive's kicker", async () => {
   const read = await measure(RECIPE_ITEM, {
     'ri-kicker': ['fontSize', 'letterSpacing', 'marginTop', 'marginBottom'],
   });
-  assert.equal(read['ri-kicker'].fontSize, '9.92px', '0.62rem');
-  assert.equal(read['ri-kicker'].letterSpacing, '1.1904px', '0.12em at 9.92px');
+  assert.equal(read['ri-kicker'].fontSize, '8.5px');
+  assert.equal(read['ri-kicker'].letterSpacing, '0.935px', '0.11em at 8.5px');
   assert.equal(read['ri-kicker'].marginTop, '0px');
-  assert.equal(read['ri-kicker'].marginBottom, '0px', 'flush, unlike the bare rail');
+  assert.equal(read['ri-kicker'].marginBottom, '2px', 'the kicker foot is --fab-space-2xs');
 });

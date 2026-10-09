@@ -610,13 +610,6 @@
     border-left: 1px solid var(--fab-border);
   }
 
-  /* THIS RAIL'S KICKERS KEEP THEIR OWN SIZE AND TRACKING, flush, so no frame moves. */
-  .manager-recipe-item-editor-rail > :global(.fab-rail) > :global(.fab-rail-label) {
-    margin: 0;
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-  }
-
   /* The "How players see it" rail embeds the REAL player `InventoryDetail` component
      (issue 544), which sets `height: 100%`; bound it and let it scroll so the full
      player UI (badge, description, "Needs:" chips, recipe list + search + pager)
