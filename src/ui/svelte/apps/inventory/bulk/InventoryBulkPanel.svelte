@@ -632,11 +632,9 @@
     color: var(--fab-text-subtle);
   }
 
-  /* STICKY, so the commit stays reachable below a long queue (issue 859). Its fill restates the
-     column's composite exactly — `--fab-surface` under an inset `--fab-surface-soft`, a 5% overlay
-     that alone would let scrolled rows show through — or the difference reads as a box; the
-     inset shadow is that second layer because `flat-ui-style-contract` bans gradients.
-     `.bulk-body`'s `padding-bottom` keeps its fully scrolled resting place off the window edge. */
+  /* STICKY, so the commit stays reachable below a long queue (issue 859). Its fill is the column's
+     composite, an opaque `--fab-surface` that hides scrolled rows under the `::before`'s 5% soft
+     layer (no gradient: `flat-ui-style-contract`). `.bulk-body`'s padding keeps it off the edge. */
   .bulk-footer {
     position: sticky;
     bottom: 0;
@@ -652,7 +650,14 @@
     padding-top: var(--fab-space-3);
     padding-bottom: var(--fab-space-2);
     background-color: var(--fab-surface);
-    box-shadow: inset 0 0 0 100vmax var(--fab-surface-soft);
+  }
+
+  .bulk-footer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--fab-surface-soft);
   }
 
   .bulk-footer-note {
@@ -679,21 +684,16 @@
     gap: var(--fab-space-2);
   }
 
-  /* Foundry's global `.app button` pins a fixed height and centres content, so a
-     button that sets only `min-height` is CROPPED — its content spills past its own
-     border. This reproduces only in real Foundry; a mounted test cannot see it. */
+  /* Foundry's global `.app button` pins a fixed height and centres content, so a button that sets
+     only `min-height` is CROPPED; this reproduces only in real Foundry, not in a mounted test. */
   .bulk-remove {
     box-sizing: border-box;
     appearance: none;
     -webkit-appearance: none;
-    height: auto;
     margin: 0;
     font: inherit;
     line-height: 1;
     cursor: pointer;
-  }
-
-  .bulk-remove {
     display: inline-flex;
     align-items: center;
     justify-content: center;
