@@ -496,6 +496,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/systems/inventorySnapshot.js',
+  'src/utils/itemEssences.js',
   'src/config/flags.js',
   'src/systems/itemStackQuantity.js',
   'src/config/stackQuantityPathPresets.js',

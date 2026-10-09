@@ -19,9 +19,8 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 globalThis.game = { actors: [] };
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { buildInventorySnapshot, projectRecipeAvailability } = await import(
-  '../src/systems/inventorySnapshot.js'
-);
+const { buildInventorySnapshot, projectRecipeAvailability } =
+  await import('../src/systems/inventorySnapshot.js');
 const { advanceDefinitionRevision } = await import('../src/utils/definitionIndex.js');
 const { itemMatchesRecipeItemSource } = await import('../src/utils/sourceUuid.js');
 
@@ -577,9 +576,7 @@ describe('the availability projection is indexed and optimistic', () => {
     // And the union is deduped: a tag carried by BOTH the component and the item flag must
     // not count the same held stack twice, or the upper bound would drift twice as high as
     // the stock actually held.
-    const both = talliesFor([
-      makeItem({ uuid: 'i2', name: 'Wood', quantity: 3, tags: ['plank'] }),
-    ]);
+    const both = talliesFor([makeItem({ uuid: 'i2', name: 'Wood', quantity: 3, tags: ['plank'] })]);
     assert.equal(both.quantityByTag.get('plank'), 3, 'counted once, not twice');
   });
 
@@ -594,6 +591,44 @@ describe('the availability projection is indexed and optimistic', () => {
     );
     assert.equal(result.available, false);
     assert.deepEqual(result.missingEssenceIds, ['earth']);
+  });
+
+  const essenceOption = (essenceId, amount) => ({ match: { type: 'essence', essenceId, amount } });
+  const essenceRecipe = (essenceId, amount) => ({
+    id: 'r',
+    ingredientSets: [{ ingredientGroups: [{ options: [essenceOption(essenceId, amount)] }] }],
+  });
+
+  it('holds an essence option to the held essence total, a definitive no (issue 2318)', () => {
+    const tallies = talliesFor([makeItem({ uuid: 'i1', name: 'Iron', quantity: 2 })]);
+    assert.equal(projectRecipeAvailability(tallies, essenceRecipe('earth', 4)).available, true);
+    assert.equal(projectRecipeAvailability(tallies, essenceRecipe('earth', 5)).available, false);
+    assert.equal(projectRecipeAvailability(tallies, essenceRecipe('water', 1)).available, false);
+  });
+
+  it('lets an essence option fall back to another option in its group', () => {
+    const recipe = {
+      id: 'r',
+      ingredientSets: [
+        {
+          ingredientGroups: [
+            { options: [essenceOption('water', 1), componentOption('comp-iron', 1)] },
+          ],
+        },
+      ],
+    };
+    const tallies = talliesFor([makeItem({ uuid: 'i1', name: 'Iron' })]);
+    assert.equal(projectRecipeAvailability(tallies, recipe).available, true);
+  });
+
+  it("counts an item's own essences flag over its component's, as the engine does", () => {
+    const flagged = makeItem({ uuid: 'i1', name: 'Iron', quantity: 3 });
+    flagged.flags.fabricate.fabricate.essences = { water: 1 };
+    const unknown = makeItem({ uuid: 'i2', name: 'Mystery', quantity: 2 });
+    unknown.flags.fabricate.fabricate.essences = { water: 2 };
+    const tallies = talliesFor([flagged, unknown]);
+    assert.equal(tallies.essenceTotals.get('water'), 7, '1 x 3 flagged units + 2 x 2 unresolved');
+    assert.equal(tallies.essenceTotals.has('earth'), false, 'the flag replaces the component');
   });
 });
 
