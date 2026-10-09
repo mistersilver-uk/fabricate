@@ -245,7 +245,7 @@
           >
             <button
               type="button"
-              class="alchemy-chip-remove-one"
+              class="alchemy-chip-remove-one fab-hit-area"
               data-alchemy-chip-remove-one={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveOneComponent', { name: chip.name })}
               onclick={(event) => {
@@ -257,7 +257,7 @@
             </button>
             <button
               type="button"
-              class="alchemy-chip-remove"
+              class="alchemy-chip-remove fab-hit-area"
               data-alchemy-chip-remove={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveAllComponent', { name: chip.name })}
               onclick={(event) => {

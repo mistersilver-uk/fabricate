@@ -309,7 +309,7 @@
 {#snippet removeControl(entry)}
   <button
     type="button"
-    class="bulk-remove"
+    class="bulk-remove fab-hit-area"
     data-inventory-bulk-remove={entry.key}
     aria-label={localize('FABRICATE.App.Inventory.Bulk.Remove', { name: entry.name })}
     onclick={() => onRemove?.(entry.key)}
