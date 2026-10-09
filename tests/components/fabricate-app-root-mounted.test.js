@@ -69,6 +69,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
+    'src/utils/itemEssences.js',
     // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
     'src/systems/salvageMessages.js',
     // Issue 1370 (epic 1357, PR 8a): the listing builder and the inventory snapshot enter
