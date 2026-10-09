@@ -792,24 +792,31 @@ const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
 const CONTROL_LAYOUT_CASE_IDS = [
   ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
 ];
-// A case may sit in two groups (the result adder's menu measures rows and corners), so dedupe.
-const LAYOUT_CASE_IDS = [
-  ...new Set([
-    ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
-    ...RESPONSIVE_LAYOUT_CASE_IDS,
-    ...CONTROL_LAYOUT_CASE_IDS,
-    ...FULL_WIDTH_LAYOUT_CASE_IDS,
-    ...FRAME_STACK_LAYOUT_CASE_IDS,
-    ...RAIL_FILL_LAYOUT_CASE_IDS,
-    ...BAND_LAYOUT_CASE_IDS,
-    ...HEADING_FLOOR_LAYOUT_CASE_IDS,
-    'fabricate-journal-lifecycle-narrow',
-    'fabricate-journal-lifecycle-wide',
-  ]),
+// A case may sit in two groups only where the first assertion below names it: the result adder's
+// menu measures its rows and its corners (issue 2257).
+const LAYOUT_CASE_REGISTRATIONS = [
+  ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
+  ...RESPONSIVE_LAYOUT_CASE_IDS,
+  ...CONTROL_LAYOUT_CASE_IDS,
+  ...FULL_WIDTH_LAYOUT_CASE_IDS,
+  ...FRAME_STACK_LAYOUT_CASE_IDS,
+  ...RAIL_FILL_LAYOUT_CASE_IDS,
+  ...BAND_LAYOUT_CASE_IDS,
+  ...HEADING_FLOOR_LAYOUT_CASE_IDS,
+  'fabricate-journal-lifecycle-narrow',
+  'fabricate-journal-lifecycle-wide',
 ];
+const LAYOUT_CASE_IDS = [...new Set(LAYOUT_CASE_REGISTRATIONS)];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 test('exactly the declared layout cases carry complete layout expectations', () => {
+  assert.deepEqual(
+    LAYOUT_CASE_REGISTRATIONS.filter(
+      (id, index) => LAYOUT_CASE_REGISTRATIONS.indexOf(id) !== index
+    ),
+    ['manager-recipe-edit-results-adder-menu'],
+    "only the result adder's menu sits in two layout groups, row geometry and controls"
+  );
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
