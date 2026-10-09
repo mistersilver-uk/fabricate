@@ -55,30 +55,41 @@
 </script>
 
 {#if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-  <Button role="primary" onclick={createGatheringTaskForSystem} disabled={!canShowEnvironments}>
+  <Button
+    role="primary"
+    size="38"
+    onclick={createGatheringTaskForSystem}
+    disabled={!canShowEnvironments}
+  >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
   </Button>
 {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-  <Button role="primary" onclick={createGatheringEventForSystem} disabled={!canShowEnvironments}>
+  <Button
+    role="primary"
+    size="38"
+    onclick={createGatheringEventForSystem}
+    disabled={!canShowEnvironments}
+  >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span
       >{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span
     >
   </Button>
 {:else if currentView === 'environments'}
-  <Button role="primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
+  <Button role="primary" size="38" onclick={createEnvironment} disabled={!canShowEnvironments}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
   </Button>
 {:else if currentView === 'environment-edit'}
   {#if environmentDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
     >
   {/if}
   <Button
     role="ghost"
+    size="38"
     data-environment-edit-back
     onclick={backToEnvironmentsBrowse}
     disabled={environmentSaving}
@@ -88,6 +99,7 @@
   </Button>
   <Button
     role="danger"
+    size="38"
     data-action="delete-environment"
     onclick={deleteEnvironmentDraft}
     disabled={environmentDraftIsNew || environmentSaving}
@@ -97,6 +109,7 @@
   </Button>
   <Button
     role="primary"
+    size="38"
     onclick={saveEnvironmentEdit}
     disabled={!environmentDraftDirty || environmentSaving}
   >
@@ -105,11 +118,11 @@
   </Button>
 {:else if currentView === 'gathering-task-edit'}
   {#if gatheringTaskDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <Button role="ghost" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
+  <Button role="ghost" size="38" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -120,6 +133,7 @@
   </Button>
   <Button
     role="danger"
+    size="38"
     data-gathering-task-delete
     onclick={deleteGatheringTaskDraft}
     disabled={!selectedGatheringTaskId || gatheringTaskSaving}
@@ -130,6 +144,7 @@
   </Button>
   <Button
     role="primary"
+    size="38"
     onclick={saveGatheringTaskDraft}
     disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
     title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
@@ -146,11 +161,11 @@
   {/if}
 {:else if currentView === 'gathering-event-edit'}
   {#if gatheringEventDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <Button role="ghost" data-gathering-event-back onclick={backToGatheringEventLibrary}>
+  <Button role="ghost" size="38" data-gathering-event-back onclick={backToGatheringEventLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -161,6 +176,7 @@
   </Button>
   <Button
     role="danger"
+    size="38"
     onclick={deleteGatheringEventDraft}
     disabled={!selectedGatheringEventId || gatheringEventSaving}
     title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
@@ -170,6 +186,7 @@
   </Button>
   <Button
     role="primary"
+    size="38"
     onclick={saveGatheringEventDraft}
     disabled={!gatheringEventDraftDirty || !gatheringEventValidation.valid || gatheringEventSaving}
     title={gatheringEventValidation.valid ? '' : gatheringEventValidation.errors.join('\n')}

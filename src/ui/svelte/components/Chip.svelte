@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(file-size): the closed density set gained the page header's 38 rung (issue 2257 D10), and each density's geometry lives in this scoped block -->
 <!--
   The app's one chip: a short, fully-rounded badge carrying a count, a state, a category or a tag. `SearchablePopover` and `Select` render it too, so it ships under `components/`, and its CSS lives in this scoped `<style>` so `VIEW_RECIPES` maps a change here to the views that render it.
 
@@ -7,7 +8,7 @@
   | `tag` | `'span'` \| `'li'` \| `'button'` \| `'div'` | `'span'` | The rendered element. A chip inside a `role="list"` must be an `li`; a clickable chip must be a real `button`. |
   | `tone` | `active`, `positive`, `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`, `secondary`, `subtle`, `tag` | `''` | Colour ONLY, never size. A CLOSED set: an unrecognised value is DROPPED rather than emitted as an unstyled `is-*`, so a typo shows as the default chip. See the invariants for how a caller picks one. |
   | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` \| `'solid'` | `''` | A second axis: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The four are alternatives, not a composition, and the set is closed the same way. `solid` is the opaque ground for a chip read over artwork. |
-  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
+  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` \| `'header'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
   | `mono` / `struck` / `icon` | booleans / Font Awesome classes | `false` / `false` / `''` | Numerals in the mono face with `tabular-nums`, so columns of counts, DCs and quantities line up; the MUTED VARIANT, a value switched off in the scope being read, composing with every tone, which owns the ink; and a leading glyph. |
   | `swatch` / `tint` | bare `--fab-tag-*` keys | `''` | A leading colour DOT (the chip is ABOUT a colour) and an ink for the WHOLE chip (the chip IS that colour). Both are validated to a bare key before interpolation into a `style` attribute, both ride `--fab-chip-color`, and the tint wins when both are set. |
   | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line and clipped; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
@@ -22,7 +23,7 @@
   - The root keeps the literal `manager-chip` class — pinned by `manager-layout.test.js`, the mounted suites and `scripts/foundry-test-run.mjs`.
   - Four of the thirteen tones are one recessive ladder a caller routes by meaning, per "Every interactive primitive declares its full state set" in `openspec/specs/design-system/spec.md`; the names do not track the tokens (`muted` inks `--fab-text-disabled`, `neutral` inks `--fab-text-muted`).
   - `emphasis="bare"` is the one emphasis that does not compose with `struck`, because its `border` shorthand resets the dashed `border-style` that prop states.
-  - `iconOnly` emits `role="img"` on a non-interactive host only, before the rest spread so a caller's own `role` wins, because `aria-label` on a bare `span` is dropped; six square sides are published, one per density, and `is-list` has no `min-height` to read.
+  - `iconOnly` emits `role="img"` on a non-interactive host only, before the rest spread so a caller's own `role` wins, because `aria-label` on a bare `span` is dropped; seven square sides are published, one per density, and `is-list` has no `min-height` to read.
   - `removable` throws rather than drops on `tag="button"`/`"a"`, a missing `removeLabel` and a missing `onRemove`; `removeLabel` names the member it takes out and defaults to `undefined`, never `''` — pinned by `tests/design-system-required-names.test.js`.
   - The remove control is a button outside a form, so it carries `data-keyboard-focus="true"`; focus moves to a sibling's remove control or the nearest enclosing `[data-chip-remove-fallback]` before `onRemove` runs, and the live region is the caller's, per "The Foundry contract binds every primitive" in `openspec/specs/design-system/spec.md`.
 -->
@@ -146,6 +147,7 @@
       density === 'action' ? 'is-action' : '',
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
+      density === 'header' ? 'is-header' : '',
       iconOnly ? 'is-icon-only' : '',
       removeControl ? 'is-removable' : '',
       presentation === 'clock' ? 'is-clock' : '',
@@ -337,12 +339,17 @@
   }
 
   /* The button's geometry restated in full; `manager-header-geometry.test.js` gates the pair. */
-  .manager-chip.is-action {
+  .manager-chip.is-action,
+  .manager-chip.is-header {
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     border-radius: 9px;
     font-size: 0.72rem;
     white-space: nowrap;
+  }
+
+  .manager-chip.is-header {
+    min-height: 38px;
   }
 
   .manager-chip.is-tag-run {
@@ -393,6 +400,12 @@
     width: 34px;
     height: 34px;
     min-height: 34px;
+  }
+
+  .manager-chip.is-icon-only.is-header {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
   }
 
   .manager-chip.is-icon-only.is-tag-run {

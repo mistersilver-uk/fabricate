@@ -13,9 +13,9 @@
   Every other prop is one branch's own state or handler leg, or is forwarded to a family unit.
 
   Invariants:
-  - The group renders its labelled `<div>` whenever the gate holds, including on the four routes
-    whose branch draws nothing; the Premium advert leads it, and holds the world Component
-    catalogue's group alone.
+  - The group renders its labelled `role="group"` `<div>` whenever the gate holds, including on
+    the four routes whose branch draws nothing; the Premium advert leads it, and holds the world
+    Component catalogue's group alone.
   - Branch order and the family dispatch are pinned by `tests/manager-header-families.test.js`.
 -->
 <script>
@@ -130,7 +130,7 @@
   Component catalogue only while it carries the Premium advert.
 -->
 {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry' || (currentView === 'world-components' && header.premiumIconsAdVisible)}
-  <div class="manager-header-actions" aria-label={header.actionsLabel}>
+  <div class="manager-header-actions" role="group" aria-label={header.actionsLabel}>
     {#if header.premiumIconsAdVisible}
       <ManagerPremiumIconsAd {text} onDismiss={header.dismissPremiumIconsAd} />
     {/if}
@@ -180,7 +180,7 @@
       />
     {:else if currentView === 'world-essences'}
       <!-- Create takes no name field. -->
-      <Button role="primary" data-world-essence-create onclick={createWorldEssence}>
+      <Button role="primary" size="38" data-world-essence-create onclick={createWorldEssence}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
       </Button>
@@ -188,6 +188,7 @@
       {#if downtimeCoreFallback}
         <!-- The promotional pill sits at the top of every Downtime screen. -->
         <Button
+          size="38"
           tag="a"
           class="manager-downtime-unlock"
           data-downtime-unlock
@@ -205,7 +206,7 @@
           <Chip
             tone={downtimeHeaderStatus.tone}
             truncate
-            density="action"
+            density="header"
             data-downtime-chrome-status
             title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
             >{downtimeHeaderStatus.label}</Chip
@@ -309,12 +310,12 @@
         {saveGatheringEventDraft}
       />
     {:else if currentView === 'world'}
-      <Button role="primary" onclick={createParty} disabled={travelSaving}>
+      <Button role="primary" size="38" onclick={createParty} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
       </Button>
     {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-      <Button role="primary" onclick={createTravelRealm} disabled={travelSaving}>
+      <Button role="primary" size="38" onclick={createTravelRealm} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
       </Button>
@@ -324,22 +325,22 @@
       <!-- The advert above is the group's only content; the systems browser's actions stay out. -->
     {:else if currentView === 'system-edit'}
       <!-- `ghost` here rests on the verb, not on a neighbour. -->
-      <Button role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
+      <Button role="ghost" size="38" data-system-edit-back onclick={backToSystemsBrowser}>
         <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
       </Button>
     {:else}
       <!-- `data-manager-import-system` is a zero-behaviour hook: the only other handle on this
            button is `fabricate-button`, which a dozen header controls share. -->
-      <Button data-manager-import-system onclick={importSystem}>
+      <Button size="38" data-manager-import-system onclick={importSystem}>
         <i class="fas fa-file-import" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
       </Button>
-      <Button onclick={exportSelectedSystem} disabled={!selectedSystemId}>
+      <Button size="38" onclick={exportSelectedSystem} disabled={!selectedSystemId}>
         <i class="fas fa-file-export" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
       </Button>
-      <Button role="primary" onclick={createSystem}>
+      <Button role="primary" size="38" onclick={createSystem}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
       </Button>

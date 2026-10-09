@@ -323,11 +323,17 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
-  it('draws the dirty chip at the action density of the buttons beside it', async () => {
+  it('draws the dirty chip at the header density of the 38px buttons beside it', async () => {
     const root = await harness.mount(props({ dirty: true }));
     const chip = root.querySelector('[data-tool-editor-status]');
     assert.ok(Boolean(chip.closest('.manager-header-actions')), 'the chip is in the cluster');
-    assert.ok(chip.classList.contains('is-action'), 'the chip stands beside 34px buttons');
+    assert.ok(chip.classList.contains('is-header'), 'the chip stands beside 38px buttons');
+    const buttons = [...root.querySelectorAll(':scope .manager-header-actions .fabricate-button')];
+    assert.ok(buttons.length > 0, 'the cluster draws its buttons');
+    assert.ok(
+      buttons.every((button) => button.classList.contains('is-size-38')),
+      'every header action stands at the 38 rung (issue 2257 D10)'
+    );
   });
 
   it('renders header-only actions, three accessible tabs, and no Kind', async () => {

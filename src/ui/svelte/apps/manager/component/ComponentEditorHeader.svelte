@@ -43,14 +43,14 @@
 </script>
 
 {#if dirty}
-  <Chip tone="warning" density="action" {...dirtyHook}>{dirtyLabel}</Chip>
+  <Chip tone="warning" density="header" {...dirtyHook}>{dirtyLabel}</Chip>
 {/if}
 <!-- Ghost, matching the recipe editor's Back: it is not a peer of Save. -->
-<Button role="ghost" {...backHook} onclick={() => onBack()} disabled={saving}>
+<Button role="ghost" size="38" {...backHook} onclick={() => onBack()} disabled={saving}>
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
 </Button>
-<Button role="primary" type="submit" form={formId} {...saveHook} disabled={!canSave}>
+<Button role="primary" size="38" type="submit" form={formId} {...saveHook} disabled={!canSave}>
   <i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
   <span>{saveLabel}</span>
 </Button>

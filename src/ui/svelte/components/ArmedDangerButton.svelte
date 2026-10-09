@@ -12,6 +12,7 @@
   | `disabled` | boolean | `false` | Disables both arming and confirming. |
   | `busy` | boolean | `false` | An optional third face for a caller whose confirm starts a write it can await. Not a variant of `armed` — see the invariants. |
   | `showTitle` | boolean | `true` | Whether the accessible name is ALSO a hover `title`. |
+  | `size` | `''` \| `'38'` | `''` | `Button`'s control-height rung: `'38'` stands it among the page header's 38px actions (issue 2257 D10); anything else draws the family's 34. |
 
   Callbacks:
   - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)`.
@@ -63,6 +64,7 @@
     busyLabel = '',
     busyIcon = 'fas fa-spinner fa-spin',
     showTitle = true,
+    size = '',
     onArm = () => {},
     onDisarm = () => {},
     onConfirm = () => {},
@@ -82,6 +84,7 @@
   const icon = $derived(faceOf(busyIcon, armedIcon, idleIcon));
   const consequence = $derived(faceOf(busyLabel, armedAriaLabel, idleAriaLabel));
   const isInert = $derived(disabled === true || inFlight);
+  const atRung38 = $derived(String(size ?? '') === '38');
 
   function handleClick() {
     if (isInert) return;
@@ -113,6 +116,8 @@
   bind:this={element}
   type="button"
   class="fabricate-button is-danger"
+  class:fab-manager-button={atRung38}
+  class:is-size-38={atRung38}
   class:is-armed={armed}
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}

@@ -1611,11 +1611,9 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     ],
     // The compact chip scale used to be a fourth entry here.
     [
-      // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
-      // scale; the Knowledge row actions and reset cluster join it rather than restating
-      // min-height/padding/font-size.
-      '.fabricate-manager .manager-tool-edit-actions .fabricate-button,\n' +
-        '.fabricate-manager .manager-knowledge-row-actions .fabricate-button,\n' +
+      // The Knowledge row actions and reset cluster share one 34px rule; the Tool Studio
+      // editor's cluster left it for the page header's 38 (issue 2257 D10).
+      '.fabricate-manager .manager-knowledge-row-actions .fabricate-button,\n' +
         '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button {',
       '.manager-knowledge-reset-actions .fabricate-button {',
       1,

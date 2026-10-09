@@ -619,14 +619,14 @@ describe('1506 Chip — the bare emphasis', () => {
 
 /** THE CLOSED VOCABULARIES ARE PINNED BY EXACT COUNT (issue 1506). */
 describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
-  it('routes exactly FIVE densities through a `density === …` branch, and `default` is their absence', () => {
+  it('routes exactly SIX densities through a `density === …` branch, and `default` is their absence', () => {
     const branches = densityBranches();
 
     assert.equal(
       branches.length,
-      5,
-      'the chip routes a different number of densities than the five it ships. This is an EXACT ' +
-        'count rather than a ceiling: a SIXTH branch reds here, and so does a `DENSITIES.has(…)` ' +
+      6,
+      'the chip routes a different number of densities than the six it ships. This is an EXACT ' +
+        'count rather than a ceiling: a SEVENTH branch reds here, and so does a `DENSITIES.has(…)` ' +
         'set refactor that drops the count to zero. A conversion routes to an EXISTING rung; ' +
         'minting one to make a conversion pixel-neutral re-creates, on the primitive, the ' +
         `per-surface geometry this component was extracted to retire. Found: ${branches}`
@@ -635,8 +635,9 @@ describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
     // The names as well as the count.
     assert.deepEqual(
       branches,
-      ['row', 'list', 'action', 'tag-run', 'inspector'],
-      'the five shipped densities are these five, in this order, and `default` is their absence'
+      ['row', 'list', 'action', 'tag-run', 'inspector', 'header'],
+      'the six shipped densities are these six, in this order, and `default` is their absence; ' +
+        '`header` is the page header’s 38px rung beside its actions (issue 2257 D10)'
     );
   });
 
@@ -782,9 +783,9 @@ describe('1506 Chip — the icon-only chip', () => {
   after(() => harness.teardown());
 
   /**
-   * The six published sides, as `[selector suffix, side, where the figure comes from]`. Five are
+   * The seven published sides, as `[selector suffix, side, where the figure comes from]`. Six are
    * read from the density they belong to; `list` states `min-height: 0` and has none to read,
-   * which is why the six are published rather than computed.
+   * which is why the seven are published rather than computed.
    */
   const ICON_ONLY_SIDES = [
     ['is-icon-only', 20, "the base rule's own min-height"],
@@ -795,6 +796,7 @@ describe('1506 Chip — the icon-only chip', () => {
       'the independent 15px icon square, distinct from the labelled 18.4px bordered list chip',
     ],
     ['is-icon-only.is-action', 34, "`is-action`'s min-height, which is the button's own figure"],
+    ['is-icon-only.is-header', 38, "`is-header`'s min-height, the page header button's 38 rung"],
     ['is-icon-only.is-tag-run', 25, "the height `is-tag-run`'s note computes: 6 + 6 + 11 + 2"],
     [
       'is-icon-only.is-inspector',
@@ -826,7 +828,7 @@ describe('1506 Chip — the icon-only chip', () => {
     );
   });
 
-  it('publishes a square SIDE for every density, six of them, with equal insets', () => {
+  it('publishes a square SIDE for every density, seven of them, with equal insets', () => {
     for (const [selector, side, provenance] of ICON_ONLY_SIDES) {
       const rule = ruleFor(selector);
       for (const property of ['width', 'height', 'min-height']) {

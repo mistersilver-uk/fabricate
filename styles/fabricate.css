@@ -1109,19 +1109,18 @@
   white-space: nowrap;
 }
 
-/* THE PAGE HEADER'S FAMILY IS ROOTED AT `PageHeader`'s OWN CLASS (issue 1777), doubled to keep the (0,2,0) it had under `.fabricate-manager`: the title and subtitle keep both roots because the rail and the scoped cards spell them too. */
+/* THE PAGE HEADER'S FAMILY IS ROOTED AT `PageHeader`'s OWN CLASS (issue 1777), doubled to keep the (0,2,0) it had under `.fabricate-manager`: the title and subtitle keep both roots because the rail and the scoped cards spell them too. The specimen's frame (issue 2257 E4, D1, D2): the trail spans the first row, the heading and the actions share the second, top-aligned; the specimen's 10px under the trail snaps to the scale's 8. */
 .fabricate-page-header.fabricate-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--fab-space-2) var(--fab-space-4);
   min-width: 0;
-  padding: var(--fab-space-3) var(--fab-space-4);
+  padding: var(--fab-space-4);
   border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-2);
 }
 
-/* `flex: 1 1 auto` lived here while the Downtime route led the header with a glyph tile (issue 1185): that tile was a THIRD child, and `space-between` then parked the heading in the middle of the row rather than beside it. */
 .fabricate-page-header .manager-heading {
   min-width: 0;
 }
@@ -1251,7 +1250,15 @@
   overflow-wrap: anywhere;
 }
 
-/* THE ACTION CLUSTER IS NEVER THE THING THAT GIVES. `.manager-header` is a two-child `space-between` row and both children shrink by default, so a heading with a long title or a wrapped subtitle claimed the width and squeezed this — and because the cluster wraps, it BROKE rather than overflowing: `Save faction` dropped onto a second line under `Delete faction` while the heading beside it ran to two lines of description. */
+/* The page header's own subtitle is the specimen's, identity snippets included (issue 2257 D2). */
+.fabricate-page-header.fabricate-page-header .manager-subtitle {
+  max-width: 74ch;
+  margin-top: var(--fab-space-chip);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* THE ACTION CLUSTER IS NEVER THE THING THAT GIVES: the page header gives it an `auto` track beside the heading's `minmax(0, 1fr)`, and `flex: 0 0 auto` holds it in a flex row, because a squeezed cluster wraps `Save` under `Delete` rather than overflowing (`manager-header-geometry.test.js`). */
 .fabricate-manager .manager-header-actions,
 .fabricate-manager .manager-action-group {
   display: inline-flex;
@@ -1264,15 +1271,24 @@
 
 /* NO CHIP RULE LIVES HERE ANY MORE, and the reason is ownership rather than taste (issue 1118). */
 
+/* The specimen's trail at the ruled readable size: 12px in the muted ink, its leaf in the secondary (issue 2257 E4). */
 .fabricate-page-header .manager-breadcrumbs {
   display: flex;
   align-items: center;
-  gap: var(--fab-space-chip);
+  gap: var(--fab-space-2);
   min-width: 0;
-  margin: 0 0 var(--fab-space-chip);
+  grid-column: 1 / -1;
   color: var(--fab-text-muted);
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.fabricate-page-header .manager-breadcrumbs > i {
+  font-size: 7px;
+}
+
+.fabricate-page-header .manager-breadcrumbs [aria-current='page'] {
+  color: var(--fab-text-secondary);
 }
 
 /* `display: block`, stated: core's `a.button, button` reset makes every button a centred flex container, and a flex container's text is an anonymous item that cannot shrink, so a squeezed crumb clipped its label at BOTH edges instead of taking the ellipsis the rule below declares. A block container is what `text-overflow` applies to. */
@@ -10581,7 +10597,6 @@
 
 /* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
 .fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
-  min-height: 34px;
   padding: 0 var(--fab-space-4);
   border-radius: 9px;
   font-size: 11.5px;
@@ -13714,8 +13729,7 @@
 
 @container fabricate-manager (max-width: 680px) {
   .fabricate-page-header.fabricate-page-header {
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .fabricate-manager .manager-body {
@@ -13847,38 +13861,11 @@
   overflow: hidden;
 }
 
-/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373). Two columns, so the trail spans both and the actions centre on the identity row beside them (issue 1777). */
+/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373): its fill and its place in the editor grid; `PageHeader` draws the rest (issue 2257). */
 .fabricate-manager .manager-tool-edit-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--fab-space-2) var(--fab-space-3);
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-4) var(--fab-space-3);
-  border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
   grid-column: 1 / -1;
   grid-row: 1;
-}
-
-/* `PageHeader`'s heading block hands its trail and identity to the grid above. */
-.fabricate-manager .manager-tool-edit-header > .manager-heading {
-  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
-  display: contents;
-}
-
-.fabricate-manager .manager-tool-edit-header .manager-breadcrumbs {
-  min-width: 0;
-  grid-column: 1 / -1;
-  overflow: hidden;
-  font-size: 0.66rem;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-tool-edit-header .manager-breadcrumbs > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .fabricate-manager .manager-tool-edit-identity,
@@ -13905,29 +13892,12 @@
 
 .fabricate-manager .manager-tool-edit-identity-copy {
   display: grid;
-  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
-.fabricate-manager .manager-tool-edit-identity h2 {
-  min-width: 0;
-  margin: 0;
-  color: var(--fab-text);
-  font-family: var(--fab-font-serif);
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+.fabricate-manager .manager-tool-edit-identity h2,
 .fabricate-manager .manager-tool-edit-identity p {
   min-width: 0;
-  margin: 0;
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
-  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -13939,8 +13909,7 @@
   justify-content: flex-end;
 }
 
-/* The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button scale, so the GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its per-character reset cluster join it rather than restating the values (issue 1118). */
-.fabricate-manager .manager-tool-edit-actions .fabricate-button,
+/* The GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its per-character reset cluster stand on the 34px rung the page header's actions left for 38 (issues 1118, 2257). */
 .fabricate-manager .manager-knowledge-row-actions .fabricate-button,
 .fabricate-manager .manager-knowledge-reset-actions .fabricate-button {
   min-height: 34px;
@@ -14965,11 +14934,6 @@
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-tool-edit-header {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
-
   /* The identity-to-actions step stays the 12px the stacked row had, over the grid's 8px. */
   .fabricate-manager .manager-tool-edit-actions {
     justify-content: flex-start;
@@ -15567,9 +15531,6 @@
 
 .fabricate-manager .manager-recipe-edit-heading-copy .manager-title {
   overflow: hidden;
-
-  /* The recipe editor title sits at the prototype's 20px, a notch under the browser list heading's 22px global default (issue 643 audit). */
-  font-size: 1.25rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -18268,34 +18229,6 @@
 /* THREE ROWS, because the title band renders here now. This route used to suppress `.manager-titlebar` and therefore declared a two-row template: the band, restored, became row 1, the tools context header inherited `minmax(0, 1fr)` with its 0 minimum, and the body fell into an implicit `auto` row that took the height - so the header COLLAPSED to nothing and the screen lost its breadcrumb, its `Tool Rules` title and its subtitle (issue 1373). */
 .fabricate-manager[data-manager-view="tools"] {
   grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-/* ── THE HEADER BAND, ON THE DESIGN'S OWN FIGURES ── `proto:2486` states `padding: 15px 22px 13px` (issue 1373). */
-.fabricate-manager .manager-tools-context-header {
-  align-items: flex-start;
-  padding: var(--fab-space-4) var(--fab-space-6) var(--fab-space-3);
-  background: var(--fab-bg-1);
-}
-
-/* `proto:2487`: `font: 600 11px var(--sans); gap: 8px; margin-bottom: 6px`. */
-.fabricate-manager .manager-tools-context-header .manager-breadcrumbs {
-  gap: var(--fab-space-2);
-  margin-bottom: var(--fab-space-chip);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* `proto:2493`: `600 19px var(--serif)`. 1.24rem is 19.84px. */
-.fabricate-manager .manager-tools-context-header .manager-title {
-  font-size: 19px;
-}
-
-/* `proto:2494`: `margin-top: 3px`, which takes the scale's nearest step. */
-.fabricate-manager .manager-tools-context-header .manager-subtitle {
-  max-width: 920px;
-  margin-top: var(--fab-space-1);
-  font-size: 0.72rem;
-  line-height: 1.4;
 }
 
 .fabricate-manager[data-manager-view="tools"] .manager-tools-main {

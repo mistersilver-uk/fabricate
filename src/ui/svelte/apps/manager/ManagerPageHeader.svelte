@@ -86,7 +86,7 @@
 </script>
 
 {#if !isToolStudioRoute}
-  <!-- Two children, always: the heading block and the trailing actions. -->
+  <!-- The trail row, then two blocks, always: the heading and the trailing actions. -->
   <PageHeader class="manager-header" breadcrumbs={crumbs} kicker={header.kicker}>
     {#snippet identity()}
       {#if header.headingVariant === 'recipe-edit'}

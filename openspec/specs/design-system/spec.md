@@ -374,7 +374,7 @@ A recorded decision to LOCATE a component outside the shared directory rests on 
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
 `ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
 A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
-`ArmedDangerButton` writes `fabricate-button is-danger` and nothing else, so the `Button` entry already roots every rule that paints it.
+`ArmedDangerButton` writes `fabricate-button is-danger`, adding only `Button`'s own `fab-manager-button is-size-38` at its `size="38"` rung (issue 2257 D10), so the `Button` entry already roots every rule that paints it.
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
@@ -1089,6 +1089,7 @@ A record's STATE, read-only, renders on the ONE chip: its tone names the state a
 A second pill component is a MISSING DENSITY on that chip and never a new member of the set — four retired into it, each of which had been a scale and a tone vocabulary of its own.
 The `action` density is the adjacent button's geometry IN FULL — height, corner, type size and inline padding — and never its height alone, truncated or not.
 A state chip standing in an action cluster with 34px buttons MUST take it, because a chip that matches one of the four reads as a fifth control drawn wrong; a toolbar count chip is not in such a cluster and keeps its own density.
+The `header` density is that geometry at the 38px rung, and a state chip in `PageHeader`'s action group MUST take it beside the header's 38px actions, while an edit card's cluster keeps `action` at 34 (issue 2257 D10).
 
 A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehicle or a place — is an avatar, with `shape` CALLER-SUPPLIED because actor type is system-defined and eligibility comes from a GM world setting rather than a type map.
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
@@ -2181,8 +2182,8 @@ Every manager page header MUST render through `PageHeader` (`src/ui/svelte/compo
 Each passes its trail as `breadcrumbs`, its title block as `title` and `subtitle` or as an `identity` snippet, and its action group as an `actions` snippet, and writes no breadcrumb markup of its own.
 The manager's route trail is derived by `src/ui/svelte/apps/manager/headerBreadcrumbs.js`, one chain per route under the world root or the crafting-system root, and a crumb is a control only where pressing it leaves the screen.
 The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button called with no argument and declared focused to Foundry, and the last crumb carries `aria-current="page"`.
-`PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
-At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
+Every caller MUST draw `PageHeader`'s specimen and MUST NOT restate its padding, trail, title, subtitle or action size; a caller rule MAY only place the header in its grid and keep its route's #1373 fill.
+The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row at 12px/500 in `--fab-text-muted` with its leaf in `--fab-text-secondary`, a 22px title (identity snippets included), a 12px/1.6 subtitle and 38px actions at the top of the title block (ruling 2026-10-07 E4; D1, D2).
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
@@ -2195,6 +2196,12 @@ At issue 1777 both callers kept their shipped geometry, which disagreed with the
 - **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
 - **AND** it writes no breadcrumb markup
 - **AND** the header root carries `fabricate-page-header`
+
+#### Scenario: A manager route draws the page header's specimen
+
+- **WHEN** a manager route renders `PageHeader`
+- **THEN** no caller rule sets its padding, trail, title, subtitle or action size
+- **AND** any surviving caller rule only places it or fills it
 
 #### Scenario: NavSidebar's geometry disagrees with its specimen
 

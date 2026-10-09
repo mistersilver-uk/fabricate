@@ -60,7 +60,7 @@
 </script>
 
 {#if currentView === 'recipes'}
-  <Button role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
+  <Button role="primary" size="38" onclick={createRecipe} disabled={!selectedSystemId}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
   </Button>
@@ -69,17 +69,18 @@
     <Chip
       tone="warning"
       truncate
-      density="action"
+      density="header"
       title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}
       >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <Button role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
+  <Button role="ghost" size="38" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
   </Button>
   <Button
     role="danger"
+    size="38"
     onclick={deleteRecipeFromEdit}
     disabled={!selectedRecipeId || recipeEditSaving}
     title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}
@@ -87,7 +88,7 @@
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
   </Button>
-  <Button role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
+  <Button role="primary" size="38" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
     <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
     <span>{recipeEditSaveLabel()}</span>
   </Button>
@@ -96,7 +97,7 @@
     <Chip
       tone="warning"
       truncate
-      density="action"
+      density="header"
       data-recipe-item-dirty
       title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}
       >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
@@ -104,6 +105,7 @@
   {/if}
   <Button
     role="ghost"
+    size="38"
     data-recipe-item-back
     onclick={backToBooksScrolls}
     disabled={recipeItemEditSaving}
@@ -114,6 +116,7 @@
   </Button>
   <Button
     role="danger"
+    size="38"
     data-recipe-item-delete
     onclick={deleteRecipeItemFromEdit}
     disabled={!recipeItemDraft?.id || recipeItemEditSaving}
@@ -124,6 +127,7 @@
   </Button>
   <Button
     role="primary"
+    size="38"
     data-recipe-item-save
     onclick={saveRecipeItemDraft}
     disabled={!canSaveRecipeItemEdit}
@@ -166,12 +170,13 @@
   <!-- no header actions for the tags view -->
 {:else if isChecksRoute}
   {#if checksDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip
     >
   {/if}
   <Button
     role="primary"
+    size="38"
     data-checks-save
     onclick={saveChecks}
     disabled={!checksDirty || checksSaving}
