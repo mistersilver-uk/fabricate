@@ -49,6 +49,7 @@ player-crafting-outcome-award-pending
 player-crafting-routed-tier-reward
 player-crafting-authority-blocked
 player-crafting-category-filter-list
+player-crafting-favourites
 player-crafting-sources-picker
 player-crafting-ingredient-routed
 player-crafting-routed-by-check
