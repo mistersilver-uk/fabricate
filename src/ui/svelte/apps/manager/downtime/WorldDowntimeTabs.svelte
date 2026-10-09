@@ -56,7 +56,6 @@
   .downtime-tab-card {
     position: relative;
     display: flex;
-    container-type: inline-size;
     align-items: center;
     flex-direction: row;
     flex-wrap: wrap;

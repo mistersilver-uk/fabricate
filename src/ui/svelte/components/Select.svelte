@@ -31,9 +31,9 @@
   - THIS COMPONENT HAS NO `<style>` AT ALL, and the `.fabricate-select*` family lives in
     `styles/fabricate.css`, for the two reasons `openspec/specs/design-system/spec.md` states; a
     CALL SITE stating its own per-site skin is the licensed exception.
-  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of `--fab-recipe-control-font`,
-    which is declared only inside `.fabricate-manager` — the area-scoped-property rule in the same
-    requirement; `tests/token-generation-gate.test.js` ratchets that read out of scoped styles.
+  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of
+    `--fab-manager-recipe-control-font`, which is declared only inside `.fabricate-manager` — the
+    area-scoped-property rule; `tests/token-generation-gate.test.js` ratchets that read out.
   - THE LABELLED FORM'S HOST IS A `<div>`, NEVER A `<label>`. A `<label>` forwards a caption click
     into the control it wraps, and this control toggles a portaled panel dismissed on `mousedown` in
     the capture phase — so from open, the caption's mousedown dismissed the list and the forwarded

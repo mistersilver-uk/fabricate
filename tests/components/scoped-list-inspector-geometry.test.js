@@ -34,7 +34,9 @@ const selectionToolbarCss = scopedComponentCss(
 
 /** The threshold the frame declares. Read from its source so the two cannot drift apart. */
 const THRESHOLD_PX = Number(
-  /@container \(max-width: (\d+)px\)/.exec(readFileSync(resolve(repoRoot, FRAME), 'utf8'))?.[1]
+  /@container fabricate-scoped-list \(max-width: (\d+)px\)/.exec(
+    readFileSync(resolve(repoRoot, FRAME), 'utf8')
+  )?.[1]
 );
 /** The manager rail's width, which `main` does not get. */
 const RAIL_PX = 220;
@@ -225,8 +227,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   before(async () => {
     assert.ok(
       Number.isFinite(THRESHOLD_PX) && THRESHOLD_PX > 0,
-      'the frame declares no `@container (max-width: Npx)` rule, so this whole gate measures ' +
-        'a breakpoint that does not exist'
+      'the frame declares no `@container fabricate-scoped-list (max-width: Npx)` rule, so ' +
+        'this whole gate measures a breakpoint that does not exist'
     );
     await harness.setup();
     const scope = projectWorldScopeEntity({

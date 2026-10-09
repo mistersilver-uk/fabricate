@@ -124,7 +124,7 @@
     a screenful of empty surface to scroll at ordinary window heights.
   */
   .downtime-preview {
-    container-type: inline-size;
+    container: fabricate-downtime-preview / inline-size;
     min-width: 0;
     padding: var(--fab-space-5) var(--fab-space-5) var(--fab-space-6);
     color: var(--fab-text);
@@ -500,35 +500,34 @@
   }
 
   /*
-    ApplicationV2 windows resize inside Foundry's fixed browser viewport, so a breakpoint must follow
-    this PANEL: a `vw` query measures the browser, not the window the GM sized.
-
-    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, and the two differ, so they
-    get separate queries. One shared 1040px collapsed both far above either honest limit — a
-    container query measures the CONTENT box, so an ordinary 1314px window gives this panel 1028px.
+    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, on this PANEL's content
+    box (an ordinary 1314px window gives it 1028px). The panel's own inset answers the manager
+    instead, because no container can query itself.
 
       - 940px is the feature grid's: four cards plus three 9px gutters need 4x228px, and 228px is
         the narrowest a card reads at with a 32px tile above 10px copy.
       - 720px is the hero's: the board column is pinned at its 260px minimum from 864px down, so
         below 720px the copy column is under 420px and the headline outgrows the board's height.
   */
-  @container (max-width: 940px) {
+  @container fabricate-downtime-preview (max-width: 940px) {
     .downtime-feature-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @container (max-width: 720px) {
+  @container fabricate-downtime-preview (max-width: 720px) {
     .downtime-hero {
       grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  @container (max-width: 640px) {
+  @container fabricate-manager (max-width: 680px) {
     .downtime-preview {
       padding: var(--fab-space-3);
     }
+  }
 
+  @container fabricate-downtime-preview (max-width: 640px) {
     .downtime-feature-grid {
       grid-template-columns: minmax(0, 1fr);
     }

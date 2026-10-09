@@ -365,7 +365,7 @@ function page() {
 // corresponds to, so drift from the design is visible rather than merely tolerated.
 const EXPECTED = {
   // ── The toolbar. It is the Recipe Studio's bar now (issue 676, ruling 1), so every
-  // control reads at the shared --fab-recipe-control-font and the micro-label at the
+  // control reads at the shared --fab-manager-recipe-control-font and the micro-label at the
   // recipe micro-label size. Both numbers MOVED in that change, and both moved TOWARD
   // the prototype — the map below is re-measured against the real markup, not carried
   // over. The old map pinned the drift and its own comments admitted it
@@ -481,8 +481,8 @@ const EXPECTED = {
   // the manager control-text scale the retired native `<select>` took from its own scoped block.
   // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
   // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
-  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
-  // only under `.fabricate-manager`.
+  // because the rung is: the family may not read `--fab-manager-recipe-control-font`, which is
+  // declared only under `.fabricate-manager`.
   'bulk-select': 12.5,
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
   // 0.72rem. `proto:1348` is `font:600 11.5px var(--sans);color:var(--text2)`: the tile's

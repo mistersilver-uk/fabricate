@@ -650,10 +650,9 @@ This bars a marker from a PROPERTY name and decides nothing about the shared pri
 Area scoping is spelled out rather than numbered.
 An AREA-SCOPED property is one declared only under the root of a single area, and it MUST NOT be declared or read outside that area, because a shared primitive that reads one renders correctly inside the area and unstyled everywhere else — an out-of-scope custom property makes the declaration invalid at computed-value time rather than failing.
 Every compound of a rule's selector list is judged separately, since the cascade applies a comma-joined rule to each of them.
-`--fab-manager-` is the prefix a NEW area-scoped property under `.fabricate-manager` takes, and carrying the prefix is SUFFICIENT to be governed by this rule but NOT necessary: a set of properties declared exclusively under `.fabricate-manager` selectors predates the convention, carries no prefix, and is bound by the rule all the same — `--fab-recipe-cluster-cols` and `--fab-env-comp-grid` are the same species as the five that do carry it.
-The GATED SET is computed from DECLARATION SITES rather than read off the prefix: a `--fab-*` property every one of whose declarations sits inside the area is area-scoped, whatever it is called.
-A prefix gate would police a fifth of its own population — measured, five of the twenty-four area-scoped properties carry the prefix — and the nineteen that predate the convention would be bound by this requirement and by nothing else.
-Carrying the prefix therefore remains a CLAIM the measurement must agree with: a `--fab-manager-*` property with a declaration outside the area fails `tests/token-generation-gate.test.js`, because such a property has silently dropped out of the computed set and is now gated by nothing.
+An area-scoped property under `.fabricate-manager` MUST carry the `--fab-manager-` prefix, and a `--fab-manager-*` property MUST be area-scoped, so the prefix is both NECESSARY and SUFFICIENT and a reader can tell from the name alone that the property is undefined outside the manager.
+The GATED SET is computed from DECLARATION SITES rather than read off the prefix: a `--fab-*` property every one of whose declarations sits inside the area is area-scoped, whatever it is called, and a property also declared at `:root` is not.
+The prefix is therefore a CLAIM the measurement must agree with in both directions: `tests/token-generation-gate.test.js` fails an area-scoped property without the prefix, and a `--fab-manager-*` property with a declaration outside the area, because such a property has silently dropped out of the computed set and is now gated by nothing.
 A Svelte scoped `<style>` MUST NOT reach an area-scoped property at all: a component is placed in a directory, not in a DOM subtree, so its own CSS cannot guarantee where its host renders.
 Nor may a `.js` module or a `.svelte` template spell one into a string, which is the channel a CSS-only scan cannot see and the one that has actually occurred; `tests/token-generation-gate.test.js` reads the global sheet and every scoped `<style>` as CSS, and matches a `var()` read or a `name:` declaration in `src/**` `.js` and `.svelte` text.
 
@@ -668,6 +667,11 @@ A theme foundation read only by a companion module is declared and exempted the 
 - **WHEN** a surface wants to name a colour it already gets from a foundation token
 - **THEN** the surface reads the foundation token directly
 - **AND** no forwarding alias is minted, because an alias declared once forwards a value without re-theming it and hides the token from every surface outside its selector
+
+#### Scenario: A change declares an unprefixed property only in the manager
+
+- **WHEN** a change declares a `--fab-*` property only under `.fabricate-manager` and its name does not start with `--fab-manager-`
+- **THEN** `token-generation-gate` fails it until the property carries the prefix
 
 ### Requirement: Geometry comes from the published ladders
 
@@ -787,10 +791,16 @@ A programmatic `.focus()` that follows a pointer activation matches `:focus` and
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
 
-Motion is limited to a 140ms ease on a control state change, and nothing else animates.
-Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
-NOTHING GATES THE 140ms FIGURE AND NOTHING SHIPS IT: measured across both stylesheet corpora, the durations written are 120ms seventeen times, 150ms nine times, and four others, and 140ms appears nowhere at all.
-So this sentence names a rung the product has never used, which makes it a decision owed rather than a rule enforced — either the ladder becomes 120/150 and a gate holds it, or the corpus moves onto 140 — and it is recorded here as unenforced so that the next reader does not mistake the silence for compliance.
+Motion MUST be `--fab-motion-control`, declared once in the sheet's `:root` as `140ms ease`, on a control's state change, and nothing else animates.
+A press nudge, and a hover or focus reveal of a control, are control state changes; a hover lift, an entrance fade and a shadow transition are not, and are not drawn.
+A transition MUST name the properties its state changes, never `all`, and MUST carry no duration or timing function of its own.
+The sheet's one `@media (prefers-reduced-motion: reduce)` block MUST remove every transition, by `transition: none !important` on `.fabricate`, the chat cards and the canvas prompt and everything inside them, and a component MUST NOT write a reduced-motion block of its own.
+Every sheet transition MUST sit under one of those roots, and a Svelte `<style>` block mounts inside them.
+Three Fabricate surfaces draw outside every root and carry no motion today: the environment dialog, the player character types menu and the compendium directory context menu; giving one a transition means rooting it first.
+Any state that animated MUST remain readable when it does not.
+The block resets no `animation`, because no keyframes ship and Foundry already stills `fa-spin`.
+`tests/components/motion-token-gate.test.js` holds the rule across the sheet and every Svelte `<style>` under `src/`, player apps included.
+The same gate fails a Svelte motion directive or import, a script-set `transition`, an `animate()` call, an inline `transition`, `@keyframes` and `scroll-behavior: smooth` under `src/`.
 
 The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and the order is `secondary` → `neutral` → `subtle` → `muted`, loudest to quietest: `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle` a quiet non-actionable state, and `muted` something unavailable.
 The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
@@ -818,6 +828,12 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **WHEN** a control begins an operation that takes perceptible time
 - **THEN** it sets `aria-busy` and changes its label
 - **AND** any spinner it renders is decorative and `aria-hidden`
+
+#### Scenario: A change writes its own motion
+
+- **WHEN** a change writes a literal duration or timing function on a transition or animation, or a scoped reduced-motion block
+- **THEN** `motion-token-gate` fails it
+- **AND** a control's state transition that names its property and reads `--fab-motion-control` passes
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
@@ -888,11 +904,15 @@ Core's own neutralisers for its own element rules are frequently scoped to the A
 A rule that exists to beat Foundry's host CSS belongs in the global sheet rather than in a component's scoped block, which is one of the two standing exceptions to co-located primitive CSS.
 An application root MUST also declare `color-scheme`, because browser-drawn chrome a stylesheet cannot reach — the native `<select>` option popup above all — otherwise paints in the UA's own scheme rather than the theme's.
 
-Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
-`tests/components/design-system-debt-ratchets.test.js` fails a new `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
+Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport, so no viewport `@media` ships: an `@media` may ask only a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
+Every `@container` MUST name its container, because an unnamed query answers to whichever container is NEAREST, and that moves the moment a host between the rule and the app root declares one.
+`tests/components/design-system-debt-ratchets.test.js` fails a new viewport `@media` and a new unnamed `@container` anywhere, and holds the sheet, `components/` and `apps/manager/` to neither, absolutely.
 A container query adds no specificity, so the narrow case is declared after the wide one.
 The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
-A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be.
+The manager root also carries `fabricate-option-host`, the name the option-card reflow queries, so that name's one rung, 620, is app-level as well.
+The same test fails a query against the manager, recipes or option-host container at any other width, in feature or range syntax, and fails any bound on those containers it cannot read as a px width.
+It also fails an `@container` whose name no `container-name` or `container` declaration establishes, because that query never fires.
+A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be, but the component still names the container it declares, and the same test fails a `container-type` with no `container-name` beside it in the sheet, `components/` and `apps/manager/`.
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
 The shipped manager grid is `220px minmax(0, 1fr) 300px` with fixed outer tracks; giving those tracks a `minmax(0, …)` upper bound is a proposed change recorded in the migrations, not a description of what ships.
 
@@ -994,6 +1014,12 @@ A match from a CLOSED trigger opens the panel on the matched row rather than com
 Two of the five — the badge and the unavailable reason — ship with no caller on this commit and are held by test rather than by a frame.
 `tests/components/design-system-debt-ratchets.test.js` counts every native `<select>` twice over, once as a parsed element in the Svelte templates and once as markup in a JavaScript template string, since a DialogV2 body cannot host a component and is therefore the one place the rule may not reach.
 A single element is exempted by a `<!-- ratchet-exempt(design-system): reason -->` comment on the line above it, which makes the exception a written decision rather than a silent one.
+
+#### Scenario: A change adds an unnamed container query
+
+- **WHEN** a change adds an `@container` whose prelude names no container, or an `@media` that asks the viewport's width
+- **THEN** `design-system-debt-ratchets` fails it
+- **AND** it passes once the breakpoint is an `@container` that names the container it answers to
 
 #### Scenario: A non-input element can hold focus
 

@@ -145,6 +145,31 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-parties-card-700',
+    label: 'Manager — World Parties card at 700px',
+    // Inside the 680-720 band: the card stacks on the ladder's 680 rung, so here it keeps both columns.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector:
+      '[data-travel-panel="parties"] [data-manager-party-body="lab-party"]' +
+      ':has([data-manager-party-add-open="lab-party"])' +
+      ':has([data-manager-party-actor-trigger="lab-party"])',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '[data-manager-party-body="lab-party"]',
+      expectedTracks: 2,
+    },
+    position: { width: 700, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
     // The smoke always has systems and normalizes an empty selection, so this honest no-systems state is lab-only.

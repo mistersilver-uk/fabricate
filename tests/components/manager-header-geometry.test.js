@@ -407,12 +407,13 @@ async function measureAdvert(width) {
 /** The widths either side of each threshold, plus the window's declared width and the extremes. */
 const ADVERT_WIDTHS = Object.freeze([
   { width: 1440, face: 'full' },
-  { width: 1280, face: 'full' },
-  { width: 1180, face: 'full' },
-  { width: 1179, face: 'compact' },
+  { width: 1321, face: 'full' },
+  { width: 1320, face: 'compact' },
+  { width: 1280, face: 'compact' },
+  { width: 1121, face: 'compact' },
   { width: 1100, face: 'compact' },
-  { width: 980, face: 'compact' },
-  { width: 979, face: 'hidden' },
+  { width: 961, face: 'compact' },
+  { width: 960, face: 'hidden' },
   { width: 900, face: 'hidden' },
   { width: 680, face: 'hidden' },
 ]);

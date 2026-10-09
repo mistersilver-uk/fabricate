@@ -246,7 +246,7 @@
     right: 4px;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 120ms ease;
+    transition: opacity var(--fab-motion-control);
   }
 
   .manager-essence-icon-tile:hover :global(.manager-essence-icon-reset),

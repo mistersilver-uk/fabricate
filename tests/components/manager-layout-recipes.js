@@ -45,11 +45,11 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   assert.ok(headBlock.includes('display: flex;'), 'the column header mirrors the row flex split');
   const headClusterBlock = blockFor('.fabricate-manager .manager-recipe-head-cluster');
   assert.ok(
-    headClusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    headClusterBlock.includes('grid-template-columns: var(--fab-manager-recipe-cluster-cols);'),
     'the header cluster shares the row cluster column template so the two align'
   );
   assert.ok(
-    clusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
+    clusterBlock.includes('grid-template-columns: var(--fab-manager-recipe-cluster-cols);'),
     'the row cluster consumes the same shared column template'
   );
   // The header hides at the stacked breakpoint.
@@ -190,7 +190,7 @@ test('manager recipe row collapses in the specified order and never drops its co
 // than prepended, and that is what makes the column header's four explicit `grid-column`
 // placements survive: a prepend would have shifted every one of them by a track.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
-  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
+  const declarations = [...css.matchAll(/--fab-manager-recipe-cluster-cols:\s*([^;]+);/g)].map(
     ([, value]) => value.replace(/\s+/g, ' ').trim()
   );
   assert.equal(
@@ -200,7 +200,7 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
   );
 
   for (const declaration of declarations) {
-    const tracks = [...declaration.matchAll(/var\(--fab-recipe-col-([a-z]+)\)/g)].map(
+    const tracks = [...declaration.matchAll(/var\(--fab-manager-recipe-col-([a-z]+)\)/g)].map(
       ([, name]) => name
     );
     assert.equal(
@@ -218,7 +218,7 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
 
   assert.ok(
     blockFor('.fabricate-manager .manager-recipes-table').includes(
-      '--fab-recipe-col-select: 22px;'
+      '--fab-manager-recipe-col-select: 22px;'
     ),
     'the track is the SelectionCheckbox `lg` box, declared rather than derived'
   );

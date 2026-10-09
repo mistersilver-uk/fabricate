@@ -568,10 +568,9 @@
 </InspectorCard>
 
 <style>
-  /* The card is its OWN container-query context. The shipped `@container (max-width: 620px)` rule
-       that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolved against the NEAREST
-       container — the whole `fabricate-manager` shell — and fired only when the entire manager was
-       narrow.
+  /* The card is the host the sheet's `.is-config-cards` radio reflow answers. That rule queries
+       `fabricate-option-host`, which the manager shell also carries, so without this the grid
+       reflowed only when the entire manager was narrow.
 
        `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
        `fabricate-card` is written by that primitive and a scoped rule stopped matching —
@@ -582,7 +581,7 @@
        containment context rather than painting. Each half stays at (0,2,0). */
   :global(.fabricate-card[data-crafting-modifier-catalogue]),
   :global(.fabricate-card[data-crafting-modifier-policy-card]) {
-    container-type: inline-size;
+    container: fabricate-option-host / inline-size;
   }
 
   /* THE ROW'S CHIPS ARE `Chip` AT `density="row"`, NOT STYLED HERE. Restating the row scale's

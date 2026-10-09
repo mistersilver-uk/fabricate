@@ -270,10 +270,4 @@
     color: var(--fab-text-subtle);
     font-size: 10.5px;
   }
-
-  @media (prefers-reduced-motion: reduce) {
-    .fab-run-action-bar :global(*) {
-      transition: none;
-    }
-  }
 </style>

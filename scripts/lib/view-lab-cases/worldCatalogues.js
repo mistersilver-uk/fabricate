@@ -199,8 +199,8 @@ export const CASES = Object.freeze([
     // and the Premium advert alone in the header group, since the lab world opts into experimental features (issue 2220).
     expectSelector:
       '.fabricate-manager:has([data-scoped-page="world-components"]) .manager-header-actions > [data-premium-icons-ad]:only-child',
-    // Only the advert's full face draws the subline.
-    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
+    // Compact at 1280: the advert's full face waits for the 1320 rung.
+    expectVisible: '[data-premium-icons-ad]',
     // The four leaves in the prototype's authored order, each proved to hold its own icon rather than merely to exist.
     expectContained: [
       {
@@ -522,7 +522,7 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/model\/componentScopeValidation\.js$/],
   }),
   managerCase({
-    // The shared entry frame stacks its rail below `max-width: 1000px`, and nothing in the registry reached that state.
+    // The shared entry frame stacks its rail below `max-width: 960px`, and nothing in the registry reached that state.
     id: 'world-component-entry-stacked',
     label: 'Manager — World Component entry stacked',
     reaches: 'beyond',
@@ -551,10 +551,36 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    // 980 rather than 1024, measured: the lab's manager container resolves to the window width minus two.
-    position: { width: 980, height: 860 },
+    // 960, measured: the lab's manager container resolves to the window width minus two.
+    position: { width: 960, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
     // The frame is the sheet's and the two pages that wear it, so a change to either selects this frame and its wide twin.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // Inside the 960-1000 band: the frame stacks on the ladder's 960 rung, so here its rail stays beside it.
+    id: 'world-component-entry-980',
+    label: 'Manager — World Component entry at 980px',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectLayout: {
+      containerSelector: '.fabricate-manager',
+      gridSelector: '.manager-component-entry-page',
+      expectedTracks: 2,
+    },
+    position: { width: 980, height: 860 },
+    kinds: ['manager', 'world', 'scoped', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,

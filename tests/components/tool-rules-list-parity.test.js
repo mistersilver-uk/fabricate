@@ -72,10 +72,10 @@ function documentFor(body) {
       body { margin: 0; }
       .application { font-size: 14px; }
       /* TRANSITIONS OFF, and this is load-bearing rather than tidy. The manager tool row
-         carries a 120ms background transition, so a computed background read in the same
-         tick as a hover returns the START value - which made the hover assertion below pass
-         against the very defect it exists to report. Measuring the ENDPOINT is the only
-         honest reading of a cascade question. */
+         carries a --fab-motion-control background transition, so a computed background read
+         in the same tick as a hover returns the START value - which made the hover assertion
+         below pass against the very defect it exists to report. Measuring the ENDPOINT is the
+         only honest reading of a cascade question. */
       *, *::before, *::after { transition: none !important; animation: none !important; }
     </style>
   </head>
