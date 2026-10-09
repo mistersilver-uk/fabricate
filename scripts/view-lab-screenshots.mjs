@@ -50,6 +50,7 @@ import { chromium } from 'playwright';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
 import { labQueryFor, partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
+import { assertComputedCensus } from './lib/viewLabComputedCensus.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 import {
@@ -482,6 +483,7 @@ async function renderPage(
     }
 
     await assertViewLabLayout(page, expectLayout, label);
+    await assertComputedCensus(page, appId, label);
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });

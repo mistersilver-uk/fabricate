@@ -747,6 +747,7 @@ A pill that CONTAINS a square element — an icon chip, a thumbnail — takes th
 Heights, radii, art and portraits MUST hold zero unmarked off-ladder sites, the books pair included.
 Each surviving off-ladder site carries a reasoned `ratchet-exempt(design-system)` marker naming its library specimen, issue 2257 where a specimen and its shipped geometry are still to converge, or why the site is not a control or a record tile.
 `tests/components/design-system-exempt-allowlist.test.js` pins every `ratchet-exempt(design-system)` marker under `src/` and `styles/` with its reason, so a marker added, dropped or reworded without its allowlist entry fails.
+The View Lab capture measures what the browser resolved on every frame it renders (`scripts/lib/viewLabComputedCensus.js`): a painted box at a ladder height whose computed corner is off its height band fails the frame, outside the rows, wells, panels and cards rounded by kind and the kinds a ruling records, and so does mono text computing above weight 500.
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
 `tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
