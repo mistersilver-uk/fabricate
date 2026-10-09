@@ -12,7 +12,6 @@
  * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
 import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
-import { mapInPool } from '../../../scripts/lib/viewLabRenderPool.js';
 
 import { CATALOGUE } from './catalogue.js';
 import { MAX_APPLIED_RESIZES, createSizeGovernor, layoutFor } from './hostLayout.js';
@@ -28,6 +27,7 @@ import {
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
 import { armReadyWatchdog } from './specimenWatchdog.js';
+import { SILENT, standUpSlots } from './standUp.js';
 
 /**
  * How many specimens load at once. Each fetches dozens of modules, and standing up the whole
@@ -209,16 +209,13 @@ function presizeBoxedSlot(iframe, row) {
 }
 
 /**
- * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
- * `specimenProtocol.js` handshake, and resolve once it has settled. The listener stays after
- * MOUNTED, because every later RESIZE is the same specimen re-measured.
+ * Create one specimen's `<iframe>`, measure the drawing it stands for, and place it there with no
+ * `src`, so the measurement sees every earlier slot placed and none yet sized.
  *
  * @param {{host: Element, row: object}} slot One resolved slot.
- * @param {string[]} problems The collector.
- * @param {{mounted: number}} results Mutated in place: `mounted` counts settled, mounted iframes.
- * @returns {Promise<void>} Resolves once this iframe has mounted or reported an error.
+ * @returns {{slot: object, iframe: HTMLIFrameElement, host: object}} What `loadSpecimen` takes.
  */
-function standUpSpecimen(slot, problems, results) {
+function placeSpecimenFrame(slot) {
   const iframe = document.createElement('iframe');
   iframe.className = LIVE_CLASS;
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
@@ -229,6 +226,21 @@ function standUpSpecimen(slot, problems, results) {
   // Before READY, so the first report is measured at the width the specimen will keep.
   if (host.presize) iframe.style.width = host.presize;
   presizeBoxedSlot(iframe, slot.row);
+  placeSpecimen(slot, iframe, document, { spansRow: host.spansRow });
+  return { slot, iframe, host };
+}
+
+/**
+ * Load one placed specimen and run the `specimenProtocol.js` handshake. The listener stays after
+ * MOUNTED, because every later RESIZE is the same specimen re-measured.
+ *
+ * @param {{slot: object, iframe: HTMLIFrameElement, host: object}} placed From `placeSpecimenFrame`.
+ * @param {string[]} problems The collector.
+ * @param {{mounted: number}} results Mutated in place: `mounted` counts settled, mounted iframes.
+ * @param {() => void} onReady Called when the specimen announces ready.
+ * @returns {Promise<string|undefined>} Settles once mounted or errored, or as `SILENT`.
+ */
+function loadSpecimen({ slot, iframe, host }, problems, results, onReady) {
   const admit = createSizeGovernor();
   const history = [];
   let runaway = false;
@@ -241,6 +253,7 @@ function standUpSpecimen(slot, problems, results) {
       const data = event.data ?? {};
       if (data.type === SPECIMEN_READY) {
         cancelWatchdog();
+        onReady();
         iframe.contentWindow.postMessage(
           { type: SPECIMEN_ASSIGN, row: slot.row, fill: host.fill },
           globalThis.location.origin
@@ -281,6 +294,8 @@ function standUpSpecimen(slot, problems, results) {
       }
     }
     globalThis.addEventListener('message', onMessage);
+    iframe.src = SPECIMEN_URL;
+    // Armed after `src`: the placed iframe's own `about:blank` load must not start the clock.
     cancelWatchdog = armReadyWatchdog(iframe, () => {
       problems.push(
         `${slot.row.spec} / ${slot.row.path}: its document never announced ready after loading. ` +
@@ -289,12 +304,9 @@ function standUpSpecimen(slot, problems, results) {
           'net::ERR_INSUFFICIENT_RESOURCES).'
       );
       globalThis.removeEventListener('message', onMessage);
-      resolve();
+      resolve(SILENT);
     });
   });
-
-  iframe.src = SPECIMEN_URL;
-  placeSpecimen(slot, iframe, document, { spansRow: host.spansRow });
   return settled;
 }
 
@@ -313,7 +325,12 @@ async function boot() {
   ]);
   const results = { mounted: 0 };
   // Every specimen settles before the report is published, a bounded few loading at a time.
-  await mapInPool(slots, STAND_UP_POOL_SIZE, (slot) => standUpSpecimen(slot, problems, results));
+  await standUpSlots(slots, {
+    place: placeSpecimenFrame,
+    load: (placed, onReady) => loadSpecimen(placed, problems, results, onReady),
+    poolSize: STAND_UP_POOL_SIZE,
+    problems,
+  });
   // A late font or container query re-measures a specimen; ready must not precede that.
   await whenSizesAreQuiet();
 
