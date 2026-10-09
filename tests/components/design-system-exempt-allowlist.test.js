@@ -8,9 +8,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { byCodePoint } from '../helpers/codePointOrder.js';
-import { DESIGN_SYSTEM_FAMILY } from '../helpers/designSystemRatchet.js';
+import {
+  DESIGN_SYSTEM_FAMILY,
+  MODULE_CORPUS,
+  STYLE_CORPUS,
+  workingTree,
+} from '../helpers/designSystemRatchet.js';
 import { parseMarkers } from '../helpers/mergeBaseRatchet.js';
-import { collectWorkingTreeSources } from '../helpers/sourceScan.js';
 
 const PORTRAIT = "an actor portrait, the portrait ladder's 32 single mark, not a control";
 const STEPPER_LABELS =
@@ -213,14 +217,12 @@ const ALLOWLIST = Object.freeze([
   ],
 ]);
 
-const MARKED_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte', '.css']);
-
 const keyOf = (file, reason) => `${file}\u{0}${reason}`;
 
-/** The family's markers in `sources` (`{ path: text }`), as `{ file, line, reason }`. */
-function markersIn(sources) {
-  return Object.entries(sources).flatMap(([file, text]) =>
-    parseMarkers(file, text)
+/** The family's markers in `files`, read through `readFile`, as `{ file, line, reason }`. */
+function markersIn(readFile, files) {
+  return files.flatMap((file) =>
+    parseMarkers(file, readFile(file) ?? '')
       .filter((marker) => marker.family === DESIGN_SYSTEM_FAMILY)
       .map(({ line, reason }) => ({ file, line, reason }))
   );
@@ -243,8 +245,11 @@ function compareToAllowlist(markers, allowlist) {
   };
 }
 
-const treeMarkers = () =>
-  markersIn(collectWorkingTreeSources(['src', 'styles'], [...MARKED_EXTENSIONS]));
+/** Every Svelte file, stylesheet and module under `src/` and `styles/`. */
+function treeMarkers() {
+  const { readFile, listFiles } = workingTree(STYLE_CORPUS, MODULE_CORPUS);
+  return markersIn(readFile, listFiles());
+}
 
 test('every design-system marker under src and styles is pinned with its reason', () => {
   const { unpinned } = compareToAllowlist(treeMarkers(), ALLOWLIST);
@@ -276,22 +281,23 @@ test('an allowlist entry pins each file and reason once', () => {
 
 test('the comparison fails a marker added, dropped or reworded, in every comment form', () => {
   const sources = {
-    'src/a.svelte': [
+    'probe/a.svelte': [
       '<!-- ratchet-exempt(design-system): kept -->',
       '<style>',
       '  /* ratchet-exempt(design-system): worded */',
       '</style>',
     ].join('\n'),
-    'src/b.js': '// ratchet-exempt(design-system): kept\n// ratchet-exempt(source-pin): other\n',
-    'styles/c.css': '/* ratchet-exempt(design-system): added */\n',
+    'probe/b.js': '// ratchet-exempt(design-system): kept\n// ratchet-exempt(source-pin): other\n',
+    'probe/c.css': '/* ratchet-exempt(design-system): added */\n',
   };
   const allowlist = [
-    ['kept', ['src/a.svelte', 'src/b.js']],
-    ['reworded', ['src/a.svelte']],
-    ['dropped', ['styles/c.css']],
+    ['kept', ['probe/a.svelte', 'probe/b.js']],
+    ['reworded', ['probe/a.svelte']],
+    ['dropped', ['probe/c.css']],
   ];
-  assert.deepEqual(compareToAllowlist(markersIn(sources), allowlist), {
-    unpinned: ['src/a.svelte:3 worded', 'styles/c.css:1 added'],
-    stale: ['src/a.svelte: reworded', 'styles/c.css: dropped'],
+  const markers = markersIn((file) => sources[file], Object.keys(sources));
+  assert.deepEqual(compareToAllowlist(markers, allowlist), {
+    unpinned: ['probe/a.svelte:3 worded', 'probe/c.css:1 added'],
+    stale: ['probe/a.svelte: reworded', 'probe/c.css: dropped'],
   });
 });
