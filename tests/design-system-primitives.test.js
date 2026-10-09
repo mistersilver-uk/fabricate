@@ -203,6 +203,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // Issue 2257: the tint palette and its trigger, on the frames that draw a pressed cell.
+  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
   // Issue 1782: the typeahead, on the limits tab and each site's open list.
   'src/ui/svelte/components/Typeahead.svelte',
@@ -248,8 +251,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/TintPicker.svelte',
-  'src/ui/svelte/components/TintPickerButton.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
