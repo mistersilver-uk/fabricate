@@ -1315,22 +1315,17 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 
   <div class="spec" data-status="target" data-status-AppTitleBar="target">
     <div class="spec-head"><h4>&lt;AppTitleBar&gt;</h4><span class="st st-target">target</span><p class="why">The strip above both the page header and the nav rail. Byte-identical in 16 of 21 audited prototypes, and the documented home of the world clock.</p></div>
-    <div class="stage b0 col">
-      <div style="display:flex;align-items:center;gap:9px;padding:12px 16px;background:var(--fab-bg-0);border:1px solid var(--fab-border);border-radius:9px">
-        <div class="k-ic" style="color:var(--fab-accent)"><svg class="i"><use href="#i-hammer"/></svg></div>
-        <span style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Fabricate</span>
-        <span class="k-badge accent">Karrun Forgecraft</span>
-        <span class="grow"></span>
-        <span class="k-fact"><svg class="i"><use href="#i-clock"/></svg><b>Day 214 &middot; 09:40</b></span>
-        <button class="k-btn" style="height:28px;min-height:28px">+1 day</button>
-        <button class="k-btn" style="height:28px;min-height:28px">+1 week</button>
+    <div class="stage col">
+      <div style="display:flex;align-items:center;gap:var(--fab-space-2);min-width:0;padding:var(--fab-space-2) var(--fab-space-4);background:var(--fab-bg-0);border-bottom:1px solid var(--fab-border);line-height:1.4">
+        <span style="max-width:220px;overflow:hidden;padding:2px var(--fab-space-2);border-radius:6px;background:var(--page-premium);color:var(--fab-on-accent);font-size:10px;font-weight:700;letter-spacing:.06em;text-overflow:ellipsis;white-space:nowrap">PREMIUM</span>
+        <span style="display:inline-flex;align-items:center;gap:var(--fab-space-chip);min-width:0;margin-left:auto;color:var(--fab-text-muted);font-size:11px;font-weight:500"><svg class="i" style="width:11.5px;height:11.5px;color:var(--fab-info)"><use href="#i-info"/></svg><span style="overflow:hidden;min-width:0;text-overflow:ellipsis;white-space:nowrap">Routed by check &middot; 3 outcome tiers</span></span>
       </div>
     </div>
     <div class="notes">
-      <div><h5>Canonical spec</h5><ul><li><b>bar</b> padding 12 · bg-0 · 1px bottom border · gap 8</li><li><b>scope</b> a real Badge tone — <b>not a hard-coded hex</b>, which is what every prototype did</li><li><b>trailing</b> world clock, mode summary, window controls</li></ul></div>
-      <div><h5>Svelte API</h5><ul><li><b>brand · scope</b> {label, tone}</li><li><b>trailing</b> snippet</li></ul></div>
+      <div><h5>Canonical spec</h5><ul><li><b>bar</b> padding 8/16 · bg-0 · 1px bottom rule only, no radius · gap 8 · about 32px tall</li><li><b>mark</b> the PREMIUM badge on the rail&rsquo;s gold badge rule, radius 6, 10px/700 at 0.06em, ellipsized at 220px</li><li><b>trailing</b> the mode summary: an info glyph before a muted caption, ellipsized; no buttons, because a 28px control does not fit the band</li><li><b>naming</b> no element carries <code>aria-label</code>: the visible mark is <code>aria-hidden</code> beside visually hidden status text, and the status reads a visually hidden prefix before its value</li></ul></div>
+      <div><h5>Svelte API</h5><ul><li><b>mark</b> shown while a companion is installed</li><li><b>trailing</b> snippet</li></ul></div>
     </div>
-    <div class="delta"><b>The scope pill is a Badge tone.</b> Every prototype paints it as a hard-coded hex, which is the one place the title bar’s divergence lives; it takes a real tone like every other mark.</div>
+    <div class="delta"><b>Redrawn to the shipped band (issue 2257 D4).</b> The specimen draws <code>ManagerTitleBar.svelte</code>&rsquo;s band; the brand, scope pill and day buttons the prototypes drew have no shipped counterpart. It stays <code>target</code> until a second host exists.</div>
   </div>
 
   <div class="spec" data-status="target" data-status-NavSidebar="target">

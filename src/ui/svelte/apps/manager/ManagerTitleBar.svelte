@@ -15,6 +15,9 @@
   - The only caller is `CraftingSystemManagerRoot.svelte`, which renders none of this markup —
     pinned by `tests/components/manager-title-bar-mounted.test.js`.
   - The PREMIUM mark is a bare span sharing the rail's gold badge rule, not a `Chip`.
+  - No element here has a role, so none carries `aria-label`; each name is `.visually-hidden`
+    text, absolutely positioned so the band does not move (issue 2257 D4) — pinned by
+    `tests/components/manager-title-bar-mounted.test.js`.
 -->
 <script>
   let { text, premiumInstalled = false, modeLabel = '', outcomeTierCount = 0 } = $props();
@@ -45,26 +48,18 @@
   );
 </script>
 
-<div
-  class="manager-titlebar"
-  data-manager-titlebar
-  aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
->
+<div class="manager-titlebar" data-manager-titlebar>
   {#if premiumInstalled}
-    <span
-      class="manager-titlebar-badge"
-      data-manager-titlebar-premium
-      title={premiumStatus}
-      aria-label={premiumStatus}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
+    <span class="manager-titlebar-badge" data-manager-titlebar-premium title={premiumStatus}
+      ><span aria-hidden="true">{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
+      ><span class="visually-hidden">{premiumStatus}</span></span
     >
   {/if}
   {#if modeLabel}
-    <span
-      class="manager-titlebar-status"
-      data-manager-titlebar-status
-      title={statusLabel}
-      aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-    >
+    <span class="manager-titlebar-status" data-manager-titlebar-status title={statusLabel}>
+      <span class="visually-hidden"
+        >{text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}</span
+      >
       <!-- An information glyph, because the line is a caption, not a dice-roll control (issue 1373). -->
       <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
       <span class="manager-titlebar-status-text">{statusLabel}</span>

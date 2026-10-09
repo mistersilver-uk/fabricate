@@ -80,7 +80,6 @@ export function registerDowntimeCases() {
     await settleBetweenTests();
   });
 
-
   it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
     const calls = [];
     const registry = createManagerExtensionsRegistry();
@@ -739,11 +738,13 @@ export function registerDowntimeCases() {
     const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
     await settleDowntimeProvider();
 
-    assert.equal(titlebarPremium().textContent.trim(), 'PREMIUM');
+    assert.equal(titlebarPremium().querySelector('[aria-hidden="true"]').textContent, 'PREMIUM');
     assert.equal(
-      titlebarPremium().getAttribute('aria-label'),
-      'Fabricate Premium is installed and connected'
+      titlebarPremium().querySelector('.visually-hidden')?.textContent,
+      'Fabricate Premium is installed and connected',
+      'the badge is named by visually hidden text, not aria-label (issue 2257 D4)'
     );
+    assert.ok(!titlebarPremium().hasAttribute('aria-label'));
     assert.equal(
       titlebarPremium().getAttribute('title'),
       'Fabricate Premium is installed and connected'
@@ -785,7 +786,8 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
 
     assert.equal(
-      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      target.querySelector('[data-manager-titlebar-premium]')?.querySelector('[aria-hidden="true"]')
+        ?.textContent,
       'PREMIUM',
       'an unrecognised companion surface still proves the premium module is installed'
     );
@@ -826,7 +828,8 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
 
     assert.equal(
-      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      target.querySelector('[data-manager-titlebar-premium]')?.querySelector('[aria-hidden="true"]')
+        ?.textContent,
       'PREMIUM',
       'a player-window-only companion still proves the premium module is installed'
     );
@@ -2546,7 +2549,8 @@ export function registerDowntimeCases() {
         await press(openToggle);
         await press(railToggleControl);
       },
-      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
+      'an unbadged companion with its group closed': () =>
+        mountBadgedDowntimeManager({ badges: {} }),
       'a badged companion with its group open on a collapsed rail': async () => {
         await mountBadgedDowntimeManager();
         await press(openToggle);

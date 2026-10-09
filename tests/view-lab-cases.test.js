@@ -2331,9 +2331,18 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   const premiumAttribute = (selector, name) =>
     premium.expectAttributes.find((entry) => entry.selector === selector && entry.name === name)
       ?.value;
-  assert.equal(
+  assert.strictEqual(
     premiumAttribute('[data-manager-titlebar-premium]', 'aria-label'),
-    lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus
+    null,
+    'the frame proves the badge carries no aria-label (issue 2257 D4)'
+  );
+  assert.equal(
+    premiumAttribute(
+      `[data-manager-titlebar-premium] > .visually-hidden:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus}")`,
+      'class'
+    ),
+    'visually-hidden',
+    'and that its name is the shipped status string as visually hidden text'
   );
   assert.equal(
     premiumAttribute('#manager-world-nav-downtime', 'title'),

@@ -492,7 +492,9 @@ export function registerRailCases() {
       craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
     });
     assert.equal(
-      target.querySelector('[data-manager-titlebar-status]').textContent.trim(),
+      target
+        .querySelector('[data-manager-titlebar-status]')
+        .querySelector('.manager-titlebar-status-text').textContent,
       'Routed by check · 2 outcome tiers'
     );
   });
@@ -502,7 +504,9 @@ export function registerRailCases() {
     mountManager([], {
       craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
     });
-    const status = target.querySelector('[data-manager-titlebar-status]').textContent.trim();
+    const status = target
+      .querySelector('[data-manager-titlebar-status]')
+      .querySelector('.manager-titlebar-status-text').textContent;
     assert.ok(status.length > 0, 'the selection still reports its resolution');
     assert.ok(!status.includes('outcome tier'), 'leftover routed tiers are not counted: ' + status);
   });
