@@ -118,7 +118,10 @@ export async function readShortWindowRailGeometry({
   }
 }
 
-/** The title strip's computed box, read in a real browser against the shipped sheet (issue 1777). */
+/**
+ * The title strip's computed box, plus the badge and status's visually hidden names, read in a
+ * real browser against the shipped sheet and the shipped markup (issues 1777, 2257).
+ */
 export async function readTitleBarGeometry() {
   const context = await openLayoutContext({
     viewport: { width: 1280, height: 200 },
@@ -130,13 +133,32 @@ export async function readTitleBarGeometry() {
       `<style>${css}</style><style>html,body{margin:0}</style>` +
         '<div class="fabricate fabricate-manager" data-manager-view="systems">' +
         '<div class="manager-titlebar" data-manager-titlebar>' +
-        '<span class="manager-titlebar-badge">PREMIUM</span>' +
-        '<span class="manager-titlebar-status"><i class="manager-titlebar-status-icon"></i>' +
+        '<span class="manager-titlebar-badge" data-manager-titlebar-premium>' +
+        '<span aria-hidden="true">PREMIUM</span>' +
+        '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>' +
+        '<span class="manager-titlebar-status" data-manager-titlebar-status>' +
+        '<span class="visually-hidden">Selected system resolution</span>' +
+        '<i class="manager-titlebar-status-icon"></i>' +
         '<span class="manager-titlebar-status-text">Simple</span></span></div></div>'
     );
     return await page.evaluate(() => {
       const style = getComputedStyle(document.querySelector('.manager-titlebar'));
+      const badge = document.querySelector('.manager-titlebar-badge');
+      const badgeStyle = getComputedStyle(badge);
+      const rectOf = (element) => {
+        const { width, height } = element.getBoundingClientRect();
+        return { width, height };
+      };
       return {
+        badgeWidth: badge.getBoundingClientRect().width,
+        badgeInset:
+          ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+            .map((property) => Number.parseFloat(badgeStyle[property]))
+            .reduce((sum, value) => sum + value, 0),
+        markWidth: badge.querySelector('[aria-hidden="true"]').getBoundingClientRect().width,
+        hiddenNames: [...document.querySelectorAll('.manager-titlebar .visually-hidden')].map(
+          rectOf
+        ),
         padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
         columnGap: style.columnGap,
         borders: [
