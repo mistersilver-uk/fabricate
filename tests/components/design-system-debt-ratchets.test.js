@@ -2078,11 +2078,6 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
     "a segment takes its track's inner rung",
   ],
   [
-    'styles/fabricate.css: .fabricate-search.fabricate-search:where(.is-compact) input',
-    ['6px'],
-    "the compact search's ruled box, held by search-field-geometry-gate",
-  ],
-  [
     'styles/fabricate.css: .fabricate-manager .manager-tag-suggestion, .fabricate-typeahead-option.fabricate-typeahead-option',
     ['6px'],
     "an option takes its 6px panel's inner rung",

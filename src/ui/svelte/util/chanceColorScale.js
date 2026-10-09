@@ -32,3 +32,6 @@ export function interpolateCssColorScale(value, stops) {
 export function toolBreakageChanceColor(value) {
   return interpolateCssColorScale(value, TOOL_BREAKAGE_CHANCE_STOPS);
 }
+
+// ratchet-exempt(design-system): drawn only under `.fabricate-manager`; flat-ui-style-contract keeps the gradient in the sheet
+export const TOOL_BREAKAGE_TRACK = 'var(--fab-manager-tool-breakage-chance-track-gradient)';

@@ -96,8 +96,7 @@ export async function promptSelectCraftingSystem(systems, { localize, packName =
     .join('');
 
   const prompt = localize('FABRICATE.Admin.Items.CompendiumImportDialogPrompt', { name: packName ?? '' });
-  // ratchet-exempt(design-system): a one-shot pick from core's Compendium directory menu;
-  // DialogV2 re-serialises its body, so the select stays native
+  // ratchet-exempt(design-system): a one-shot pick from core's Compendium directory menu; DialogV2 re-serialises its body, so the select stays native
   const select = `<select name="systemId" style="width: 100%;">${optionsHtml}</select>`;
   const content = `
     <div class="fabricate-compendium-import">

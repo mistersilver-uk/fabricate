@@ -141,8 +141,7 @@ export function selectDialog({
       `<option value="${escapeDialogHtml(option.value)}"${index === 0 ? ' selected' : ''}>${escapeDialogHtml(option.label)}</option>`
     )
     .join('');
-  // ratchet-exempt(design-system): the capped-cookbook learn picker is a one-shot choice;
-  // DialogV2 re-serialises its body, so the select stays native
+  // ratchet-exempt(design-system): the capped-cookbook learn picker is a one-shot choice; DialogV2 re-serialises its body, so the select stays native
   const selectMarkup = `<select id="${selectId}" name="recipe" aria-label="${escapeDialogHtml(selectLabel)}">${optionMarkup}</select>`;
   const dialogContent = `
     ${content ? `<p>${escapeDialogHtml(content)}</p>` : ''}

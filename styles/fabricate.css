@@ -4158,6 +4158,8 @@
   height: 34px;
   padding: 0 34px;
   border: 1px solid var(--fab-border);
+
+  /* ratchet-exempt(design-system): the compact search's ruled box, 34 at radius 6, the geometry requirement's named exception rather than a rung */
   border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
@@ -10542,6 +10544,8 @@
   min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
+
+  /* ratchet-exempt(design-system): a nav row keeps its 30px rung's corner when a long label wraps it taller */
   border-radius: 7px;
   color: var(--fab-text-muted);
   background: transparent;
