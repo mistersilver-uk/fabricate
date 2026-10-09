@@ -255,6 +255,13 @@
     align-self: stretch;
   }
 
+  /* The name stands centred under its square, as the card drew it before issue 1778. The card
+     layout starts its content at the left edge for the alchemy chooser's text cards, and this
+     card's own `text-align: center` was left behind when it moved onto ListRow. */
+  :global(.inventory-card .inventory-card-name) {
+    text-align: center;
+  }
+
   /* The thumbnail is the positioning context for every overlay: the pips sit INSIDE
      its bounds, not hanging off the card.
 
