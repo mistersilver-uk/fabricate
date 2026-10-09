@@ -714,6 +714,13 @@ const BAND_LAYOUT_CASES = {
   'world-component-entry-980': { tracks: 2, width: 980, height: 860 },
 };
 const BAND_LAYOUT_CASE_IDS = Object.keys(BAND_LAYOUT_CASES);
+// And the Component Rules header either side of the advert's 1320 rung, where the page heading
+// keeps 320px beside the advert on the real header (a floor, so no grid).
+const HEADING_FLOOR_LAYOUT_CASES = {
+  'manager-components-premium-ad-1150': { width: 1150, height: 820 },
+  'manager-components-premium-ad-full': { width: 1330, height: 820 },
+};
+const HEADING_FLOOR_LAYOUT_CASE_IDS = Object.keys(HEADING_FLOOR_LAYOUT_CASES);
 // And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
 // at its own window.
 const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
@@ -766,6 +773,7 @@ const LAYOUT_CASE_IDS = [
   ...FRAME_STACK_LAYOUT_CASE_IDS,
   ...RAIL_FILL_LAYOUT_CASE_IDS,
   ...BAND_LAYOUT_CASE_IDS,
+  ...HEADING_FLOOR_LAYOUT_CASE_IDS,
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
@@ -794,6 +802,13 @@ test('exactly the declared layout cases carry complete layout expectations', () 
         typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
         `${viewCase.id} states its rows as one line or as wrapped lines`
       );
+      continue;
+    }
+    if (HEADING_FLOOR_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+      assert.deepEqual(viewCase.position, HEADING_FLOOR_LAYOUT_CASES[viewCase.id]);
+      assert.equal(viewCase.expectLayout.gridSelector, undefined, 'a floor needs no grid');
+      assert.equal(viewCase.expectLayout.minInlineSize.pixels, 320);
+      assert.match(viewCase.expectLayout.minInlineSize.selector, /\.manager-heading$/u);
       continue;
     }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
