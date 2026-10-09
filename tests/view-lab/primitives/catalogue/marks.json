@@ -159,14 +159,14 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "content": ["default"]
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -176,7 +176,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -186,7 +186,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -196,7 +196,17 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "header"
+    },
+    "content": ["header"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -206,7 +216,7 @@
   },
   {
     "spec": "<Chip>",
-    "cap": "densities — six scales, one chip",
+    "cap": "densities — seven scales, one chip",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
@@ -324,6 +334,18 @@
       "iconOnly": true,
       "icon": "fas fa-xmark",
       "aria-label": "Blocked"
+    }
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "icon only — a square, one side per density",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "props": {
+      "density": "header",
+      "iconOnly": true,
+      "icon": "fas fa-lock",
+      "aria-label": "Archived"
     }
   },
   {
