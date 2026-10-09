@@ -356,22 +356,49 @@
     min-height: 0;
   }
 
+  /* No padding and no gap of its own: the left column carries the view's padding, and the detail
+     column is a full rail section flush to the content area's edges, so the grid's pager can run
+     to that rail's border as the left column's footer. */
   .inventory-view-grid {
     display: grid;
     /* Left (filters + grid) carries the denser weight; the detail column keeps a
        comfortable minimum. Below the breakpoint the two columns stack. */
     grid-template-columns: minmax(320px, 1.6fr) minmax(300px, 1fr);
-    gap: var(--fab-space-4);
     height: 100%;
     min-height: 0;
-    padding: var(--fab-space-4);
     box-sizing: border-box;
     background: var(--fab-surface);
     color: var(--fab-text);
   }
 
+  .inventory-view-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+  }
+
+  .inventory-view-column-left {
+    padding: var(--fab-space-4);
+  }
+
+  /* The grid's pager is the left column's footer: it bleeds out through that column's padding to
+     the nav rail, the window's bottom edge and the detail rail's border. */
+  .inventory-view-column-left :global(.inventory-grid-pagination) {
+    margin: 0 calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
+  }
+
+  /* A rail section, not a card: one border against the grid, square, filling the column. */
+  .inventory-view-column-right {
+    border-left: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+    overflow: hidden;
+  }
+
   /* At the supported 1024px window floor this container's content box is roughly
-     938px wide, so the shared 960px boundary is deliberately reachable. */
+     938px wide, so the shared 960px boundary is deliberately reachable. Stacked, the
+     rail runs the window's width beneath the left column, its border turned to the top. */
   @container fabricate-inventory (max-width: 960px) {
     .inventory-view-grid {
       grid-template-columns: 1fr;
@@ -384,20 +411,10 @@
     .inventory-view-column {
       min-height: 220px;
     }
-  }
 
-  .inventory-view-column {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-  }
-
-  .inventory-view-column-right {
-    border: 1px solid var(--fab-border);
-    border-radius: 11px;
-    background: var(--fab-surface-soft);
-    overflow: hidden;
+    .inventory-view-column-right {
+      border-top: 1px solid var(--fab-border);
+      border-left: 0;
+    }
   }
 </style>
