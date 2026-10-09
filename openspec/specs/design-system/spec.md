@@ -613,13 +613,13 @@ Re-deriving the eight is a palette change across seven theme blocks and is recor
 Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
 A surface that sits on the page — a card, a row, a well, a button, a handle, or a dock pinned to its scroll area's edge — MUST draw no shadow; its edge is a 1px `--fab-border` or a ring.
 `--fab-shadow-sm` is retired from the seven theme blocks: its last reader was that dock, which sits, and a small floating surface takes `--fab-shadow-md`.
-Whether a surface floats or sits is a judgement no pattern can read from a declaration, so a pinned allow-list and review hold the split: every read of a `--fab-shadow-*` token in the sheet, `components/` and `apps/manager/` is listed by file and selector with the reason that surface floats, a new read fails until it is listed, and the review of that listing decides the classification.
+Whether a surface floats or sits is a judgement no pattern can read from a declaration, so a pinned allow-list and review hold the split: every read of a `--fab-shadow-*` token in the sheet or a Svelte scoped block is listed by file and selector with the reason that surface floats, a new read fails until it is listed, and the review of that listing decides the classification.
 The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those two tokens.
 A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
 The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
 No rule in that scope draws depth through another channel: no `drop-shadow()`, no `text-shadow` other than `none`, and no `--fab-shadow-*` declaration outside the theme blocks.
-`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds the sheet, `components/` and `apps/manager/` to that set absolutely.
+`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds all of them to that set absolutely, the player apps included.
 
 #### Scenario: A primitive needs a colour the token set does not name
 
@@ -633,7 +633,7 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 #### Scenario: A change draws elevation on a surface the allow-list does not name
 
-- **WHEN** a change reads a `--fab-shadow-*` token in the sheet, `components/` or `apps/manager/` at a file and selector the pinned allow-list does not name
+- **WHEN** a change reads a `--fab-shadow-*` token in the sheet or a Svelte scoped block at a file and selector the pinned allow-list does not name
 - **THEN** `design-system-debt-ratchets` fails it until the site is listed with the reason it floats, and the review of that listing decides whether it floats or sits
 
 ### Requirement: The token namespace is one generation and names its purpose
@@ -906,13 +906,13 @@ An application root MUST also declare `color-scheme`, because browser-drawn chro
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport, so no viewport `@media` ships: an `@media` may ask only a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
 Every `@container` MUST name its container, because an unnamed query answers to whichever container is NEAREST, and that moves the moment a host between the rule and the app root declares one.
-`tests/components/design-system-debt-ratchets.test.js` fails a new viewport `@media` and a new unnamed `@container` anywhere, and holds the sheet, `components/` and `apps/manager/` to neither, absolutely.
+`tests/components/design-system-debt-ratchets.test.js` fails a new viewport `@media` and a new unnamed `@container` anywhere, and holds the sheet and every Svelte scoped block, the player apps included, to neither, absolutely.
 A container query adds no specificity, so the narrow case is declared after the wide one.
 The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
 The manager root also carries `fabricate-option-host`, the name the option-card reflow queries, so that name's one rung, 620, is app-level as well.
 The same test fails a query against the manager, recipes or option-host container at any other width, in feature or range syntax, and fails any bound on those containers it cannot read as a px width.
 It also fails an `@container` whose name no `container-name` or `container` declaration establishes, because that query never fires.
-A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be, but the component still names the container it declares, and the same test fails a `container-type` with no `container-name` beside it in the sheet, `components/` and `apps/manager/`.
+A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be, but the component still names the container it declares, and the same test fails a `container-type` with no `container-name` beside it in the sheet or any Svelte scoped block.
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
 The shipped manager grid is `220px minmax(0, 1fr) 300px` with fixed outer tracks; giving those tracks a `minmax(0, …)` upper bound is a proposed change recorded in the migrations, not a description of what ships.
 

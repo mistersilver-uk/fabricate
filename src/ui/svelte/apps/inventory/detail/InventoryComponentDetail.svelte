@@ -676,7 +676,7 @@
 
   .inventory-detail-recipe:hover {
     background: var(--fab-surface-raised);
-    border-color: var(--fab-accent-border);
+    border-color: var(--fab-border-strong);
   }
 
   .inventory-detail-recipe:focus-visible {

@@ -1111,7 +1111,7 @@
      any of the seven inherits the treatment instead of needing a rule of its own. */
   .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
     border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
     color: var(--fab-accent-strong);
     font-weight: 600;
   }

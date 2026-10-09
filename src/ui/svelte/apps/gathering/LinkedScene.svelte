@@ -254,7 +254,7 @@
     padding: 0 12px;
     border: 1px solid var(--fab-border);
     border-radius: 7px;
-    background: var(--fab-surface-raised);
+    background: var(--fab-surface-soft);
     color: var(--fab-text);
     font: inherit;
     font-weight: 600;
@@ -262,7 +262,8 @@
   }
 
   .gathering-linked-scene-visit:hover {
-    border-color: var(--fab-accent);
+    border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
   .gathering-linked-scene-visit:focus-visible {

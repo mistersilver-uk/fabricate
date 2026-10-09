@@ -283,7 +283,7 @@
   /* An active favourite reads as a filled gold star. */
   .crafting-recipe-row-fav.is-active {
     border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
+    background: var(--fab-surface-active);
     color: var(--fab-warning-text);
   }
 

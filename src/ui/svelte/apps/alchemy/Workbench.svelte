@@ -532,7 +532,7 @@
   }
 
   .alchemy-chip:hover {
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .alchemy-chip:focus-visible {
