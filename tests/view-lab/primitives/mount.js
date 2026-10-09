@@ -27,6 +27,7 @@ import {
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
 import { armReadyWatchdog } from './specimenWatchdog.js';
+import { runBounded } from './standUpPool.js';
 
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
@@ -277,7 +278,9 @@ function standUpSpecimen(slot, problems, results) {
     cancelWatchdog = armReadyWatchdog(iframe, () => {
       problems.push(
         `${slot.row.spec} / ${slot.row.path}: its document never announced ready after loading. ` +
-          'A module it imports failed to compile or import; the dev server log names the file.'
+          'Either a module it imports failed to compile or import (the dev server log names the file), ' +
+          'or the browser refused a request for lack of resources (the console shows ' +
+          'net::ERR_INSUFFICIENT_RESOURCES).'
       );
       globalThis.removeEventListener('message', onMessage);
       resolve();
@@ -303,8 +306,8 @@ async function boot() {
     ...MANIFEST.notAPrimitive,
   ]);
   const results = { mounted: 0 };
-  // Every specimen settles before the report is published.
-  await Promise.all(slots.map((slot) => standUpSpecimen(slot, problems, results)));
+  // Every specimen settles before the report is published, a bounded few loading at a time.
+  await runBounded(slots, (slot) => standUpSpecimen(slot, problems, results));
   // A late font or container query re-measures a specimen; ready must not precede that.
   await whenSizesAreQuiet();
 

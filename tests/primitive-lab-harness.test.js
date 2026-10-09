@@ -55,6 +55,7 @@ import {
   readSpecimenSnippets,
 } from './view-lab/primitives/specimenSnippets.js';
 import { armReadyWatchdog } from './view-lab/primitives/specimenWatchdog.js';
+import { runBounded } from './view-lab/primitives/standUpPool.js';
 import { worktreeWatchIgnores } from './view-lab/watchIgnore.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -633,4 +634,23 @@ test('a specimen document that never announces ready is reported once its load h
     calls.some((call) => call.cleared === 2),
     'READY must cancel the pending watchdog'
   );
+});
+
+test('runBounded never exceeds its pool size and settles every item', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  const seen = [];
+  await runBounded(
+    Array.from({ length: 30 }, (_, index) => index),
+    async (item) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      seen.push(item);
+      inFlight -= 1;
+    },
+    4
+  );
+  assert.equal(peak, 4);
+  assert.equal(seen.length, 30);
 });
