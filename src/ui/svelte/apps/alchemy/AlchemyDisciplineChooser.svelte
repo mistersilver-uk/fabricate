@@ -115,7 +115,7 @@
     width: 52px;
     height: 52px;
     margin-bottom: 14px;
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-accent-soft);
     border: 1px solid var(--fab-accent-border);
     color: var(--fab-accent);

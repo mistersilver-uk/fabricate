@@ -55,8 +55,7 @@
     /* ratchet-exempt(design-system): the 10px trailing inset moved unchanged from IoTable */
     padding: var(--fab-space-1) 10px var(--fab-space-1) var(--fab-space-1);
     border: 1px solid var(--fab-border);
-    /* ratchet-exempt(design-system): moved unchanged from IoTable, which carried it at base */
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 

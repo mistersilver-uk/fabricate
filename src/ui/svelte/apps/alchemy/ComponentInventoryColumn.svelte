@@ -158,7 +158,7 @@
     height: 100%;
     background: var(--fab-surface-raised);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     overflow: hidden;
   }
 

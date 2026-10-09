@@ -302,7 +302,7 @@
     min-height: 0;
     padding: 0;
     border: none;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-overlay-dark-24);
     color: var(--fab-text);
     font-size: 15px;
@@ -331,7 +331,7 @@
     min-height: 40px;
     padding: 0;
     border: 1px dashed var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: transparent;
     color: var(--fab-text-muted);
     cursor: pointer;

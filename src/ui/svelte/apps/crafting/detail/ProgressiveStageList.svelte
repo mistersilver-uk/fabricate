@@ -659,7 +659,7 @@
     width: 24px;
     height: 24px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     object-fit: cover;
   }
 
@@ -731,7 +731,7 @@
     flex: 0 0 auto;
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 7px;
   }
 
   /* Stacked, the chevrons are a VERTICAL pair ENDING the row — the same stack the GM's
@@ -747,6 +747,7 @@
   .crafting-stage-move.is-stacked .crafting-stage-move-button {
     width: 24px;
     min-height: 22px;
+    border-radius: 6px;
   }
 
   .crafting-stage-meta {
@@ -800,7 +801,7 @@
     min-height: 34px;
     padding: 0;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
     color: var(--fab-text);
     font: inherit;

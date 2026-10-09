@@ -426,7 +426,7 @@
     gap: 6px;
     padding: 5px 12px;
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-accent-soft);
     color: var(--fab-accent);
     font-size: 12px;
@@ -514,7 +514,7 @@
 
   .inventory-detail-accordion-item {
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     overflow: hidden;
   }
@@ -559,7 +559,7 @@
   .inventory-detail-accordion-toggle:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 6px;
   }
 
   .inventory-detail-accordion-body {

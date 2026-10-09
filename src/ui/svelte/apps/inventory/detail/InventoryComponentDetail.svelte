@@ -664,7 +664,7 @@
     padding: var(--fab-space-2);
     min-height: 56px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     color: var(--fab-text);
     text-align: left;

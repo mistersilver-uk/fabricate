@@ -253,7 +253,7 @@
     height: 30px;
     padding: 0 12px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font: inherit;

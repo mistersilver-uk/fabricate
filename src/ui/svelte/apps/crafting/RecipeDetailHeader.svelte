@@ -267,7 +267,7 @@
     margin: 0;
     padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     font-size: 13px;
     font-style: italic;
     color: var(--fab-text-muted);

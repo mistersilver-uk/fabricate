@@ -204,7 +204,7 @@
         out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
 
         The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
-        var(--fab-border-strong)` at `border-radius: 14px`, and `.is-empty` insets it a
+        var(--fab-border-strong)` at `border-radius: 11px`, and `.is-empty` insets it a
         further `40px 20px`. Every `EmptyState` variant that CENTRES its stack also keeps a
         box — base, `compact` and `inline` all draw the dashed panel, and only `note`
         releases it, at the price of `place-items: start` and a left-aligned 10px line. So the
@@ -424,7 +424,7 @@
     overflow-y: auto;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     color: var(--fab-text);
   }
 
@@ -463,7 +463,7 @@
 
   .alchemy-bench {
     border: 1.5px dashed var(--fab-border-strong);
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
     padding: 16px;
     margin-bottom: 14px;
@@ -490,7 +490,7 @@
   .alchemy-bench-empty-icon {
     width: 52px;
     height: 52px;
-    border-radius: 13px;
+    border-radius: 11px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
@@ -633,7 +633,7 @@
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    border-radius: 10px;
+    border-radius: 11px;
     font-size: 12px;
     font-weight: 600;
     border: 1px solid var(--fab-border);
@@ -676,7 +676,7 @@
     align-items: center;
     gap: 14px;
     padding: 16px 18px;
-    border-radius: 12px;
+    border-radius: 11px;
     border: 1px solid var(--fab-accent-border);
     background: var(--fab-surface-soft);
   }
@@ -711,7 +711,7 @@
     align-items: center;
     gap: 14px;
     padding: 16px 18px;
-    border-radius: 12px;
+    border-radius: 11px;
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
   }
@@ -746,7 +746,7 @@
   .alchemy-missing {
     margin-top: 10px;
     padding: 11px 13px;
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-info-soft);
     border: 1px solid var(--fab-info-border);
   }
