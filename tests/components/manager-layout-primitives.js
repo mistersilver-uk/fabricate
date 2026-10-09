@@ -1263,6 +1263,19 @@ test('the manager titlebar draws the AppTitleBar specimen box', async () => {
   assert.equal(strip.radius, '0px');
 });
 
+// The names the band moved into visually hidden text add no width to the badge and paint no box.
+test('the manager titlebar hidden names take no width', async () => {
+  const strip = await readTitleBarGeometry();
+  assert.ok(
+    Math.abs(strip.badgeWidth - (strip.markWidth + strip.badgeInset)) <= 0.5,
+    `the badge should be the mark plus its padding and borders, got ${strip.badgeWidth}`
+  );
+  assert.equal(strip.hiddenNames.length, 2, 'the badge and the status each hide one name');
+  for (const { width, height } of strip.hiddenNames) {
+    assert.ok(width <= 1 && height <= 1, `a hidden name painted a ${width}x${height} box`);
+  }
+});
+
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {
   // Find each top-level view-specific `.manager-body` grid override (those that keep a
   // distinct fixed rail column). Each must ship a matching `.is-rail-collapsed` override that
