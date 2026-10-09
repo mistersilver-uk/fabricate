@@ -467,6 +467,8 @@ It does two jobs, because both are projections of the same thing — the source 
 
 - It rewrites the stored description of every component and recipe item from that entry's own source item.
 - Content links in the source description are resolved, so `@UUID[...]` renders as the linked item's name instead of raw link text.
+- Inline `@Embed[...]` references to other Items or text Journal pages are expanded to plain-text descriptions, without rendering interactive embedded HTML.
+- To avoid recursion and oversized descriptions, embedded content is depth- and size-limited; an unavailable embed keeps its original directive, while cyclic or oversized resolved embeds fall back to a document name.
 - Unlike the identity scan above, this **does** reach locked system and module compendiums, because it only reads those items rather than writing to them.
 - Any description you edited by hand for a component or recipe item will be replaced by the source item's text.
 - Tools are not affected; they carry no description.
