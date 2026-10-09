@@ -16110,11 +16110,12 @@
   padding: var(--fab-space-1);
   box-sizing: border-box;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 11px;
   background: var(--fab-bg-3);
   box-shadow: var(--fab-shadow-md);
 }
 
+/* The item's 7 is the panel's 11 less its 4px padding, so the corners stay concentric. */
 .fabricate-action-menu-panel button.manager-action-menu-item {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -16125,7 +16126,7 @@
   min-width: 0;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: none;
   color: var(--fab-text);
   cursor: pointer;
@@ -17992,7 +17993,6 @@
   width: 150px;
   min-width: 150px;
   max-width: 150px;
-  border-radius: 9px;
 }
 
 /* The panel IS the inset, so the entries stack without a gap exactly as `proto:2292` draws them. */
@@ -18000,13 +18000,12 @@
   gap: 0;
 }
 
-/* `proto:4683`: a 28px entry, `font:600 11px` in secondary ink on a 6px corner, the glyph in a 14px column so the four labels share one left edge. */
+/* `proto:4683`: a 28px entry, `font:600 11px` in secondary ink, the glyph in a 14px column so the four labels share one left edge. */
 .fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item {
   min-height: 28px;
   grid-template-columns: 14px minmax(0, 1fr);
   column-gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border-radius: 6px;
   color: var(--fab-text-secondary);
   font-size: 11px;
   font-weight: 600;

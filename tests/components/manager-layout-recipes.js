@@ -1231,6 +1231,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
           minHeight: style.minHeight,
+          borderRadius: style.borderTopLeftRadius,
           height: Number(box.height.toFixed(2)),
           // The offset of the glyph from the entry's own padding edge.
           glyphIndent: Number(
@@ -1265,7 +1266,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     });
 
     assert.equal(report.panel.width, 150, '`proto:2292` draws a 150px panel');
-    assert.equal(report.panel.borderRadius, '9px', '`proto:2292`: a 9px corner');
+    assert.equal(report.panel.borderRadius, '11px', "the shared menu panel's 11 (issue 2257)");
     assert.equal(report.headerText, 'Accept instead');
     assert.equal(report.headerTransform, 'uppercase', '`proto:2293` sets the eyebrow in caps');
 
@@ -1282,6 +1283,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
       assert.equal(entry.fontSize, '11px', `\`proto:4683\`: the ${entry.kind} entry is 11px`);
       assert.equal(entry.fontWeight, '600', `\`proto:4683\`: the ${entry.kind} entry is 600`);
       assert.equal(entry.minHeight, '28px', `\`proto:4683\`: a 28px ${entry.kind} entry`);
+      assert.equal(entry.borderRadius, '7px', `the ${entry.kind} entry is concentric at 7`);
       assert.ok(entry.height >= 28, `the ${entry.kind} entry paints 28px or more (${entry.height}px)`);
       assert.equal(entry.glyphFontSize, '10px', '`proto:4683`: a 10px glyph');
       assert.equal(entry.glyphWidth, '14px', '`proto:4683`: a 14px glyph column');

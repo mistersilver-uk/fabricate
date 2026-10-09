@@ -200,7 +200,7 @@
   },
   {
     "spec": "<TintPicker> <Menu>",
-    "cap": "anchored menu",
+    "cap": "anchored menu — opened from the keyboard, the first item focused",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/ActionMenu.svelte",
     "slot": {

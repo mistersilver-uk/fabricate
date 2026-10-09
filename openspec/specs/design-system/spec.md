@@ -1401,6 +1401,7 @@ A heading renders in the same portaled panel OUTSIDE the `role="menu"` element a
 An item MAY carry a tone, which tints its glyph and never its label.
 The panel lines up with its trigger's END edge, which suits a kebab at the end of a row, and a caller MAY align it with the START edge instead (`align`), which suits an adder at the start of a list; either alignment is clamped inside the portal host.
 The requirement row's kind menu is this primitive: the `or…` control opens it under the heading that states what choosing does, each kind's item toned with that kind.
+The panel MUST be radius 11 and each item radius 7, concentric with its 4px padding; this binds `ActionMenu` and the requirement row's kind menu.
 
 #### Scenario: A surface needs a kebab over two or more commands
 
