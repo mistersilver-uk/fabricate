@@ -1,8 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { mode = 'automatic', onChange = () => {}, idPrefix = 'composition-mode' } = $props();
+  let { mode = 'automatic', onChange = () => {} } = $props();
+
+  const groupName = $props.id();
+  const hintId = `${groupName}-hint`;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -13,7 +17,7 @@
     {
       value: 'automatic',
       icon: 'fas fa-wand-magic-sparkles',
-      key: 'Automatic',
+      labelKey: 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic',
       fallback: 'Automatic',
       descKey: 'AutomaticHint',
       descFallback:
@@ -22,7 +26,7 @@
     {
       value: 'manual',
       icon: 'fas fa-hand-pointer',
-      key: 'Manual',
+      labelKey: 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual',
       fallback: 'Manual',
       descKey: 'ManualHint',
       descFallback:
@@ -34,37 +38,20 @@
   const selected = $derived(OPTIONS.find((option) => option.value === current) || OPTIONS[0]);
 </script>
 
-<div
-  class="manager-environment-mode-control"
-  role="radiogroup"
-  aria-label={text(
+<SegmentedControl
+  options={OPTIONS}
+  value={current}
+  {onChange}
+  {groupName}
+  ariaLabel={text(
     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ModeLabel',
     'Composition mode'
   )}
->
-  {#each OPTIONS as option (option.value)}
-    <button
-      type="button"
-      role="radio"
-      id={`${idPrefix}-${option.value}`}
-      class={`manager-environment-mode-option ${current === option.value ? 'is-selected' : ''}`}
-      aria-checked={current === option.value}
-      data-composition-mode-option={option.value}
-      onclick={() => onChange(option.value)}
-    >
-      <span class="manager-environment-mode-head">
-        <i class={option.icon} aria-hidden="true"></i>
-        <span
-          >{text(
-            `FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${option.key}`,
-            option.fallback
-          )}</span
-        >
-      </span>
-    </button>
-  {/each}
-</div>
-<p class="manager-muted manager-environment-mode-hint">
+  optionDataAttr="data-composition-mode-option"
+  fill
+  aria-describedby={hintId}
+/>
+<p id={hintId} class="manager-muted manager-environment-mode-hint">
   {text(
     `FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${selected.descKey}`,
     selected.descFallback

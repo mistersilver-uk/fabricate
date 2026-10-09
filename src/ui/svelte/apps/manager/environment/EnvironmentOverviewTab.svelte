@@ -9,6 +9,7 @@
   import { formatList, localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import {
     ADD_SENTINEL,
@@ -114,6 +115,15 @@
       : [{ id: dangerLevel, label: defaultDangerLabel(dangerLevel) }, ...dangerLevelOptions]
   );
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
+  const SELECTION_MODES = [
+    ['targeted', 'Targeted', 'fas fa-eye'],
+    ['blind', 'Blind', 'fas fa-eye-slash'],
+  ].map(([value, name, icon]) => ({
+    value,
+    icon,
+    labelKey: `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${name}`,
+    fallback: name,
+  }));
 
   function addBiome(chosen) {
     const id = String(chosen || '').trim();
@@ -163,6 +173,7 @@
   const instanceId = $props.id();
   const dangerCaptionId = `${instanceId}-danger-level`;
   const dangerHintId = `${instanceId}-danger-level-hint`;
+  const selectionHintId = `${instanceId}-selection-mode-hint`;
 
   // Each add control's name, stated once: the trigger's `aria-label` and its sentinel row's label.
   function addRealmLabel() {
@@ -495,35 +506,20 @@
               'Player-facing behaviour'
             )}
           </h3>
-          <div
-            class="manager-environment-mode-control"
-            role="radiogroup"
-            aria-label={text(
+          <SegmentedControl
+            options={SELECTION_MODES}
+            value={selectionMode}
+            onChange={(next) => onUpdate({ selectionMode: next })}
+            groupName={`${instanceId}-selection-mode`}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SelectionMode',
               'Task selection mode'
             )}
-          >
-            {#each [['targeted', 'Targeted', 'fas fa-eye'], ['blind', 'Blind', 'fas fa-eye-slash']] as option (option[0])}
-              <button
-                type="button"
-                role="radio"
-                class={`manager-environment-mode-option ${selectionMode === option[0] ? 'is-selected' : ''}`}
-                aria-checked={selectionMode === option[0]}
-                data-selection-mode-option={option[0]}
-                onclick={() => onUpdate({ selectionMode: option[0] })}
-              >
-                <span class="manager-environment-mode-head"
-                  ><i class={option[2]} aria-hidden="true"></i><span
-                    >{text(
-                      `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${option[1]}`,
-                      option[1]
-                    )}</span
-                  ></span
-                >
-              </button>
-            {/each}
-          </div>
-          <p class="manager-muted manager-environment-mode-hint">
+            optionDataAttr="data-selection-mode-option"
+            fill
+            aria-describedby={selectionHintId}
+          />
+          <p id={selectionHintId} class="manager-muted manager-environment-mode-hint">
             {selectionMode === 'blind'
               ? text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindHint',

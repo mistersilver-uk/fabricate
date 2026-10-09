@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createClassComponent } from '../../node_modules/svelte/src/legacy/legacy-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   createSvelteCompiler,
@@ -105,6 +106,8 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/EmptyState.svelte');
+    for (const modulePath of LOCALIZE_OR_RAW_MODULES) writeRawModule(modulePath);
+    writeCompiledSvelte('src/ui/svelte/components/SegmentedControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')).href);
