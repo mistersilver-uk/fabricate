@@ -102,7 +102,7 @@
             name={source.name}
             alt=""
             shape="square"
-            size={40}
+            size={32}
           />
           {#if source.removable === false}
             <span class="crafting-source-lock" aria-hidden="true">
@@ -134,7 +134,7 @@
       emptyLabel={localize('FABRICATE.App.Crafting.Sources.Empty')}
       onChange={toggleSource}
     >
-      <!-- The dashed 40px `+` well is sized to the portraits beside it, so it is this file's own
+      <!-- The dashed 32px `+` well is sized to the portraits beside it, so it is this file's own
            button; `aria-label` and `title` come before the spread, which omits undefined keys. -->
       {#snippet trigger({ attributes })}
         <button
@@ -202,16 +202,18 @@
      both would render two concentric hairlines where the design draws one. The edge, the
      ground and the corner all come off here and the tile owns them; `border-radius` stays
      only to match the tile's own 9px, so no sliver of button shows outside its corner. The
-     40px box is unchanged, which is what keeps the row's geometry where it was. */
+     box matches the tile's 32px, so the button and the portrait it wraps are one box. */
   .crafting-source-avatar {
     box-sizing: border-box;
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    min-height: 40px;
+    width: 32px;
+    /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
+    height: 32px;
+    /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
+    min-height: 32px;
     padding: 0;
     border: 0;
     border-radius: 9px;
@@ -222,7 +224,7 @@
 
   /* An `outline` at a NEGATIVE offset, which paints exactly over the tile's own 1px border
      rather than beside it — so the required actor still reads as one accent ring and the row
-     still measures 40px. A `border-color` cannot do this any more: the border it recoloured
+     still measures 32px. A `border-color` cannot do this any more: the border it recoloured
      belongs to the nested tile, and a caller cannot reach it. */
   .crafting-source-avatar.is-required {
     outline: 1px solid var(--fab-accent);
@@ -326,9 +328,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    min-height: 40px;
+    width: 32px;
+    /* ratchet-exempt(design-system): the add well in the portrait row, at the 32px of the portraits it adds; 30 or 34 would break the row */
+    height: 32px;
+    /* ratchet-exempt(design-system): the add well in the portrait row, at the 32px of the portraits it adds; 30 or 34 would break the row */
+    min-height: 32px;
     padding: 0;
     border: 1px dashed var(--fab-border);
     border-radius: 9px;

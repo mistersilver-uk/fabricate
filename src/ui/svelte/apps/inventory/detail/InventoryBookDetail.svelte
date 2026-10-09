@@ -280,7 +280,7 @@
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
         <div class="inventory-detail-accordion-header">
           <span class="inventory-detail-book-recipe-static">
-            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
             <span class="inventory-detail-row-name">{recipe.name}</span>
           </span>
           {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(
@@ -327,7 +327,7 @@
                   aria-controls={expanded ? bodyId : undefined}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
-                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
                   <span class="inventory-detail-row-name">{recipe.name}</span>
                   <i
                     class="fas inventory-detail-accordion-caret"
@@ -539,10 +539,10 @@
     align-items: center;
     gap: var(--fab-space-3);
     padding: 0;
-    /* Defuse Foundry's fixed global button height so the 40px thumb isn't clamped/misaligned
+    /* Defuse Foundry's fixed global button height so the 38px thumb isn't clamped/misaligned
        (matches the min-height the sibling recipe/read-learn buttons pin). */
     height: auto;
-    min-height: 40px;
+    min-height: 38px;
     border: none;
     background: none;
     color: var(--fab-text);

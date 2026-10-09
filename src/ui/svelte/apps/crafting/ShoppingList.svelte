@@ -284,7 +284,7 @@
                 title={entry.name}
                 onclick={() => onIncrement?.(entry.recipeId)}
               >
-                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={26} />
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
@@ -310,9 +310,9 @@
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={28} glyph={12} />
+                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={26} glyph={11} />
                 {:else}
-                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
+                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={26} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
                 <Chip
@@ -336,7 +336,7 @@
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
-                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={26} />
                 <span class="crafting-shopping-acquire-name" title={tool.name}>{tool.name}</span>
                 <span
                   class={`crafting-shopping-chip ${tool.needsRepair ? 'tone-warning' : 'tone-danger'}`}
@@ -472,7 +472,7 @@
        wins regardless of specificity. `.crafting-shopping-entry-qty` declares no
        `font-size`, so unreset the quantity would jump to 14px while the 13px name held,
        shifting the row baseline.
-     - `height: auto` + `min-height` — the row needs ~36px (a 28px thumb plus padding)
+     - `height: auto` + `min-height` — the row needs ~34px (a 26px thumb plus padding)
        against Foundry's ~32px `--button-size` floor, which would otherwise clip it.
   */
   .crafting-shopping-entry-main {
@@ -485,7 +485,7 @@
     justify-content: flex-start;
     gap: 8px;
     height: auto;
-    min-height: 36px;
+    min-height: 34px;
     margin: 0;
     padding: 4px 6px;
     border: 0;

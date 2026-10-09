@@ -369,8 +369,8 @@ describe('ComponentSourcesBar mounted behavior', () => {
       /\.crafting-source-avatar \{[^}]*border: 0;/u,
       'the button`s own 1px edge came OFF in the same commit: `Avatar` draws a 1px ' +
         '`--fab-border` edge that cannot be turned off, so keeping both would render two ' +
-        'concentric hairlines. Measured in the View Lab: the button is 40.00x40.00 with ' +
-        'border-width 0 and the tile inside it 40.00x40.00 with 1px'
+        'concentric hairlines. The button and the tile inside it are one 32px box, and only the ' +
+        'tile draws an edge'
     );
     assert.match(
       source,
