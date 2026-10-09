@@ -291,6 +291,31 @@ test('repair — is idempotent: a second run reports unchanged', async () => {
   assert.equal(second.descriptions.unchanged, 1);
 });
 
+test('repair — expands the shared dnd5e inline embed from a LOCKED compendium source', async (t) => {
+  const sharedUuid = 'Compendium.dnd5e.equipment24.Item.dmgSpellScroll00';
+  const raw = 'Scroll rules: @Embed[' + sharedUuid + ' inline]';
+  const { component, run } = buildDescriptionRepairManager({ sourceDescription: raw });
+  const originalResolver = globalThis.fromUuid;
+  globalThis.fromUuid = async (uuid, options) =>
+    uuid === sharedUuid
+      ? {
+          uuid,
+          name: 'Spell Scroll, Cantrip',
+          system: { description: { value: '<p>Shared spell scroll instructions.</p>' } },
+        }
+      : originalResolver(uuid, options);
+  t.after(() => { globalThis.fromUuid = originalResolver; });
+
+  const first = await run();
+  assert.equal(component.description, 'Scroll rules: Shared spell scroll instructions.');
+  assert.equal(first.descriptions.refreshed, 1, 'a repaired embed is actually different');
+  assert.equal(first.skippedLocked, 1, 'reading the compendium never unlocks it');
+
+  const second = await run();
+  assert.equal(second.descriptions.refreshed, 0);
+  assert.equal(second.descriptions.unchanged, 1, 'the resolved snapshot survives the next repair');
+});
+
 test('repair — a source that RESOLVES but is BLANK never wipes the stored description', async () => {
   // The data-loss guard, pinned. This is the only thing between a GM's Repair click and the silent
   // destruction of every description whose source item happens to carry no prose of its own — and
