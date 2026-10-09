@@ -206,6 +206,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
   ],
   [
+    "per-item `attrs` carry the caller's data-* hooks; Required for and Produced by need two " +
+      'hook names with different values, which one `<part>DataAttr` cannot carry',
+    { 'src/ui/svelte/components/XrefList.svelte': 1 },
+  ],
+  [
     'drawn only under `.fabricate-manager`; flat-ui-style-contract keeps the gradient in the sheet',
     { 'src/ui/svelte/util/chanceColorScale.js': 1 },
   ],
