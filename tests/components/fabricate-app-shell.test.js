@@ -394,29 +394,52 @@ describe('SvelteFabricateApp shell window', () => {
       );
     });
 
-    it('derives a system-scoped presentTools payload from the active canvas tool', () => {
-      assert.ok(
-        appSource.includes('const componentId = this._activeCanvasTool?.componentId;'),
-        'the threading boundary derives the present set from the active tool componentId'
-      );
-      assert.ok(
-        appSource.includes('const systemId = this._activeCanvasTool?.systemId;'),
-        'the threading boundary also reads the active tool systemId for scoping'
-      );
-      assert.ok(
-        appSource.includes('const toolId = this._activeCanvasTool?.toolId;'),
-        'the threading boundary also reads the library tool id (issue 1119)'
-      );
-      // Issue 1119: an item-sourced Tool carries `componentId: null`.
-      assert.ok(
-        appSource.includes('if (!systemId || (!componentId && !toolId)) return null;'),
-        'the payload is inert only when the system or BOTH ids are missing'
-      );
-      assert.ok(
-        appSource.includes('componentIds: componentId ? [componentId] : [],') &&
-          appSource.includes('toolIds: toolId ? [toolId] : [],'),
-        'the payload carries systemId, componentIds and toolIds so matching stays system-scoped'
-      );
+    // componentId is a per-system id, so the system rides with it; an item-sourced Tool has no
+    // componentId and is carried by its library Tool id (issue 1119). Every seam reads the same
+    // payload per call, and only a crafting Journal command carries it (issue 2265).
+    it('derives one system-scoped presentTools payload for every station seam, per call', async () => {
+      await withFabricateLifecycleReplay(async ({ loadModule }) => {
+        const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+        const app = Object.create(SvelteFabricateApp.prototype);
+        const seams = [
+          'listGatheringForActor',
+          'startGatheringAttempt',
+          'hydrateCraftingRecipe',
+          'evaluateSelectedSet',
+          'craftRecipe',
+          'advanceCraftingRun',
+          'listJournalForActor',
+        ];
+        const received = {};
+        for (const seam of [...seams, 'executeJournalRunCommand']) {
+          globalThis.game.fabricate[seam] = (opts) => (received[seam] = opts);
+        }
+        const services = app._buildServices();
+        const cases = [
+          [{ systemId: 's', toolId: 't', componentId: '' }, { componentIds: [], toolIds: ['t'] }],
+          [{ systemId: 's', toolId: 't', componentId: 'c' }, { componentIds: ['c'], toolIds: ['t'] }],
+          [{ systemId: 's', toolId: '', componentId: 'c' }, { componentIds: ['c'], toolIds: [] }],
+          [{ systemId: '', toolId: 't', componentId: 'c' }, null],
+          [{ systemId: 's', toolId: '', componentId: '' }, null],
+          [null, null],
+        ];
+        for (const [station, ids] of cases) {
+          app._activeCanvasTool = station;
+          const expected = ids && { systemId: 's', ...ids };
+          for (const seam of seams) {
+            services[seam]({ actorId: 'actor-1' });
+            assert.deepEqual(received[seam].presentTools, expected, `${seam} ${JSON.stringify(station)}`);
+            assert.equal(received[seam].actorId, 'actor-1', 'the caller options survive');
+          }
+          for (const runType of ['crafting', 'gathering']) {
+            services.executeJournalRunCommand({ runType, action: 'execute', payload: { trigger: 'manual' } });
+            const sent = received.executeJournalRunCommand.payload;
+            assert.equal(sent.trigger, 'manual');
+            assert.deepEqual(sent.presentTools, runType === 'crafting' ? (expected ?? undefined) : undefined);
+            assert.equal(Object.hasOwn(sent, 'presentTools'), runType === 'crafting' && Boolean(expected));
+          }
+        }
+      });
     });
 
     it('passes the active canvas tool through to the Svelte props', () => {

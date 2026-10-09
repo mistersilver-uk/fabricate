@@ -292,6 +292,42 @@ sealed('a tool station whose activeCanvasTool cannot be built is denied SOURCE_M
   );
 });
 
+sealed('the station chip label falls back to the linked component name on the grant path', () => {
+  const unnamedTool = { id: 'tool-1', componentId: 'comp-axe' };
+  const labelFor = (resolutionDeps) =>
+    buildGrantPayload({
+      request: activationRequest(),
+      system: behaviorSystem({ toolId: 'tool-1', systemId: 'sysA' }),
+      resolutionDeps,
+    }).payload.grant.context.activeCanvasTool.label;
+  const asked = [];
+
+  assert.equal(
+    labelFor(() => ({
+      getTool: () => unnamedTool,
+      getComponents: ({ systemId }) => {
+        asked.push(systemId);
+        return [{ id: 'comp-axe', name: 'Iron Axe' }];
+      },
+    })),
+    'Iron Axe'
+  );
+  assert.deepEqual(asked, ['sysA'], 'the components are read for the station system');
+  assert.equal(
+    labelFor(() => ({
+      getTool: () => ({ ...unnamedTool, name: 'Snapshot Axe' }),
+      getComponents: () => [{ id: 'comp-axe', name: 'Iron Axe' }],
+    })),
+    'Snapshot Axe',
+    'the name snapshot still wins over the linked component'
+  );
+  assert.equal(
+    labelFor(() => ({ getTool: () => unnamedTool })),
+    '',
+    'a deps object without a components reader degrades to the empty label'
+  );
+});
+
 sealed('openGrant opens crafting, then gathering, and refuses every incomplete grant', () => {
   const { deps, calls } = collaborators();
   const activeCanvasTool = { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: '' };

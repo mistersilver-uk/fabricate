@@ -17,6 +17,7 @@ import {
   installCraftingJournalRunAuthority,
 } from '../systems/journalRunCommands.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
+import { engineWithStationPresence } from '../systems/stationPresence.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
 import { localizeWith } from '../utils/localizeWithFallback.js';
@@ -290,9 +291,10 @@ function buildRunStartOperations(fabricate) {
     start: async ({ actor, payload, executionGrant, requestId, sender }) => {
       const sourceActors = await resolveJournalSourceActors(null, payload, actor);
       if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const start = fabricate.craftingEngine?.startVersionedRun;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const start = engine?.startVersionedRun;
       if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return start.call(fabricate.craftingEngine, {
+      return start.call(engine, {
         viewer: sender,
         actor,
         sourceActors,
@@ -326,11 +328,12 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
     describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
-      const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const describe = engine?.describeVersionedStageCheck;
       if (typeof describe !== 'function') {
         return { required: false, blocked: 'unsupported-operation' };
       }
-      const descriptor = await describe.call(fabricate.craftingEngine, {
+      const descriptor = await describe.call(engine, {
         actor,
         componentSourceActors,
         runId: run.id,
@@ -393,7 +396,10 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
   };
 }
 
-/** The stage legs: execute, begin and cancel, each re-resolving its own source actors. */
+/**
+ * The stage legs: execute, begin and cancel, each re-resolving its own source actors. A crafting
+ * command's `payload.presentTools` reaches Tool presence for that command only (issue 2265).
+ */
 function buildStageOperations(fabricate) {
   return {
     execute: async ({
@@ -407,9 +413,10 @@ function buildStageOperations(fabricate) {
     }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const execute = fabricate.craftingEngine?.executeVersionedStage;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const execute = engine?.executeVersionedStage;
       if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return execute.call(fabricate.craftingEngine, {
+      return execute.call(engine, {
         viewer: sender,
         actor,
         componentSourceActors,
@@ -432,9 +439,10 @@ function buildStageOperations(fabricate) {
     }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const begin = fabricate.craftingEngine?.beginVersionedStage;
+      const engine = engineWithStationPresence(fabricate.craftingEngine, payload.presentTools);
+      const begin = engine?.beginVersionedStage;
       if (typeof begin !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return begin.call(fabricate.craftingEngine, {
+      return begin.call(engine, {
         viewer: sender,
         actor,
         componentSourceActors,
