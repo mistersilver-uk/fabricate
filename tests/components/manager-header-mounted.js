@@ -78,6 +78,29 @@ function headerCensus(host) {
   return lines;
 }
 
+/**
+ * The page header's D10 frame, checked per state so a census regeneration cannot accept its loss:
+ * the trail is the header's own child, and its actions and action chips stand on the 38 rung.
+ *
+ * @returns {{buttons: number, chips: number}} how many controls the state put on the rung
+ */
+function assertHeaderFrame(host, state) {
+  const header = host.querySelector('header.fabricate-page-header');
+  const trail = header.querySelector('.manager-breadcrumbs');
+  assert.ok(!trail || trail.parentElement === header, `"${state}": the trail left the header row`);
+  const buttons = [...header.querySelectorAll('.fabricate-button')].filter(
+    (button) => !button.matches('[data-premium-icons-ad-link]')
+  );
+  for (const button of buttons) {
+    assert.ok(button.classList.contains('is-size-38'), `"${state}": ${button.className}`);
+  }
+  const chips = [...header.querySelectorAll(':scope .manager-header-actions .manager-chip')];
+  for (const chip of chips) {
+    assert.ok(chip.classList.contains('is-header'), `"${state}": ${chip.className}`);
+  }
+  return { buttons: buttons.length, chips: chips.length };
+}
+
 // Named world records, one corpus per leg: a heading is about a name, so an id-only corpus is
 // mute. `water` matches the in-system essence the store double publishes, which is what puts the
 // essence rules editor into its world-backed branch.
@@ -1992,11 +2015,15 @@ export function registerHeaderCases() {
 
   it('emits the same page-header DOM, attribute for attribute, in each of its states', async () => {
     const censuses = {};
+    const onRung = { buttons: 0, chips: 0 };
     for (const [state, { view, open, prove }] of Object.entries(CENSUS_STATES)) {
       useShippedLocalization();
       await open();
       assert.equal(managerView(), view, `"${state}" landed on the wrong route`);
       prove?.();
+      const frame = assertHeaderFrame(target, state);
+      onRung.buttons += frame.buttons;
+      onRung.chips += frame.chips;
       censuses[state] = headerCensus(target);
       unmount(mounted);
       mounted = null;
@@ -2005,6 +2032,8 @@ export function registerHeaderCases() {
       store = null;
     }
 
+    assert.ok(onRung.buttons > 0, 'no state put a header action on the 38 rung');
+    assert.ok(onRung.chips > 0, 'no state put a state chip beside the header actions');
     const base = censuses[CENSUS_BASE_STATE];
     const observed = {
       base,

@@ -20,6 +20,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const cascade = managerButtonCascade();
 
+/** The scanner's one `ArmedDangerButton` site, named by the scanner rather than by a line. */
+const ARMED_DANGER = 'src/ui/svelte/components/ArmedDangerButton.svelte';
+const ARMED_DANGER_SITES = cascade.sites
+  .filter((site) => site.file === ARMED_DANGER)
+  .map((site) => site.id);
+
 /** The conversion LEDGER: the batches whose sites no longer appear in the derived corpus. */
 const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
@@ -419,7 +425,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .fabricate-button'),
     disposition: 'EXCLUDE',
-    stranding: ['src/ui/svelte/components/ArmedDangerButton.svelte:118'],
+    stranding: ARMED_DANGER_SITES,
     why:
       MOVED_POPULATION +
       'The move is unusually clean here, because this entry always rested on the site that ' +
@@ -1037,6 +1043,10 @@ test('a site the sweep does not convert is never modelled as carrying the primit
     cascade.sites.length,
     'with the conversion complete every literal call site left is one the sweep holds back'
   );
+});
+
+test('the scanner finds exactly one ArmedDangerButton site for the stranding entry', () => {
+  assert.equal(ARMED_DANGER_SITES.length, 1, `found ${ARMED_DANGER_SITES.join(', ') || 'none'}`);
 });
 
 test('every reviewed entry that claims a control would be stranded still reaches it', () => {

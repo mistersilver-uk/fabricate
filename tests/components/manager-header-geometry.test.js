@@ -109,16 +109,17 @@ function pageFor(subtitle, title) {
 
 /**
  * @param {string} markup the Manager's content, composed inside its real shell
- * @param {{width?: number, extraCss?: string}} [shell] the manager's width and any further
- *   component CSS the markup carries already scoped
+ * @param {{width?: number, extraCss?: string, view?: string}} [shell] the manager's width, any
+ *   further component CSS the markup carries already scoped, and its `data-manager-view`
  * @returns {string}
  */
-function pageAround(markup, { width = 1040, extraCss = '' } = {}) {
+function pageAround(markup, { width = 1040, extraCss = '', view = '' } = {}) {
+  const viewAttribute = view ? ` data-manager-view="${view}"` : '';
   const fixture = SCOPED_COMPONENTS.reduce(
     stampScopedClasses,
     `<div class="application theme-dark">
       <section class="window-content">
-        <div class="fabricate fabricate-manager" data-fabricate-theme="dark" style="width:${width}px">
+        <div class="fabricate fabricate-manager" data-fabricate-theme="dark"${viewAttribute} style="width:${width}px">
           ${markup}
         </div>
       </section>
@@ -480,19 +481,56 @@ const pageHeaderHarness = createMountedComponentHarness({
 /** The classes `Button size="38"` writes, which every header action file passes (D10). */
 const HEADER_BUTTON = 'fabricate-button fab-manager-button is-size-38';
 
-/** `PageHeader`'s own markup, rendered with the specimen's trail, title, subtitle and actions. */
-async function renderSpecimen() {
+/** Each caller that renders `PageHeader`, with the route its own CSS is scoped under. */
+const SPECIMEN_CALLERS = Object.freeze([
+  { name: 'the manager header', class: 'manager-header' },
+  {
+    name: 'the Tool library header',
+    class: 'manager-header manager-tools-context-header',
+    view: 'tools',
+  },
+  { name: 'the Tool editor header', class: 'manager-tool-edit-header', view: 'tool-edit' },
+]);
+
+/** The heading block each caller fills: the plain title and subtitle, or an identity snippet. */
+const SPECIMEN_HEADINGS = Object.freeze([
+  { name: 'title and subtitle', props: { title: 'Frontier Outpost', subtitle: LONG_SUBTITLE } },
+  {
+    name: 'the recipe editor identity',
+    props: {
+      identity: createRawSnippet(() => ({
+        render: () =>
+          `<div class="manager-recipe-edit-heading"><span class="fab-medallion" style="width:38px;height:38px"></span>` +
+          `<div class="manager-recipe-edit-heading-copy"><h1 class="manager-title">Frontier Outpost</h1>` +
+          `<p class="manager-subtitle">${LONG_SUBTITLE}</p></div></div>`,
+      })),
+    },
+  },
+  {
+    name: 'the Tool editor identity',
+    props: {
+      identity: createRawSnippet(() => ({
+        render: () =>
+          `<div class="manager-tool-edit-identity"><img alt="">` +
+          `<div class="manager-tool-edit-identity-copy"><h2 class="manager-title">Frontier Outpost</h2>` +
+          `<p class="manager-subtitle">${LONG_SUBTITLE}</p></div></div>`,
+      })),
+    },
+  },
+]);
+
+/** `PageHeader`'s own markup for one caller and heading, with a middle crumb that is no button. */
+async function renderSpecimen(caller, heading) {
   try {
     await pageHeaderHarness.setup();
     const host = await pageHeaderHarness.mount({
-      class: 'manager-header',
+      class: caller.class,
       breadcrumbs: [
         { label: 'World', onSelect: () => {} },
-        { label: 'Economy', onSelect: () => {} },
+        { label: 'Economy' },
         { label: 'Frontier Outpost' },
       ],
-      title: 'Frontier Outpost',
-      subtitle: LONG_SUBTITLE,
+      ...heading.props,
       actions: createRawSnippet(() => ({
         render: () =>
           `<div class="manager-header-actions" role="group" aria-label="Actions">` +
@@ -506,50 +544,74 @@ async function renderSpecimen() {
   }
 }
 
-/** Every figure the specimen draws, read off the rendered header at the manager's width. */
-async function measureSpecimen(specimenMarkup) {
+/** The inks the specimen names, resolved through probes rather than restated as colours. */
+const INKS = Object.freeze({
+  muted: '--fab-text-muted',
+  secondary: '--fab-text-secondary',
+  border: '--fab-border',
+});
+
+/** Every figure the specimen draws, read off the rendered header at one manager width. */
+async function measureSpecimen(specimenMarkup, { view = '', width = 1040 } = {}) {
   const browser = await borrowBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    const probes =
-      '<span data-ink="muted" style="color:var(--fab-text-muted)"></span>' +
-      '<span data-ink="secondary" style="color:var(--fab-text-secondary)"></span>';
-    await page.setContent(pageAround(specimenMarkup + probes), { waitUntil: 'load' });
+    const probes = Object.entries(INKS)
+      .map(([ink, token]) => `<span data-ink="${ink}" style="color:var(${token})"></span>`)
+      .join('');
+    await page.setContent(pageAround(specimenMarkup + probes, { view, width }), {
+      waitUntil: 'load',
+    });
     return await page.evaluate(() => {
       const one = (selector) => document.querySelector(selector);
       const style = (selector) => getComputedStyle(one(selector));
       const box = (selector) => one(selector).getBoundingClientRect();
       const px = (value) => Number.parseFloat(value);
       const header = style('header.fabricate-page-header');
+      const subtitle = one('.manager-subtitle');
+      const ruler = document.createElement('span');
+      ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+      ruler.style.font = getComputedStyle(subtitle).font;
+      ruler.textContent = '0'.repeat(100);
+      subtitle.parentElement.append(ruler);
+      const ch = ruler.getBoundingClientRect().width / 100;
+      ruler.remove();
       return {
         padding: ['Top', 'Right', 'Bottom', 'Left'].map((side) => px(header[`padding${side}`])),
         rule: [px(header.borderTopWidth), px(header.borderBottomWidth)],
+        ruleColor: header.borderBottomColor,
         columnGap: px(header.columnGap),
         trailFirst: one('header').firstElementChild === one('.manager-breadcrumbs'),
         trail: {
           size: px(style('.manager-breadcrumbs').fontSize),
           weight: style('.manager-breadcrumbs').fontWeight,
           ink: style('.manager-breadcrumbs button').color,
+          middle: style('.manager-breadcrumbs span:not([aria-current])').color,
           leaf: style('.manager-breadcrumbs [aria-current="page"]').color,
           chevron: px(style('.manager-breadcrumbs > i').fontSize),
           gap: px(style('.manager-breadcrumbs').columnGap),
           below: Math.round(box('.manager-heading').top - box('.manager-breadcrumbs').bottom),
         },
-        ink: {
-          muted: style('[data-ink="muted"]').color,
-          secondary: style('[data-ink="secondary"]').color,
-        },
+        ink: Object.fromEntries(
+          [...document.querySelectorAll('[data-ink]')].map((probe) => [
+            probe.dataset.ink,
+            getComputedStyle(probe).color,
+          ])
+        ),
         title: px(style('.manager-title').fontSize),
         subtitle: {
           size: px(style('.manager-subtitle').fontSize),
           line: px(style('.manager-subtitle').lineHeight),
           above: px(style('.manager-subtitle').marginTop),
         },
+        subtitleWidth: subtitle.getBoundingClientRect().width,
+        ch,
         actions: [...document.querySelectorAll('.manager-header-actions .fabricate-button')].map(
           (button) => Math.round(button.getBoundingClientRect().height)
         ),
         actionsTop: Math.round(box('.manager-header-actions').top),
         headingTop: Math.round(box('.manager-heading').top),
+        headingBottom: Math.round(box('.manager-heading').bottom),
       };
     });
   } finally {
@@ -557,32 +619,62 @@ async function measureSpecimen(specimenMarkup) {
   }
 }
 
-test('PageHeader draws its specimen: trail row, 22px title, 12px/1.6 subtitle, 38px actions', async () => {
-  const specimenMarkup = await renderSpecimen();
-  assert.ok(specimenMarkup.includes('fabricate-page-header'), 'the header rendered nothing');
-  const measured = await measureSpecimen(specimenMarkup);
+for (const caller of SPECIMEN_CALLERS) {
+  for (const heading of SPECIMEN_HEADINGS) {
+    test(`${caller.name} draws the specimen with ${heading.name}`, async () => {
+      const specimenMarkup = await renderSpecimen(caller, heading);
+      assert.ok(specimenMarkup.includes('fabricate-page-header'), 'the header rendered nothing');
+      const measured = await measureSpecimen(specimenMarkup, caller);
 
-  assert.deepEqual(measured.padding, [16, 16, 16, 16], 'the frame pads 16 on every side');
-  assert.deepEqual(measured.rule, [0, 1], 'bordered by its 1px bottom rule (D1)');
-  assert.equal(measured.columnGap, 16, 'the heading and the actions sit 16 apart');
+      assert.deepEqual(measured.padding, [16, 16, 16, 16], 'the frame pads 16 on every side');
+      assert.deepEqual(measured.rule, [0, 1], 'bordered by its 1px bottom rule (D1)');
+      assert.equal(measured.ruleColor, measured.ink.border, 'the rule takes the border ink');
+      assert.equal(measured.columnGap, 16, 'the heading and the actions sit 16 apart');
 
-  assert.equal(measured.trailFirst, true, 'the trail is the header’s first row');
-  assert.equal(measured.trail.size, 12, 'the trail reads at 12px, not the specimen’s 10.5');
-  assert.equal(measured.trail.weight, '500');
-  assert.ok(measured.ink.muted !== measured.ink.secondary, 'the two inks are distinguishable');
-  assert.equal(measured.trail.ink, measured.ink.muted, 'a crumb takes the muted ink');
-  assert.equal(measured.trail.leaf, measured.ink.secondary, 'the leaf takes the secondary ink');
-  assert.equal(measured.trail.chevron, 7, 'the chevron is the specimen’s 7px');
-  assert.equal(measured.trail.gap, 8, 'the crumbs sit 8 apart');
-  assert.equal(measured.trail.below, 8, 'the specimen’s 10 under the trail, snapped to the scale');
+      assert.equal(measured.trailFirst, true, 'the trail is the header’s first row');
+      assert.equal(measured.trail.size, 12, 'the trail reads at 12px, not the specimen’s 10.5');
+      assert.equal(measured.trail.weight, '500');
+      assert.ok(measured.ink.muted !== measured.ink.secondary, 'the two inks are distinguishable');
+      assert.equal(measured.trail.ink, measured.ink.muted, 'a crumb takes the muted ink');
+      assert.equal(measured.trail.middle, measured.ink.muted, 'an inert crumb takes it too');
+      assert.equal(measured.trail.leaf, measured.ink.secondary, 'the leaf takes the secondary ink');
+      assert.equal(measured.trail.chevron, 7, 'the chevron is the specimen’s 7px');
+      assert.equal(measured.trail.gap, 8, 'the crumbs sit 8 apart');
+      assert.equal(
+        measured.trail.below,
+        8,
+        'the specimen’s 10 under the trail, snapped to the scale'
+      );
 
-  assert.equal(measured.title, 22, 'the title is 22px');
-  assert.deepEqual(
-    measured.subtitle,
-    { size: 12, line: 19.2, above: 6 },
-    'the subtitle is 12px/1.6'
+      assert.equal(measured.title, 22, 'the title is 22px');
+      assert.deepEqual(
+        measured.subtitle,
+        { size: 12, line: 19.2, above: 6 },
+        'the subtitle is 12px/1.6'
+      );
+      assert.ok(measured.ch > 0, 'the subtitle font could not be measured');
+      assert.ok(
+        measured.subtitleWidth <= 74 * measured.ch + 1,
+        `the subtitle runs ${Math.round(measured.subtitleWidth / measured.ch)}ch wide`
+      );
+
+      assert.deepEqual(measured.actions, [38, 38], 'every header action stands at 38');
+      assert.equal(
+        measured.actionsTop,
+        measured.headingTop,
+        'the actions align to the heading’s top'
+      );
+    });
+  }
+}
+
+test('at a 680px manager the actions stack under the heading', async () => {
+  const [caller] = SPECIMEN_CALLERS;
+  const measured = await measureSpecimen(await renderSpecimen(caller, SPECIMEN_HEADINGS[0]), {
+    width: 680,
+  });
+  assert.ok(
+    measured.actionsTop >= measured.headingBottom,
+    `the actions start at ${measured.actionsTop}, above the heading's bottom at ${measured.headingBottom}`
   );
-
-  assert.deepEqual(measured.actions, [38, 38], 'every header action stands at 38');
-  assert.equal(measured.actionsTop, measured.headingTop, 'the actions align to the heading’s top');
 });
