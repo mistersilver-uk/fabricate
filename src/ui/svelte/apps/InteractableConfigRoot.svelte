@@ -1018,7 +1018,7 @@
   }
 
   /* Collapse to a single column on a narrow panel so cells never overflow. */
-  @container (max-width: 22rem) {
+  @container fabricate-ic-facts (max-width: 22rem) {
     .fab-ic-fact-list,
     .fab-ic-fact-list.has-environment {
       grid-template-columns: minmax(0, 1fr);
@@ -1044,7 +1044,7 @@
   }
 
   .fab-ic-facts {
-    container-type: inline-size;
+    container: fabricate-ic-facts / inline-size;
   }
 
   .fab-ic-fact dd {
