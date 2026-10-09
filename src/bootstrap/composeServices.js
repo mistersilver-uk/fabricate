@@ -49,6 +49,7 @@ import { registerRecipeItemLearningHook } from '../systems/RecipeItemLearningHoo
 import { RecipeManager } from '../systems/RecipeManager.js';
 import { RecipeVisibilityService } from '../systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from '../systems/ResolutionModeService.js';
+import { activeRunRecipeIds } from '../systems/runTerms.js';
 import { SalvageRunManager } from '../systems/SalvageRunManager.js';
 import { readPersistedCraftingSystems } from '../systems/SettingsCraftingDefinitionRepository.js';
 import { runStartupMaintenance } from '../systems/startupMaintenance.js';
@@ -214,8 +215,7 @@ function buildCoreManagers(fabricate) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
-      activeRunRecipeIds: () =>
-        fabricate.craftingRunManager?.activeRunRecipeIds?.(game.actors) ?? [],
+      activeRunRecipeIds: () => activeRunRecipeIds(fabricate.craftingRunManager, game.actors),
       // Delegators over the field (issue 1364): the merge fails closed on an absent store, so a
       // captured still-undefined value would merge nothing and report success.
       componentScopeStore: scopeStoreDelegate(() => fabricate.componentScopeStore),

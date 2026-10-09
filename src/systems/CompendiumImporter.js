@@ -11,6 +11,7 @@ import {
   WORLD_SCOPE_ENTITY_TYPES,
   WORLD_SCOPE_SLICE_KEYS,
 } from './importReferenceResolver.js';
+import { pruneOrphanedRecipes } from './orphanRecipePrune.js';
 import { membershipKey } from './scopedDefinitions.js';
 import {
   membershipKeySet,
@@ -476,42 +477,10 @@ export class CompendiumImporter {
     });
   }
 
-  /**
-   * Prune provenance-matched orphans after an overwrite (issue 775): each persisted recipe of the
-   * system absent from the payload is deleted when stamped by THIS pack, and otherwise kept and
-   * reported (`unprovenanced`, `foreignProvenance`, or `activeRuns` while a begun run holds it).
-   * Absence is judged against EVERY payload id, so a recipe whose overwrite threw is never pruned.
-   */
+  /** Prune provenance-matched orphans after an overwrite (see `orphanRecipePrune.js`). */
   async _pruneOrphanedRecipes(system, recipesData, packSystemId, summary) {
-    const payloadIds = new Set(
-      recipesData.map((recipeData) => recipeData?.id).filter((id) => id != null)
-    );
-
-    const persistedRecipes =
-      this._recipeManager.getRecipes?.({ craftingSystemId: system.id }) ?? [];
-    const orphanCandidates = persistedRecipes.filter((recipe) => !payloadIds.has(recipe.id));
-    const heldByRuns = new Set(this._activeRunRecipeIds());
-
-    for (const orphan of orphanCandidates) {
-      const provenanceSystemId = orphan.importSource?.systemId ?? null;
-      const heldByRun = heldByRuns.has(String(orphan.id));
-      const reason = orphanRetentionReason(provenanceSystemId, packSystemId, heldByRun);
-      if (!reason) {
-        await this._recipeManager.deleteRecipe(orphan.id, {
-          notify: false,
-          emitChange: false,
-          persist: false,
-          cleanupFlags: false,
-        });
-        summary.recipes.pruned++;
-      }
-      summary.orphans.push({
-        recipeId: orphan.id,
-        recipeName: orphan.name || orphan.id,
-        disposition: reason ? 'reported' : 'pruned',
-        reason: reason ?? 'provenanceMatched',
-      });
-    }
+    const seams = { recipeManager: this._recipeManager, heldRecipeIds: this._activeRunRecipeIds() };
+    await pruneOrphanedRecipes(seams, { system, recipesData, packSystemId, summary });
   }
 
   /**
@@ -1219,11 +1188,4 @@ export class CompendiumImporter {
 
     return null;
   }
-}
-
-/** Why an orphan candidate is kept and reported, or `null` when this pack may prune it. */
-function orphanRetentionReason(provenanceSystemId, packSystemId, heldByRun) {
-  if (provenanceSystemId == null) return 'unprovenanced';
-  if (provenanceSystemId !== packSystemId) return 'foreignProvenance';
-  return heldByRun ? 'activeRuns' : null;
 }

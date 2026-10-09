@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildManagerWorld, installWorld } from '../fixtures/managerServicesCorpus.js';
-import { createManagerServices } from '../../src/ui/managerServices.js';
 import { CompendiumImporter } from '../../src/systems/CompendiumImporter.js';
+import { createManagerServices } from '../../src/ui/managerServices.js';
+import { buildManagerWorld, installWorld } from '../fixtures/managerServicesCorpus.js';
 
 const KNOWLEDGE_IO = Object.freeze({
   knowledgeSnapshot: () => null,
@@ -94,10 +94,12 @@ describe('the system import service', () => {
     });
   });
 
-  it('builds its importer to spare the recipes the world\'s active runs hold', async () => {
+  it("builds its importer to spare the recipes the world's active runs hold", async () => {
     await withWorld({}, async () => {
+      const worldActor = { id: 'world-actor' };
+      globalThis.game.actors = [worldActor];
       globalThis.game.fabricate.getCraftingRunManager = () => ({
-        activeRunRecipeIds: (actors) => new Set(actors === globalThis.game.actors ? ['held-recipe'] : []),
+        getActiveRuns: (actor) => (actor === worldActor ? [{ recipeId: 'held-recipe' }] : []),
       });
       const { importFromPackData } = CompendiumImporter.prototype;
       const held = [];
@@ -106,8 +108,10 @@ describe('the system import service', () => {
         return null;
       };
       try {
-        await createManagerServices({ ...KNOWLEDGE_IO, adminStore: () => ({ refresh: async () => {} }) })
-          .renderSystemImportDialog();
+        await createManagerServices({
+          ...KNOWLEDGE_IO,
+          adminStore: () => ({ refresh: async () => {} }),
+        }).renderSystemImportDialog();
       } finally {
         CompendiumImporter.prototype.importFromPackData = importFromPackData;
       }

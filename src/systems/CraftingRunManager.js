@@ -100,28 +100,12 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }));
   }
 
-  /** Every recipe id an active run of these actors resolves against, so a prune can spare it. */
-  activeRunRecipeIds(actors = []) {
-    const ids = new Set();
-    for (const actor of actors || []) {
-      for (const run of this.getActiveRuns(actor)) if (run?.recipeId) ids.add(String(run.recipeId));
-    }
-    return ids;
-  }
-
   findActiveRunForRecipe(actor, recipeId) {
     const runs = this.getActiveRuns(actor);
     return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
-  /** `termsSnapshot` is the run's accepted terms (see `runTerms.js`), kept while it is active. */
-  async createRun(
-    actor,
-    recipe,
-    componentSourceActors = [],
-    userId = null,
-    { termsSnapshot = null, ...lifecycle } = {}
-  ) {
+  async createRun(actor, recipe, componentSourceActors = [], userId = null, lifecycle = {}) {
     const container = this._getContainer(actor);
     const runId = foundry.utils.randomID();
     const stepStates = this._buildStepStates(recipe);
@@ -140,7 +124,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
       ...lifecycleFields,
-      ...(termsSnapshot && { termsSnapshot }),
+      // The run's accepted terms (`runTerms.js`), kept only while it is active.
+      ...(lifecycle.termsSnapshot && { termsSnapshot: lifecycle.termsSnapshot }),
     };
 
     container.active[runId] = run;
@@ -350,10 +335,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         expectedRevision: options.expectedRevision ?? run.runRevision,
       });
     }
-    this._assertRunMutation(run, {
-      ...options,
-      allowPaused: status === 'cancelled',
-    });
+    this._assertRunMutation(run, { ...options, allowPaused: status === 'cancelled' });
 
     run.status = status;
     run.currentStepIndex = null;

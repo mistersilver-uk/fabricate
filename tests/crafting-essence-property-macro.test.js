@@ -500,11 +500,11 @@ test('1036: the essence macro context names the invoking essence and its contrib
 
 test('a versioned timed finish hands the property macro the start snapshot\'s name and flags', async () => {
   const seen = [];
-  globalThis.__versionedMacroProbe = seen;
+  Object.assign(globalThis, { __versionedMacroProbe: seen });
   const probe = makeScriptMacro(
     'globalThis.__versionedMacroProbe.push(...context.resolvedIngredients.map(({ item }) => ({ name: item.name, flags: item.flags }))); return null;'
   );
-  globalThis.fromUuid = async (uuid) => (uuid === 'Macro.probe' ? probe : null);
+  Object.assign(globalThis, { fromUuid: async (uuid) => (uuid === 'Macro.probe' ? probe : null) });
   const fixture = await createPersistedCraftingHistory({
     stageCount: 1,
     checked: false,
@@ -512,11 +512,11 @@ test('a versioned timed finish hands the property macro the start snapshot\'s na
     prepare: ({ system, steps, items }) => {
       system.features.propertyMacros = true;
       steps[0].resultGroups[0].results[0].propertyMacroUuid = 'Macro.probe';
-      items.forEach((item, index) => {
+      for (const [index, item] of items.entries()) {
         item.name = `Heartwood ${index + 1}`;
         item.flags = { mythwright: { grove: index } };
         item.toObject = () => ({ name: item.name, img: item.img, type: 'loot', system: { ...item.system }, flags: structuredClone(item.flags) });
-      });
+      }
     },
     drive: async (context) => {
       const remainingAfterStart = context.remaining();

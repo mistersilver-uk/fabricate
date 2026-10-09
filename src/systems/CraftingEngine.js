@@ -5465,11 +5465,7 @@ export class CraftingEngine {
   }
 
   _getFailureConsumptionPolicy(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
-    }
-    const system = this._getRecipeSystem(recipe);
+    const system = recipe?.craftingSystemId ? this._getRecipeSystem(recipe) : null;
     if (!system) {
       return { consumeIngredientsOnFail: true, breakToolsOnFail: false };
     }

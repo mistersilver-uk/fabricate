@@ -4,16 +4,16 @@ import { readFileSync } from 'node:fs';
 import { compileFunction } from 'node:vm';
 import { setGatheringEngine } from '../src/bootstrap/gatheringRuntime.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
+import { Recipe } from '../src/models/Recipe.js';
 import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { resolveRunRecipe, snapshotRunTerms } from '../src/systems/runTerms.js';
 import { engineWithStationPresence } from '../src/systems/stationPresence.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { resolveRunRecipe, snapshotRunTerms } from '../src/systems/runTerms.js';
-import { Recipe } from '../src/models/Recipe.js';
 import {
   promptJournalStageCheck,
   withUnrollableCheckRefusal,
@@ -675,8 +675,10 @@ describe('journal run command protocol', () => {
     const createOperations = loadCraftingOperations();
     const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
     try {
-      globalThis.foundry = { utils: { randomID: () => 'terms-run' } };
-      globalThis.game = { user: { id: 'player' }, time: { worldTime: 1000 } };
+      Object.assign(globalThis, {
+        foundry: { utils: { randomID: () => 'terms-run' } },
+        game: { user: { id: 'player' }, time: { worldTime: 1000 } },
+      });
       const authored = (setIds) => new Recipe({ id: 'recipe', craftingSystemId: 'system', name: 'Routes',
         metadata: { version: '1.0.0' },
         steps: [{ id: 'step', ingredientSets: setIds.map((id) => ({ id, name: id, ingredientGroups: [] })) }] });
@@ -685,9 +687,10 @@ describe('journal run command protocol', () => {
         craftingRunManager: new CraftingRunManager(),
         recipeManager: { getRecipe: (id) => (id === 'recipe' ? live : null) },
       };
-      let harness;
-      const operations = createOperations(fabricate, () => harness.service);
-      harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const harness = commandHarness({
+        currentUserId: 'gm',
+        operations: { crafting: createOperations(fabricate, () => harness.service) },
+      });
       const { actor, service } = harness;
       Object.assign(actor, { id: 'a', isOwner: true, items: [] });
       const flags = {};
@@ -697,7 +700,7 @@ describe('journal run command protocol', () => {
         flags[scope][key] = structuredClone(value);
         return actor;
       };
-      globalThis.fromUuid = async (uuid) => (uuid === actor.uuid ? actor : null);
+      Object.assign(globalThis, { fromUuid: async (uuid) => (uuid === actor.uuid ? actor : null) });
       const run = await fabricate.craftingRunManager.createRun(actor, live, [actor], 'player', {
         lifecycleVersion: 1, termsSnapshot: snapshotRunTerms(live, null),
       });
