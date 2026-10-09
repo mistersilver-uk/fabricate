@@ -26,8 +26,8 @@
 #   1. DISTINGUISHES A CONFLICT FROM A FAILURE. Unmerged index entries are what makes a failed merge
 #      a *conflict*. Any other merge failure — an unreachable ref, a dirty tree, a broken repository
 #      — exits with its own message and never consults the resolution inputs at all.
-#   2. NAMES THE CONTENT THAT COULD NOT BE COMBINED, as an `::error::` list, then aborts the merge so
-#      the working tree is not left half-merged.
+#   2. NAMES THE CONTENT THAT COULD NOT BE COMBINED, as `::notice::` when a resolution is supplied,
+#      or `::error::` when none exists, then aborts the merge so nothing is left half-merged.
 #   3. REFUSES, ACTIONABLY, WHEN NO RESOLUTION WAS SUPPLIED — naming how to produce one.
 #   4. RESOLVES THE RESOLUTION, fetching it by sha where the runner's clone does not already carry
 #      it. A ref that does not resolve is UNVERIFIABLE (exit 2), not a refusal: nothing about it was
@@ -70,9 +70,17 @@ if [ -z "$UNMERGED" ]; then
 fi
 
 # ── 2. NAME WHAT COULD NOT BE COMBINED ──────────────────────────────────────────────────────────
-echo "::error::the forward-port's merge of origin/release into main CONFLICTED. These paths could not be combined automatically:"
+# A supplied resolution makes the conflict an expected intermediate state, not a failed run.
+# The content gate, not this diagnostic, decides whether that resolution is acceptable.
+# Without a resolution the same conflict is unrecoverable and must remain an error.
+if [ -n "$RESOLUTION_REF" ]; then
+  CONFLICT_ANNOTATION="notice"
+else
+  CONFLICT_ANNOTATION="error"
+fi
+echo "::${CONFLICT_ANNOTATION}::the forward-port's merge of origin/release into main CONFLICTED. These paths could not be combined automatically:"
 printf '%s\n' "$UNMERGED" | cut -f2 | sort -u | while IFS= read -r CONFLICTED_PATH; do
-  echo "::error::  ${CONFLICTED_PATH}"
+  echo "::${CONFLICT_ANNOTATION}::  ${CONFLICTED_PATH}"
 done
 
 git merge --abort
