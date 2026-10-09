@@ -201,7 +201,7 @@
   .gathering-detail-event-level {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 13px;
     font-weight: 600;
     color: var(--fab-text);
@@ -251,7 +251,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 14px;
     font-weight: 600;
   }

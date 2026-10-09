@@ -121,7 +121,7 @@
 
   .inventory-detail-header {
     display: flex;
-    gap: 12px;
+    gap: var(--fab-space-3);
     align-items: flex-start;
   }
 
@@ -138,8 +138,8 @@
   :global(:where(.inventory-detail) .inventory-chip) {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-raised);
@@ -177,7 +177,7 @@
   :global(:where(.inventory-detail) .inventory-detail-section) {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale).

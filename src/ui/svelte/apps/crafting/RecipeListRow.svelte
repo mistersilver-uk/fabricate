@@ -207,7 +207,7 @@
     flex: 1 1 auto;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
   }
 
@@ -236,7 +236,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 1px 6px;
+    padding: 1px var(--fab-space-chip);
     border: 1px solid var(--fab-border);
     border-radius: 999px;
     background: var(--fab-surface-raised);

@@ -1,7 +1,7 @@
 /**
  * Spacing set in MARKUP is on the scale (issue 1523): a `style` attribute, a `style:` directive or
- * a component's `--custom` prop in the manager and component templates. A spacing property, or a
- * custom property a spacing declaration reads, is classified as a `<style>` block's is in
+ * a component's `--custom` prop in every Svelte template. A spacing property, or a custom property
+ * a spacing declaration reads, is classified as a `<style>` block's is in
  * `spacing-scale-ratchet.test.js`. A value computed at runtime cannot be read, so it is listed as a
  * diagnostic rather than banned.
  */
@@ -16,14 +16,15 @@ import {
   templatesOf,
   workingTree,
 } from '../helpers/designSystemRatchet.js';
+import { walkNodes } from '../helpers/moduleAst.js';
 import { declarationsIn, varReferencesIn } from '../helpers/styleBlockScan.js';
-import { lineOf, walkElements } from '../helpers/svelteTemplateScan.js';
+import { lineOf } from '../helpers/svelteTemplateScan.js';
 
 import { SCANNED_SPACING_PROPERTIES, SPACING_SCALE_PREFIX } from './spacing-known-literals.js';
 import { inSvelteScope, offScaleLengthsIn, spacingContext } from './spacing-scale-classifier.js';
 
-/** 26 markup style sites when chosen. */
-const MARKUP_SITE_FLOOR = 20;
+/** 37 markup style sites when chosen, 27 of them in the manager and components. */
+const MARKUP_SITE_FLOOR = 30;
 
 const SCANNED_SPACING = new Set(SCANNED_SPACING_PROPERTIES);
 
@@ -67,26 +68,33 @@ function valueTexts(value) {
   );
 }
 
+/** The template nodes that take a style, and those of them that take a `--custom` prop. */
+const COMPONENT_NODE = new Set(['Component', 'SvelteComponent', 'SvelteSelf']);
+const STYLED_NODE = new Set([...COMPONENT_NODE, 'RegularElement', 'SvelteElement']);
+
 /** The property a markup attribute sets, `style` for a whole style attribute, or null. */
 function propertyOf(element, attribute) {
   if (attribute.type === 'StyleDirective') return attribute.name;
   if (attribute.type !== 'Attribute') return null;
   if (attribute.name === 'style') return 'style';
-  return element.type === 'Component' && attribute.name.startsWith('--') ? attribute.name : null;
+  return COMPONENT_NODE.has(element.type) && attribute.name.startsWith('--')
+    ? attribute.name
+    : null;
 }
 
 /** Each style a scope template sets in markup, as `{ file, line, property, texts }`. */
 function markupStyles(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
-    walkElements(ast.fragment, (element) => {
+    for (const element of walkNodes(ast.fragment)) {
+      if (!STYLED_NODE.has(element.type)) continue;
       for (const attribute of element.attributes ?? []) {
         const property = propertyOf(element, attribute);
         if (property === null) continue;
         const line = lineOf(source, attribute.start);
         found.push({ file, line, property, texts: valueTexts(attribute.value) });
       }
-    });
+    }
   }
   return found;
 }
@@ -140,7 +148,7 @@ function markupSpacing(readFile, files) {
   return { sites, offScale, runtime: [...runtime] };
 }
 
-test('no spacing set in manager or component markup is off the scale', (t) => {
+test('no spacing set in Svelte markup is off the scale', (t) => {
   const { readFile, listFiles } = workingTree(STYLE_CORPUS);
   const { sites, offScale, runtime } = markupSpacing(readFile, listFiles());
   assert.ok(
@@ -185,6 +193,9 @@ test('markup spacing fails off the scale in each spelling, and a runtime value i
     at('<div style={`margin: 13px; --other: 13px`}></div>', ['margin 13px']),
     at('<div style="gap: var(--fab-space-2); --other: 13px"></div>', []),
     at('<div style="padding: {inset}px"></div><div style={computed}></div>', []),
-    at('<div style="padding: 13px"></div>', [], PLAYER),
+    at('<div style="padding: 13px"></div>', ['padding 13px'], PLAYER),
+    at('<svelte:element this="div" style="padding: 13px" />', ['padding 13px']),
+    at('<svelte:component this={Pad} --pad="13px" />', ['--pad 13px']),
+    at('{#if open}<svelte:self --pad="13px" />{/if}', ['--pad 13px']),
   ]);
 });

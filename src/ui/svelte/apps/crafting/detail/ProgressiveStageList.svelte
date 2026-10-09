@@ -643,7 +643,7 @@
   .crafting-stage-handle {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--fab-space-1);
     color: var(--fab-text-muted);
   }
 
@@ -685,7 +685,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .crafting-stage-row.is-stacked .crafting-stage-name {
@@ -710,7 +710,7 @@
   }
 
   .crafting-stage-handle.is-stacked {
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .crafting-stage-row.is-stacked .crafting-stage-ordinal {
@@ -740,7 +740,7 @@
      HTML5 drag never fires on touch, so these are the only touch path to reordering. */
   .crafting-stage-move.is-stacked {
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .crafting-stage-move.is-stacked .crafting-stage-move-button {
@@ -761,7 +761,7 @@
   .crafting-stage-difficulty {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--fab-space-1);
     white-space: nowrap;
   }
 
@@ -772,7 +772,7 @@
 
   .crafting-stage-move {
     display: inline-flex;
-    gap: 4px;
+    gap: var(--fab-space-1);
     flex: 0 0 auto;
   }
 

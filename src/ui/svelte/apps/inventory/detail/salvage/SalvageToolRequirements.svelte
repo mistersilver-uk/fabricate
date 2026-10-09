@@ -63,7 +63,7 @@
   .salvage-tools {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* HAND-ROLLED, AND REFUSED (issue 1514), where its three sibling bodies' eyebrows converted.
@@ -79,7 +79,7 @@
   .salvage-tools-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 10px;
     font-weight: 700;
@@ -93,7 +93,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
   }

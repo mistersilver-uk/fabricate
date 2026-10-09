@@ -80,7 +80,7 @@
   .journal-recent-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 

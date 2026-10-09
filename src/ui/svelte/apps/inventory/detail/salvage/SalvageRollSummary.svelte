@@ -123,7 +123,7 @@
   .salvage-summary {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
@@ -152,7 +152,7 @@
   .salvage-summary-outcome {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     font-size: 13px;
     font-weight: 600;
@@ -190,7 +190,7 @@
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
   }
@@ -201,8 +201,8 @@
     max-width: 100%;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 8px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2xs) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-surface-raised);

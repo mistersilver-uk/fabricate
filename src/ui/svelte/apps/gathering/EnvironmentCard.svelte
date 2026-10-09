@@ -210,7 +210,7 @@
 
   .gathering-env-card-thumb.is-fallback {
     object-fit: contain;
-    padding: 8px;
+    padding: var(--fab-space-2);
     box-sizing: border-box;
   }
 
@@ -244,15 +244,15 @@
   .gathering-env-card-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
   .gathering-env-card-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 7px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-chip);
     border-radius: 999px;
     font-size: 11px;
     line-height: 1.6;
@@ -303,8 +303,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 7px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-chip);
     border-radius: 999px;
     font-size: 11px;
     background: var(--fab-surface-raised);
@@ -322,8 +322,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 7px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-chip);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
@@ -343,8 +343,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 7px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-chip);
     border-radius: 999px;
     font-size: 11px;
     background: var(--fab-surface-raised);

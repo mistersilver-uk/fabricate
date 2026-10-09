@@ -167,7 +167,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     color: var(--fab-text-muted);
   }
@@ -178,7 +178,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
     font-size: 12px;
     color: var(--fab-text-muted);
   }
@@ -186,7 +186,7 @@
   .gathering-task-drops-hints li {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .gathering-task-drops-hints i {

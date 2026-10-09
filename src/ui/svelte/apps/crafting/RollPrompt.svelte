@@ -272,7 +272,7 @@
     display: grid;
     align-content: start;
     flex: 1 1 auto;
-    gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
+    gap: var(--fab-space-4);
     min-height: 0;
     overflow-y: auto;
     color: var(--fab-text);
@@ -343,10 +343,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: calc(var(--fab-space-2) + var(--fab-space-2xs));
+    gap: var(--fab-space-3);
     min-height: 30px;
     box-sizing: border-box;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    padding: 0 var(--fab-space-3);
     background: var(--fab-bg-2);
   }
   .bulk-row + .bulk-row {
@@ -447,7 +447,7 @@
   }
   .bonus-group {
     display: grid;
-    gap: calc(var(--fab-space-1) + 1px);
+    gap: var(--fab-space-1);
   }
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
@@ -457,7 +457,7 @@
     box-sizing: border-box;
     height: 30px;
     min-height: 30px;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-2);
@@ -479,6 +479,6 @@
   /* `100%` is the viewport at scale 1 and the window when Foundry scales it with a transform,
      where `vh` would overflow the window. */
   :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
-    max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
+    max-height: min(640px, calc(100% - (2 * 16px)));
   }
 </style>

@@ -260,7 +260,7 @@
   .requirement-rail {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .requirement-rail-header {

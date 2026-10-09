@@ -188,13 +188,13 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .gathering-linked-scene-label {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--fab-space-1);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -249,9 +249,9 @@
     -webkit-appearance: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     height: 30px;
-    padding: 0 12px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-surface-soft);

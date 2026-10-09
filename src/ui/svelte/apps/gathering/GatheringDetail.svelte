@@ -291,7 +291,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: var(--fab-space-3);
     height: 100%;
     padding: var(--fab-space-4);
     box-sizing: border-box;
@@ -333,14 +333,14 @@
     padding: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .gathering-detail-pip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 9px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2xs) var(--fab-space-2);
     border-radius: 999px;
     font-size: 12px;
     background: var(--fab-surface-raised);

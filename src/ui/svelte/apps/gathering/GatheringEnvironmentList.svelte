@@ -212,7 +212,7 @@
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-env-list-title {
@@ -277,7 +277,7 @@
 
   .gathering-env-show-unavailable {
     flex: 0 0 auto;
-    padding: 4px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-surface);

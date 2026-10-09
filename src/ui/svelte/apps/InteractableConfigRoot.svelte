@@ -911,8 +911,8 @@
   .fabricate-interactable-config {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.85rem;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
     height: 100%;
     overflow-y: auto;
   }
@@ -962,7 +962,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--fab-space-2);
   }
 
   .fab-ic-title {
@@ -973,7 +973,7 @@
   .fab-ic-section {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: var(--fab-space-2);
   }
 
   .fab-ic-section-title {
@@ -1009,7 +1009,7 @@
     margin: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.35rem 0.75rem;
+    gap: var(--fab-space-chip) var(--fab-space-3);
     align-items: start;
   }
 
@@ -1028,7 +1028,7 @@
   .fab-ic-fact {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -1051,7 +1051,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--fab-space-chip);
     flex-wrap: wrap;
     min-width: 0;
   }
@@ -1064,7 +1064,7 @@
      the 24px band the 6px rung is published for. */
   .fab-ic-fact-id {
     font-size: 0.7rem;
-    padding: 0.05rem 0.3rem;
+    padding: 1px var(--fab-space-1);
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     color: var(--fab-text-muted);
@@ -1078,7 +1078,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--fab-space-chip);
     font-size: 0.9rem;
   }
 
@@ -1090,7 +1090,7 @@
   .fab-ic-actions {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: var(--fab-space-chip);
   }
 
   /* THE PRESSED STATE'S ACCENT, STATED AGAINST THE ATTRIBUTE THAT CARRIES IT (issue 1520).
@@ -1129,7 +1129,7 @@
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--fab-space-chip);
     font-size: 0.9rem;
   }
 
@@ -1149,19 +1149,19 @@
      retargeted: two tinted boxes for one state, in two colour families, is what keeping it
      would have rendered. */
   .fab-ic-identity {
-    gap: 0.55rem;
+    gap: var(--fab-space-2);
   }
 
   .fab-ic-identity-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--fab-space-2);
   }
 
   .fab-ic-identity-body {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: var(--fab-space-2);
   }
 </style>

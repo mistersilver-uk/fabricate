@@ -264,7 +264,7 @@
   .crafting-io-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .crafting-io-name {

@@ -157,7 +157,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
@@ -171,7 +171,7 @@
   .crafting-sources-avatars {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
   }
 

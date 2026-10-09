@@ -239,7 +239,7 @@
   .crafting-browser-header {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-browser-title {
@@ -258,12 +258,12 @@
   .crafting-browser-filters {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-browser-filter-toggles {
     display: flex;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-browser-toggle {
@@ -272,9 +272,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-height: 30px;
-    padding: 4px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-surface-soft);
@@ -304,7 +304,7 @@
   .crafting-browser-filter-category {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .crafting-browser-filter-label {
@@ -326,9 +326,9 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
     overflow-y: auto;
-    padding-right: 2px;
+    padding-right: var(--fab-space-2xs);
   }
 
   .crafting-browser-empty {
