@@ -17,7 +17,7 @@ import {
   workingTree,
 } from '../helpers/designSystemRatchet.js';
 import { declarationsIn, varReferencesIn } from '../helpers/styleBlockScan.js';
-import { lineOf } from '../helpers/svelteTemplateScan.js';
+import { lineOf, walkNodes } from '../helpers/svelteTemplateScan.js';
 
 import { SCANNED_SPACING_PROPERTIES, SPACING_SCALE_PREFIX } from './spacing-known-literals.js';
 import { inSvelteScope, offScaleLengthsIn, spacingContext } from './spacing-scale-classifier.js';
@@ -71,16 +71,6 @@ function valueTexts(value) {
 const COMPONENT_NODE = new Set(['Component', 'SvelteComponent', 'SvelteSelf']);
 const STYLED_NODE = new Set([...COMPONENT_NODE, 'RegularElement', 'SvelteElement']);
 
-/** Calls `visit` on each STYLED_NODE, `svelte:element` and `svelte:component` included. */
-function walkStyled(node, visit, seen = new Set()) {
-  if (!node || typeof node !== 'object' || seen.has(node)) return;
-  seen.add(node);
-  if (STYLED_NODE.has(node.type)) visit(node);
-  for (const [key, child] of Object.entries(node)) {
-    if (key !== 'parent') walkStyled(child, visit, seen);
-  }
-}
-
 /** The property a markup attribute sets, `style` for a whole style attribute, or null. */
 function propertyOf(element, attribute) {
   if (attribute.type === 'StyleDirective') return attribute.name;
@@ -95,7 +85,7 @@ function propertyOf(element, attribute) {
 function markupStyles(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
-    walkStyled(ast.fragment, (element) => {
+    walkNodes(ast.fragment, STYLED_NODE, (element) => {
       for (const attribute of element.attributes ?? []) {
         const property = propertyOf(element, attribute);
         if (property === null) continue;
@@ -204,5 +194,6 @@ test('markup spacing fails off the scale in each spelling, and a runtime value i
     at('<div style="padding: 13px"></div>', ['padding 13px'], PLAYER),
     at('<svelte:element this="div" style="padding: 13px" />', ['padding 13px']),
     at('<svelte:component this={Pad} --pad="13px" />', ['--pad 13px']),
+    at('{#if open}<svelte:self --pad="13px" />{/if}', ['--pad 13px']),
   ]);
 });
