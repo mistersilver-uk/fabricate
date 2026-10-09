@@ -2183,7 +2183,7 @@ Each passes its trail as `breadcrumbs`, its title block as `title` and `subtitle
 The manager's route trail is derived by `src/ui/svelte/apps/manager/headerBreadcrumbs.js`, one chain per route under the world root or the crafting-system root, and a crumb is a control only where pressing it leaves the screen.
 The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button called with no argument and declared focused to Foundry, and the last crumb carries `aria-current="page"`.
 Every caller MUST draw `PageHeader`'s specimen and MUST NOT restate its padding, trail, title, subtitle or action size; a caller rule MAY only place the header in its grid and keep its route's #1373 fill.
-The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row at 12px/500 in `--fab-text-muted` with its leaf in `--fab-text-secondary`, a 22px title (identity snippets included), a 12px/1.6 subtitle and 38px actions at the top of the title block (ruling 2026-10-07 E4; D1, D2).
+The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row at 12px/500 in `--fab-text-muted` with its leaf in `--fab-text-secondary`, a 22px title (identity snippets included), a 12px/1.6 subtitle at most 74ch wide and 38px actions at the top of the title block (ruling 2026-10-07 E4; D1, D2).
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
