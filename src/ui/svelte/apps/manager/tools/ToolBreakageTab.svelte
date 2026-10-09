@@ -410,7 +410,7 @@
             )}
             rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
             resolveColor={toolBreakageChanceColor}
-            trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+            trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)"
             controlClass="manager-tool-breakage-chance-control"
             numberInputProps={{
               'data-tool-breakage-chance-input': '',

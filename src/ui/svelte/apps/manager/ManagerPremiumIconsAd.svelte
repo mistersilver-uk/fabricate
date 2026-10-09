@@ -17,7 +17,7 @@
     `onDismiss` runs, so it never falls to `body` — pinned by
     `tests/components/manager-header-mounted.js`.
   - The tiles are decorative backgrounds whose images live in `styles/fabricate.css`, so no icon is
-    addressable as art; the strip compacts below 1180px of manager width and is withheld below 980.
+    addressable as art; the strip compacts at 1320px of manager width and is withheld at 960.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -183,14 +183,14 @@
     white-space: nowrap;
   }
 
-  @container fabricate-manager (max-width: 1179px) {
+  @container fabricate-manager (max-width: 1320px) {
     .manager-premium-icons-ad-icon:nth-child(n + 4),
     .manager-premium-icons-ad-subline {
       display: none;
     }
   }
 
-  @container fabricate-manager (max-width: 979px) {
+  @container fabricate-manager (max-width: 960px) {
     .manager-premium-icons-ad {
       display: none;
     }

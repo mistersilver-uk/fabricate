@@ -954,12 +954,12 @@
   color-scheme: dark;
 
   /* One control-text scale shared by the recipe browser filter bar (search + selects) and the recipe editor overview fields (name, flavour, selects), so both read at the same size (issue 643). */
-  --fab-recipe-control-font: 0.72rem;
+  --fab-manager-recipe-control-font: 0.72rem;
 
   position: relative;
   isolation: isolate;
   container-type: inline-size;
-  container-name: fabricate-manager;
+  container-name: fabricate-manager fabricate-option-host;
   display: grid;
   grid-template-rows: auto auto 1fr;
   height: 100%;
@@ -3702,7 +3702,7 @@
   gap: var(--fab-space-3);
 }
 
-@media (width <= 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-currency-provider-managed-grid {
     grid-template-columns: 1fr;
   }
@@ -4782,15 +4782,15 @@
 /* The recipe library is a list of CARD rows, not a column grid: a card row has no columns, so the retired recipe column-grid custom property and the table head are both gone (issue 643). */
 .fabricate-manager .manager-recipes-table {
   /* The row's right cluster and the column header share ONE fixed template, so the header labels line up with the cells beneath them AND the columns line up row-to-row (each row cluster is its own grid, so `auto` columns would drift per row — fixed widths are what make them agree) (issues 643, 1010). */
-  --fab-recipe-col-io: 112px;
-  --fab-recipe-col-check: 108px;
-  --fab-recipe-col-lock: 28px;
-  --fab-recipe-col-status: 40px;
-  --fab-recipe-col-edit: 28px;
-  --fab-recipe-col-select: 22px;
-  --fab-recipe-cluster-cols: var(--fab-recipe-col-io) var(--fab-recipe-col-check)
-    var(--fab-recipe-col-lock) var(--fab-recipe-col-status) var(--fab-recipe-col-edit)
-    var(--fab-recipe-col-select);
+  --fab-manager-recipe-col-io: 112px;
+  --fab-manager-recipe-col-check: 108px;
+  --fab-manager-recipe-col-lock: 28px;
+  --fab-manager-recipe-col-status: 40px;
+  --fab-manager-recipe-col-edit: 28px;
+  --fab-manager-recipe-col-select: 22px;
+  --fab-manager-recipe-cluster-cols: var(--fab-manager-recipe-col-io) var(--fab-manager-recipe-col-check)
+    var(--fab-manager-recipe-col-lock) var(--fab-manager-recipe-col-status) var(--fab-manager-recipe-col-edit)
+    var(--fab-manager-recipe-col-select);
 
   container-type: inline-size;
   container-name: fabricate-recipes;
@@ -4822,7 +4822,7 @@
 
 .fabricate-manager .manager-recipe-head-cluster {
   display: grid;
-  grid-template-columns: var(--fab-recipe-cluster-cols);
+  grid-template-columns: var(--fab-manager-recipe-cluster-cols);
   gap: var(--fab-space-3);
   flex-shrink: 0;
   place-items: center;
@@ -4896,7 +4896,7 @@
 
 /* Close the Foundry BLEED on the Component Studio's own roles (issue 676). */
 .fabricate-manager[data-manager-view="components"] .fabricate-filter-bar .fabricate-button {
-  font-size: var(--fab-recipe-control-font);
+  font-size: var(--fab-manager-recipe-control-font);
 }
 
 /* The row name is the prototype's serif display face at ~13.5px; the shared `.manager-system-name` has no base size, so it bled to 14 too. */
@@ -4965,10 +4965,10 @@
   opacity: 0.55;
 }
 
-/* The row's right cluster is a fixed grid sharing `--fab-recipe-cluster-cols` with the column header, so every cell aligns to its header AND row-to-row (issue 643). */
+/* The row's right cluster is a fixed grid sharing `--fab-manager-recipe-cluster-cols` with the column header, so every cell aligns to its header AND row-to-row (issue 643). */
 .fabricate-manager .manager-recipe-cluster {
   display: grid;
-  grid-template-columns: var(--fab-recipe-cluster-cols);
+  grid-template-columns: var(--fab-manager-recipe-cluster-cols);
   flex-shrink: 0;
   gap: var(--fab-space-3);
   place-items: center;
@@ -5191,13 +5191,13 @@
 
 .fabricate-manager .manager-recipe-name-input {
   font-family: var(--fab-font-serif);
-  font-size: var(--fab-recipe-control-font);
+  font-size: var(--fab-manager-recipe-control-font);
   font-weight: 600;
 }
 
 .fabricate-manager .manager-recipe-flavour-input {
   min-height: 68px;
-  font-size: var(--fab-recipe-control-font);
+  font-size: var(--fab-manager-recipe-control-font);
   resize: vertical;
 }
 
@@ -5382,7 +5382,7 @@
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category); row two is the two VIEW controls (grouping, ordering), split by a rule; row three is the active-filter chips and the count. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
+  /* The whole bar reads at the shared --fab-manager-recipe-control-font (issue 643): the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
   gap: var(--fab-space-2);
 }
 
@@ -5520,7 +5520,7 @@
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
 
-  /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-recipe-control-font)` deliberately not (issue 1502). */
+  /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-manager-recipe-control-font)` deliberately not (issue 1502). */
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -7991,7 +7991,7 @@
   min-width: 0;
 }
 
-@media (width <= 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-currency-macro-row {
     grid-template-columns: 1fr;
   }
@@ -8300,7 +8300,8 @@
   box-shadow: none;
 }
 
-@container (max-width: 620px) {
+/* The option cards answer the editor surface that hosts them: a card or panel that names itself `fabricate-option-host`, or else the manager. */
+@container fabricate-option-host (max-width: 620px) {
   .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -12005,7 +12006,7 @@
 /* A definite floor, because a percentage one resolves to nothing while the caption sizes its line, and the field would then shrink under the add button rather than wrap below the heading. */
 .fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact {
   flex: 1 1 260px;
-  width: min(320px, 34vw);
+  width: 320px;
   min-width: 220px;
   max-width: 320px;
 }
@@ -12591,7 +12592,7 @@
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
-  --fab-tool-breakage-chance-track-gradient: linear-gradient(
+  --fab-manager-tool-breakage-chance-track-gradient: linear-gradient(
     90deg,
     var(--fab-success) 0%,
     var(--fab-warning) 33%,
@@ -13525,7 +13526,7 @@
 
   /* The workspace releases its 300px side rail through the TOKEN its base rule reads, not through `grid-template-columns`: that base rule is declared later in this file and a container query adds no specificity, so the direct property tied and lost. */
   .fabricate-manager .manager-environment-workspace {
-    --fab-env-workspace-grid: minmax(0, 1fr);
+    --fab-manager-env-workspace-grid: minmax(0, 1fr);
   }
 
   .fabricate-manager .manager-table-head,
@@ -13762,7 +13763,7 @@
 }
 
 /* Below the list frame's own 760px stack the inspector sits under the list, and in a bounded body row the list rows would shrink to nothing, so the list-over-inspector layout sizes its rows to content and is the one scroller (issue 1976). */
-@container (max-width: 760px) {
+@container fabricate-scoped-list (max-width: 760px) {
   .fabricate-manager[data-manager-view="world-components"] .manager-scoped-list-layout.has-inspector,
   .fabricate-manager[data-manager-view="world-essences"] .manager-scoped-list-layout.has-inspector,
   .fabricate-manager[data-manager-view="world-tools"] .manager-scoped-list-layout.has-inspector {
@@ -13923,7 +13924,7 @@
 
 .fabricate-manager .manager-tool-editor-panel {
   /* Shared radio cards query their available editor width, not the full manager shell. */
-  container-type: inline-size;
+  container: fabricate-option-host / inline-size;
   padding: var(--fab-space-5);
   grid-column: 2;
   grid-row: 3;
@@ -14850,7 +14851,7 @@
 
 }
 
-@container fabricate-manager (max-width: 980px) {
+@container fabricate-manager (max-width: 960px) {
   /* THE PROVENANCE CAPTION DROPS UNDER THE MODE IT QUALIFIES (issue 1373). */
   .fabricate-manager .manager-tool-authority-readonly {
     grid-template-columns: 24px minmax(0, 1fr);
@@ -15255,7 +15256,7 @@
 /* The editor workspace: tab panel + 300px side rail (issue 1096). */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
-  grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);
+  grid-template-columns: var(--fab-manager-env-workspace-grid, minmax(0, 1fr) 300px);
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
@@ -15769,11 +15770,11 @@
 
 /* Composition table */
 .fabricate-manager .manager-environment-comp {
-  --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
+  --fab-manager-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
 
   /* The column strip's lead track is the shared list's own cluster (issue 1512): the 22px ordinal badge, the line's 12px gap and the 24px disclosure every row opens its overrides through (issue 1522), and with reorder the 24px grip and another 12px gap before them. The strip's gap supplies the 12px after the cluster, so no figure is repeated. */
-  --fab-env-comp-lead: 58px;
-  --fab-env-comp-lead-ranked: 94px;
+  --fab-manager-env-comp-lead: 58px;
+  --fab-manager-env-comp-lead-ranked: 94px;
 
   display: flex;
   flex-direction: column;
@@ -15781,12 +15782,12 @@
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
+  --fab-manager-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
 }
 
 /* The weight track is 158px, not 112px: it holds a Stepper (102px — 54px of chrome around its 48px input) plus the 6px chip gap plus the ~50px selection-share readout. */
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;
+  --fab-manager-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp-band {
@@ -15811,7 +15812,7 @@
 /* The strip sits over the shared list's rows, so its horizontal padding and its gap are the list line's 12px rather than the 8px the unranked table used, and its first track is the list's lead cluster (issue 1512). */
 .fabricate-manager .manager-environment-comp-head {
   display: grid;
-  grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-manager-env-comp-lead) var(--fab-manager-env-comp-grid);
   align-items: center;
   gap: var(--fab-space-3);
   padding: 0 var(--fab-space-3) var(--fab-space-chip);
@@ -15835,7 +15836,7 @@
 /* A row outside the ordered list leads with the strip's own track and ends its chevron there, so the chevron and every column sit where an ordered row's do. */
 .fabricate-manager .manager-environment-comp-row {
   display: grid;
-  grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-manager-env-comp-lead) var(--fab-manager-env-comp-grid);
   align-items: center;
   gap: var(--fab-space-3);
   padding: var(--fab-space-2) var(--fab-space-3);
@@ -15846,11 +15847,11 @@
 
 /* A ranked strip gains the grip's width at the lead and a 24px track under the list's trailing rocker. */
 .fabricate-manager .manager-environment-comp-head.has-rank-controls {
-  grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;
+  grid-template-columns: var(--fab-manager-env-comp-lead-ranked) var(--fab-manager-env-comp-grid) 24px;
 }
 
 .fabricate-manager .manager-environment-comp:has(.has-rank-controls) .manager-environment-comp-row {
-  grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-manager-env-comp-lead-ranked) var(--fab-manager-env-comp-grid);
 }
 
 .fabricate-manager .manager-environment-comp-disclosure {
@@ -15860,7 +15861,7 @@
 /* The record's own cells, on the same template the strip reads, so a label sits over the column it names. The list owns everything outside them. */
 .fabricate-manager .manager-environment-comp-cells {
   display: grid;
-  grid-template-columns: var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-manager-env-comp-grid);
   align-items: center;
   gap: var(--fab-space-3);
   flex: 1 1 auto;
@@ -16490,16 +16491,16 @@
   }
 
   .fabricate-manager .manager-environment-comp {
-    --fab-env-comp-grid: minmax(0, 1fr) 80px 110px 80px;
+    --fab-manager-env-comp-grid: minmax(0, 1fr) 80px 110px 80px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
+    --fab-manager-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
   }
 
   /* The weight track does NOT narrow with the container: 102px is the stepper's natural width and the selection-share readout still has to fit beside it. */
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;
+    --fab-manager-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;
   }
 
 }
@@ -17456,7 +17457,7 @@
   flex: 0 0 auto;
 }
 
-@media (max-width: 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-realm-env-editor {
     grid-template-columns: 1fr;
   }
@@ -18016,7 +18017,7 @@
   font-weight: 500;
 }
 
-/* THE LITERAL IS THE POINT. `--fab-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */
+/* THE LITERAL IS THE POINT. `--fab-manager-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */
 .fabricate-select .fabricate-select-trigger-toolbar {
   min-height: 34px;
   border-radius: 9px;
@@ -18222,8 +18223,8 @@
 
   /* Drop the I/O column from the shared template so the cluster reflows tight rather than reserving an empty grid track. */
   .fabricate-manager .manager-recipes-table {
-    --fab-recipe-cluster-cols: var(--fab-recipe-col-check) var(--fab-recipe-col-lock)
-      var(--fab-recipe-col-status) var(--fab-recipe-col-edit) var(--fab-recipe-col-select);
+    --fab-manager-recipe-cluster-cols: var(--fab-manager-recipe-col-check) var(--fab-manager-recipe-col-lock)
+      var(--fab-manager-recipe-col-status) var(--fab-manager-recipe-col-edit) var(--fab-manager-recipe-col-select);
   }
 
   /* Re-place the header labels onto the tracks this rung left (issue 1010): the template is rewritten here but the placements are authored outside every container query, so without these CHECK sits over the lock, STATUS over status + edit, and EDIT lands on the appended SELECT column. */
@@ -18247,8 +18248,8 @@
   }
 
   .fabricate-manager .manager-recipes-table {
-    --fab-recipe-cluster-cols: var(--fab-recipe-col-lock) var(--fab-recipe-col-status)
-      var(--fab-recipe-col-edit) var(--fab-recipe-col-select);
+    --fab-manager-recipe-cluster-cols: var(--fab-manager-recipe-col-lock) var(--fab-manager-recipe-col-status)
+      var(--fab-manager-recipe-col-edit) var(--fab-manager-recipe-col-select);
   }
 
   .fabricate-manager .manager-recipe-head-cell.is-status {
@@ -20183,7 +20184,7 @@
 }
 
 /* THE RAIL STACKS UNDER THE PANEL below the threshold rather than compressing to a column too narrow to read, which is the ruling the shared list frame already makes about its inspector (issue 1371). */
-@container fabricate-manager (max-width: 1000px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-entry-page,
   .fabricate-manager .manager-main.manager-component-entry-page {
     grid-template-columns: minmax(0, 1fr);
@@ -20574,7 +20575,7 @@
 }
 
 /* The two cards stack before the tag card's chip runs start wrapping to one chip a line. */
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-rules-duo {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -20699,7 +20700,7 @@
   min-width: 0;
 }
 
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-rules-card .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -21126,7 +21127,7 @@
 }
 
 /* ══ issue 1371 r18-entry, maintainer ruling M31 — THE ENTRY'S ESSENCE GRID BREAKS AS THE EDITOR'S ══ The world Component entry's `Essence contribution` card renders the shared 4-up `.manager-component-essence-grid`, the same grid the rules editor's card renders (D5, `proto:1343`). */
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

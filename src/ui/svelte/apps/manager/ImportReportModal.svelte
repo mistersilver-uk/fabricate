@@ -169,7 +169,7 @@
     flex: 1;
     min-width: 0;
     color: var(--fab-text-secondary);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     overflow-wrap: anywhere;
   }
 

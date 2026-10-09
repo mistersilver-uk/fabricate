@@ -307,7 +307,7 @@ export const ENTRY_FRAME_CHECKS = Object.freeze([
     'keeps BOTH halves when it stacks over a pane of a definite height: each keeps its content, the tab strip stays in the column, and the frame scrolls (M26, M32)',
     ({ stacked: { main, column, strip, rail, frameScrolls } }) => {
       // WHY THIS CHECK EXISTS ────────────────────────────────────────────────────────────── The
-      // frame stacks below `@container fabricate-manager (max-width: 1000px)`, and until r19-entry2
+      // frame stacks below `@container fabricate-manager (max-width: 960px)`, and until r19-entry2
       // nothing measured the stacked side on either consumer — this suite's own comment said so, as
       // a reason to stay wide.
       const height = ({ top, bottom }) => bottom - top;

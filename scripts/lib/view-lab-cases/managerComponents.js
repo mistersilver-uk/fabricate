@@ -74,6 +74,12 @@ const SALVAGE_ROW_SOURCES = Object.freeze([
 /** Component Rules' header group, led by the Premium advert until it is dismissed. */
 const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
 
+/** The page heading keeps 320px beside the advert, measured on the lab's real header. */
+const PREMIUM_AD_HEADING_FLOOR = Object.freeze({
+  containerSelector: '[data-manager-view="components"] .manager-header',
+  minInlineSize: { selector: '[data-manager-view="components"] .manager-heading', pixels: 320 },
+});
+
 /** Open the editor on a component and bring its salvage results into view. */
 
 const salvageSteps = (componentId) => [
@@ -126,10 +132,10 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
-    // The lab world opts into experimental features, so the Premium advert leads the header.
+    // The lab world opts into experimental features, so the Premium advert leads the header,
+    // compact at 1280: the full face waits for the 1320 rung.
     expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
-    // Only the full face draws the subline.
-    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
+    expectVisible: '[data-premium-icons-ad]',
     // Issue 1371 r13-list — the list opens on its first drawn row (maintainer ruling M14).
     expectContained: [
       {
@@ -194,6 +200,37 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1100, height: 820 },
     kinds: ['manager', 'components'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Inside the old 1121-1179 band, where the full face left the lab header's heading 291-318px.
+    id: 'manager-components-premium-ad-1150',
+    label: 'Manager — Components header at 1150px',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    expectVisible: '[data-premium-icons-ad]',
+    expectLayout: PREMIUM_AD_HEADING_FLOOR,
+    position: { width: 1150, height: 820 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Issue 2220: the advert's full face, six icons and the subline, above the 1320 rung.
+    id: 'manager-components-premium-ad-full',
+    label: 'Manager — Components with the full Premium advert',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Only the full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
+    expectLayout: PREMIUM_AD_HEADING_FLOOR,
+    position: { width: 1330, height: 820 },
+    kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
   }),
   managerCase({
@@ -689,7 +726,7 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    position: { width: 980, height: 860 },
+    position: { width: 960, height: 860 },
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),

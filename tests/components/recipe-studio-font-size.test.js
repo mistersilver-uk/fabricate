@@ -370,8 +370,8 @@ const EXPECTED = {
   // the manager control-text scale the retired native `<select>` took from its own scoped block.
   // The staged axis is a FORM control in a 300px rail of full-width fields, and the shared
   // primitive's form rung is 38px / radius 9 / 12.5px / weight 500. The literal is written here
-  // because the rung is: the family may not read `--fab-recipe-control-font`, which is declared
-  // only under `.fabricate-manager`.
+  // because the rung is: the family may not read `--fab-manager-recipe-control-font`, which is
+  // declared only under `.fabricate-manager`.
   'bulk-select': 12.5,
   // ── The two roles the recipe panel adds to that chrome. Both are shipped primitives the
   // Component Studio's panel does not render, so neither has a committed number there.

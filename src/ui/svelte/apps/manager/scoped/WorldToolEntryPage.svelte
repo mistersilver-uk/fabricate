@@ -1063,7 +1063,7 @@
                       'Breakage chance'
                     )}
                     resolveColor={toolBreakageChanceColor}
-                    trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                    trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)"
                     controlClass="manager-tool-breakage-chance-control"
                     numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                     rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}

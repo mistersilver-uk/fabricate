@@ -399,13 +399,13 @@
 
 <style>
   /* One control scale for the whole dialog (issue 772): it is dense, and it sits between surfaces
-     that read at `--fab-recipe-control-font`, so the manager's default body size made it both the
-     largest type on screen and the one with the least room for it. */
+     that read at `--fab-manager-recipe-control-font`, so the manager's default body size made it
+     both the largest type on screen and the one with the least room for it. */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     color: var(--fab-text-secondary);
   }
 
@@ -422,7 +422,7 @@
     min-height: 28px;
     border-radius: 7px;
     padding: 0 var(--fab-space-2);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
@@ -468,7 +468,7 @@
     min-width: 0;
     flex: 1;
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* The field labels read as the bulk rail's micro-labels rather than as body text: the two
@@ -511,7 +511,7 @@
      `tests/components/manager-select-conversion-rendered.test.js` measures it. */
   :global(.fabricate-field.manager-import-mapping-category .fabricate-select-trigger) {
     min-width: 140px;
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
   }
 
   /* The real control is 1px and transparent, so the ring is drawn on the visible box.

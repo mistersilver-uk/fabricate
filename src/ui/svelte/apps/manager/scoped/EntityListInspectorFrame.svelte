@@ -981,7 +981,7 @@
      released full-width classification `<main>` is the list column plus the freed 300px — so the
      budget this frame lays out against is the main column's inline size, not the window's. */
   .manager-scoped-list-frame {
-    container-type: inline-size;
+    container: fabricate-scoped-list / inline-size;
     display: grid;
     grid-template-rows: minmax(0, 1fr);
     min-width: 0;
@@ -1151,7 +1151,7 @@
        selects beside it sit on (issue 1372). */
     background: var(--fab-bg-1);
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
@@ -1355,7 +1355,7 @@
 
   /* BELOW THE THRESHOLD THE INSPECTOR STACKS UNDER THE LIST rather than compressing to a column
      too narrow to read a name in. */
-  @container (max-width: 760px) {
+  @container fabricate-scoped-list (max-width: 760px) {
     .manager-scoped-list-layout.has-inspector {
       grid-template-columns: minmax(0, 1fr);
     }
