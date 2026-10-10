@@ -10,6 +10,7 @@ import path from 'node:path';
 import { resolveExecutable } from '../../scripts/lib/resolveExecutable.js';
 
 import { byCodePoint } from './codePointOrder.js';
+import { logicalChanges, logicalFiles, logicalReader, physicalSite } from './logicalStylesheet.js';
 import { keyByAlignment, netOfSiteMarkers, siteText } from './siteMarkers.js';
 import { envWithoutGitLocation } from './temp-git-repo.js';
 
@@ -534,14 +535,14 @@ function netByValue(offences, falls) {
   return { remaining, netted, shrank };
 }
 
-function emptyMarkerFailures(files, family, readFile) {
+function emptyMarkerFailures(files, family, readFile, siteOf) {
   return files.flatMap((file) =>
     parseMarkers(file, readFile(file) ?? '')
       .filter((marker) => marker.family === family && marker.reason === '')
       .map(
         (marker) =>
-          `${file}:${marker.line} has a ratchet-exempt(${family}) marker with no reason; write ` +
-          'why the regression is legitimate after the colon'
+          `${siteOf(file, marker.line)} has a ratchet-exempt(${family}) marker with no reason; ` +
+          'write why the regression is legitimate after the colon'
       )
   );
 }
@@ -572,8 +573,8 @@ function sides({ base, changes, include, corpusRoot, scope, cwd }) {
   if (headChanged.length + baseChanged.size === 0) return null;
   if (scope === 'corpus') {
     return {
-      headFiles: listHeadFiles(corpusRoot, cwd).filter((path) => include(path)),
-      baseFiles: listBaseFiles(base, corpusRoot, cwd).filter((path) => include(path)),
+      headFiles: logicalFiles(listHeadFiles(corpusRoot, cwd)).filter((path) => include(path)),
+      baseFiles: logicalFiles(listBaseFiles(base, corpusRoot, cwd)).filter((path) => include(path)),
       headChanged,
     };
   }
@@ -594,7 +595,8 @@ function skipped(code, reason, corpusRoot, changedCount) {
  * `{base, head}`: a family's own cross-side matching, such as a function rename. `headMarkers:
  * false` stops a file-head marker exempting an entry, for a family whose markers excuse one site.
  * `siteMarkers` makes each entry one site, excused at its first line only when it is new relative
- * to base (`siteMarkers.js`); a function `(entry, marker)` narrows which markers excuse.
+ * to base (`siteMarkers.js`); a function `(entry, marker)` narrows which markers excuse. Both
+ * sides see the module sheet as one logical `styles/fabricate.css` (`logicalStylesheet.js`).
  *
  * @returns {{compared: true, family: string, base: string, changedCount: number,
  *   failures: string[], shrank: string[], netted: string[], exempted: string[]}
@@ -617,15 +619,19 @@ export function compareToBase({
   if (!FAMILY_NAME.test(family ?? '')) throw new Error(`invalid ratchet family name: ${family}`);
   if (!['changed', 'corpus'].includes(scope)) throw new Error(`${family}: unknown scope ${scope}`);
   if (base.skipped) return skipped(base.skipped, base.reason, corpusRoot, null);
-  const changes = changedPaths(base, { cwd });
+  const changes = logicalChanges(changedPaths(base, { cwd }));
   const changedCount = changes.changed.length + changes.removed.length;
   const files = sides({ base, changes, include, corpusRoot, scope, cwd });
   if (!files) {
     const reason = `none of the ${changedCount} changed path(s) is in the ${family} corpus`;
     return skipped('corpus-unchanged', reason, corpusRoot, changedCount);
   }
-  const readHead = (file) => readHeadFile(cwd, file);
-  const readBase = baseReader(base, readBaseFiles(base, files.baseFiles, { cwd }), cwd);
+  const physicalHead = (file) => readHeadFile(cwd, file);
+  const readHead = logicalReader(physicalHead);
+  const readBase = logicalReader(
+    baseReader(base, readBaseFiles(base, files.baseFiles, { cwd }), cwd)
+  );
+  const siteOf = (file, line) => physicalSite(file, line, physicalHead);
   const headPathOf = new Map([...changes.renames].map(([to, from]) => [from, to]));
   const toHeadPath = (raw) => {
     const entry = validEntry(raw, family);
@@ -656,9 +662,9 @@ export function compareToBase({
   const exempts = !siteMarkers;
   const { failures, exempted } = judge(remaining, family, readHead, { headMarkers, exempts });
   for (const entry of net.fresh) {
-    exempted.push(`${entry.file}:${entry.site.line} ${entry.id}: ${entry.marker.reason}`);
+    exempted.push(`${siteOf(entry.file, entry.site.line)} ${entry.id}: ${entry.marker.reason}`);
   }
-  failures.push(...emptyMarkerFailures(files.headChanged, family, readHead));
+  failures.push(...emptyMarkerFailures(files.headChanged, family, readHead, siteOf));
   return {
     compared: true,
     family,
