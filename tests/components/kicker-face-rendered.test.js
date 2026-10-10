@@ -56,13 +56,18 @@ function freePort() {
 }
 
 /** The registry's step verbs this suite's cases use; any other verb fails rather than being skipped. */
-async function runSteps(page, steps) {
+// Mirrors `runSteps` in scripts/view-lab-screenshots.mjs until a follow-up extracts a shared runner.
+async function runSteps(page, steps, caseId) {
   for (const step of steps) {
     if (typeof step === 'string') {
       const label = new RegExp(
         String.raw`^\s*${step.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}(\s|$)`
       );
       await page.locator('.manager-nav-button').filter({ hasText: label }).first().click();
+    } else if ((await page.locator(step.selector).count()) === 0) {
+      throw new Error(
+        `${caseId}: nothing matches "${step.selector}" — the case cannot reach its view state`
+      );
     } else if ('fill' in step) {
       await page.locator(step.selector).first().fill(step.fill);
     } else if (Object.keys(step).length === 1) {
@@ -99,7 +104,7 @@ describe('Kicker draws the host UI face in every case it is captured in', { skip
     server = await createServer({
       configFile: resolve(repoRoot, VIEW_LAB_VITE_CONFIG),
       cacheDir: viteDepCacheDir(),
-      server: { port, strictPort: true },
+      server: { port },
       logLevel: 'silent',
     });
     await server.listen();
@@ -113,7 +118,7 @@ describe('Kicker draws the host UI face in every case it is captured in', { skip
         query: labQueryFor(viewCase),
         port,
         settleMs: 0,
-        afterOpen: (opened) => runSteps(opened, viewCase.steps ?? []),
+        afterOpen: (opened) => runSteps(opened, viewCase.steps ?? [], id),
       });
       measured.set(id, await page.evaluate(readKickerFaces));
       await dispose();
