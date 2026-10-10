@@ -99,7 +99,7 @@ describe('Kicker draws the host UI face in every case it is captured in', { skip
     server = await createServer({
       configFile: resolve(repoRoot, VIEW_LAB_VITE_CONFIG),
       cacheDir: viteDepCacheDir(),
-      server: { port, strictPort: true, hmr: false, watch: null },
+      server: { port, strictPort: true },
       logLevel: 'silent',
     });
     await server.listen();
