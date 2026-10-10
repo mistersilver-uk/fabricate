@@ -10,6 +10,27 @@ import {
   interactablesManagerCase,
 } from './caseFactories.js';
 
+/** The config panel opened on a seeded interactable with one state toggle pressed (issue 1625). */
+function stateToggleCase(pressed, unpressed, description) {
+  return configCase({
+    id: `interactables-config-${pressed}`,
+    label: `Interactable config — ${description}`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: pressed },
+    // The state row sits below the window's fold.
+    steps: [{ selector: `[data-interactable-state-toggle="${pressed}"]`, scroll: true }],
+    expectSelector:
+      `.fabricate-interactable-config:has([data-interactable-state-toggle="${unpressed}"][aria-pressed="false"]) ` +
+      `[data-interactable-state-toggle="${pressed}"][aria-pressed="true"]`,
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  });
+}
+
 export const CASES = Object.freeze([
   // Registered before the design-system adoption that re-skins them, and the ordering is not a preference.
   browserCase({
@@ -155,6 +176,28 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  configCase({
+    id: 'interactables-config-tool',
+    label: 'Interactable config — tool-sourced interactable',
+    // `beyond`: the smoke never opens one of these panels, so there is no counterpart to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: 'tool' },
+    steps: [],
+    // The linked-source fact, which names the Tool by the shared display precedence.
+    expectSelector: '.fabricate-interactable-config .fab-ic-facts .fab-ic-fact-name',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
+  stateToggleCase('locked', 'disabled', 'a locked Tool interactable, Locked pressed'),
+  stateToggleCase(
+    'disabled',
+    'locked',
+    'a disabled Tool interactable whose marker is missing, Disabled pressed'
+  ),
   interactablesManagerCase({
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',

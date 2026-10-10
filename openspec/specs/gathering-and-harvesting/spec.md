@@ -925,6 +925,7 @@ Applying phases and actual receipts are updated in that same history record by r
 Versioned Journal history MUST prefer the applied createGatheredResults receipt over pre-effect planned createdResults, including failure awards; missing or opaque receipts MUST NOT establish itemized awards.
 Recorded d100 roll, threshold and cleared/missed evidence remains usable when individual awarded quantities cannot be attributed; the Journal retains unknown per-row amounts and shows the unattributed actual receipt once.
 Native d100 item rows clear when `effectiveRoll >= 101 - finalDropRate`; historical presentation MUST honor recorded outcomes rather than reinterpret them as a low-roll check.
+The drop preview MUST carry each row's `threshold` from the same expression the roll evaluation uses, so the preview and the roll cannot disagree.
 The d100 resolver's status is independent of item hits: it returns failed when selected events exist under `failureWithEvent`, otherwise succeeded, including an all-miss item result.
 Subsequent engine failure rules still apply; the Journal MUST use the recorded terminal status rather than derive success or failure from item quantities.
 Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.

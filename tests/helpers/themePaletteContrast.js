@@ -23,16 +23,28 @@ export function themePalettes(sheetRules) {
 function channels(value) {
   const hex = value.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/iu);
   if (hex) return [...hex.slice(1).map((pair) => Number.parseInt(pair, 16)), 1];
-  const rgb = value.match(/^rgb\((\d+) (\d+) (\d+)(?: \/ ([\d.]+)%)?\)$/u);
+  const rgb = value.match(/^rgb\(([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+)%)?\)$/u);
   assert.ok(rgb, `a palette value this guard cannot read: ${value}`);
   return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] ? Number(rgb[4]) / 100 : 1];
 }
 
+/** `top` composited over `ground`, as an opaque `rgb()`; `ground` must itself be opaque. */
+function over(top, ground) {
+  const [r, g, b, alpha] = channels(top);
+  const base = channels(ground);
+  assert.equal(base[3], 1, `a ground must be opaque, so flatten its stack first: ${ground}`);
+  return [r, g, b].map((value, index) => value * alpha + base[index] * (1 - alpha));
+}
+
+/** The opaque ground `top` paints over the opaque `base`, for a stack of translucent grounds. */
+export function flatten(top, base) {
+  return `rgb(${over(top, base).join(' ')})`;
+}
+
 /** WCAG contrast of `ink` composited over the opaque `ground`. */
 export function contrast(ink, ground) {
-  const [r, g, b, alpha] = channels(ink);
   const base = channels(ground);
-  const shown = [r, g, b].map((value, index) => value * alpha + base[index] * (1 - alpha));
+  const shown = over(ink, ground);
   const lum = (rgb) =>
     rgb
       .map((value) => value / 255)

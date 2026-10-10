@@ -806,8 +806,7 @@
          It is a switch rather than a checkbox for the routing reason as well: the library routes
          an immediately-applied binary state to the toggle, and this panel already renders that
          primitive. Its `label` IS a state reading - "Hidden from players" describes the
-         interactable when the knob is on - which is what the two controls beside the Delete
-         verb below could not say and why they stayed buttons. -->
+         interactable when the knob is on. -->
     <section class="fab-ic-section">
       <StatusToggle
         on={view.presentation.hidden}
@@ -838,51 +837,25 @@
       </Button>
     </section>
 
-    <!-- State toggle row. These two are PRESSED BUTTONS and stay pressed buttons, which is the
-         one place this window declined the conversion the rest of it made (issue 1520, maintainer
-         ruling at review).
-
-         A switch's knob is a CLAIM about the thing it sits beside, and these two labels are
-         action verbs rather than state readings: the copy flips between "Disable"/"Enable" and
-         "Lock"/"Unlock" because a button had to say what pressing it would do. Converted, a
-         DISABLED interactable drew an accent-filled track with the knob to the right beside the
-         word "Enable", and a LOCKED one drew the same beside "Unlock" - so the control stated the
-         opposite of the state it was reporting, in a form every sighted GM could read. As a
-         button the same polarity is only an `aria-pressed` announcement, which is a pre-existing
-         copy defect rather than a drawn falsehood: the shipped button already announced "Enable,
-         toggle button, PRESSED" in exactly that state.
-
-         The repair is state readings ("Disabled", "Locked") that `lang/en.json` does not carry,
-         and issue 1625 owns them; a static axis name instead would orphan
-         `FABRICATE.Canvas.Interactable.Config.Enable` and `.Unlock`, which
-         `tests/lang-keys-no-orphans.test.js` refuses. Inverting the polarity instead - reporting
-         "not disabled" and "not locked" so the ON position matched the verb - was rejected for a
-         narrower reason: `aria-pressed` here reads DISABLED and LOCKED today, that is what the
-         shipped control announces, and flipping it silently changes what every screen reader says
-         about this panel in order to rescue a visual affordance that is being removed anyway.
-         The polarity is carried across byte for byte and pinned by this window's suite, so issue
-         1625 has to preserve it when it supplies the readings.
-
-         WHAT THE PRESSED STATE LOOKS LIKE IS STATED ONCE, IN THE SCOPED BLOCK BELOW, AGAINST
-         `aria-pressed` - the attribute that already carries the state - rather than against a
-         second `is-active` class saying the same thing twice. That is the same correction this
-         change made for the Manage panel's promote disclosure. -->
+    <!-- State toggle row: pressed buttons, not switches (issue 1520). Each label is the state it
+         asserts and never changes; `aria-pressed` is true while disabled and while locked; the
+         Locked glyph follows the state, the Disabled ban dims while unpressed. Pinned by `interactable-config-state-toggles-mounted.test.js`. -->
     <section class="fab-ic-section fab-ic-actions">
       <Button
         aria-pressed={view.state.enabled === false}
         onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
+        data-interactable-state-toggle="disabled"
       >
-        {view.state.enabled
-          ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
-          : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
+        <i class="fas fa-ban fab-ic-state-glyph" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Canvas.Interactable.Config.StateDisabled', 'Disabled')}</span>
       </Button>
       <Button
         aria-pressed={view.state.locked === true}
         onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
+        data-interactable-state-toggle="locked"
       >
-        {view.state.locked
-          ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
-          : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
+        <i class="fas {view.state.locked ? 'fa-lock' : 'fa-lock-open'}" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Canvas.Interactable.Config.StateLocked', 'Locked')}</span>
       </Button>
       <Button role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
@@ -1093,27 +1066,19 @@
     gap: var(--fab-space-chip);
   }
 
-  /* THE PRESSED STATE'S ACCENT, STATED AGAINST THE ATTRIBUTE THAT CARRIES IT (issue 1520).
-     The Disable and Lock buttons report a live state as well as offering an action, and without
-     a treatment that state has no visual expression at all - which is the defect this sheet
-     records for the component browser's grouping switch, a `.fabricate-button` under a class with
-     no CSS anywhere. Keyed on `aria-pressed` rather than on a companion class, so the drawn
-     state and the announced state cannot drift; the same correction the Manage panel's promote
-     disclosure took for its `aria-expanded` edge.
-
-     `:global(...)` because the element is `Button`'s, anchored on a class this file
-     writes so Svelte's hash lands on the ancestor. SEVEN elements carry `.fab-ic-actions` in
-     this panel - five inline rows inside the identity, node and visual sections, plus the
-     primary action row and the state row - and the compound still reaches exactly two buttons,
-     because it is the ATTRIBUTE that selects rather than the row: those two are the only
-     `.fabricate-button`s in the window that carry `aria-pressed` at all. That is the point of
-     keying it here rather than on a row class, and it is why a third pressed button added to
-     any of the seven inherits the treatment instead of needing a rule of its own. */
+  /* The pressed state's accent, keyed on `aria-pressed` so the drawn and announced states cannot
+     drift (issue 1520). The border is the pressed signal; the fill is subtle. `:global(...)`
+     because the element is `Button`'s; the Disabled and Locked toggles are the only
+     `.fabricate-button`s here carrying `aria-pressed`. */
   .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
     border-color: var(--fab-accent);
     background: var(--fab-surface-active);
     color: var(--fab-text);
-    font-weight: 600;
+  }
+
+  /* The Disabled glyph is always the ban, so it dims while the toggle is unpressed. */
+  .fab-ic-actions :global(.fabricate-button[aria-pressed='false'] .fab-ic-state-glyph) {
+    opacity: 0.55;
   }
 
   .fab-ic-actions-inline {

@@ -59,7 +59,11 @@
          distinguishable; "Soon" is a word, not a count (issue 1515). -->
     {#each item.markers as marker (marker.kind)}
       {#if marker.kind === 'count'}
-        <span class="manager-nav-count" aria-label={marker.label}>{marker.value}</span>
+        <!-- The unit sits inside the count, so the collapsed rail that hides the count hides it too. -->
+        <span class="manager-nav-count"
+          >{marker.value}{#if marker.label}<span class="visually-hidden">{` ${marker.label}`}</span
+            >{/if}</span
+        >
       {:else if marker.kind === 'dirty'}
         <span class="manager-nav-dirty-marker" {...marker.hooks} role="img" aria-label={marker.name}
         ></span>
@@ -131,6 +135,7 @@
           class="manager-nav-submenu"
           id={entry.submenu.domId}
           {...entry.submenu.hooks}
+          role="group"
           aria-label={entry.submenu.label}
         >
           {#each entry.children as child (child.id)}

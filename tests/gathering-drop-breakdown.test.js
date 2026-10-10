@@ -174,6 +174,115 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
   );
 });
 
+/** Issue 2257 D20: each preview drop states the effective roll it needs, as the roll reads it. */
+function thresholdService({ roll = 50, evaluateExpression = async () => 10 } = {}) {
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, {}]]);
+  return new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    getUserId: () => 'user-1',
+    rollD100: () => roll,
+    hooks: { callAll: () => {} },
+    evaluateExpression
+  });
+}
+
+function thresholdEnvironment(rules = {}) {
+  const environment = {
+    conditions: { weather: 'rain', timeOfDay: 'night' },
+    biomes: ['forest'],
+    rules: { rewardSelectionMode: 'allDrops', rewardLimit: 99, ...rules }
+  };
+  Object.defineProperty(environment, '__libraryCharacterModifiers', {
+    value: new Map([['mod', { id: 'mod', label: 'Mod', icon: 'fa-user', expression: '@mod' }]]),
+    enumerable: false
+  });
+  return environment;
+}
+
+const thresholdRow = (id, dropRate, extra = {}) => ({
+  id, name: id, componentId: id, quantity: 1, dropRate, ...extra
+});
+
+test('issue 2257: a preview drop states the effective roll its final chance needs, as an integer', async () => {
+  const service = thresholdService();
+  const rates = [0, 1, 29, 57, 99, 100];
+  const task = {
+    id: 't',
+    resolutionMode: 'd100',
+    dropRows: [
+      ...rates.map((rate) => thresholdRow(`rate-${rate}`, rate)),
+      // The authored rate is floored before it is mixed.
+      thresholdRow('fractional', 29.7)
+    ]
+  };
+  const preview = await service.previewDropBreakdown({ environment: thresholdEnvironment(), task });
+  assert.deepEqual(
+    preview.drops.map((drop) => [drop.id, drop.threshold]),
+    [
+      ['rate-0', 101],
+      ['rate-1', 100],
+      ['rate-29', 72],
+      ['rate-57', 44],
+      ['rate-99', 2],
+      ['rate-100', 1],
+      ['fractional', 72]
+    ],
+    'a certain find needs a 1, and an impossible one a 101'
+  );
+
+  // A multiplicative product is rounded once: 25 × 0.9 = 22.5 → 23, so the roll needs a 78.
+  const multiplied = await service.previewDropBreakdown({
+    environment: thresholdEnvironment({ dropModifierMode: 'multiplicative' }),
+    task: {
+      id: 't',
+      resolutionMode: 'd100',
+      dropRows: [thresholdRow('product', 25, { characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-' }] })]
+    },
+    actor: {}
+  });
+  assert.equal(multiplied.drops[0].threshold, 78);
+  assert.ok(
+    [...preview.drops, ...multiplied.drops].every((drop) => Number.isInteger(drop.threshold)),
+    'every threshold is a whole roll'
+  );
+});
+
+test('issue 2257: the preview threshold cannot drift from the one the roll evaluates against', async () => {
+  const service = thresholdService({ roll: 40 });
+  const task = {
+    id: 't',
+    resolutionMode: 'd100',
+    // The task's own modifier moves the effective roll, never the threshold.
+    gatheringModifier: 7,
+    dropRows: [
+      thresholdRow('plain', 64),
+      thresholdRow('weather', 40, { conditionModifiers: { weather: [{ conditionId: 'rain', value: 10 }] } }),
+      thresholdRow('character', 25, { characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '-' }] }),
+      thresholdRow('mixed', 33.9, {
+        conditionModifiers: { biome: [{ conditionId: 'forest', value: 20 }] },
+        characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '+' }]
+      }),
+      thresholdRow('never', 0)
+    ]
+  };
+  const byMode = {};
+  for (const dropModifierMode of ['additive', 'multiplicative']) {
+    const environment = thresholdEnvironment({ dropModifierMode });
+    const preview = await service.previewDropBreakdown({ environment, task, actor: {} });
+    const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
+    const rolled = new Map(resolved.itemRows.map((row) => [row.id, row]));
+    assert.equal(rolled.size, 5, `${dropModifierMode}: every row is evaluated`);
+    for (const drop of preview.drops) {
+      assert.equal(drop.threshold, rolled.get(drop.id).threshold, `${dropModifierMode}: ${drop.id}'s threshold`);
+      assert.equal(rolled.get(drop.id).effectiveRoll, 47, `${dropModifierMode}: the modifier moved the roll`);
+    }
+    byMode[dropModifierMode] = preview.drops.map((drop) => drop.threshold);
+  }
+  assert.notDeepEqual(byMode.additive, byMode.multiplicative, 'the two modes mix the modifiers differently');
+});
+
 /**
  * The RECORDED breakdown (issue 1648, TP14-B). Everything above is the live preview — odds computed
  * from current configuration.

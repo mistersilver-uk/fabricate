@@ -2,8 +2,10 @@
      supplies entitled display strings. With no form prop the dense output is unchanged; `onOpen`
      makes the content one native button, `openProps` alone an inert div, and `trailing` and
      `aside` sit beside it. `inset="row"` gives the dense selectable form the dense row's inset,
-     and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `class` and a
-     rest spread land on the root; `data-list-row` wins. -->
+     and `detailAlign="end"` holds the detail at the trailing edge (issue 2321). `bodyBasis="fill"`
+     gives a form's body `flex: 1 1 0`, so text under the name wraps inside it and the trailing
+     figures keep the first flex line (issue 2257). `class` and a rest spread land on the root;
+     `data-list-row` wins. -->
 <script>
   import Medallion from './Medallion.svelte';
 
@@ -37,6 +39,7 @@
     markSize = 22,
     inset = 'form',
     detailAlign = 'start',
+    bodyBasis = 'auto',
     selected = undefined,
     disabled = false,
     onOpen = null,
@@ -131,6 +134,7 @@
   class:is-card={isCard}
   class:is-row-inset={rowInset}
   class:is-detail-end={detailAlign === 'end'}
+  class:is-body-fill={bodyBasis === 'fill' && form}
   class:is-danger={tone === 'danger'}
   {...rest}
   data-list-row={isDefault ? 'default' : 'dense'}

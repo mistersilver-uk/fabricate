@@ -342,6 +342,12 @@ export const CASES = Object.freeze([
     expectView: 'tool-edit',
     expectSelector: '[data-tool-preview-usability]',
     position: { width: 1280, height: 720 },
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-tool-preview-actor]', styles: 'font-size: 11.5px; font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'tools'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,

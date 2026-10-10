@@ -147,7 +147,8 @@ export const CASES = Object.freeze([
         target: '[data-component-inspector-kicker]',
       },
     ],
-    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
+    // the sort Select and its sort-direction `Button` at one weight (issue 2257 D8).
     expectLayout: {
       controls: [
         {
@@ -155,6 +156,8 @@ export const CASES = Object.freeze([
           styles:
             'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
         },
+        { selector: '[data-component-sort]', styles: 'font-size: 11.5px; font-weight: 600' },
+        { selector: '[data-component-sort-direction]', styles: 'font-weight: 600' },
       ],
     },
     kinds: ['manager', 'components'],
@@ -748,6 +751,12 @@ export const CASES = Object.freeze([
     // The flat row in view after the scroll; its amount toggle is the requirement row's (issue 1516).
     expectCenterHit:
       '[data-salvage-group="rw-salv-partial"] [data-salvage-result] [data-recipe-option-amount-mode="rolled"]',
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-salvage-dc-preset]', styles: 'font-size: 11.5px; font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
     sourceMatches: SALVAGE_ROW_SOURCES,
@@ -1025,6 +1034,54 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
       '[data-complication-disclosure][aria-expanded="true"]',
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-complication-roll-condition-cmp]',
+          styles: 'font-size: 11.5px; font-weight: 600',
+        },
+      ],
+    },
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComplicationEffectRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-component-complications-check-trigger',
+    label: 'Manager — Component complications check trigger',
+    // Beyond the smoke: the check-trigger Select appears only once a check-trigger condition is chosen on an open complication.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', w: '1280', h: '820' },
+    steps: [
+      // A crafting trigger has to exist for the Select to list; the save keeps the dirty-draft discard dialog from blocking navigation.
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-add-trigger]' },
+      { selector: '[data-checks-save]' },
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
+      },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
+      {
+        selector:
+          '[data-complication="hb-comp-dust-cloud"] [data-complication-condition="checkTrigger"]',
+      },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '[data-complication="hb-comp-dust-cloud"] [data-complication-trigger]',
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-complication-trigger]', styles: 'font-size: 11.5px; font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
