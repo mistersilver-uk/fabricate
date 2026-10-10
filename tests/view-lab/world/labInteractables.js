@@ -31,6 +31,16 @@ export const LAB_INTERACTABLE_REFS = Object.freeze({
     regionId: LAB_INTERACTABLE_REGION_ID,
     behaviorId: 'deep-gate-cache',
   }),
+  locked: Object.freeze({
+    sceneId: LAB_INTERACTABLE_SCENE_ID,
+    regionId: LAB_INTERACTABLE_REGION_ID,
+    behaviorId: 'deep-gate-cache',
+  }),
+  disabled: Object.freeze({
+    sceneId: LAB_INTERACTABLE_SCENE_ID,
+    regionId: LAB_INTERACTABLE_REGION_ID,
+    behaviorId: 'deep-gate-lost',
+  }),
 });
 
 /** The Tile document the tool interactable's marker resolves to. */
@@ -220,7 +230,7 @@ export function seedLabInteractables(world) {
 
   const cache = behaviorDocument({
     region,
-    id: 'deep-gate-cache',
+    id: LAB_INTERACTABLE_REFS.locked.behaviorId,
     name: 'Sunken cache anvil',
     system: {
       ...buildInteractableBehaviorSystem({
@@ -252,7 +262,7 @@ export function seedLabInteractables(world) {
   // carry, and disabled.
   const lost = behaviorDocument({
     region,
-    id: 'deep-gate-lost',
+    id: LAB_INTERACTABLE_REFS.disabled.behaviorId,
     name: 'Collapsed shaft winch',
     system: {
       ...buildInteractableBehaviorSystem({

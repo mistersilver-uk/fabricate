@@ -274,7 +274,7 @@ From it a GM can:
 - **Relink** points the interactable at a different existing marker (tile, drawing, or token).
 - **Create / Recreate marker** makes a fresh tile or drawing marker (for example after the original was deleted, or to add a marker to a region-only interactable).
 - **Remove** drops the marker but keeps the interactable working region-only.
-- **Enable / Lock** toggles the interactable's enabled and locked state.
+- **Disabled / Locked** toggle buttons set the interactable's disabled and locked state; each keeps its label and reads as pressed while that state is on.
   These are **distinct**.
   **Disabling** (or setting "Hidden from players") conceals the interactable, so the marker is hidden from players and no prompt fires, while **locking** keeps the marker visible and the prompt firing, but denies Interact with "This is locked."
   A summary line shows the first reason that would block activation, in order: disabled, then locked, then used up, then uses exhausted, then cooling down.
