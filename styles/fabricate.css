@@ -20958,7 +20958,7 @@
 
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
 
-/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; the `toolbar` rung already states their weight 500. */
+/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; each `<Select>` rung states its own weight. */
 .fabricate-manager[data-manager-view="components"] .manager-component-toolbar .fabricate-select-trigger {
   color: var(--fab-text-secondary);
 }
