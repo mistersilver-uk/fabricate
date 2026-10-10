@@ -53,7 +53,7 @@ export function resolveToolName(tool, component) {
 
 /**
  * A behaviour system's source name: a Tool by `data-models` "Tool" requirement 13, a Task by its
- * name. Null when nothing resolves, so the caller's stored-name-then-id fallback applies.
+ * name. Null when nothing resolves, so each caller applies its own fallback.
  */
 export function resolveInteractableSourceLabel(deps, system) {
   if (!system) return null;
@@ -63,7 +63,8 @@ export function resolveInteractableSourceLabel(deps, system) {
     );
     if (!tool) return null;
     const component = linkedComponentFor(tool, listSystemComponents(deps, system.systemId));
-    return resolveToolDisplayName(tool, component, '') || null;
+    const name = resolveToolDisplayName(tool, component, '');
+    return name ? String(name) : null;
   }
   const task = listSystemTasks(deps, system.systemId).find(
     (candidate) => String(candidate?.id) === String(system.taskId)
