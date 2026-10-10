@@ -48,7 +48,7 @@ const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
 /** The identity marker `npm run lab:check` reads off each specimen's `<iframe>`. */
 const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
-/** The drawing's width as measured before it was replaced, and `capped` when it has a `max-width`. */
+/** The drawing's width before it was replaced; `capped` when a `max-width` or a stretch, never an inset, sizes its slot. */
 const DRAWN_ATTRIBUTE = 'data-primitive-lab-drawn';
 const CAPPED_ATTRIBUTE = 'data-primitive-lab-capped';
 
@@ -228,7 +228,7 @@ function placeSpecimenFrame(slot) {
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
   const host = readHostLayout(slot.host, slot.row);
   iframe.setAttribute(DRAWN_ATTRIBUTE, String(slot.host.getBoundingClientRect().width));
-  if (host.maxInlineSize !== 'none') iframe.setAttribute(CAPPED_ATTRIBUTE, '');
+  if (host.maxInlineSize !== 'none' || !host.inlineSize) iframe.setAttribute(CAPPED_ATTRIBUTE, '');
   // Before READY, so the first report is measured at the width the specimen will keep.
   if (host.presize) iframe.style.width = host.presize;
   presizeBoxedSlot(iframe, slot.row);
