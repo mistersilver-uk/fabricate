@@ -1205,7 +1205,8 @@
     "path": "src/ui/svelte/components/OutcomeLadder.svelte",
     "undrawn": {
       "Success": "the status glyph’s accessible name; the drawing draws the glyph",
-      "Failure": "the status glyph’s accessible name; the drawing draws the glyph"
+      "Failure": "the status glyph’s accessible name; the drawing draws the glyph",
+      "icons/commodities/metal/ingot-plain-steel.webp": "the yield's art path, drawn as its 14px picture rather than as text"
     },
     "props": {
       "reachedId": "fruitful",
