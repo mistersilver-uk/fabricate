@@ -48,6 +48,13 @@ test('the time is muted, and clears 4.5:1 on a resting, selected and failed entr
   assert.equal(ink, '--fab-text-muted');
   assert.deepEqual(under(ink, paint(LOG_LIST, ENTRY, 'background')), []);
   assert.deepEqual(under(ink, paint(LOG_LIST, `${ENTRY}.is-danger`, 'background')), []);
+  const selectedGrounds = rulesIn(corpus[LOG_LIST]).filter(
+    (rule) =>
+      splitSelectorList(rule.selector).some((selector) =>
+        selector.replaceAll(/:not\([^)]*\)/gu, '').includes('.is-selected')
+      ) && propertiesOf(rule).has('background')
+  );
+  assert.deepEqual(selectedGrounds, [], 'a selected entry keeps the resting ground');
 });
 
 test('a hovered entry raises its ground, so its time takes secondary and clears 4.5:1 there', () => {

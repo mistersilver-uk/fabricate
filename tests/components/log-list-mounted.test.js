@@ -293,7 +293,7 @@ describe('LogList', () => {
       const rest = await page.evaluate(readTime);
       assert.match(rest.family, /^"JetBrains Mono"/u, 'the time is set in the mono face');
       assert.equal(rest.size, '9.5px');
-      assert.ok(rest.weight <= 500, `mono ships 400 and 500 only, not ${rest.weight}`);
+      assert.equal(rest.weight, 400, 'the ladder sets the log line at Mono 400');
       assert.equal(rest.overflow, 'ellipsis');
       assert.ok(rest.cut, 'a time longer than its column is cut, not wrapped or spilled');
       assert.ok(rest.inside && rest.oneLine, 'and stays on one line inside the copy column');
