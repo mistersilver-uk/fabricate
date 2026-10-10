@@ -328,7 +328,7 @@
     white-space: nowrap;
   }
 
-  /* Opt-in WorldClockChip composition; icon, label and value are direct flex children. */
+  /* Opt-in WorldClockChip geometry, centring its one baseline-aligned line of icon, label and value. */
   .manager-chip.is-clock {
     height: 28px;
     min-height: 28px;

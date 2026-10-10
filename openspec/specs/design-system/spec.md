@@ -1148,7 +1148,7 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
 `StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
-`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry stays `target` in its own library block, whose owner flips it.
+`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry keeps its own library block, `shipped` since its kicker adopted `Kicker` (issue 2257).
 A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a gathering condition modifier's condition and drop-chance change.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.
@@ -2393,6 +2393,8 @@ It stays a bare line until a second independent caller justifies naming the shap
 A converted select's KICKER-SHAPED caption is recorded as a caption the `Kicker` primitive does not serve, and is not to be re-proposed as one.
 The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
 The second difference is structural and smaller — `Kicker` takes no `class` and no `style`, and its rest spread carries a hook and no `id`, so it cannot be the `aria-labelledby` target the trigger's accessible name now comes from — and it is second because it is a one-prop fix where the type is a design decision.
+The run bar's and run progress's kickers adopt `Kicker`, because their shipped subtle ink is under the 4.5:1 floor.
+The converted-select captions remain ruled out.
 
 An `asidePlacement` prop on `ListRow`, which would draw the selectable form's `aside` inline beside its button, is recorded as declined (issue 1523, decision D1): the aside stays beneath the button, as "Dense result rows and compact rail pagination retain their meaning" states, and the library's list row specimens draw it there.
 

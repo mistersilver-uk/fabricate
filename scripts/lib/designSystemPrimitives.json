@@ -499,10 +499,10 @@
     {
       "path": "src/ui/svelte/components/RunProgress.svelte",
       "library": "<RunProgress>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match, but its hand-rolled kicker is not the shipped `Kicker`, so it stays target with that disagreement recorded in the library's migrations table."
+      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match. `shipped` at issue 2257 (D22): its kicker is the shipped `Kicker` inside the span its id names, because the hand-rolled subtle ink measured under the 4.5:1 floor; `run-kicker-contrast.test.js` holds the muted ink at 4.5:1 on the run ground in seven themes."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte",
@@ -803,7 +803,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/ActionsPanel.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch is a recorded deviation the specimen draws (issue 2257 D22), and the hand-rolled kicker disagrees, so its library specimen reads target until issue 2257 converges it."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch is a recorded deviation the specimen draws (issue 2257 D22). At issue 2257 its completion kicker converges on the shipped `Kicker`, and its library specimen reads `shipped`."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",

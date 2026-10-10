@@ -2,6 +2,7 @@
      heading over `StageBars`, which names its group by the kicker when one is drawn and by
      `ariaLabel` otherwise. -->
 <script>
+  import Kicker from './Kicker.svelte';
   import StageBars from './StageBars.svelte';
 
   let {
@@ -33,7 +34,9 @@
 <div class="fab-run-progress" data-run-progress>
   {#if label || blocker}
     <div class="fab-run-progress-heading">
-      {#if label}<span class="fab-run-progress-kicker" id={kickerId}>{label}</span>{/if}
+      {#if label}<span class="fab-run-progress-label" id={kickerId}
+          ><Kicker as="span">{label}</Kicker></span
+        >{/if}
       {#if blocker}<span class="fab-run-progress-blocker" data-run-progress-blocker>{blocker}</span
         >{/if}
     </div>
@@ -59,12 +62,8 @@
     gap: var(--fab-space-2);
   }
 
-  .fab-run-progress-kicker {
-    color: var(--fab-text-subtle);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .fab-run-progress-label {
+    line-height: 0;
   }
 
   .fab-run-progress-blocker {
