@@ -6,6 +6,8 @@ interactables-config-configured
 interactables-config-needs-configuration
 interactables-config-source-open
 interactables-config-tool
+interactables-config-locked
+interactables-config-disabled
 interactables-manager-list
 interactables-manager-promote
 interactables-manager-region-open

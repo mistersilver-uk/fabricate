@@ -53,6 +53,7 @@ export const CONFIG_PANEL_CONTRACT = Object.freeze({
     'fab-ic-node-state',
     'fab-ic-section',
     'fab-ic-section-title',
+    'fab-ic-state-glyph',
     'fab-ic-title',
     'fab-ic-visual-status',
   ]),
