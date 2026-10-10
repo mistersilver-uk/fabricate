@@ -737,6 +737,7 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-component-edit-salvage-rolled-narrow',
   'manager-component-edit-salvage-narrow',
   'manager-checks-parity-outcomes-multiply',
+  'manager-checks-parity-outcomes-under-fixed',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.

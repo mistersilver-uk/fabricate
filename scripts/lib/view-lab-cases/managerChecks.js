@@ -1399,30 +1399,38 @@ export const CASES = Object.freeze([
     },
     expectCenterHit: '[data-outcome-adjustment][data-stepper-endpoint]',
   }),
-  parityCase({
+  managerCase({
+    ...parityCase({
+      label: 'outcome tiers against a fixed target',
+      frame: 12,
+      query: { system: 'lab-runework' },
+      steps: [
+        ...parityFormula('1d20'),
+        ...previewAsActor('lab-actor-idrin'),
+        ...PARITY_UNDER,
+        ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
+        ...parityPreview(1),
+        ...parityOutcomes(
+          ['Botched', 'Flawed', 'Success', 'Fine'],
+          '[data-outcome-dc]',
+          [
+            [1, '-4'],
+            [2, '-1'],
+            [3, '0'],
+            [4, '+3'],
+          ],
+          ['failure', 'failure', 'success', 'success']
+        ),
+      ],
+      expectSelector: '.fabricate-manager [data-outcome-head]',
+    }),
     id: 'manager-checks-parity-outcomes-under-fixed',
-    label: 'outcome tiers against a fixed target',
-    frame: 12,
-    query: { system: 'lab-runework' },
-    steps: [
-      ...parityFormula('1d20'),
-      ...previewAsActor('lab-actor-idrin'),
-      ...PARITY_UNDER,
-      ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
-      ...parityPreview(1),
-      ...parityOutcomes(
-        ['Botched', 'Flawed', 'Success', 'Fine'],
-        '[data-outcome-dc]',
-        [
-          [1, '-4'],
-          [2, '-1'],
-          [3, '0'],
-          [4, '+3'],
-        ],
-        ['failure', 'failure', 'success', 'success']
-      ),
-    ],
-    expectSelector: '.fabricate-manager [data-outcome-head]',
+    expectLayout: {
+      containerSelector: '.manager-checks-tier-list',
+      oneLineRows: '.manager-checks-tier-list [data-outcome-row]',
+      unclipped: '.manager-checks-tier-list [data-outcome-dc]',
+      alignedLeft: '.manager-checks-tier-list .manager-checks-tier-stepper',
+    },
   }),
   underCase({
     id: 'manager-checks-under-fixed-rolled',
