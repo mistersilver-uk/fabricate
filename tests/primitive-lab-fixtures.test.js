@@ -268,13 +268,14 @@ function soleExpression(attribute) {
   return value?.type === 'ExpressionTag' ? value.expression : null;
 }
 
-/** Whether an expression is the `local` binding whole, or a condition that may yield it. */
+/** Whether an expression is the `local` binding whole, or a condition that may yield it; `&&` yields only its right. */
 function yields(expression, local) {
   if (expression?.type === 'ConditionalExpression') {
     return yields(expression.consequent, local) || yields(expression.alternate, local);
   }
   if (expression?.type === 'LogicalExpression') {
-    return yields(expression.left, local) || yields(expression.right, local);
+    const right = yields(expression.right, local);
+    return expression.operator === '&&' ? right : right || yields(expression.left, local);
   }
   return expression?.type === 'Identifier' && expression.name === local;
 }
@@ -799,4 +800,7 @@ test('a snippet the fixture declares and never passes on is refused', () => {
   for (const handed of ['{action}', 'action={typed ? action : undefined}']) {
     assert.deepEqual(declaring(['<Specimen {...props}', handed, '/>'].join(' ')), [], handed);
   }
+  assert.deepEqual(declaring('<Specimen {...props} action={action && typed} />'), [
+    'declares the `action` snippet and does not pass it on',
+  ]);
 });
