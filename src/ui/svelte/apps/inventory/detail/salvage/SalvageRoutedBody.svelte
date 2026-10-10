@@ -21,7 +21,7 @@
   record's `checkResult.data.outcomeId`, the engine's own record of which tier it routed
   through, so the marker cannot disagree with the award. Before a roll — and on a
   runless salvage, which records nothing — no tier is marked. The tiers are the shared
-  `OutcomeLadder` (issue 1644), each figure its band chip and each result a list row, and every
+  `OutcomeLadder` (issue 1644), each figure its bare band and each result a yield chip, and every
   `data-inventory-*` hook rides that ladder's per-item props.
 -->
 <script>

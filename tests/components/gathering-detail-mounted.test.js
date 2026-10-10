@@ -97,6 +97,7 @@ function dropBreakdown() {
         quantity: 2,
         baseChance: 0.4,
         finalChance: 0.53,
+        threshold: 48,
         modifiers: {
           weather: { conditionId: 'rain', value: 10 },
           timeOfDay: { conditionId: 'night', value: -5 },
@@ -116,6 +117,7 @@ function scrambledBreakdown(awardMode) {
     quantity,
     baseChance: chance,
     finalChance: chance,
+    threshold: 101 - Math.round(chance * 100),
     modifiers,
   });
   return {
@@ -703,6 +705,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'FABRICATE.App.Gathering.Detail.DropQuantity:{"x":2}'
     );
     assert.equal(row.querySelector('.manager-chip').textContent.trim(), '53%', 'its chance figure');
+    assert.equal(
+      row.querySelector(':scope .fabricate-list-row-meta [data-yield-reading]').textContent,
+      'FABRICATE.App.Gathering.Detail.DropThreshold:{"threshold":48}',
+      "the engine's threshold, as a sentence under the name"
+    );
     assert.ok(!row.querySelector('.fabricate-list-row-detail'), 'and no inline sentence');
     assert.ok(
       !section.querySelector('[data-gathering-drop-modifiers]'),
@@ -741,6 +748,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       assert.deepEqual(
         rows.map((row) => row.querySelector('.manager-chip').textContent.trim()),
         ['10%', '90%', '45%']
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('[data-yield-reading]').textContent),
+        [91, 11, 56].map(
+          (threshold) => `FABRICATE.App.Gathering.Detail.DropThreshold:{"threshold":${threshold}}`
+        ),
+        "each row's sentence states its own threshold"
       );
       assert.ok(!target.querySelector('[data-yield-cut]'), 'a preview draws no cut');
 
@@ -1173,7 +1187,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
   });
 
-  it('draws each drop on the shared list row, its artwork on the 22px art tile', async () => {
+  it('draws each drop on the shared list row, its artwork on the borderless 26px mark', async () => {
     const { services } = makeServices(listing([environment()]), {
       drops: [
         { id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 },
@@ -1192,8 +1206,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       Boolean(row.querySelector('[data-list-row="dense"]')),
       'the drop is a dense list row'
     );
-    const tile = row.querySelector('.fab-medallion');
-    assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the row size');
+    const tile = row.querySelector(
+      ':scope .fabricate-list-row-leading > .fab-medallion.is-glyph-chip'
+    );
+    assert.match(tile.getAttribute('style'), /width:\s*26px;\s*height:\s*26px/, 'at the mark size');
+    assert.ok(!row.querySelector('[data-yield-reading]'), 'a drop with no threshold states none');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
     assert.equal(tile.querySelector('img').getAttribute('src'), 'icons/svg/mystery-man.svg');
     assert.ok(!row.querySelector('.fab-fill-bar'), 'the chance is a figure, not a fill track');

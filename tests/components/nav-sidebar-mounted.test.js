@@ -1,9 +1,11 @@
-/** Issue 1777 — `<NavSidebar>`'s two variants and the ARIA each owes. */
+/** Issue 1777 — `<NavSidebar>`'s two variants, the ARIA each owes, and the group box (issue 2257). */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { tick } from '../../node_modules/svelte/src/index-client.js';
+import { renderWithCascade } from '../helpers/layout-harness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -113,6 +115,10 @@ function sections() {
             markers: [{ kind: 'count', value: 4 }],
           }),
           children: [leaf('recipes', 'Recipes', page), leaf('books', 'Books', { active: false })],
+        }),
+        leaf('validation', 'Validation', {
+          active: false,
+          markers: [{ kind: 'count', value: 9, label: 'Open validation issues' }],
         }),
         leaf('graph', 'Graph', {
           disabled: true,
@@ -284,12 +290,28 @@ describe('NavSidebar, labelled variant', () => {
       ['probe-recipes', 'page'],
     ]);
     assert.deepEqual(
-      [...root.querySelectorAll('.manager-nav-submenu')].map((list) =>
-        list.getAttribute('aria-label')
-      ),
-      ['Crafting sections'],
-      'an open sub-list keeps its name'
+      [...root.querySelectorAll('.manager-nav-submenu')].map((list) => [
+        list.getAttribute('role'),
+        list.getAttribute('aria-label'),
+      ]),
+      [['group', 'Crafting sections']],
+      'an open sub-list is a group, which is what lets its name be announced (issue 2257 D12)'
     );
+  });
+
+  it('names a count through visually hidden text inside it, never an aria-label', async () => {
+    const root = await mountLabelled();
+    const counts = [...root.querySelectorAll('.manager-nav-count')];
+    assert.deepEqual(
+      counts.map((count) => [count.textContent, count.hasAttribute('aria-label')]),
+      [
+        ['4', false],
+        ['9 Open validation issues', false],
+      ],
+      'an unnamed count adds nothing'
+    );
+    const named = counts[1].querySelector('.visually-hidden');
+    assert.equal(named?.textContent, ' Open validation issues', 'the unit is read, not drawn');
   });
 
   it('declares every row and chevron focused, so Foundry keybindings stay quiet', async () => {
@@ -485,5 +507,173 @@ describe('NavSidebar, labelled variant, a tier-gated group', () => {
     } finally {
       proto.scrollIntoView = original;
     }
+  });
+});
+
+/** One group three times: open, shut, and open on its own current page. */
+function boxSection() {
+  const children = (id) => [leaf(`${id}-a`, 'Recipes'), leaf(`${id}-b`, 'Books')];
+  return {
+    entries: ['open', 'shut', 'current'].map((id) =>
+      group(id, {
+        expanded: id !== 'shut',
+        locked: false,
+        toggle: { label: 'Toggle crafting' },
+        submenuLabel: 'Crafting sections',
+        hooks: { 'data-probe-group': id },
+        parent: leaf(id, 'Crafting', {
+          markers: [{ kind: 'count', value: 4, label: 'Recipes in this system' }],
+          active: id === 'current',
+          current: id === 'current' ? 'page' : undefined,
+        }),
+        children: children(id),
+      })
+    ),
+  };
+}
+
+/** In the page: each group's box and its parent's pieces, offset from the group's corner. */
+function readGroupBoxes() {
+  const tokenValue = (property, token) => {
+    const probe = document.createElement('span');
+    probe.style.setProperty(property, `var(${token})`);
+    document.querySelector('.fabricate-manager').append(probe);
+    const value = getComputedStyle(probe).getPropertyValue(property);
+    probe.remove();
+    return value;
+  };
+  /** Whether `row`'s keyboard focus ring falls inside `frame`, the box that clips or holds it. */
+  const ringInside = (row, frame) => {
+    row.focus();
+    const style = getComputedStyle(row);
+    const reach = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    const box = row.getBoundingClientRect();
+    const edge = frame.getBoundingClientRect();
+    const shown = row.matches(':focus-visible') && style.outlineStyle !== 'none';
+    row.blur();
+    return shown && box.left - reach >= edge.left && box.right + reach <= edge.right;
+  };
+  const of = (id) => {
+    const node = document.querySelector(`[data-probe-group="${id}"]`);
+    const origin = node.getBoundingClientRect();
+    const at = (child) => {
+      const box = child.getBoundingClientRect();
+      return [box.left - origin.left, box.top - origin.top, box.width, box.height];
+    };
+    const parent = node.querySelector('.manager-nav-parent');
+    const style = getComputedStyle(node);
+    const rows = [...node.querySelectorAll('.manager-nav-subitem')];
+    return {
+      pieces: {
+        icon: at(parent.querySelector('i')),
+        label: at(parent.querySelector('.manager-nav-label')),
+        chevron: at(node.querySelector('.manager-nav-toggle')),
+      },
+      radius: style.borderTopLeftRadius,
+      fill: style.backgroundColor,
+      shadow: style.boxShadow,
+      padding: style.padding,
+      parentRadius: getComputedStyle(parent).borderTopLeftRadius,
+      parentFill: getComputedStyle(parent).backgroundColor,
+      parentBorder: getComputedStyle(parent).borderTopColor,
+      unitRendered: parent
+        .querySelector(':scope .manager-nav-count .visually-hidden')
+        .getClientRects().length,
+      guide: [...node.querySelectorAll('.manager-nav-submenu')].map((list) => [
+        getComputedStyle(list).borderLeftStyle,
+        at(list.querySelector('.manager-nav-subitem'))[0],
+      ]),
+      rowsInside: rows.map((row) => {
+        const box = row.getBoundingClientRect();
+        return box.left >= origin.left && box.right <= origin.right && box.bottom <= origin.bottom;
+      }),
+      rings: {
+        child: rows.length > 0 && ringInside(rows[0], node),
+        parent: ringInside(parent, node.closest('.manager-nav')),
+      },
+    };
+  };
+  return {
+    open: of('open'),
+    shut: of('shut'),
+    current: of('current'),
+    soft: tokenValue('background-color', '--fab-surface-soft'),
+    active: tokenValue('background-color', '--fab-surface-active'),
+    border: tokenValue('color', '--fab-border'),
+  };
+}
+
+describe('NavSidebar, labelled variant, the expanded group box in Chromium', () => {
+  before(() => labelledHarness.setup());
+  after(() => labelledHarness.teardown());
+  afterEach(() => labelledHarness.remount());
+
+  async function measure(bodyClass) {
+    const root = await labelledHarness.mount({ sections: [boxSection()] });
+    const view = await renderWithCascade(
+      `<div class="fabricate fabricate-manager"><div class="manager-body${bodyClass}">` +
+        `<aside class="manager-rail">${root.innerHTML}</aside></div></div>`,
+      [readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')],
+      { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }
+    );
+    try {
+      return await view.page.evaluate(readGroupBoxes);
+    } finally {
+      await view.close();
+    }
+  }
+
+  it('draws an open group as one radius-9 box whose parent does not move', async () => {
+    const read = await measure('');
+    assert.equal(read.open.radius, '9px');
+    assert.equal(read.open.fill, read.soft, 'on the soft ground');
+    assert.equal(read.open.shadow, `${read.border} 0px 0px 0px 1px inset`, 'an inset hairline');
+    assert.equal(read.open.padding, '2px');
+    assert.deepEqual(read.open.rowsInside, [true, true], 'its rows sit inside the box');
+    assert.deepEqual(
+      read.open.guide,
+      [['none', 14]],
+      'no guide rule: a child starts one --fab-space-3 step inside the box'
+    );
+    assert.equal(read.shut.shadow, 'none', 'a shut group draws no box');
+    assert.deepEqual(
+      read.open.pieces,
+      read.shut.pieces,
+      'the parent’s icon, label and chevron hold their place when the group opens'
+    );
+    assert.deepEqual(
+      [read.open.parentRadius, read.shut.parentRadius],
+      ['7px', '9px'],
+      'the 30px parent nests its corner 2px inside the box; a shut 34px row keeps 9'
+    );
+    assert.deepEqual([read.open.unitRendered, read.shut.unitRendered], [1, 1], 'a count’s unit');
+  });
+
+  it('keeps an active parent’s plate inside the box and drops its border', async () => {
+    const read = await measure('');
+    assert.equal(read.current.parentBorder, 'rgba(0, 0, 0, 0)', 'no edge inside the box');
+    assert.equal(read.current.parentFill, read.active, 'the active plate the specimen draws');
+    assert.equal(read.current.parentRadius, '7px');
+    assert.deepEqual(read.current.pieces, read.open.pieces, 'and it does not move either');
+  });
+
+  it('keeps every keyboard focus ring inside the box and the nav that clip it', async () => {
+    const read = await measure('');
+    assert.deepEqual(read.open.rings, { child: true, parent: true }, 'an open group');
+    assert.equal(read.shut.rings.parent, true, 'a top-level row spanning the nav');
+  });
+
+  it('draws no box on the collapsed rail, and the open parent still does not move', async () => {
+    const read = await measure(' is-rail-collapsed');
+    assert.equal(read.open.fill, 'rgba(0, 0, 0, 0)');
+    assert.equal(read.open.shadow, 'none');
+    assert.equal(read.open.padding, '0px');
+    assert.equal(read.open.parentRadius, '9px', 'the collapsed parent is a 34px row');
+    assert.deepEqual(read.open.pieces.icon, read.shut.pieces.icon, 'the icon is all it shows');
+    assert.deepEqual(
+      [read.open.unitRendered, read.shut.unitRendered],
+      [0, 0],
+      'a hidden count takes its unit with it, so a row is never named by its count'
+    );
   });
 });

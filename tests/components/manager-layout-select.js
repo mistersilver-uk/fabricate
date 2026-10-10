@@ -929,7 +929,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
             :root { --button-size: 28px; --button-focus-outline-color: #ff6400; font-size: 16px; }
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
             /* Foundry's own application base, which is what "inherited" means outside the manager
-               — 14px, so it can never be mistaken for the toolbar rung's 11.52px literal. */
+               — 14px, so it can never be mistaken for the toolbar rung's 11.5px literal. */
             .fabricate { font-size: 14px; }
             .fas::before, .fa-solid::before { content: "x"; }
             .probe { width: 10px; height: 10px; }
@@ -1065,9 +1065,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
         assert.equal(measured.fontSize, rung.fontSize, `${where}: type size`);
         assert.equal(
           measured.fontWeight,
-          '500',
-          `${where}: a published ramp numeral at EVERY rung, rather than the \`normal\` the ` +
-            'shipped toolbar select computes today'
+          rung.fontWeight,
+          `${where}: a published ramp numeral at every rung, never the inherited \`normal\``
         );
         assert.notEqual(
           measured.justify,
@@ -1088,8 +1087,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
     // The literal's whole observable consequence, stated as its own clause.
     assert.equal(
       report.triggers['player:toolbar'].fontSize,
-      '11.52px',
-      'the toolbar rung ships a LITERAL 0.72rem, so it is 11.52px with no manager ancestor'
+      '11.5px',
+      'the toolbar rung ships a literal 11.5px, so it holds with no manager ancestor'
     );
     assert.notEqual(
       report.triggers['player:toolbar'].fontSize,
@@ -1148,20 +1147,20 @@ test('the shared Select paints identically in both areas, and beats the paint it
     assert.equal(report.headings.untickedManager, report.headings.untickedPlayer, 'in both areas');
 
     // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW.
-    assert.equal(report.shipped.select.size, '11.52px', 'the converted sort trigger`s type size');
+    assert.equal(report.shipped.select.size, '11.5px', 'the converted sort trigger`s type size');
     // The search field is the library's `<Search>` at 500 12.5px since issue 1782.
     assert.equal(report.shipped.search.size, '12.5px', 'and its search field states its own');
     assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
     assert.deepEqual(
       [report.shipped.select.weight, report.shipped.search.weight, report.shipped.direction.weight],
-      ['500', '500', '400'],
-      'the sort and the search take the ramp`s 500 while the direction toggle declares no ' +
-        'weight and computes `normal`, which is OFF the published ramp'
+      ['600', '500', '400'],
+      'the sort takes the rung`s 600 and the search the ramp`s 500, while the bare direction ' +
+        'toggle declares no weight and computes `normal`, which is off the published ramp'
     );
     assert.equal(
       report.triggers['manager:toolbar'].fontWeight,
-      '500',
-      'so the toolbar line`s SIZE is intact across the conversion and only its WEIGHT moves'
+      report.shipped.select.weight,
+      'the shipped sort draws the rung`s own weight, not a per-site one'
     );
   } finally {
     await context.close();
