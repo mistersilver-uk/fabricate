@@ -27,6 +27,12 @@ const JOURNAL_ADDITIONAL_DICE_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/crafting\/RollPromptAdditionalDice\.svelte$/,
 ]);
 
+/** A routed ladder tier's band (issue 2257 D14): a bare mono figure, named by its tone and inked by it. */
+const ROUTED_BAND = (tier, tone, ink) => ({
+  selector: `[data-journal-detail] [data-outcome-tier="${tier}"] [data-outcome-band="${tone}"]`,
+  styles: `font-size: 10px; border-width: 0; color: var(${ink})`,
+});
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-alchemy-chooser',
@@ -345,8 +351,15 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '[data-journal-detail] [data-outcome-ladder]' +
-      ':has([data-outcome-tier="lab-abundant"] .manager-chip:text-is("≤15"))' +
-      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is(">15"))',
+      ':has([data-outcome-tier="lab-abundant"] [data-outcome-band]:text-is("≤15"))' +
+      ':has([data-outcome-tier="lab-failed"] [data-outcome-band]:text-is(">15"))',
+    // Issue 2257 D14: each band a bare mono figure, inked by its tier.
+    expectLayout: {
+      controls: [
+        ROUTED_BAND('lab-abundant', 'neutral', '--fab-text-secondary'),
+        ROUTED_BAND('lab-failed', 'danger', '--fab-danger-text'),
+      ],
+    },
     kinds: ['player', 'journal', 'gathering'],
     sourceMatches: [
       JOURNAL_SOURCES,
@@ -361,21 +374,21 @@ export const CASES = Object.freeze([
       'player-journal-routed-bands-under-crafting',
       { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under' },
       'lab-v1-journal-check-prompt',
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("≤7"))' +
-        ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is(">12"))',
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("≤7"))' +
+        ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is(">12"))',
     ],
     [
       'player-journal-routed-bands-under-attribute',
       { journalCaseState: 'gathering-journal-check-prompt', gatheringTaskMode: 'routed-under' },
       'lab-v1-gathering-journal-check-prompt',
-      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is("Failed · −15"))',
+      ':has([data-outcome-tier="lab-failed"] [data-outcome-band]:text-is("Failed · −15"))',
     ],
     [
       'player-journal-routed-bands-under-multiply',
       { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under-multiply' },
       'lab-v1-journal-check-prompt',
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("Ruined · Otherwise"))' +
-        ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("Standard · ×½"))',
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("Ruined · Otherwise"))' +
+        ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("Standard · ×½"))',
     ],
   ].map(([id, query, runId, ladder]) =>
     playerCase({
@@ -456,12 +469,18 @@ export const CASES = Object.freeze([
       '[data-journal-detail]' +
       ':has([data-journal-summary-card="check"]:has-text("2 successes needed · d10s"))' +
       ' [data-outcome-ladder]' +
-      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
-      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("2–3"))' +
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–1"))' +
+      ':has([data-outcome-tier="count-botch"] [data-outcome-band]:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("2–3"))' +
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("0–1"))' +
       // In ladder order: a best-first ladder closes on its Botch row.
       ':has([data-outcome-tier="rw-masterwork"] ~ [data-outcome-tier="rw-ruined"] + [data-outcome-tier="count-botch"])',
+    expectLayout: {
+      controls: [
+        ROUTED_BAND('rw-masterwork', 'neutral', '--fab-text-secondary'),
+        ROUTED_BAND('rw-ruined', 'danger', '--fab-danger-text'),
+      ],
+    },
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,
@@ -485,12 +504,13 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '[data-journal-detail] [data-outcome-ladder]' +
-      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("3"))' +
-      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–2"))' +
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("3"))' +
+      ':has([data-outcome-tier="count-botch"] [data-outcome-band]:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("0–2"))' +
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("4+"))' +
       ':has([data-outcome-tier="rw-standard"] + [data-outcome-tier="count-botch"]' +
       ' + [data-outcome-tier="rw-ruined"] + [data-outcome-tier="rw-masterwork"])',
+    expectLayout: { controls: [ROUTED_BAND('rw-standard', 'neutral', '--fab-text-secondary')] },
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,

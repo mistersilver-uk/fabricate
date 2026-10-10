@@ -1732,6 +1732,7 @@
           "DropsErrorDetail": "Try selecting the task again, and tell your GM if it keeps happening.",
           "FindChanceLabel": "Find chance",
           "DropQuantity": "×{x}",
+          "DropThreshold": "Effective roll {threshold} or higher",
           "ChanceBreakdown": "Chance breakdown",
           "DropBaseChance": "Base chance",
           "ModifierWeather": "Weather",

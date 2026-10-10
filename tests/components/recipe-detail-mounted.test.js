@@ -594,7 +594,7 @@ describe('RecipeDetail mounted behavior', () => {
     checkResult: { success, data: { outcomeId } },
   });
 
-  it('tones tiered outcomes by success and failure, with no band chip and no control', async () => {
+  it('tones tiered outcomes by success and failure, with no band and no control', async () => {
     const target = await mountTiers([
       {
         id: 't-success',
@@ -621,9 +621,9 @@ describe('RecipeDetail mounted behavior', () => {
     );
     assert.equal(section.querySelectorAll('.fab-outcome-tier').length, 2, 'the rows are drawn');
     assert.equal(
-      section.querySelectorAll(':scope .fab-outcome-tier-heading .manager-chip').length,
+      section.querySelectorAll(':scope .fab-outcome-tier-heading [data-outcome-band]').length,
       0,
-      'crafting tiers carry no band, so no chip'
+      'crafting tiers carry no band'
     );
     assert.equal(section.querySelectorAll('button, input, select').length, 0, 'no control');
   });
@@ -637,7 +637,7 @@ describe('RecipeDetail mounted behavior', () => {
       'Flawed, Standard, Fine',
       'the collapsed row lists every contributing tier name'
     );
-    assert.equal(rows[0].querySelectorAll('[data-list-row]').length, 1, 'the shared result once');
+    assert.equal(rows[0].querySelectorAll('[data-outcome-yield]').length, 1, 'the shared result once');
   });
 
   it('marks "Your roll" on the row a success outcome id was merged into', async () => {
@@ -678,7 +678,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(tierSection(unknown).querySelectorAll('.fab-outcome-tier').length, 3);
   });
 
-  it('draws each result kind on the shared row with its kind hook', async () => {
+  it('draws each result kind on the shared yield chip with its kind hook', async () => {
     const target = await mountTiers([
       {
         id: 't-pass',
@@ -719,9 +719,9 @@ describe('RecipeDetail mounted behavior', () => {
       },
     ]);
     const row = (kind) =>
-      tierSection(target).querySelector(`[data-list-row][data-award-kind="${kind}"]`);
+      tierSection(target).querySelector(`[data-outcome-yield][data-award-kind="${kind}"]`);
     const text = (node, part) =>
-      node.querySelector(`.fabricate-list-row-${part}`)?.textContent.trim() ?? null;
+      node.querySelector(`.fab-outcome-yield-${part}`)?.textContent.trim() ?? null;
     const item = row('component');
     assert.equal(text(item, 'name'), 'Iron Sword');
     assert.equal(text(item, 'quantity'), '×2', 'an item states its count');
