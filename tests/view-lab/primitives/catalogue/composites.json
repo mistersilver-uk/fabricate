@@ -1201,34 +1201,50 @@
     "props": {
       "stages": [
         {
-          "id": "s1"
+          "id": "s1",
+          "stepName": "Gather"
         },
         {
-          "id": "s2"
+          "id": "s2",
+          "stepName": "Smelt"
         },
         {
-          "id": "s3"
+          "id": "s3",
+          "stepName": "Forge"
         },
         {
-          "id": "s4"
+          "id": "s4",
+          "stepName": "Quench"
         },
         {
-          "id": "s5"
+          "id": "s5",
+          "stepName": "Temper"
         },
         {
-          "id": "s6"
+          "id": "s6",
+          "stepName": "Grind"
         },
         {
-          "id": "s7"
+          "id": "s7",
+          "stepName": "Polish"
         },
         {
-          "id": "s8"
+          "id": "s8",
+          "stepName": "Finish"
         }
       ],
       "current": 3,
       "view": 2
     },
     "undrawn": {
+      "Gather": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Smelt": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Forge": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Quench": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Temper": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Grind": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Polish": "the step's name, read only by assistive technology; the drawing shows numerals",
+      "Finish": "the step's name, read only by assistive technology; the drawing shows numerals",
       "Previous stage": "the back arrow's accessible name, as `RunDetail` words it; the drawing words it Show the previous stage",
       "Next stage": "the forward arrow's accessible name, as `RunDetail` words it; the drawing words it Show the next stage"
     },
@@ -1239,7 +1255,7 @@
       "positionKey": "FABRICATE.App.Journal.Stage.Position",
       "returnKey": "FABRICATE.App.Journal.Stage.Return"
     },
-    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its accessible names follow `RunDetail`, so each numeral is named View stage N and the arrows Previous stage and Next stage, where the drawing says Show stage N and Show the previous stage; its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
+    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its accessible names follow `RunDetail`, so each numeral is named View stage N with its step's name and the arrows Previous stage and Next stage, where the drawing says Show stage N and Show the previous stage; its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
