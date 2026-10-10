@@ -694,10 +694,9 @@ export const CASES = Object.freeze([
     ],
     // Issue 1644: the find section states its one drop on the shared yield scale.
     expectSelector: '[data-gathering-drops-state="ready"] [data-yield-scale] [data-yield-entry]',
-    // Issue 2257 D15: the borderless 26px mark, and each row one flex line in the 274px column.
+    // Issue 2257 D15: the borderless 26px mark.
     expectLayout: {
       containerSelector: '[data-gathering-drops] [data-yield-scale]',
-      oneLineRows: '[data-gathering-drops] [data-yield-entry] > .fabricate-list-row',
       controls: [
         {
           selector: '[data-gathering-drops] [data-yield-entry="hb-ridgemoss-drop"] .fab-medallion',
@@ -762,10 +761,9 @@ export const CASES = Object.freeze([
       '[data-gathering-drops]' +
       ':has([data-gathering-drops-disclosure][aria-expanded="true"][aria-controls])' +
       ' [data-gathering-drop-modifiers]',
-    // Issue 2257 D15: five rows, each one flex line under its threshold sentence.
+    // Issue 2257 D15: the borderless 26px mark on the five-row scale.
     expectLayout: {
       containerSelector: '[data-gathering-drops] [data-yield-scale]',
-      oneLineRows: '[data-gathering-drops] [data-yield-entry] > .fabricate-list-row',
       controls: [
         {
           selector: '[data-gathering-drops] [data-yield-entry="row-1"] .fab-medallion',

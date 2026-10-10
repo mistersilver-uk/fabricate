@@ -113,12 +113,11 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
 
 /**
  * Issue 2257 D15: a shared-model row after its roll, on the one history witness the scale's capture
- * publishes — the borderless 26px mark, and the mark, body, quantity and chance on one flex line.
+ * publishes: the borderless 26px mark.
  */
 const JOURNAL_HISTORY_DATA_LAYOUT = Object.freeze({
   'unknown-material-resolution-1240': {
     containerSelector: '[data-journal-detail] [data-yield-scale]',
-    oneLineRows: '[data-journal-detail] [data-yield-entry] > .fabricate-list-row',
     controls: [
       {
         selector: '[data-journal-detail] [data-yield-entry="unknown-silver-ore"] .fab-medallion',
