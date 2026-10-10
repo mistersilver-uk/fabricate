@@ -22,8 +22,9 @@
     `openspec/specs/design-system/spec.md` states, while the muted tone clears it in all seven
     palettes.
   - THE TRACKING IS `0.11em`, NOT `.14em`; every shipped `.14em` is bound to a larger size.
-  - NO `font-family`: the specimen names the library PAGE's own body-face variable, which is not a
-    product token, so the eyebrow inherits the surface's UI face and re-skins with it.
+  - It states the host's UI face itself, `var(--font-body, var(--font-primary, sans-serif))`, rather
+    than inheriting its parent's, so a kicker inside mono evidence still draws the UI face (issue 2257
+    D21; `tests/components/kicker-face-rendered.test.js`).
 -->
 <script>
   let { as = 'p', tone = 'default', children = undefined, ...rest } = $props();
@@ -45,6 +46,7 @@
   .fab-kicker {
     margin: 0;
     color: var(--fab-text-muted);
+    font-family: var(--font-body, var(--font-primary, sans-serif));
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0.11em;
