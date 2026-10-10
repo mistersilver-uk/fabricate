@@ -26,6 +26,11 @@ export const LAB_INTERACTABLE_REFS = Object.freeze({
     regionId: LAB_INTERACTABLE_REGION_ID,
     behaviorId: 'deep-gate-draft',
   }),
+  tool: Object.freeze({
+    sceneId: LAB_INTERACTABLE_SCENE_ID,
+    regionId: LAB_INTERACTABLE_REGION_ID,
+    behaviorId: 'deep-gate-cache',
+  }),
 });
 
 /** The Tile document the tool interactable's marker resolves to. */

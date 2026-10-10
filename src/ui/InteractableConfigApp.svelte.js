@@ -14,7 +14,8 @@ import {
 import {
   listSystemOptions,
   listToolSourceOptions,
-  listTaskSourceOptions
+  listTaskSourceOptions,
+  resolveInteractableSourceLabel
 } from './interactableSourceLibrary.js';
 import { normalizeNodeConfig } from '../systems/gatheringNodeConfig.js';
 import {
@@ -200,22 +201,8 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
       },
       // Resolve the live tool/task label for display (the panel shows id + label).
       resolveSourceLabel: () => {
-        const behavior = this._resolveBehavior();
-        const system = readInteractableBehaviorSystem(behavior);
-        if (!system) return null;
-        const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
-        if (system.interactableType === 'tool') {
-          const sys = manager?.getSystem?.(system.systemId);
-          const tool = (sys?.tools ?? []).find((t) => String(t?.id) === String(system.toolId));
-          if (!tool) return null;
-          const label = String(tool?.label || '').trim();
-          if (label) return label;
-          const component = (sys?.components ?? []).find((c) => String(c?.id) === String(tool?.componentId));
-          return component?.name ? String(component.name) : null;
-        }
-        const tasks = this._readLibraryTasks(system.systemId);
-        const task = tasks.find((t) => String(t?.id) === String(system.taskId));
-        return task?.name ? String(task.name) : null;
+        const system = readInteractableBehaviorSystem(this._resolveBehavior());
+        return resolveInteractableSourceLabel(this._sourceDeps(), system);
       },
       resolveEnvironmentLabel: () => {
         const behavior = this._resolveBehavior();
@@ -566,14 +553,6 @@ export class InteractableConfigApp extends SvelteApplicationMixin(
       getCraftingSystemManager: () => globalThis.game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getGatheringConfig: () => globalThis.game?.settings?.get?.('fabricate', 'gatheringConfig') ?? null
     };
-  }
-
-  _readLibraryTasks(systemId) {
-    if (!systemId) return [];
-    // Read the same persisted gathering config the manager + browser read.
-    const config = globalThis.game?.settings?.get?.('fabricate', 'gatheringConfig') ?? null;
-    const tasks = config?.systems?.[systemId]?.tasks;
-    return Array.isArray(tasks) ? tasks : [];
   }
 
   /**

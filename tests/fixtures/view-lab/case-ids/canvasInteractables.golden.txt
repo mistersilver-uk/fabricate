@@ -5,6 +5,7 @@ interactables-browser-no-matches
 interactables-config-configured
 interactables-config-needs-configuration
 interactables-config-source-open
+interactables-config-tool
 interactables-manager-list
 interactables-manager-promote
 interactables-manager-region-open

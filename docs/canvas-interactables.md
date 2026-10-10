@@ -120,6 +120,8 @@ The **Manage Interactables** panel is a GM-only, scene-level window launched fro
 It is the single place to see and manage every interactable on the current scene, and the supported way to author **arbitrary-shaped** interactables.
 
 **List.** The panel lists every interactable on the current scene with its **name**, **type** (tool or gathering task), **source**, **state** (enabled, locked, or used up), and **marker status** (tile, drawing, token, region-only, or missing).
+A tool's source reads as its **Display label** (see [Tools]({% link tools.md %})), else its name, else its linked component's name.
+The interactable's config panel names its linked tool the same way.
 Each row offers:
 
 - **Open configuration** opens the config panel for that interactable.

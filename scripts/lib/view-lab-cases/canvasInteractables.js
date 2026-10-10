@@ -155,6 +155,22 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  configCase({
+    id: 'interactables-config-tool',
+    label: 'Interactable config — tool-sourced interactable',
+    // `beyond`: the smoke never opens one of these panels, so there is no counterpart to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: 'tool' },
+    steps: [],
+    // The linked-source fact, which names the Tool by the shared display precedence.
+    expectSelector: '.fabricate-interactable-config .fab-ic-facts .fab-ic-fact-name',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
   interactablesManagerCase({
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',
