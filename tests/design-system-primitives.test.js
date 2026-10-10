@@ -460,6 +460,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'player-gathering-economy-strip',
       'the one frame that draws the stamina pool strip',
     ],
+    [
+      'src/ui/svelte/components/NavSidebarRows.svelte',
+      'manager-world-travel-with-gathering-expanded',
+      'the one frame that measures an open group box whose parent is not the current route',
+    ],
+    [
+      'src/ui/svelte/components/NavSidebarRows.svelte',
+      'manager-recipes-normal',
+      'a frame that measures an open group box on its own route',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
     assert.ok(

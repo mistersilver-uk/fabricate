@@ -2065,7 +2065,7 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
   [
     'src/ui/svelte/components/NavSidebar.svelte: .fabricate-app-nav-well',
     ['9px'],
-    'NavSidebar geometry is issue 2257',
+    'the specimen draws the 44px icon well at 9',
   ],
   [
     'src/ui/svelte/components/SegmentedControl.svelte: .manager-segmented.is-compact .manager-segment',

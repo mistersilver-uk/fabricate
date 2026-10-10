@@ -2202,8 +2202,9 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
-`NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
-At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 2257.
+`NavSidebar`'s `labelled` variant MUST draw an expanded group on the expanded rail as one box (radius 9, soft ground, inset hairline, `--fab-space-2xs` padding) with the parent row unshifted, borderless and unplated unless the rail marks it active, and its children one `--fab-space-3` step in; the collapsed rail draws no box.
+Its rows MUST stay 34px at radius 9 with a 12.5px label over a 24px icon column, and 47×34 at radius 9 on the collapsed rail (its 56px column less 8px of padding and the rail's 1px divider), and the library's `labelled` units are drawn to them (issue 2257).
+Its `icon` variant MUST keep 8/0/6 item padding and the `--fab-success` pip (rulings 2026-09-19, 2026-10-07 E3).
 
 #### Scenario: A manager route draws its header
 
@@ -2218,11 +2219,12 @@ At issue 1777 both callers kept their shipped geometry, which disagreed with the
 - **THEN** no caller rule sets its padding, trail, title, subtitle or action size
 - **AND** any surviving caller rule only places it or fills it
 
-#### Scenario: NavSidebar's geometry disagrees with its specimen
+#### Scenario: A GM expands a nav group
 
-- **WHEN** `NavSidebar`'s geometry disagrees with its specimen
-- **THEN** the entry stays `target`
-- **AND** the geometry converges in issue 2257
+- **WHEN** a `labelled` parent's chevron expands its group
+- **THEN** the parent and its rows draw inside one radius-9 box
+- **AND** the parent's icon, label and chevron do not move
+- **AND** on the collapsed rail the group draws no box and the parent's icon does not move
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 

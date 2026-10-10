@@ -94,11 +94,6 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
-    '<NavSidebar> ships at target: the pip and 8/0/6 padding are ruled, so the specimen is ' +
-      "redrawn; the expanded group's box converges at issue 2257 (issue 1777 decision E3)",
-    { 'src/ui/svelte/components/NavSidebar.svelte': 1 },
-  ],
-  [
     'promoted on its second importer at issue 1644; its icon chip, hint line and a short ' +
       "candidate's undimmed reading still disagree with the specimen, carried to issue 2257",
     { 'src/ui/svelte/components/ChoiceOptionList.svelte': 1 },

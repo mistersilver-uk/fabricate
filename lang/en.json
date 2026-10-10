@@ -2666,6 +2666,7 @@
           "Breadcrumb": "System overview",
           "Actions": "System overview actions",
           "CountBadgeAria": "Open validation issues",
+          "CountBadgeAriaSingular": "Open validation issue",
           "Empty": "No validation issues detected. Everything in this system is ready to use.",
           "BlockerNote": "This system has a blocker: players cannot see or use any of its recipes until it is resolved.",
           "CountWarning": "warnings",
