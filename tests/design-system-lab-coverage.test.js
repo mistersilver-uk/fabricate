@@ -633,7 +633,8 @@ test('every prop a catalogue row passes is a prop the component declares', () =>
           'no prop of that name to render it'
       );
     }
-    if (entry.row.content === undefined) continue;
+    // A fixture takes a row's `content` as its own `children`; the fixture gate holds it to render them.
+    if (entry.row.content === undefined || entry.row.fixture !== undefined) continue;
     assert.ok(
       names.has(CHILDREN_PROP),
       `${where(entry)}: the row supplies \`content\` and ${entry.row.path} declares no ` +

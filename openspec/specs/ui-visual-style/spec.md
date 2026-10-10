@@ -45,7 +45,8 @@ Controls MUST distinguish those meanings explicitly: a full-track scale describe
 Product UI type must come from a shared, self-hosted three-family contract declared in the `:root` block of `styles/fabricate.css`, alongside the theme tokens and the spacing scale.
 
 - Two font tokens are declared once in `:root` — never inside a theme block, because every theme block must declare an identical token set: `--fab-font-serif` (Spectral, with a serif stack fallback) and `--fab-font-mono` (JetBrains Mono, with a monospace stack fallback).
-  The UI face remains Foundry's `--font-primary` and is not tokenized here.
+  The UI face is Foundry's, read as `var(--font-body, var(--font-primary, sans-serif))`, and is not tokenized here.
+  A theme re-faces it through `--font-body`, the variable `Kicker` reads; setting `font-family` on `.application` alone does not.
 - Fonts are **self-hosted** under `assets/fonts/` and loaded through `@font-face` with `font-display: swap`.
   No CDN or remote font URL: `styles/fabricate.css` is loaded globally into the Foundry document, a failed remote fetch is a console error in every world, and Foundry worlds are routinely run offline.
   Ship only the weights the product uses (Spectral 600/700, JetBrains Mono 400/500, latin subset), and ship each family's licence file beside it.
