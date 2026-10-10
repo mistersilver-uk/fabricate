@@ -1215,6 +1215,7 @@
           "yields": [
             {
               "name": "Iron Nodule",
+              "img": "icons/commodities/metal/ingot-plain-steel.webp",
               "icon": "fas fa-hammer",
               "quantity": "×2"
             }

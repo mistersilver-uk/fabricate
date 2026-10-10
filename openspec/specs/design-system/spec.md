@@ -48,6 +48,7 @@ The row's `trailing` controls MUST sit beside the button, and block content sits
 A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
+The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
 Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
@@ -736,7 +737,7 @@ Resizing to the nearest rung in the same change would smuggle a layout move into
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
 Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
-Issue 1523's sweep snapped the rest, and the remaining population is 4 off-ladder art tiles in 4 files, each under a `ratchet-exempt` reason: the 56px slot tile (issue 2257), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill; no portrait is off its ladder and no site passes a non-literal size.
+Issue 1523's sweep snapped the rest, and the remaining population is 5 off-ladder art tiles in 5 files, each under a `ratchet-exempt` reason: the 56px slot tile (issue 2257), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill and in `OutcomeLadder`'s yield chip (maintainer, 2026-10-10); no portrait is off its ladder and no site passes a non-literal size.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
 The icon chip's corner follows its rung — 6 at 22, 7 at 26 and 30, 9 at 38 and at any size off the ladder — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
@@ -2437,11 +2438,13 @@ A known shared roll whose unknown outcomes prevent locating a cut MUST remain vi
 Default preview callers MUST retain the existing shared comparison and ordering.
 `YieldScale` MAY keep authored order: with `order` `authored` it MUST keep entry order and MUST NOT draw a cut, and a known shared roll stays a standalone reading.
 Gathering's drop preview MUST compose `YieldScale` in authored order, because its reward selection is by authored order.
+Outside `perRow`, `YieldScale` MUST set each row's reading as a sentence under its name, beside a borderless 26px mark (the row's picture where it has art, else its glyph), on one flex line with its quantity and chance, and MUST NOT break a word that fits a line of its own; a `perRow` evidence row keeps its dense inline reading (ruling 2026-10-07; D7 as amended 2026-10-10; D15).
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
 `OutcomeLadder` MAY mark the one reached tier: `reachedId` matches a tier's merged `ids`, else its `id`, and only the first matching tier carries the `reachedLabel` pill and the accent edge.
-Its band is optional, and a tier with no band MUST draw no chip.
-Each tier, its band chip, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+Its band is optional, and a tier with no band MUST draw no band.
+Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+`OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard
