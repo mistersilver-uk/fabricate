@@ -19,10 +19,10 @@
     {
       "path": "src/ui/svelte/components/StageCard.svelte",
       "library": "<StageCard>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match, but its 12px region inset is not the specimen's 48px indent, so it stays target with that disagreement recorded in the library's migrations table."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match. `shipped` at issue 2257 (D22): re-measured on those frames, its specimen is redrawn to the one 12px region inset issue 1648 chose and to io as the four-column truncated `ListRow` grid. DEBT: its 10.5px summary, note and fact label, its inactive 12px/600 name and 11px numeral, and its io rows' 10.5px quantity (the row ink `ListRow` sets), all in `--fab-text-subtle`, measure 3.01-3.98:1, under the 4.5:1 floor, and are not redrawn; owned by issue 2353."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",
@@ -414,7 +414,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `shipped` at issue 2257: the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell is `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the frames that draw a pressed cell. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2257, and neither blocks the flip."
+      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `shipped` at issue 2257: the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell is `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the frames that draw a pressed cell. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2352, and neither blocks the flip."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",
@@ -803,7 +803,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/ActionsPanel.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch, the hand-rolled kicker and the armed-cancel layout disagree, so its library specimen reads target with those recorded in the migrations table."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch is a recorded deviation the specimen draws (issue 2257 D22), and the hand-rolled kicker disagrees, so its library specimen reads target until issue 2257 converges it."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",
@@ -812,7 +812,7 @@
       "callers": [
         "src/ui/svelte/apps/FabricateAppRoot.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box and direct-child alignment. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-ready-single`: the box, family and value match; its 11px glyph and its kicker disagree, so its library specimen reads target with those recorded in the migrations table."
+      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box; the chip centres one baseline-aligned line of glyph, label and value. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-ready-single`: the box, family and value match. At issue 2257 (D22) its library specimen is redrawn to the 11px glyph and the 9px, 0.08em label in `--fab-info-text`, a named kicker scale `Kicker` has no info tone for, and reads `shipped`; `world-clock-chip-contrast.test.js` holds all three parts at 4.5:1 in seven themes."
     },
     {
       "path": "src/ui/svelte/components/SlotRow.svelte",

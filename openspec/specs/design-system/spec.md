@@ -116,7 +116,7 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
-WorldClockChip MUST compose Chip's opt-in `presentation="clock"` with direct icon, label and value flex children aligned centrally inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
+WorldClockChip MUST compose Chip's opt-in `presentation="clock"` around one baseline-aligned line of icon, label and value, centred inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
 Its info-family fill, border and ink MUST remain distinct from the single shared player-header surface behind it.
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
