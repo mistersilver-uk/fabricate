@@ -1075,8 +1075,8 @@
       idStem="component-rules"
       tabDataAttr="data-component-edit-tab"
       badgeDataAttr="data-component-edit-tab-badge"
+      activePanelOnly
     />
-
     <!-- The page notice position: a row of the column above the scroller, so it stays in view. -->
     {#if saveFailed}
       <div class="manager-component-entry-notices" data-notice-position="page">

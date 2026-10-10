@@ -22,6 +22,7 @@ import {
   MANAGE_PANEL_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
+import { defineStructureContract } from '../helpers/structureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -44,6 +45,16 @@ const selectSource = readFileSync(
 );
 
 describe('InteractablesManagerApp singleton window', () => {
+  defineStructureContract(
+    'names a row source through the shared label resolver (issue 1624)',
+    { file: 'src/ui/InteractablesManagerApp.svelte.js', member: '_resolveSourceLabel' },
+    {
+      calls: ['resolveInteractableSourceLabel'],
+      callsNo: ['listSystemTools', 'listSystemComponents'],
+      callsWith: [['resolveInteractableSourceLabel', 'system']],
+    }
+  );
+
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
     assert.ok(appSource.includes('SvelteApplicationMixin('), 'uses the SvelteApplicationMixin');
     assert.ok(appSource.includes('foundry.applications.api.ApplicationV2'), 'extends ApplicationV2');
