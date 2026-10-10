@@ -174,6 +174,7 @@ export const SELECT_RUNGS = Object.freeze([
     radius: '9px',
     fill: 'surface-soft',
     fontSize: '12.5px',
+    fontWeight: '500',
     minWidth: '240px',
     maxWidth: '340px',
   }),
@@ -183,6 +184,7 @@ export const SELECT_RUNGS = Object.freeze([
     radius: '7px',
     fill: 'bg-2',
     fontSize: '11.5px',
+    fontWeight: '500',
     minWidth: '96px',
     maxWidth: '240px',
   }),
@@ -191,8 +193,9 @@ export const SELECT_RUNGS = Object.freeze([
     height: 34,
     radius: '9px',
     fill: 'bg-1',
-    // 0.72rem against a 16px ROOT. `rem` is root-relative.
-    fontSize: '11.52px',
+    // The weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
+    fontSize: '11.5px',
+    fontWeight: '600',
     minWidth: '160px',
     maxWidth: '320px',
   }),
