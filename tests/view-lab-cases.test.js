@@ -743,7 +743,7 @@ const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) =
 // The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
 // primer's item list offset and lead (issue 1521), each open action menu's panel and item
 // corners, each open nav group's box, every `toolbar`-rung Select a case draws, and the routed
-// ladder's and yield scale's converged figures (issue 2257).
+// ladder's, yield scale's, slot tile's and choice list's converged figures (issue 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
 /** A Journal ladder tier's bare band, named by its tone and inked by it. */
 const routedBand = (tier, tone, ink) => ({
@@ -754,6 +754,13 @@ const routedBand = (tier, tone, ink) => ({
 const yieldMark = (scope, entry) => ({
   selector: `${scope} [data-yield-entry="${entry}"] .fab-medallion`,
   styles: 'width: 26px; border-width: 0',
+});
+/** A requirement slot's tile. */
+const slotRing = (slot) => `[data-requirement-slot="${slot}"] .fab-slot-tile`;
+/** A short stack's part, held at full opacity. */
+const shortStackPart = (part) => ({
+  selector: `[data-recipe-section="stacks"] .is-short ${part}`,
+  styles: 'opacity: 1',
 });
 const CRAFTED_TIER = '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"]';
 const SALVAGED_TIER = '[data-inventory-salvage-outcome="rw-salv-masterwork"]';
@@ -870,6 +877,24 @@ const NON_VERB_CONTROLS = Object.freeze({
   'player-gathering-drop-open': [yieldMark('[data-gathering-drops]', 'row-1')],
   'fabricate-journal-history-data-unknown-material-resolution-1240': [
     yieldMark('[data-journal-detail]', 'unknown-silver-ore'),
+  ],
+  'player-crafting-pick-for-me': [
+    {
+      selector: slotRing('s1-g2'),
+      styles: 'box-shadow: 0 0 0 1px var(--fab-border); border-width: 0',
+    },
+    { selector: slotRing('s1-g1'), styles: 'box-shadow: 0 0 0 1px var(--fab-danger-border)' },
+    { selector: slotRing('s1-g3'), styles: 'box-shadow: 0 0 0 1px var(--fab-warning-border)' },
+    { selector: '[data-requirement-slot="s1-g2"] .fab-slot-pip', styles: 'line-height: 1.6' },
+  ],
+  'player-crafting-stack-picker': [
+    {
+      selector: '[data-recipe-section="stacks"] [aria-checked="true"] .fab-medallion',
+      styles: 'border-width: 0; font-size: 11px',
+    },
+    { selector: '[data-recipe-section="stacks"] [role="radio"].is-short', styles: 'opacity: 1' },
+    shortStackPart('.fab-choice-option-copy'),
+    shortStackPart('.fab-choice-option-reading'),
   ],
 });
 const NON_VERB_SELECTORS = new Set(

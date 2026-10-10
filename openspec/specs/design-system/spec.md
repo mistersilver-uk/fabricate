@@ -737,7 +737,7 @@ Resizing to the nearest rung in the same change would smuggle a layout move into
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
 Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
-Issue 1523's sweep snapped the rest, and the remaining population is 5 off-ladder art tiles in 5 files, each under a `ratchet-exempt` reason: the 56px slot tile (issue 2257), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill and in `OutcomeLadder`'s yield chip (maintainer, 2026-10-10); no portrait is off its ladder and no site passes a non-literal size.
+Issue 1523's sweep snapped the rest, and the remaining population is 5 off-ladder art tiles in 5 files, each under a `ratchet-exempt` reason: the 56px slot tile (the specimen's own tap target, not a record tile; issue 2257 D16), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill and in `OutcomeLadder`'s yield chip (maintainer, 2026-10-10); no portrait is off its ladder and no site passes a non-literal size.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
 The icon chip's corner follows its rung — 6 at 22, 7 at 26 and 30, 9 at 38 and at any size off the ladder — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
@@ -2423,9 +2423,10 @@ Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `ChoiceOptionList` MUST be one single-select `radiogroup` of `radio` candidates with one tab stop, whose arrow, Home and End keys move focus and the choice together past any disabled candidate.
-It MUST disable a candidate only when it is held but the stage claims it elsewhere, or while its caller refuses it, such as a pending selection command; a candidate held short of the need MUST stay pressable, dimmed and described by its reading.
+It MUST disable a candidate only when it is held but the stage claims it elsewhere, or while its caller refuses it, such as a pending selection command; a candidate held short of the need MUST stay pressable, with its chip and name dimmed and its reading at full opacity and at least 4.5:1.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
 `SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
+`SlotTile` MUST draw the 1px edge of its met, short and partial faces as a ring outside the tile, while its open face keeps its dashed 1px border; its pip MUST be 16.4px tall, inked `--fab-bg-0` on the partial face and the candidate pip while the met and short faces keep `--fab-on-success` and `--fab-on-danger` (where `--fab-bg-0` measures under 4.5:1); a pressed tile MUST keep its tick (rulings 2026-10-07 and 2026-10-10; D16).
 `SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
@@ -2450,7 +2451,7 @@ Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadde
 #### Scenario: A player chooses a candidate from the keyboard
 
 - **WHEN** a slot's candidates include one the stage claims elsewhere and one held short of the need
-- **THEN** the claimed one is disabled and the short one is offered, dimmed and described by its reading
+- **THEN** the claimed one is disabled and the short one is offered with its chip and name dimmed, described by its reading at full opacity
 - **AND** the arrow keys move focus and the choice together, passing over the disabled candidate
 
 #### Scenario: A player views another stage while allocating materials
