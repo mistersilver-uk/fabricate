@@ -7,10 +7,9 @@ import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import {
-  STYLESHEET_ENTRY,
   checkoutReader,
   readStylesheet,
-  stylesheetImports,
+  stylesheetSources,
 } from '../../scripts/lib/stylesheetSource.js';
 
 /** The repo root, resolved from this file's own location. */
@@ -145,11 +144,11 @@ function moduleSheetIn(dir, entries, extensions) {
   const named = entries.some((entry) => entry.name === 'fabricate.css');
   if (basename(dir) !== 'styles' || !named || !listed) return null;
   const readFile = checkoutReader(dirname(dir));
-  const parts = stylesheetImports(readFile(STYLESHEET_ENTRY) ?? '');
+  const { parts } = stylesheetSources(readFile);
   return {
     entry: join(dir, 'fabricate.css'),
     text: readStylesheet(readFile),
-    parts: new Set(parts.map((file) => join(dirname(dir), file))),
+    parts: new Set(parts.map(({ file }) => join(dirname(dir), file))),
   };
 }
 

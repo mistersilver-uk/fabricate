@@ -6,7 +6,7 @@
 import {
   STYLESHEET_ENTRY,
   STYLESHEET_PART_PATTERN,
-  stylesheetImports,
+  stylesheetSources,
 } from './stylesheetSource.js';
 
 export const STYLESHEET_PART_LIMIT = 4000;
@@ -48,20 +48,19 @@ function partFailures(file, text) {
 
 /** Every structural failure of the sheet `readFile` sees, given the repo-relative `styles/` files. */
 export function stylesheetIntegrityFailures(readFile, stylesFiles) {
-  const entry = readFile(STYLESHEET_ENTRY);
-  if (entry === undefined) return [`${STYLESHEET_ENTRY} is missing`];
-  let imports;
+  let sources;
   try {
-    imports = stylesheetImports(entry);
+    sources = stylesheetSources(readFile);
   } catch (error) {
     return [error.message];
   }
-  const failures = imports.length > 0 ? entryFailures(entry) : [];
+  const { entry, parts } = sources;
+  if (entry === undefined) return [`${STYLESHEET_ENTRY} is missing`];
+  const failures = parts.length > 0 ? entryFailures(entry) : [];
   const seen = new Set();
-  const partsFailures = imports.flatMap((file) => {
+  const partsFailures = parts.flatMap(({ file, text }) => {
     const twice = seen.has(file) ? [`${file} is imported more than once`] : [];
     seen.add(file);
-    const text = readFile(file);
     const own = text === undefined ? [`${file} is imported but missing`] : partFailures(file, text);
     return [...twice, ...own];
   });

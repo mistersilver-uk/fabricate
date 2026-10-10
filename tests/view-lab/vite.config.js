@@ -1,5 +1,6 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
@@ -9,6 +10,10 @@ import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foun
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+// By URL, so it is loaded unbundled and the stylesheet read guard can admit its frame.
+const { openServedFile } = await import(
+  pathToFileURL(join(import.meta.dirname, 'servedFile.js')).href
+);
 const chromeCache = resolveChromeCache(repoRoot);
 const dnd5eRoot = join(repoRoot, '.foundry-e2e', 'systems', 'dnd5e');
 
@@ -66,7 +71,7 @@ function staticMount(prefix, root, label) {
         response.setHeader('Content-Type', mimeTypeFor(target));
         // Never cache: a re-harvest must be visible to the very next capture.
         response.setHeader('Cache-Control', 'no-store');
-        createReadStream(target).pipe(response);
+        openServedFile(target).pipe(response);
       });
     },
   };

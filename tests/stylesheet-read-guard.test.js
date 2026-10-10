@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -91,6 +92,22 @@ readFileSync(sheetUrl, 'utf8');`;
   assert.match(run.stderr, REFUSED);
 });
 
+test('the guard refuses a partial by name, before the filesystem is asked', () => {
+  const probe = path.join(repoRoot, 'styles', 'fabricate-probe.css');
+  const run = node([
+    '--input-type=module',
+    '-e',
+    `import { readFileSync } from 'node:fs';
+readFileSync(${JSON.stringify(probe)}, 'utf8');`,
+  ]);
+  assert.notEqual(run.status, 0);
+  assert.match(
+    run.stderr,
+    /styles\/fabricate-probe\.css was opened .* outside the stylesheet loader/u
+  );
+  assert.doesNotMatch(run.stderr, /ENOENT/u);
+});
+
 test('with a log named, the guard records each refused read and lets it through', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'fabricate-guard-log-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -122,9 +139,9 @@ test('a direct read of the sheet is refused here', () => {
 });
 `
   );
-  const guarded = node(['--test', '--test-isolation=process', probe]);
+  const guarded = node(['--test', probe]);
   assert.equal(guarded.status, 0, guarded.stdout + guarded.stderr);
-  const bare = node(['--test', '--test-isolation=process', probe], { bare: true });
+  const bare = node(['--test', probe], { bare: true });
   assert.notEqual(bare.status, 0, 'without the preload the probe fails, so it can fail');
 });
 
@@ -139,7 +156,7 @@ test('npm test and every CI shard preload the guard', () => {
 
 const SELF = 'tests/stylesheet-read-guard.test.js';
 const RAW_IMPORT = /styles\/[\w.-]+\.css\?(?:raw|inline)\b/u;
-const PATH_STYLE_TAG = /addStyleTag\(\s*\{[^}]*\bpath\s*:/u;
+const PATH_STYLE_TAG = /addStyleTag\(\s*\{[^}]*\bpath\b\s*[:,}]/u;
 
 /** The reads the guard cannot see: Vite inlines a `?raw` import, Playwright an `addStyleTag` path. */
 function unguardedReads(sources) {
@@ -159,8 +176,9 @@ test('no script or test reads a stylesheet through a ?raw import or an addStyleT
     'tests/a.js': `import css from '../styles/fabricate.css?raw';`,
     'tests/b.js': `await page.addStyleTag({ path: sheetPath });`,
     'tests/c.js': `await page.addStyleTag({ content: css });`,
+    'tests/d.js': `await page.addStyleTag({ path });`,
   };
-  assert.deepEqual(unguardedReads(offenders), ['tests/a.js', 'tests/b.js']);
+  assert.deepEqual(unguardedReads(offenders), ['tests/a.js', 'tests/b.js', 'tests/d.js']);
 });
 
 test('the fixture raw mount serves a styles/ basename and nothing outside styles/', () => {
@@ -174,4 +192,38 @@ test('the fixture raw mount serves a styles/ basename and nothing outside styles
   ]) {
     assert.equal(stylesFileFor(request), null, request);
   }
+});
+
+/** An OS-assigned free port, because Vite reads `port: 0` as its own default. */
+function freePort() {
+  return new Promise((done) => {
+    const probe = createNetServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => done(port));
+    });
+  });
+}
+
+const VITE = import.meta.resolve('vite');
+const DEP_CACHE = pathToFileURL(path.join(repoRoot, 'tests/helpers/vite-dep-cache-dir.js')).href;
+
+// A child process, because Node 22 can crash on exit after Vite has bundled a config; the status
+// is printed before then.
+test('the View Lab serves the module sheet raw from its own bundled config', async () => {
+  const port = await freePort();
+  const boot = `import { createServer } from ${JSON.stringify(VITE)};
+import { viteDepCacheDir } from ${JSON.stringify(DEP_CACHE)};
+const server = await createServer({
+  configFile: ${JSON.stringify(path.join(repoRoot, 'tests/view-lab/vite.config.js'))},
+  cacheDir: viteDepCacheDir(),
+  server: { port: ${port}, watch: null },
+  logLevel: 'silent',
+});
+await server.listen();
+const response = await fetch('http://127.0.0.1:${port}/@fabricate-styles/fabricate.css');
+console.log(JSON.stringify({ status: response.status }));
+await server.close();`;
+  const run = node(['--conditions=browser', '--input-type=module', '-e', boot]);
+  const [line] = run.stdout.trim().split('\n');
+  assert.equal(JSON.parse(line ?? '{}').status, 200, run.stdout + run.stderr);
 });

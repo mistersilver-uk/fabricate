@@ -20,6 +20,7 @@ import {
   readStylesheet,
   stylesheetImports,
   stylesheetParts,
+  stylesheetSources,
 } from '../scripts/lib/stylesheetSource.js';
 
 import { readBaseFiles, resolveRatchetBase } from './helpers/mergeBaseRatchet.js';
@@ -67,6 +68,26 @@ test('no entry reads as nothing; a missing, foreign or mixed import throws', () 
     /rules beside/
   );
   assert.deepEqual(stylesheetImports('/* @import url("fabricate-a.css"); */\n.x {}\n'), []);
+  for (const form of [
+    '@import "x.css";',
+    '@import url(x.css);',
+    '@import url("x.css") layer(modules);',
+    '@IMPORT url("x.css");',
+  ]) {
+    assert.throws(
+      () => stylesheetImports(`${form}\n.x {}\n`),
+      /holds an @import the loader cannot read/,
+      form
+    );
+  }
+});
+
+test('an empty part counts no lines', () => {
+  const files = { ...SPLIT, 'styles/fabricate-tokens.css': '' };
+  assert.deepEqual(
+    stylesheetParts(mapReader(files)).map(({ lineCount }) => lineCount),
+    [0, 3]
+  );
 });
 
 test('a checkout reader reads another tree, and a partial path maps to the entry', () => {
@@ -78,6 +99,12 @@ test('a checkout reader reads another tree, and a partial path maps to the entry
     }
     assert.equal(readStylesheet(checkoutReader(root)), readStylesheet(mapReader(SPLIT)));
     assert.equal(checkoutReader(root)('styles/absent.css'), undefined);
+    for (const file of ['styles/fabricate.css', 'styles/fabricate-rules.css']) {
+      assert.throws(() => checkoutReader(root)(file), /read through readStylesheet\(\)/, file);
+    }
+    for (const file of ['../outside.css', '/etc/hosts', 'styles/../../outside.css']) {
+      assert.throws(() => checkoutReader(root)(file), /is outside/, file);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -125,7 +152,7 @@ test('a change that first splits the sheet joins to the base sheet byte for byte
   const readBase = (file) => readBaseFiles(base, [file]).get(file);
   const baseEntry = readBase(STYLESHEET_ENTRY);
   const head = checkoutReader();
-  const splitHere = stylesheetImports(head(STYLESHEET_ENTRY) ?? '').length > 0;
+  const splitHere = stylesheetSources(head).parts.length > 0;
   if (baseEntry === undefined || stylesheetImports(baseEntry).length > 0 || !splitHere) {
     t.diagnostic('the base is already split or the head is not, so there is no first split');
     return;

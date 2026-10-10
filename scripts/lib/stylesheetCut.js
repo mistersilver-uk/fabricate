@@ -79,9 +79,11 @@ function lineStates(lines) {
   let state = { depth: 0, inComment: false, quote: null, skip: false };
   for (const line of lines) {
     states.push({ depth: state.depth, inComment: state.inComment });
-    for (let index = 0; index < line.length; index += 1) {
+    let index = 0;
+    while (index < line.length) {
       state = step(state, line[index], line[index + 1]);
-      if (state.skip) [state, index] = [{ ...state, skip: false }, index + 1];
+      index += state.skip ? 2 : 1;
+      state = { ...state, skip: false };
     }
     state = { ...state, quote: null };
   }

@@ -4,11 +4,21 @@
  * parts join back to the sheet byte for byte.
  */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
-import { cutStylesheet, stylesheetEntry } from '../scripts/lib/stylesheetCut.js';
-import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
+import { STYLESHEET_CUT, cutStylesheet, stylesheetEntry } from '../scripts/lib/stylesheetCut.js';
+import {
+  checkoutReader,
+  readStylesheet,
+  stylesheetSources,
+} from '../scripts/lib/stylesheetSource.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
+import { repoRoot } from './helpers/sourceScan.js';
 import { mapReader, splitSheet } from './helpers/splitStylesheet.js';
 
 const SHEET = [
@@ -92,4 +102,63 @@ test('a cut that falls inside a block, or out of order, throws', () => {
     () => cutStylesheet(SHEET, [TABLE[0], TABLE[2], TABLE[1]]),
     /fabricate-chat\.css starts before fabricate-rules\.css ends/
   );
+});
+
+const CLI_FILES = [
+  'scripts/split-stylesheet.mjs',
+  'scripts/lib/stylesheetCut.js',
+  'scripts/lib/stylesheetSource.js',
+];
+
+/** A throwaway checkout holding the cut script and this sheet unsplit, and a runner of the script. */
+function checkoutWithScript(t) {
+  const root = mkdtempSync(path.join(tmpdir(), 'fabricate-split-cli-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const file of CLI_FILES) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    copyFileSync(path.join(repoRoot, file), path.join(root, file));
+  }
+  mkdirSync(path.join(root, 'styles'));
+  writeFileSync(path.join(root, 'styles/fabricate.css'), readStylesheet());
+  const run = (...args) =>
+    spawnSync(process.execPath, [path.join(root, CLI_FILES[0]), ...args], { encoding: 'utf8' });
+  const styles = () => readdirSync(path.join(root, 'styles')).sort(byCodePoint);
+  return { root, run, styles };
+}
+
+test('the cut script prints its cut under --check and refuses any other argument', (t) => {
+  const checkout = checkoutWithScript(t);
+  const checked = checkout.run('--check');
+  assert.equal(checked.status, 0, checked.stderr);
+  assert.equal(checked.stdout.trim().split('\n').length, STYLESHEET_CUT.length);
+  assert.deepEqual(checkout.styles(), ['fabricate.css'], '--check writes nothing');
+  for (const args of [['--out', '../elsewhere'], ['--root=/'], ['styles/fabricate.css']]) {
+    const refused = checkout.run(...args);
+    assert.notEqual(refused.status, 0, args.join(' '));
+    assert.match(refused.stderr, /ERR_PARSE_ARGS/u, args.join(' '));
+  }
+});
+
+test('the cut script writes partials that join to the sheet, and keeps a commented entry', (t) => {
+  const checkout = checkoutWithScript(t);
+  const read = checkoutReader(checkout.root);
+  const original = readStylesheet(read);
+  assert.equal(checkout.run().status, 0);
+  const partials = STYLESHEET_CUT.map(({ partial }) => partial);
+  assert.deepEqual(checkout.styles(), ['fabricate.css', ...partials].sort(byCodePoint));
+  assert.ok(readStylesheet(read) === original, 'the written partials join to the sheet');
+  const { entry } = stylesheetSources(read);
+  assert.equal(entry, stylesheetEntry(cutStylesheet(original)));
+  const commented = `/* The tokens come first. */\n${entry}`;
+  writeFileSync(path.join(checkout.root, 'styles/fabricate.css'), commented);
+  assert.equal(checkout.run().status, 0);
+  assert.equal(stylesheetSources(read).entry, commented, 'a re-cut keeps the entry as it is');
+  assert.ok(readStylesheet(read) === original, 'and rewrites the same partials');
+  writeFileSync(
+    path.join(checkout.root, 'styles/fabricate.css'),
+    entry.split('\n').slice(1).join('\n')
+  );
+  const drifted = checkout.run();
+  assert.notEqual(drifted.status, 0);
+  assert.match(drifted.stderr, /imports other partials than the cut/u);
 });

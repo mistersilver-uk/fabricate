@@ -205,7 +205,10 @@ test('the npm scripts cover the repository, and are short enough to read', () =>
   // Issue #1660's acceptance criterion.
   for (const key of ['lint', 'format', 'format:check', 'lint:svelte', 'test']) {
     // The stylesheet read guard's `--import` preload (issue 1711) is one flag, not a file list.
-    const length = scripts[key].replace(/ --import \S+/u, '').length;
+    const length = scripts[key].replace(
+      ' --import ./tests/helpers/stylesheetReadGuard.js',
+      ''
+    ).length;
     assert.ok(
       length < 80,
       `the \`${key}\` script is ${length} characters; the point of issue #1660 is ` +

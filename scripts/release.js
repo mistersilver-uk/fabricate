@@ -280,7 +280,7 @@ async function main() {
 
   await mkdir(join(distDir, 'styles'), { recursive: true });
   const stylesheetFiles = new Set([STYLESHEET_ENTRY, ...stylesheetParts().map(({ file }) => file)]);
-  for (const file of stylesheetFiles) await cp(join(ROOT, file), join(distDir, file));
+  await Promise.all([...stylesheetFiles].map((file) => cp(join(ROOT, file), join(distDir, file))));
 
   await mkdir(join(distDir, 'lang'), { recursive: true });
   await cp(join(ROOT, 'lang', 'en.json'), join(distDir, 'lang', 'en.json'));

@@ -5,7 +5,7 @@
  * checkout reads through the same loader; it defaults to this checkout.
  */
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 
 export const STYLESHEET_ENTRY = 'styles/fabricate.css';
 
@@ -16,12 +16,36 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 const COMMENT = /\/\*[\s\S]*?\*\//gu;
 const IMPORT_RULE = /@import\s+url\(\s*(["'])([^"']*)\1\s*\)\s*;/gu;
 const PART_NAME = /^fabricate-[a-z0-9-]+\.css$/u;
+const ANY_IMPORT = /@import\b/iu;
 
-/** A reader of the checkout at `root`, `undefined` for a file it does not hold. */
+const isSheetPath = (file) => file === STYLESHEET_ENTRY || STYLESHEET_PART_PATTERN.test(file);
+
+/** How many loader functions are reading: a checkout reader hands sheet paths only to them. */
+let loaderReads = 0;
+
+function asLoader(read) {
+  loaderReads += 1;
+  try {
+    return read();
+  } finally {
+    loaderReads -= 1;
+  }
+}
+
+/**
+ * A reader of the checkout at `root`, `undefined` for a file it does not hold. It refuses a path
+ * outside `root`, and a sheet path unless a loader function here is the one reading.
+ */
 export function checkoutReader(root = REPO_ROOT) {
+  const base = resolve(root);
   return (file) => {
+    const target = resolve(base, file);
+    if (!target.startsWith(base + sep)) throw new Error(`${file} is outside ${base}`);
+    if (loaderReads === 0 && isSheetPath(file)) {
+      throw new Error(`${file} is read through readStylesheet(), not a checkout reader`);
+    }
     try {
-      return readFileSync(join(root, file), 'utf8');
+      return readFileSync(target, 'utf8');
     } catch (error) {
       if (error.code === 'ENOENT') return;
       throw error;
@@ -42,6 +66,9 @@ export function logicalStylesheetPath(file) {
  */
 export function stylesheetImports(entryText) {
   const code = String(entryText).replaceAll(COMMENT, '');
+  if (ANY_IMPORT.test(code.replaceAll(IMPORT_RULE, ''))) {
+    throw new Error(`${STYLESHEET_ENTRY} holds an @import the loader cannot read`);
+  }
   const names = [...code.matchAll(IMPORT_RULE)].map((match) => match[2]);
   if (names.length === 0) return [];
   const bad = names.find((name) => !PART_NAME.test(name));
@@ -52,19 +79,31 @@ export function stylesheetImports(entryText) {
   return names.map((name) => `styles/${name}`);
 }
 
-const lineCount = (text) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+const lineCount = (text) =>
+  text === '' ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+
+/**
+ * The entry's own text and each partial it imports as `{file, text}`, `text` being `undefined`
+ * for a missing partial: what a structural check reads. `entry` is `undefined` with no entry.
+ */
+export function stylesheetSources(readFile = readRepoFile) {
+  return asLoader(() => {
+    const entry = readFile(STYLESHEET_ENTRY);
+    if (entry === undefined) return { entry, parts: [] };
+    const parts = stylesheetImports(entry).map((file) => ({ file, text: readFile(file) }));
+    return { entry, parts };
+  });
+}
 
 function partTexts(readFile) {
-  const entry = readFile(STYLESHEET_ENTRY);
+  const { entry, parts } = stylesheetSources(readFile);
   if (entry === undefined) return;
-  const files = stylesheetImports(entry);
-  if (files.length === 0) return [{ file: STYLESHEET_ENTRY, text: entry }];
-  return files.map((file) => {
-    const text = readFile(file);
+  if (parts.length === 0) return [{ file: STYLESHEET_ENTRY, text: entry }];
+  for (const { file, text } of parts) {
     if (text === undefined)
       throw new Error(`${STYLESHEET_ENTRY} imports ${file}, which is missing`);
-    return { file, text };
-  });
+  }
+  return parts;
 }
 
 /**

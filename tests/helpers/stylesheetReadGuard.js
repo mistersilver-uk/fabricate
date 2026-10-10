@@ -15,12 +15,12 @@ const GUARDED_NAME = /^fabricate(?:-[a-z0-9-]+)?\.css$/u;
 const ALLOWED_CALLERS = [
   'scripts/lib/stylesheetSource.js',
   'tests/helpers/vite-fixture-server.js',
-  'tests/view-lab/vite.config.js',
+  'tests/view-lab/servedFile.js',
 ].flatMap((file) => {
   const absolute = path.join(REPO_ROOT, file);
   return [absolute, pathToFileURL(absolute).href];
 });
-const OWN_FRAMES = /node:internal|node_modules|stylesheetReadGuard\.js/u;
+const OWN_FRAMES = /\(node:|at node:|node_modules|stylesheetReadGuard\.js/u;
 
 /** The absolute path an fs call names, from a string, Buffer or `file:` URL; `null` for an fd. */
 function targetOf(argument) {
