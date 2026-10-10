@@ -582,8 +582,8 @@
           idStem="scoped-component-entry"
           tabDataAttr="data-scoped-entry-tab"
           badgeDataAttr="data-scoped-entry-tab-badge"
+          activePanelOnly
         />
-
         <div
           class="manager-component-entry-panel"
           data-scoped-entry={PAGE_ID}

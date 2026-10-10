@@ -763,8 +763,8 @@
         badges={tabBadges}
         badgeDataAttr="data-world-tool-entry-tab-badge"
         danger
+        activePanelOnly
       />
-
       <div
         class="manager-world-tool-entry-panel"
         data-scoped-entry={PAGE_ID}

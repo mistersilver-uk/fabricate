@@ -1,7 +1,8 @@
 /**
- * The EDITOR recipe's gap rule and action pair, mounted (issue 1522): between the tab bar and the
- * first card sit only the notices and then the tab's heading block, on every tab of every editor,
- * and every editor header puts Back before Save with Save last.
+ * The EDITOR recipe's gap rule, tab-panel relationship and action pair, mounted (issue 1522):
+ * between the tab bar and the first card sit only the notices and then the tab's heading block, on
+ * every tab of every editor; every tab's `aria-controls` names a rendered panel that tab labels
+ * (issue 2330); and every editor header puts Back before Save with Save last.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -459,16 +460,43 @@ function firstCardOf(host, cards) {
   return card;
 }
 
-/** Open every tab of the editor's strip in turn, asserting the gap rule on each. */
-async function assertGapRuleOnEveryTab(host, cards) {
+/** Open every tab of the editor's strip in turn, running `check` on each. */
+async function forEveryTab(host, check) {
   const count = activeTab(host).tabs.querySelectorAll('[role="tab"]').length;
   assert.ok(count >= 2, 'the editor offers more than one tab');
   for (let index = 0; index < count; index += 1) {
     const tab = activeTab(host).tabs.querySelectorAll('[role="tab"]')[index];
     await press(tab, `tab ${index}`);
     assert.equal(activeTab(host).tab.id, tab.id, `${tab.id} opens its panel`);
-    assertGapRule(host, firstCardOf(host, cards));
+    check();
   }
+}
+
+const assertGapRuleOnEveryTab = (host, cards) =>
+  forEveryTab(host, () => assertGapRule(host, firstCardOf(host, cards)));
+
+/**
+ * The selected tab controls its panel, and every tab's `aria-controls` names a rendered tabpanel
+ * labelled by that tab: the ARIA rule, so a strip rendering every panel hidden passes too.
+ */
+function assertTabsControlRenderedPanels(host) {
+  const { tabs, tab: selected, panel } = activeTab(host);
+  assert.equal(
+    selected.getAttribute('aria-controls'),
+    panel.id,
+    `${selected.id} controls its panel`
+  );
+  const dangling = [...tabs.querySelectorAll('[role="tab"][aria-controls]')]
+    .map((tab) => [tab, tab.getAttribute('aria-controls')])
+    .filter(([tab, controls]) => {
+      const named = host.querySelector(`[id="${controls}"]`);
+      return (
+        named?.getAttribute('role') !== 'tabpanel' ||
+        named.getAttribute('aria-labelledby') !== tab.id
+      );
+    })
+    .map(([tab, controls]) => `${selected.id}: ${tab.id} -> ${controls}`);
+  assert.deepEqual(dangling, [], 'every aria-controls names a panel its tab labels');
 }
 
 /** The raised notice, asserted to sit at its editor's notice position, in the named one. */
@@ -559,6 +587,11 @@ describe('the EDITOR recipe (issue 1522)', () => {
     it(`${file}: only notices and the heading block sit above every tab's first card`, async () => {
       await editor.open();
       await assertGapRuleOnEveryTab(target, editor.cards);
+    });
+
+    it(`${file}: every tab's aria-controls names a rendered panel that tab labels`, async () => {
+      await editor.open();
+      await forEveryTab(target, () => assertTabsControlRenderedPanels(target));
     });
 
     if (editor.raise) {
