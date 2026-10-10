@@ -2126,6 +2126,10 @@
   overflow: hidden;
 }
 
+.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name:focus {
+  text-overflow: clip;
+}
+
 /* The number's label, in the ROW rather than in a column header — which is where the prototype puts it, and what lets the recipe-tier list drop its header row entirely. */
 .fabricate-manager .manager-checks-tier-unit {
   flex: 0 0 auto;
@@ -2142,7 +2146,7 @@
   /* The shared `Stepper` takes its HEIGHT from the layout context, which the design system permits; its border, radius, background and type stay the primitive's own. */
   --fab-stepper-fill-height: 28px;
 
-  /* The fill chrome (58px) plus the endpoint label (3.996rem, up to 4.5px more once glyph advances round) and headroom, so the label stays whole at any Foundry interface font scale. */
+  /* 54px of fill chrome (two 1px borders, two 2px paddings, two 2px gaps, two 22px adjunct margin-boxes), then the endpoint label (9 mono glyphs at 0.74rem = 3.996rem), its input's 4px of inline padding, and up to 4.5px of glyph rounding; 63px + 4rem leaves the rest as headroom. */
   width: calc(63px + 4rem);
 }
 

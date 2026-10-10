@@ -1394,7 +1394,8 @@ export const CASES = Object.freeze([
     expectLayout: {
       containerSelector: '.manager-checks-tier-list',
       oneLineRows: '.manager-checks-tier-list [data-outcome-row]',
-      unclipped: '.manager-checks-tier-list [data-outcome-adjustment]',
+      unclipped:
+        '.manager-checks-tier-list [data-outcome-adjustment], .manager-checks-tier-list [data-outcome-name]',
       alignedLeft: '.manager-checks-tier-list .manager-checks-tier-stepper',
     },
     expectCenterHit: '[data-outcome-adjustment][data-stepper-endpoint]',
