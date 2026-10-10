@@ -302,6 +302,124 @@ test('the catalogue is alive and every row carries an address', () => {
   }
 });
 
+/** The row keys this gate holds a rule for, which the README's row-shape table must document. */
+const CHECKED_ROW_KEYS = Object.freeze([
+  'spec',
+  'cap',
+  'draws',
+  'path',
+  'fixture',
+  'slot',
+  'props',
+  'data',
+  'content',
+  'snippets',
+  'note',
+  'inset',
+  'window',
+  'partial',
+  'undrawn',
+]);
+
+/** Where a row's `fixture` names a file. */
+const FIXTURE_DIRECTORY = 'tests/view-lab/primitives/fixtures';
+
+/** The `data` keys `LiveSpecimen.svelte` passes a fixture itself, so a row may not. */
+const REFUSED_DATA_KEYS = Object.freeze([
+  'component',
+  'props',
+  CHILDREN_PROP,
+  ...SPECIMEN_SNIPPET_NAMES,
+]);
+
+/** The keys the README's row-shape table documents, read off its first column. */
+function readmeRowKeys(readme) {
+  const table = readme.split('\n## Row shape\n', 2)[1]?.split('\n## ', 1)[0] ?? '';
+  return [...table.matchAll(/^\| `(\w+)`\s*\|/gm)].map((match) => match[1]);
+}
+
+const README_ROW_KEYS = readmeRowKeys(
+  readFileSync(path.join(REPO_ROOT, CATALOGUE_DIRECTORY, CATALOGUE_README), 'utf8')
+);
+
+/**
+ * A row's keys outside the README's table, and its `fixture` and `data` refused: a typo such as
+ * `fixtrue` would otherwise mount the plain specimen silently.
+ *
+ * @param {object} row A catalogue row.
+ * @param {(name: string) => boolean} fixtureExists Whether a fixture file has that name.
+ * @returns {string[]} One problem per refused key.
+ */
+function rowKeyProblems(row, fixtureExists) {
+  const problems = Object.keys(row)
+    .filter((key) => !README_ROW_KEYS.includes(key))
+    .map((key) => `\`${key}\` is not a key the README's row-shape table documents`);
+  if (
+    row.fixture !== undefined &&
+    !(typeof row.fixture === 'string' && fixtureExists(row.fixture))
+  ) {
+    problems.push(
+      `\`fixture\` ${JSON.stringify(row.fixture)} names no file in ${FIXTURE_DIRECTORY}`
+    );
+  }
+  if (row.data === undefined) return problems;
+  if (row.fixture === undefined)
+    problems.push('`data` is a fixture’s props, and the row names no `fixture`');
+  if (typeof row.data !== 'object' || row.data === null || Array.isArray(row.data)) {
+    problems.push('`data` must be a plain object of the fixture’s props');
+    return problems;
+  }
+  const refused = Object.keys(row.data).filter((name) => REFUSED_DATA_KEYS.includes(name));
+  for (const key of refused) {
+    problems.push(`\`data.${key}\` is a prop \`LiveSpecimen.svelte\` passes the fixture itself`);
+  }
+  return problems;
+}
+
+const fixtureFileExists = (name) =>
+  existsSync(path.join(REPO_ROOT, FIXTURE_DIRECTORY, `${name}.svelte`));
+
+test('the README documents exactly the row keys this gate checks', () => {
+  assert.deepEqual(
+    [...README_ROW_KEYS].sort(byCodePoint),
+    [...CHECKED_ROW_KEYS].sort(byCodePoint),
+    'a key added to the README or to this gate alone is a key the other does not know'
+  );
+});
+
+test('every row key is one the README documents, and `fixture` and `data` are well formed', () => {
+  const fixtured = CATALOGUE.filter((entry) => entry.row.fixture !== undefined);
+  assert.ok(fixtured.length > 0, 'no row names a fixture, so the `fixture` rules have no domain');
+  for (const entry of CATALOGUE) {
+    assert.deepEqual(rowKeyProblems(entry.row, fixtureFileExists), [], where(entry));
+  }
+
+  const row = { spec: '<Chip>', draws: 'span', path: 'src/Chip.svelte' };
+  const problemsOf = (extra) => rowKeyProblems({ ...row, ...extra }, fixtureFileExists);
+  assert.deepEqual(problemsOf({ fixtrue: 'ChipRemovable' }), [
+    "`fixtrue` is not a key the README's row-shape table documents",
+  ]);
+  assert.deepEqual(problemsOf({ knobs: {} }), [
+    "`knobs` is not a key the README's row-shape table documents",
+  ]);
+  assert.deepEqual(problemsOf({ fixture: 'NoSuchFixture' }), [
+    `\`fixture\` "NoSuchFixture" names no file in ${FIXTURE_DIRECTORY}`,
+  ]);
+  assert.deepEqual(problemsOf({ data: { typed: 'smith' } }), [
+    '`data` is a fixture’s props, and the row names no `fixture`',
+  ]);
+  assert.deepEqual(problemsOf({ fixture: 'ChipRemovable', data: { props: {}, typed: 'smith' } }), [
+    '`data.props` is a prop `LiveSpecimen.svelte` passes the fixture itself',
+  ]);
+  assert.deepEqual(problemsOf({ fixture: 'ChipRemovable', data: ['smith'] }), [
+    '`data` must be a plain object of the fixture’s props',
+  ]);
+  assert.deepEqual(
+    readmeRowKeys('# x\n## Row shape\n| `spec` | yes |\n| `knobs` | no |\n## Next\n| `tag` |'),
+    ['spec', 'knobs']
+  );
+});
+
 test('every catalogue row addresses a drawing the library actually has', () => {
   for (const resolved of RESOLVED) {
     assert.ok(resolved.problem === null, resolved.problem ?? '');

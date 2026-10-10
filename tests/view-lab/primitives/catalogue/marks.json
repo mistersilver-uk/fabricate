@@ -349,6 +349,44 @@
     }
   },
   {
+    "spec": "<Chip>",
+    "cap": "removable — a membership token in an editable set",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "fixture": "ChipRemovable",
+    "props": {
+      "removable": true,
+      "removeLabel": "Remove Perception"
+    },
+    "content": ["Perception"],
+    "note": "The remove handler is the fixture's no-op: the primitive refuses a removable chip with none, and a specimen's set never changes."
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "removable — a membership token in an editable set",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "fixture": "ChipRemovable",
+    "props": {
+      "removable": true,
+      "removeLabel": "Remove Survival"
+    },
+    "content": ["Survival"]
+  },
+  {
+    "spec": "<Chip>",
+    "cap": "removable — a membership token in an editable set",
+    "draws": ":scope > div > span",
+    "path": "src/ui/svelte/components/Chip.svelte",
+    "fixture": "ChipRemovable",
+    "props": {
+      "removable": true,
+      "removeLabel": "Remove Athletics",
+      "disabled": true
+    },
+    "content": ["Athletics"]
+  },
+  {
     "spec": "<Kicker> <IconChip> <StatBox>",
     "cap": "kicker — one size, one tracking",
     "draws": ".k-kicker",

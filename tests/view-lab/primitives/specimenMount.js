@@ -3,15 +3,13 @@
  * catalogue row over the `specimenProtocol.js` handshake, installs its own Foundry shim (an iframe
  * is a separate realm), mounts the component and reports its size to `mount.js`.
  */
-import { mount } from 'svelte';
-
 import { FABRICATE_THEME_ATTRIBUTE, FABRICATE_THEME_IDS } from '../../../src/ui/theme.js';
 import { configureLabPage } from '../foundryFrame.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
+import { loadFixture } from './fixtures.js';
 import { loadComponent } from './importers.js';
 import { installPrimitiveLabFoundry } from './labFoundry.js';
-import LiveSpecimen from './LiveSpecimen.svelte';
 import {
   applySlotBox,
   buildSpecimenFrame,
@@ -21,13 +19,18 @@ import {
   readSlotWindow,
 } from './slot.js';
 import {
+  SPECIMEN_ACT_DONE,
+  SPECIMEN_ACT_GRANT,
+  SPECIMEN_ACT_REQUEST,
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
   SPECIMEN_MOUNTED,
   SPECIMEN_READY,
+  SPECIMEN_RECHECK,
+  SPECIMEN_REACHED,
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
-import { readSpecimenSnippets } from './specimenSnippets.js';
+import { standUpSpecimen } from './standUpSpecimen.js';
 
 /** A fallback box, big enough to show the printed error message, when mounting fails. */
 const ERROR_BOX = Object.freeze({ width: 420, height: 120 });
@@ -35,6 +38,35 @@ const ERROR_BOX = Object.freeze({ width: 420, height: 120 });
 /** Post a plain, structured-clonable message to the parent frame. */
 function postToParent(message) {
   globalThis.parent.postMessage(message, globalThis.location.origin);
+}
+
+/** Call `onMessage` with each parent message of `type`; returns the unsubscribe. */
+function onParentMessage(type, onMessage) {
+  function listener(event) {
+    if (event.origin !== globalThis.location.origin) return;
+    if (event.source !== globalThis.parent) return;
+    if (event.data?.type === type) onMessage(event.data);
+  }
+  globalThis.addEventListener('message', listener);
+  return () => globalThis.removeEventListener('message', listener);
+}
+
+/** Ask the parent for this specimen's act turn; resolves with the call that ends it. */
+function requestActTurn() {
+  return new Promise((resolve) => {
+    const stop = onParentMessage(SPECIMEN_ACT_GRANT, () => {
+      stop();
+      resolve(() => postToParent({ type: SPECIMEN_ACT_DONE }));
+    });
+    postToParent({ type: SPECIMEN_ACT_REQUEST });
+  });
+}
+
+/** Answer each of the parent's re-checks with whether the fixture's state still holds. */
+function answerRechecks(fixture, root) {
+  onParentMessage(SPECIMEN_RECHECK, () => {
+    postToParent({ type: SPECIMEN_REACHED, reached: Boolean(fixture.reached(root)) });
+  });
 }
 
 /**
@@ -45,14 +77,10 @@ function postToParent(message) {
  */
 function waitForAssignment() {
   return new Promise((resolve) => {
-    function onMessage(event) {
-      if (event.origin !== globalThis.location.origin) return;
-      if (event.source !== globalThis.parent) return;
-      if (event.data?.type !== SPECIMEN_ASSIGN) return;
-      globalThis.removeEventListener('message', onMessage);
-      resolve({ row: event.data.row, fill: event.data.fill === true });
-    }
-    globalThis.addEventListener('message', onMessage);
+    const stop = onParentMessage(SPECIMEN_ASSIGN, (data) => {
+      stop();
+      resolve({ row: data.row, fill: data.fill === true });
+    });
     postToParent({ type: SPECIMEN_READY });
   });
 }
@@ -129,16 +157,9 @@ async function boot() {
   document.body.append(frame);
 
   const component = await loadComponent(row.path);
-  mount(LiveSpecimen, {
-    target: root,
-    props: {
-      path: row.path,
-      component,
-      props: row.props ?? {},
-      content: row.content ?? null,
-      snippets: readSpecimenSnippets(row),
-    },
-  });
+  const fixture = row.fixture === undefined ? null : await loadFixture(row.fixture);
+  await standUpSpecimen({ target: root, row, component, fixture, requestActTurn });
+  if (fixture?.act) answerRechecks(fixture, root);
 
   // After mounting, so a late web-font swap is in the first reported size.
   await document.fonts.ready;
