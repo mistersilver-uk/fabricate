@@ -243,7 +243,7 @@ function placeSpecimenFrame(slot) {
  */
 function onActMessage(data, iframe, row, acts) {
   if (data.type === SPECIMEN_ACT_REQUEST) {
-    acts.acted.push({ iframe, row });
+    acts.acted.set(iframe, row);
     acts.turns.request(iframe, () =>
       iframe.contentWindow.postMessage({ type: SPECIMEN_ACT_GRANT }, globalThis.location.origin)
     );
@@ -281,10 +281,11 @@ function askReached(iframe) {
  * a press, which the act's own check at mount cannot see. Each failure is a problem and an error.
  */
 async function recheckActs(acted, problems, when) {
-  const answers = await Promise.all(acted.map(({ iframe }) => askReached(iframe)));
+  const specimens = [...acted];
+  const answers = await Promise.all(specimens.map(([iframe]) => askReached(iframe)));
   for (const [index, reached] of answers.entries()) {
     if (reached) continue;
-    const { row } = acted[index];
+    const [, row] = specimens[index];
     const problem =
       `${row.spec} / ${row.path}: fixture ${row.fixture} ` +
       (reached === null ? `did not answer the re-check ${when}` : `no longer holds ${when}`);
@@ -301,7 +302,8 @@ async function recheckActs(acted, problems, when) {
  * @param {string[]} problems The collector.
  * @param {{mounted: number}} results Mutated in place: `mounted` counts settled, mounted iframes.
  * @param {() => void} onReady Called when the specimen announces ready.
- * @param {{turns: object, acted: object[]}} acts The page's act turns and who acted.
+ * @param {{turns: object, acted: Map<HTMLIFrameElement, object>}} acts The page's act turns, and
+ *   each specimen that acted with its row.
  * @returns {Promise<string|undefined>} Settles once mounted or errored, or as `SILENT`.
  */
 function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) {
@@ -352,6 +354,8 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) 
         return;
       }
       if (data.type === SPECIMEN_ERROR) {
+        // Its failure is already the problem; a re-check would only report it again as silent.
+        acts.acted.delete(iframe);
         acts.turns.release(iframe);
         applySize(iframe, data, host);
         problems.push(`${slot.row.spec} / ${slot.row.path}: ${data.message}`);
@@ -390,7 +394,7 @@ async function boot() {
     ...MANIFEST.notAPrimitive,
   ]);
   const results = { mounted: 0 };
-  const acts = { turns: createActTurns(), acted: [] };
+  const acts = { turns: createActTurns(), acted: new Map() };
   // Every specimen settles before the report is published, a bounded few loading at a time.
   await standUpSlots(slots, {
     place: placeSpecimenFrame,
