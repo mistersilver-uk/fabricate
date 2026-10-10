@@ -1788,14 +1788,16 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const ladder = target.querySelector('[data-inventory-salvage-outcomes]');
     assert.ok(ladder?.matches('[data-outcome-ladder]'), 'the outcomes are the shared ladder');
     assert.ok(
-      bands.every((node) => node.matches('.manager-chip') && node.closest('.fab-outcome-tier')),
-      "each band is its tier's chip"
+      bands.every(
+        (node) => node.matches('[data-outcome-band]') && node.closest('.fab-outcome-tier')
+      ),
+      "each band is its tier's bare band"
     );
     const award = ladder.querySelector(
-      ':scope [data-inventory-salvage-outcome="o2"] [data-list-row][data-inventory-salvage-result="c2"]'
+      ':scope [data-inventory-salvage-outcome="o2"] [data-outcome-yield][data-inventory-salvage-result="c2"]'
     );
-    assert.equal(award?.querySelector('.fabricate-list-row-name').textContent, 'Iron Shard');
-    assert.equal(award.querySelector('.fabricate-list-row-quantity').textContent, '×1');
+    assert.equal(award?.querySelector('.fab-outcome-yield-name').textContent, 'Iron Shard');
+    assert.equal(award.querySelector('.fab-outcome-yield-quantity').textContent, '×1');
     assert.deepEqual(
       [...ladder.querySelectorAll('[data-inventory-salvage-outcome]')].map(
         (node) => node.dataset.outcomeSuccess
@@ -1843,7 +1845,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
     const threshold = target.querySelector('[data-inventory-outcome-threshold]');
     assert.equal(threshold.dataset.inventoryOutcomeThreshold, '15');
-    assert.ok(threshold.matches('.fab-outcome-tier-heading > .manager-chip'), "the tier's chip");
+    assert.ok(
+      threshold.matches('.fab-outcome-tier-heading > [data-outcome-band]'),
+      "the tier's band"
+    );
     assert.equal(
       target.querySelector('[data-inventory-outcome-band]'),
       null,
@@ -1881,8 +1886,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       ]
     );
     assert.ok(
-      bands.every((node) => node.matches('.manager-chip.is-neutral')),
-      'each band is the shared Chip, as the Journal ladder draws it'
+      bands.every((node) => node.matches('[data-outcome-band="neutral"]')),
+      "each band is the ladder's own band, as the Journal ladder draws it"
     );
     assert.ok(
       !target.querySelector('[data-inventory-outcome-threshold]'),

@@ -732,9 +732,9 @@ export class GatheringRichStateService {
 
   /**
    * A no-dice preview of each drop row's chance for the "What you might find" inspector, using
-   * `resolveD100Attempt`'s per-row math without rolling: base and adjusted chance plus a weather,
-   * time-of-day, biome and per-ability breakdown. Unresolvable character modifiers are omitted,
-   * with no diagnostics shown to players.
+   * `resolveD100Attempt`'s per-row math without rolling: base and adjusted chance, the roll's own
+   * `threshold` for that chance, and a weather, time-of-day, biome and per-ability breakdown.
+   * Unresolvable character modifiers are omitted, with no diagnostics shown to players.
    *
    * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, eventPolicy: string}>}
    */
@@ -810,18 +810,10 @@ export class GatheringRichStateService {
         ...conditionEntries,
         ...characterEntries,
       ]);
-      const weather = conditionKindDisplay(
-        row.conditionModifiers,
-        'weather',
-        conditions,
-        dropModifierMode
-      );
-      const timeOfDay = conditionKindDisplay(
-        row.conditionModifiers,
-        'timeOfDay',
-        conditions,
-        dropModifierMode
-      );
+      const kindDisplay = (kind) =>
+        conditionKindDisplay(row.conditionModifiers, kind, conditions, dropModifierMode);
+      const weather = kindDisplay('weather');
+      const timeOfDay = kindDisplay('timeOfDay');
       const biome = biomeKindDisplay(
         row.conditionModifiers?.biome,
         biomes,
@@ -836,6 +828,7 @@ export class GatheringRichStateService {
         quantity: row.quantity,
         baseChance: base / 100,
         finalChance: finalRate / 100,
+        threshold: dropThreshold(finalRate),
         modifiers: {
           weather: {
             conditionId: normalizeConditionId(conditions?.weather),
@@ -2157,6 +2150,11 @@ function matchingConditionModifierEntries(
   return entries;
 }
 
+/** The least effective d100 roll a row with this final chance drops on; the preview states it too. */
+function dropThreshold(finalDropRate) {
+  return 101 - finalDropRate;
+}
+
 function rollDropRow({
   row,
   index,
@@ -2197,7 +2195,7 @@ function rollDropRow({
   const allEntries = [...conditionEntries, ...charList];
   const { finalRate } = applyDropModifierContributions(Number(row.dropRate), allEntries);
   const finalDropRate = finalRate;
-  const threshold = 101 - finalDropRate;
+  const threshold = dropThreshold(finalDropRate);
   return {
     ...cloneJson(row),
     rank: index,

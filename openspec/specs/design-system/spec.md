@@ -48,6 +48,7 @@ The row's `trailing` controls MUST sit beside the button, and block content sits
 A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
+The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
 Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
@@ -720,6 +721,7 @@ The values 32, 36 and 40 are RETIRED as CONTROL heights and MUST NOT be reintrod
 The search field is 38 at radius 9 on every non-compact site, the journal included (maintainer ruling 2, 2026-09-19), and it carries the one named EXCEPTION to the retired 32: `SearchField`'s `density="compact"` at its four ruled sites, recorded as an exception and never as a rung, so the 26 / 28 / 30 / 34 / 38 / 44 ladder stays closed.
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
+The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
 A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.
@@ -735,7 +737,7 @@ Resizing to the nearest rung in the same change would smuggle a layout move into
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
 Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
-Issue 1523's sweep snapped the rest, and the remaining population is 4 off-ladder art tiles in 4 files, each under a `ratchet-exempt` reason: the 56px slot tile (issue 2257), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill; no portrait is off its ladder and no site passes a non-literal size.
+Issue 1523's sweep snapped the rest, and the remaining population is 5 off-ladder art tiles in 5 files, each under a `ratchet-exempt` reason: the 56px slot tile (issue 2257), the two identity previews of an essence's colour and icon (124 and 150px), and the 14px inline mark in the salvage award pill and in `OutcomeLadder`'s yield chip (maintainer, 2026-10-10); no portrait is off its ladder and no site passes a non-literal size.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
 The icon chip's corner follows its rung — 6 at 22, 7 at 26 and 30, 9 at 38 and at any size off the ladder — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
@@ -2202,8 +2204,9 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
-`NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
-At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 2257.
+`NavSidebar`'s `labelled` variant MUST draw an expanded group on the expanded rail as one box (radius 9, soft ground, inset hairline, `--fab-space-2xs` padding) with the parent row unshifted, borderless and unplated unless the rail marks it active, and its children one `--fab-space-3` step in; the collapsed rail draws no box.
+Its rows MUST stay 34px at radius 9 with a 12.5px label over a 24px icon column, and 47×34 at radius 9 on the collapsed rail (its 56px column less 8px of padding and the rail's 1px divider), and the library's `labelled` units are drawn to them (issue 2257).
+Its `icon` variant MUST keep 8/0/6 item padding and the `--fab-success` pip (rulings 2026-09-19, 2026-10-07 E3).
 
 #### Scenario: A manager route draws its header
 
@@ -2218,11 +2221,12 @@ At issue 1777 both callers kept their shipped geometry, which disagreed with the
 - **THEN** no caller rule sets its padding, trail, title, subtitle or action size
 - **AND** any surviving caller rule only places it or fills it
 
-#### Scenario: NavSidebar's geometry disagrees with its specimen
+#### Scenario: A GM expands a nav group
 
-- **WHEN** `NavSidebar`'s geometry disagrees with its specimen
-- **THEN** the entry stays `target`
-- **AND** the geometry converges in issue 2257
+- **WHEN** a `labelled` parent's chevron expands its group
+- **THEN** the parent and its rows draw inside one radius-9 box
+- **AND** the parent's icon, label and chevron do not move
+- **AND** on the collapsed rail the group draws no box and the parent's icon does not move
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
@@ -2434,11 +2438,13 @@ A known shared roll whose unknown outcomes prevent locating a cut MUST remain vi
 Default preview callers MUST retain the existing shared comparison and ordering.
 `YieldScale` MAY keep authored order: with `order` `authored` it MUST keep entry order and MUST NOT draw a cut, and a known shared roll stays a standalone reading.
 Gathering's drop preview MUST compose `YieldScale` in authored order, because its reward selection is by authored order.
+Outside `perRow`, `YieldScale` MUST set each row's reading as a sentence under its name, beside a borderless 26px mark (the row's picture where it has art, else its glyph), on one flex line with its quantity and chance, and MUST NOT break a word that fits a line of its own; a `perRow` evidence row keeps its dense inline reading (ruling 2026-10-07; D7 as amended 2026-10-10; D15).
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
 `OutcomeLadder` MAY mark the one reached tier: `reachedId` matches a tier's merged `ids`, else its `id`, and only the first matching tier carries the `reachedLabel` pill and the accent edge.
-Its band is optional, and a tier with no band MUST draw no chip.
-Each tier, its band chip, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+Its band is optional, and a tier with no band MUST draw no band.
+Each tier, its band, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+`OutcomeLadder` MUST draw each tier's status glyph at 10px, its band as a bare mono 10px figure in `--fab-text-secondary` (`--fab-danger-text` on a failing tier) at no less than 4.5:1 on its heading ground, and each yield as a radius-6 wrapping chip at least 24px tall, led by a 14px picture where the yield has art, else its 9px glyph, with its name, `×qty` and detail in `--fab-text-secondary`; a group's members wrap at whitespace and an item's name ellipsizes with its full name as its `title` (rulings 2026-10-07 and 2026-10-10; D14, D19).
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player chooses a candidate from the keyboard
