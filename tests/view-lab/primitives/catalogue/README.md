@@ -228,7 +228,8 @@ Every string it hands a component comes from the row's `props`, `content`, `snip
 `tests/primitive-lab-fixtures.test.js` holds every fixture to that on its syntax tree, and the drawing-text gate reads `data` as it reads `props`, and a `…Key` as the shipped string it names.
 
 A fixture's template holds only the component, shipped primitives and snippet wiring.
-It renders no raw element, so it has no class, style or ancestor context class of its own, and markup only the shipped caller's own scope draws is left out and named in `partial`.
+It renders no raw element, `<style>` or `{@html}`, and a `class` or `style` it passes reads the row, so it has no class, style or ancestor context class of its own, and markup only the shipped caller's own scope draws is left out and named in `partial`.
+A snippet the row's `snippets` names is a prop the fixture declares and passes on.
 A part may stand inside its real parent: `NavSidebarRows` stands in `<NavSidebar>`'s `content` snippet.
 Every callback a fixture passes is a no-op, so nothing writes back.
 

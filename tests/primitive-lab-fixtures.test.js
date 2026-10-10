@@ -1,9 +1,9 @@
 /**
  * The Primitive Lab's fixture gate (issue 2339): a fixture is a call site that authors no word. Its
  * template renders the row's component with the row's props, shipped primitives and snippet wiring
- * only, every string it hands a component comes from the row, its imports are the closed list, an
- * `act` comes with its `reached`, and it compiles with no warning. Each rule runs over the real
- * fixtures and over a synthetic source that breaks it.
+ * only, with no style or class of its own; every string it hands a component comes from the row, its
+ * imports are the closed list, an `act` drives no event itself and comes with its `reached`, and it
+ * compiles with no warning. Each rule runs over the real fixtures and a synthetic source breaking it.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -45,6 +45,11 @@ const VALUE_ATTRIBUTE = (name) =>
   VALUE_PROP.test(name) || name === 'role' || name === 'aria-hidden' || name.startsWith('data-');
 
 const REST_PROP = '...rest';
+
+/** Element methods an act may not call itself, because `fixtureActs.js` drives every event. */
+const EVENT_METHODS = new Set(['focus', 'blur', 'click', 'dispatchEvent']);
+
+const PRESENTATION_ATTRIBUTES = new Set(['class', 'style']);
 
 /** AST keys that hold positions, back-references or comments rather than code. */
 const SKIPPED_KEYS = new Set([
@@ -220,14 +225,113 @@ const undeclared = (passed, declared) =>
     ? passed
     : passed.filter((name) => !declared.includes(name) && !declared.includes(REST_PROP));
 
-/** Whether a render tag calls the local `children` binding. */
-function rendersChildren(nodes, local) {
-  return nodes.some((node) => {
-    if (node.type !== 'RenderTag') return false;
+/** Visit every ESTree or template node under `node`. */
+function eachNode(node, visit) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const item of node) eachNode(item, visit);
+    return;
+  }
+  if (typeof node.type === 'string') visit(node);
+  for (const [key, value] of Object.entries(node)) {
+    if (!SKIPPED_KEYS.has(key)) eachNode(value, visit);
+  }
+}
+
+/** An attribute's value when it is exactly one `{expression}`, else null. */
+function soleExpression(attribute) {
+  const value =
+    Array.isArray(attribute.value) && attribute.value.length === 1
+      ? attribute.value[0]
+      : attribute.value;
+  return value?.type === 'ExpressionTag' ? value.expression : null;
+}
+
+/** Whether a node renders the `local` binding or hands it on whole as an attribute. */
+function passesOn(node, local) {
+  if (node.type === 'RenderTag') {
     const call =
       node.expression.type === 'ChainExpression' ? node.expression.expression : node.expression;
     return call.callee?.name === local;
+  }
+  return (node.attributes ?? []).some(
+    (attribute) => attribute.type === 'Attribute' && soleExpression(attribute)?.name === local
+  );
+}
+
+/** The `content` and snippets a fixture's rows hand it, each of which it declares and passes on. */
+function handedProblems(nodes, { bindings, rows }) {
+  const handed = (local) => local !== undefined && nodes.some((node) => passesOn(node, local));
+  const problems =
+    rows.some((row) => row.content !== undefined) && !handed(bindings.get('children'))
+      ? ['is handed `content` by its row and renders no `children`']
+      : [];
+  const snippets = new Set(rows.flatMap((row) => Object.keys(row.snippets ?? {})));
+  for (const name of snippets) {
+    if (!handed(bindings.get(name))) {
+      problems.push(`is handed the \`${name}\` snippet by its row and does not pass it on`);
+    }
+  }
+  return problems;
+}
+
+/** The name a class or style attribute or directive sets, or null for any other attribute. */
+function presentationName(attribute) {
+  if (attribute.type === 'ClassDirective') return `class:${attribute.name}`;
+  if (attribute.type === 'StyleDirective') return `style:${attribute.name}`;
+  const isPresentation =
+    attribute.type === 'Attribute' && PRESENTATION_ATTRIBUTES.has(attribute.name);
+  return isPresentation ? attribute.name : null;
+}
+
+/** Whether an expression reads a row value: a `$props()` local, or a member of one. */
+function readsRow(expression, readable) {
+  let root = expression;
+  while (root?.type === 'MemberExpression') root = root.object;
+  return root?.type === 'Identifier' && readable.has(root.name);
+}
+
+/**
+ * No `<style>`, no `{@html}`, and no class or style the fixture authors: a `class` or `style`
+ * attribute only reads the row's `props` or `data`, and a directive's name is always its own.
+ */
+function presentationProblems(ast, nodes, bindings) {
+  const readable = new Set(
+    [...bindings]
+      .filter(([key]) => key !== 'component' && key !== 'children')
+      .map(([, local]) => local)
+  );
+  const problems = ast.css
+    ? ['carries a <style> block, so presentation no shipped primitive owns']
+    : [];
+  for (const node of nodes) {
+    if (node.type === 'HtmlTag') {
+      problems.push('renders {@html}, so markup no shipped primitive owns');
+    }
+    for (const attribute of node.attributes ?? []) {
+      const name = presentationName(attribute);
+      if (name === null) continue;
+      if (attribute.type === 'Attribute' && readsRow(soleExpression(attribute), readable)) continue;
+      problems.push(
+        `gives <${node.name}> \`${name}\` of its own, so presentation no shipped primitive owns`
+      );
+    }
+  }
+  return problems;
+}
+
+/** Each `.focus()`, `.blur()`, `.click()` or `.dispatchEvent()` a script calls itself. */
+function eventCallProblems(ast) {
+  const problems = [];
+  eachNode([ast.instance?.content, ast.module?.content], (node) => {
+    const callee = node.type === 'CallExpression' ? node.callee : null;
+    if (callee?.type !== 'MemberExpression' || callee.computed) return;
+    if (!EVENT_METHODS.has(callee.property.name)) return;
+    problems.push(
+      `calls \`.${callee.property.name}()\`; an act drives events only through fixtureActs.js`
+    );
   });
+  return problems;
 }
 
 /** The alias's problems: it spreads the row's props, and passes only what each row's path declares. */
@@ -284,11 +388,11 @@ function templateProblems(ast, { file, rows, propsOf }) {
         : primitiveProblems(node, primitives, propsOf))
     );
   }
-  const wantsChildren = rows.some((row) => row.content !== undefined);
-  if (wantsChildren && !rendersChildren(nodes, bindings.get('children'))) {
-    problems.push('is handed `content` by its row and renders no `children`');
-  }
-  return problems;
+  return [
+    ...problems,
+    ...handedProblems(nodes, { bindings, rows }),
+    ...presentationProblems(ast, nodes, bindings),
+  ];
 }
 
 /** The import list of D3. */
@@ -327,6 +431,7 @@ function fixtureProblems(source, context) {
     ...words.map((word) => `authors the word ${JSON.stringify(word)}; a word comes from its row`),
     ...importProblems(ast, context.file),
     ...templateProblems(ast, context),
+    ...eventCallProblems(ast),
     ...(exported.includes('act') && !exported.includes('reached')
       ? ['exports `act` and no `reached`']
       : []),
@@ -378,9 +483,18 @@ test('the fixture corpus is alive', () => {
   assert.ok(acting.length > 0, 'no fixture exports `act`, so the act rules have no real domain');
 });
 
+/** The fixture files no catalogue row names. */
+const orphansOf = (fixtures) =>
+  fixtures.filter(({ rows }) => rows.length === 0).map(({ file }) => file);
+
+/** A source's compiler warnings, one `code: message` each. */
+function warningsOf(source, file) {
+  const { warnings } = compile(source, { filename: file, generate: 'client' });
+  return warnings.map((warning) => `${warning.code}: ${warning.message}`);
+}
+
 test('every fixture is named by a catalogue row', () => {
-  const orphans = FIXTURES.filter(({ rows }) => rows.length === 0).map(({ file }) => file);
-  assert.deepEqual(orphans, [], 'a fixture no row names is code the lab never runs');
+  assert.deepEqual(orphansOf(FIXTURES), [], 'a fixture no row names is code the lab never runs');
 });
 
 test('every fixture is a call site that authors no word', () => {
@@ -391,9 +505,8 @@ test('every fixture is a call site that authors no word', () => {
 
 test('every fixture compiles with no warning', () => {
   for (const { file, source } of FIXTURES) {
-    const { warnings } = compile(source, { filename: file, generate: 'client' });
     assert.deepEqual(
-      warnings.map((warning) => `${warning.code}: ${warning.message}`),
+      warningsOf(source, file),
       [],
       `${file}: \`lint:svelte:warnings\` walks src only, so this is the fixture's warning gate`
     );
@@ -404,11 +517,12 @@ test('every fixture compiles with no warning', () => {
 function synthetic({
   instance = '',
   module = '',
+  declares = '',
   template = '<Specimen {...props} onRemove={remove} />',
 }) {
   return (
     (module ? `<script module>\n${module}\n</script>\n` : '') +
-    `<script>\n  let { component: Specimen, props = {}, children, typed = '' } = $props();\n  function remove() {}\n${instance}\n</script>\n\n${template}\n`
+    `<script>\n  let { component: Specimen, props = {}, children, typed = ''${declares} } = $props();\n  function remove() {}\n${instance}\n</script>\n\n${template}\n`
   );
 }
 
@@ -475,6 +589,7 @@ test('a raw element, or a context class around the alias, is refused', () => {
     '<div class="manager-body is-rail-collapsed"><Specimen {...props} onRemove={remove} /></div>';
   assert.deepEqual(problemsOf({ template }), [
     'renders a raw <div>, so markup no shipped primitive owns',
+    'gives <div> `class` of its own, so presentation no shipped primitive owns',
   ]);
 });
 
@@ -513,4 +628,68 @@ test('an `act` with no `reached`, and an undeclared `data` key, are refused', ()
   assert.deepEqual(problemsOf({}, [{ ...CHIP, data: { typed: 'smith', items: [] } }]), [
     'is handed `data.items`, which it does not declare',
   ]);
+});
+
+test('an unnamed fixture is an orphan, and a warning a source compiles with is read', () => {
+  const named = { file: 'a.svelte', rows: [CHIP] };
+  assert.deepEqual(orphansOf([named, { file: SYNTHETIC_FILE, rows: [] }]), [SYNTHETIC_FILE]);
+  const warned = warningsOf(synthetic({ template: '<img src="x.webp" />' }), SYNTHETIC_FILE);
+  assert.ok(
+    warned.some((warning) => warning.startsWith('a11y_missing_attribute')),
+    warned.join('\n')
+  );
+});
+
+test('a <style> block, an {@html} tag, and a class or style the fixture authors are refused', () => {
+  const style = '<Specimen {...props} onRemove={remove} />\n<style>\n  .x { margin: 0; }\n</style>';
+  assert.deepEqual(problemsOf({ template: style }), [
+    'carries a <style> block, so presentation no shipped primitive owns',
+  ]);
+  assert.deepEqual(
+    problemsOf({ template: '<Specimen {...props} onRemove={remove}>{@html typed}</Specimen>' }),
+    ['renders {@html}, so markup no shipped primitive owns']
+  );
+  const withAttribute = (attribute) =>
+    ['<Specimen {...props} onRemove={remove}', attribute, '/>'].join(' ');
+  const authored = [
+    ['class="is-rail-collapsed"', 'class'],
+    ['class="pick {typed}"', 'class'],
+    ["style={'margin: 0'}", 'style'],
+    ['style:margin={typed}', 'style:margin'],
+    ['class:is-open={typed}', 'class:is-open'],
+  ];
+  for (const [attribute, name] of authored) {
+    const template = withAttribute(attribute);
+    assert.ok(
+      problemsOf({ template }).includes(
+        `gives <Specimen> \`${name}\` of its own, so presentation no shipped primitive owns`
+      ),
+      template
+    );
+  }
+  for (const attribute of ['class={props.class}', 'class={typed}', 'style={props.style}']) {
+    const template = withAttribute(attribute);
+    assert.deepEqual(problemsOf({ template }), [], `${attribute} reads the row`);
+  }
+});
+
+test('an act that calls an element event method itself is refused', () => {
+  for (const method of ['focus', 'blur', 'click', 'dispatchEvent']) {
+    const module = `export async function act(root) { root.querySelector('input').${method}(); }\nexport function reached() { return true; }`;
+    assert.deepEqual(problemsOf({ module }), [
+      `calls \`.${method}()\`; an act drives events only through fixtureActs.js`,
+    ]);
+  }
+});
+
+test('a row snippet needs a fixture that declares it and passes it on', () => {
+  const listRow = { path: 'src/ui/svelte/components/ListRow.svelte', snippets: { meta: [] } };
+  const template = '<Specimen {...props} />';
+  const refused = ['is handed the `meta` snippet by its row and does not pass it on'];
+  assert.deepEqual(problemsOf({ template }, [listRow]), refused);
+  assert.deepEqual(problemsOf({ declares: ', meta', template }, [listRow]), refused);
+  assert.deepEqual(
+    problemsOf({ declares: ', meta', template: '<Specimen {...props} {meta} />' }, [listRow]),
+    []
+  );
 });
