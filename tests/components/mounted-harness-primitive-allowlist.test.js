@@ -29,12 +29,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-  // THE APP'S ONE SELECT (issue 1504). It is the widest-reaching arrival on this list since
-  // `EmptyState`: three shared components render it — `Pagination`, `BulkEditSelect` and
-  // `EntityListInspectorFrame` — so it is in the static closure of every suite that mounts a
-  // tree holding a pager, a bulk panel or a scoped catalogue, which is most of them. And it
-  // pulls `SearchablePopover` in behind it, which is exactly the silent fan-out this list
-  // exists to turn into a named failure.
+  // THE APP'S ONE SELECT (issue 1504), which pulls `SearchablePopover` in behind it. The guard
+  // names it for a suite whose roster it reads: inline, by name or shorthand, and one spread deep.
   'src/ui/svelte/components/Select.svelte',
   // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
   // The list reaches five manager surfaces at once, and it renders the disclosure and the icon
@@ -212,9 +208,17 @@ test('a component adjudicated OUT of the shared set is really out of it, and rea
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
 const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
 
-// The three forms a suite uses to DECLARE what its temp tree compiles.
+// A suite DECLARES its temp tree in a `writeCompiledSvelte(…)` argument or a `compiledModules`
+// array, roster name or shorthand. A spread is followed one level into the file declaring it, and
+// a call on a roster (`NAME.filter(…)`) is not read.
 const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
 const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
+const COMPILED_MODULES_NAME = /compiledModules\s*:\s*([A-Za-z_$][\w$]*)\s*(?=[,}]|$)/gm;
+const COMPILED_MODULES_SHORTHAND = /[{,]\s*compiledModules\s*(?=[,}]|$)/gm;
+const SPREAD = /\.\.\.(\w+)/g;
+const LOCAL_ARRAY = /const\s+(\w+)\s*=\s*\[([^\]]*)\]/g;
+const EXPORTED_ROSTER = /export\s+const\s+(\w+)\s*=\s*Object\.freeze\(\[([^\]]*)\]/g;
+const NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'(\.[^']+)'/g;
 // A template-literal compile inside a loop: writeCompiledSvelte(`prefix/${part}.svelte`).
 const TEMPLATE_COMPILE = /^`([^`$]*)\$\{(\w+)\}([^`]*)`$/;
 // The SAME compile loop with no template at all.
@@ -226,23 +230,22 @@ const BARE_LOOP_COMPILE = /^(\w+)$/;
 // spans words.
 const QUOTED = /'([\w./@-]+)'/g;
 
+const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
+
 /** The set of component paths a suite actually COMPILES into its temp tree. */
-function compiledPathsOf(suite) {
-  // `const NAME = [ … ]` — the backing array for both `...NAME` spreads inside a
-  // `compiledModules` list and `for (const x of NAME)` compile loops.
-  const arrays = new Map([
-    ...importedArraysOf(suite),
-    ...[...suite.matchAll(/const\s+(\w+)\s*=\s*\[([^\]]*)\]/g)].map(([, name, body]) => [
-      name,
-      body,
-    ]),
-  ]);
-  const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
+function compiledPathsOf(suite, suitePath) {
+  const arrays = arraysOf(suite, suitePath);
+
+  // A roster passed by name reads as its body when the suite declares it, else as `[...NAME]`.
+  const rosterRegion = (name) =>
+    arrays.get(name)?.file === suitePath ? arrays.get(name).body : `...${name}`;
 
   const declared = [];
   const regions = [
     ...[...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument),
     ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
+    ...[...suite.matchAll(COMPILED_MODULES_NAME)].map(([, name]) => rosterRegion(name)),
+    ...[...suite.matchAll(COMPILED_MODULES_SHORTHAND)].map(() => rosterRegion('compiledModules')),
   ];
 
   // The list a `for (const <variable> of …)` compile loop iterates, inline or by const name.
@@ -251,7 +254,9 @@ function compiledPathsOf(suite) {
       `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
     ).exec(suite);
     if (!binding) return null;
-    return literalsIn(binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? ''));
+    return literalsIn(
+      binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1])?.body ?? '')
+    );
   };
 
   for (const region of regions) {
@@ -272,31 +277,51 @@ function compiledPathsOf(suite) {
       continue;
     }
 
-    for (const value of literalsIn(region)) declared.push(value);
-    // `compiledModules: [...SHARED, 'one/more.svelte']`.
-    for (const [, spread] of region.matchAll(/\.\.\.(\w+)/g)) {
-      for (const value of literalsIn(arrays.get(spread) ?? '')) declared.push(value);
-    }
+    declared.push(...literalsIn(region), ...spreadPathsOf(region, arrays, suitePath));
   }
 
   return declared;
 }
 
-/**
- * Backing arrays a suite IMPORTS, keyed by the local name it spreads them under.
- * @param {string} suite Source text of the suite.
- * @returns {Array<[string, string]>} `[localName, arrayBody]` pairs.
- */
-function importedArraysOf(suite) {
+/** The literals each `...NAME` in a region resolves to, plus those of NAME's own spreads. */
+function spreadPathsOf(region, arrays, suitePath) {
+  const paths = [];
+  for (const [, spread] of region.matchAll(SPREAD)) {
+    const array = arrays.get(spread);
+    if (!array) continue;
+    paths.push(...literalsIn(array.body));
+    const scope = array.file === suitePath ? arrays : arraysOfFile(array.file);
+    for (const [, nested] of array.body.matchAll(SPREAD)) {
+      paths.push(...literalsIn(scope.get(nested)?.body ?? ''));
+    }
+  }
+  return paths;
+}
+
+/** A file's arrays by local name: the frozen rosters it imports and the arrays it declares. */
+function arraysOf(source, file) {
+  const declaredIn = (pattern) =>
+    [...source.matchAll(pattern)].map(([, name, body]) => [name, { body, file }]);
+  return new Map([
+    ...importedArraysOf(source, file),
+    ...declaredIn(LOCAL_ARRAY),
+    ...declaredIn(EXPORTED_ROSTER),
+  ]);
+}
+
+const arraysOfFile = (file) => arraysOf(readFileSync(file, 'utf8'), file);
+
+/** The frozen rosters a file imports, keyed by local name and resolved relative to that file. */
+function importedArraysOf(source, fromFile) {
   const pairs = [];
-  for (const [, names, specifier] of suite.matchAll(/import\s*\{([^}]*)\}\s*from\s*'(\.[^']+)'/g)) {
-    const resolved = resolve(repoRoot, 'tests/components', specifier);
+  for (const [, names, specifier] of source.matchAll(NAMED_IMPORT)) {
+    const resolved = resolve(repoRoot, dirname(fromFile), specifier);
     if (!existsSync(resolved)) continue;
-    const source = readFileSync(resolved, 'utf8');
     const declared = new Map(
-      [...source.matchAll(/export\s+const\s+(\w+)\s*=\s*Object\.freeze\(\[([^\]]*)\]/g)].map(
-        ([, name, body]) => [name, body]
-      )
+      [...readFileSync(resolved, 'utf8').matchAll(EXPORTED_ROSTER)].map(([, name, body]) => [
+        name,
+        { body, file: resolved },
+      ])
     );
     for (const raw of names.split(',')) {
       const name = raw.trim().split(/\s+as\s+/).at(-1);
@@ -340,35 +365,78 @@ function closureOf(componentPath, seen = new Set()) {
 
 const closures = new Map(componentPaths.map((path) => [path, closureOf(path)]));
 
-test('every hand-rolled mount harness names the shared primitives its tree renders', () => {
-  const suitePaths = repoPathsUnder('tests', '.test.js');
-  const gaps = [];
+/** What one suite's temp tree names, and each shared primitive that tree renders without naming. */
+function gapsIn(suitePath, suite) {
+  const compiled = new Set(compiledPathsOf(suite, suitePath));
+  const named = componentPaths.filter((path) => compiled.has(path));
+  const missing = SHARED_PRIMITIVES.filter(
+    (primitive) =>
+      !named.includes(primitive) && named.some((path) => closures.get(path).has(primitive))
+  );
+  const gaps = missing.map(
+    (primitive) => `${suitePath} mounts a tree that renders ${primitive} but never compiles it`
+  );
+  return { named, gaps };
+}
 
-  for (const suitePath of suitePaths) {
+/** Below this many suites resolving a component, the reader has stopped seeing its rosters. */
+const RESOLVED_SUITE_FLOOR = 185;
+/** Below this many multi-line rosters across the resolved helpers, the capture check went blind. */
+const ROSTER_FLOOR = 40;
+
+test('every hand-rolled mount harness names the shared primitives its tree renders', () => {
+  const gaps = [];
+  let resolved = 0;
+  for (const suitePath of repoPathsUnder('tests', '.test.js')) {
     const suite = readRepoFile(suitePath);
     // A suite that compiles nothing cannot hang on a missing component. Matched as a CALL.
     if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
-
-    const compiled = new Set(compiledPathsOf(suite));
-    const named = componentPaths.filter((path) => compiled.has(path));
-    const required = new Set(
-      SHARED_PRIMITIVES.filter(
-        (primitive) =>
-          !named.includes(primitive) &&
-          named.some((path) => closures.get(path).has(primitive))
-      )
-    );
-
-    for (const primitive of required) {
-      gaps.push(`${suitePath} mounts a tree that renders ${primitive} but never compiles it`);
-    }
+    const { named, gaps: suiteGaps } = gapsIn(suitePath, suite);
+    if (named.length > 0) resolved += 1;
+    gaps.push(...suiteGaps);
   }
 
+  assert.ok(
+    resolved >= RESOLVED_SUITE_FLOOR,
+    `only ${resolved} suites resolve a component, so the reader stopped seeing their rosters`
+  );
   assert.deepEqual(
     gaps,
     [],
     `a missing entry HANGS the suite (# cancelled), it does not fail it:\n- ${gaps.join('\n- ')}`
   );
+});
+
+const [SELECT, PAGINATION] = ['Select', 'Pagination'].map((name) =>
+  SHARED_PRIMITIVES.find((path) => path.endsWith(`/${name}.svelte`))
+);
+const SYNTHETIC_SUITE = 'tests/components/synthetic-roster.test.js';
+// Assembled at run time, so this file holds no roster the live walk above reads.
+const syntheticSuite = (...lines) => lines.join('\n').replaceAll('@KEY', 'compiledModules');
+
+test('a roster passed by name or shorthand is read as a spread, and a call on it is not', () => {
+  const gapsOf = (...lines) => gapsIn(SYNTHETIC_SUITE, syntheticSuite(...lines));
+  const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it`;
+
+  const byName = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE });');
+  assert.ok(byName.gaps.includes(selectGap), 'a roster passed by name is read');
+  const shorthand = gapsOf(`const @KEY = ['${PAGINATION}'];`, 'h({ @KEY });');
+  assert.ok(shorthand.gaps.includes(selectGap), 'a roster passed by shorthand is read');
+  const call = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
+  assert.deepEqual(call.named, [], 'a call on a roster stays unread, as the harness test needs');
+});
+
+test('a spread roster is followed one level into the file that declares it', () => {
+  const spreading = (name, helper) =>
+    syntheticSuite(`import { ${name} } from '../helpers/${helper}';`, `h({ @KEY: [...${name}] });`);
+
+  const unread = [
+    ['CRAFTING_APP_COMPILED_MODULES', 'svelte-component-harness.js'],
+    ['SCOPED_SHARED_COMPILED_MODULES', 'componentScopeMountModules.js'],
+  ].filter(
+    ([name, helper]) => !compiledPathsOf(spreading(name, helper), SYNTHETIC_SUITE).includes(SELECT)
+  );
+  assert.deepEqual(unread, [], 'each reaches Select only through a nested SELECT_COMPILED_MODULES');
 });
 
 test('every inspected suite resolves at least one real component, so none passes vacuously', () => {
@@ -386,7 +454,7 @@ test('every inspected suite resolves at least one real component, so none passes
     // `<style>` blocks) names no path this parser can read, and is not vacuous for it.
     if (suite.includes('componentScopeMountModules.js')) continue;
 
-    const compiled = new Set(compiledPathsOf(suite));
+    const compiled = new Set(compiledPathsOf(suite, suitePath));
     if (!componentPaths.some((path) => compiled.has(path))) unreadable.push(suitePath);
   }
 
@@ -445,16 +513,33 @@ test('a shared component two application roots render is adjudicated, in or out'
 });
 
 // A COMMENT INSIDE A ROSTER IS INSIDE THAT ROSTER'S CAPTURED BODY (issue 1514).
-const HARNESS_ROSTER_SOURCE = 'tests/helpers/svelte-component-harness.js';
+const ROSTER_HELPERS = Object.freeze([
+  'tests/helpers/svelte-component-harness.js',
+  'tests/helpers/checksHarnessModules.js',
+  'tests/helpers/componentEditViewModules.js',
+  'tests/helpers/rollPromptHarnessModules.js',
+  'tests/helpers/componentScopeMountModules.js',
+]);
 
-test('every exported roster in the shared harness resolves whole through the guard reader', () => {
-  const source = readRepoFile(HARNESS_ROSTER_SOURCE);
+/** Every file a compiling suite's imported rosters are declared in, at either spread level. */
+function rosterSources() {
+  const sources = new Set();
+  for (const suitePath of repoPathsUnder('tests', '.test.js')) {
+    const suite = readRepoFile(suitePath);
+    if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
+    for (const [, { file }] of importedArraysOf(suite, suitePath)) {
+      sources.add(file);
+      for (const [, nested] of arraysOfFile(file)) sources.add(nested.file);
+    }
+  }
+  return [...sources].map((file) => relative(repoRoot, file).replaceAll('\\', '/'));
+}
+
+/** How many multi-line rosters a helper exports, and each the reader captures short. */
+function truncatedRostersIn(sourcePath) {
+  const source = readRepoFile(sourcePath);
   const rosterNames = [...source.matchAll(/^export const (\w+) = Object\.freeze\(\[$/gm)].map(
     ([, name]) => name
-  );
-  assert.ok(
-    rosterNames.length >= 8,
-    `expected the harness to export its module rosters as frozen arrays, found ${rosterNames.length}`
   );
 
   // Ground truth is one quoted path per line inside the declaration.
@@ -465,31 +550,47 @@ test('every exported roster in the shared harness resolves whole through the gua
     return [...source.slice(start, end).matchAll(/^\s*'([\w./@-]+)',?\s*$/gm)].map(([, p]) => p);
   };
 
-  // The real reader, driven through a synthetic suite that imports every roster by name.
+  // The real reader, driven through a synthetic file beside the helper that imports every roster.
   const resolved = new Map(
     importedArraysOf(
-      `import { ${rosterNames.join(', ')} } from '../helpers/svelte-component-harness.js';`
+      `import { ${rosterNames.join(', ')} } from './${posix.basename(sourcePath)}';`,
+      sourcePath
     )
   );
 
   const truncated = [];
   for (const name of rosterNames) {
     const declared = declaredPathsOf(name);
-    const body = resolved.get(name);
-    if (body === undefined) {
-      truncated.push(`${name} was not resolved by importedArraysOf at all`);
+    const roster = resolved.get(name);
+    if (roster === undefined) {
+      truncated.push(`${sourcePath}: ${name} was not resolved by importedArraysOf at all`);
       continue;
     }
-    const captured = [...body.matchAll(QUOTED)].map(([, value]) => value);
+    const captured = literalsIn(roster.body);
     const missing = declared.filter((path) => !captured.includes(path));
-    if (missing.length) {
+    if (missing.length > 0) {
       truncated.push(
-        `${name} resolves ${captured.length} of ${declared.length} declared paths; ` +
+        `${sourcePath}: ${name} resolves ${captured.length} of ${declared.length} paths; ` +
           `a bracket character in its comments truncated the capture before ${missing.join(', ')}`
       );
     }
   }
+  return { rosters: rosterNames.length, truncated };
+}
 
+test('every exported roster the guard reader resolves through is captured whole', () => {
+  const sources = rosterSources();
+  assert.deepEqual(
+    ROSTER_HELPERS.filter((helper) => !sources.includes(helper)),
+    [],
+    'the reader no longer resolves through these roster helpers, so this clause stopped seeing them'
+  );
+
+  const results = sources.map(truncatedRostersIn);
+  const rosters = results.reduce((total, { rosters: count }) => total + count, 0);
+  assert.ok(rosters >= ROSTER_FLOOR, `expected at least ${ROSTER_FLOOR} rosters, found ${rosters}`);
+
+  const truncated = results.flatMap((result) => result.truncated);
   assert.deepEqual(
     truncated,
     [],
