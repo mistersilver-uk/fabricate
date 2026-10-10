@@ -251,7 +251,6 @@ test('issue 2257: a preview drop states the effective roll its final chance need
 
 test('issue 2257: the preview threshold cannot drift from the one the roll evaluates against', async () => {
   const service = thresholdService({ roll: 40 });
-  const environment = thresholdEnvironment({ dropModifierMode: 'multiplicative' });
   const task = {
     id: 't',
     resolutionMode: 'd100',
@@ -268,14 +267,20 @@ test('issue 2257: the preview threshold cannot drift from the one the roll evalu
       thresholdRow('never', 0)
     ]
   };
-  const preview = await service.previewDropBreakdown({ environment, task, actor: {} });
-  const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
-  const rolled = new Map(resolved.itemRows.map((row) => [row.id, row]));
-  assert.equal(rolled.size, 5, 'every row is evaluated');
-  for (const drop of preview.drops) {
-    assert.equal(drop.threshold, rolled.get(drop.id).threshold, `${drop.id}'s threshold`);
-    assert.equal(rolled.get(drop.id).effectiveRoll, 47, 'the modifier moved the roll');
+  const byMode = {};
+  for (const dropModifierMode of ['additive', 'multiplicative']) {
+    const environment = thresholdEnvironment({ dropModifierMode });
+    const preview = await service.previewDropBreakdown({ environment, task, actor: {} });
+    const resolved = await service.resolveD100Attempt({ task, environment, actor: { uuid: 'Actor.x' } });
+    const rolled = new Map(resolved.itemRows.map((row) => [row.id, row]));
+    assert.equal(rolled.size, 5, `${dropModifierMode}: every row is evaluated`);
+    for (const drop of preview.drops) {
+      assert.equal(drop.threshold, rolled.get(drop.id).threshold, `${dropModifierMode}: ${drop.id}'s threshold`);
+      assert.equal(rolled.get(drop.id).effectiveRoll, 47, `${dropModifierMode}: the modifier moved the roll`);
+    }
+    byMode[dropModifierMode] = preview.drops.map((drop) => drop.threshold);
   }
+  assert.notDeepEqual(byMode.additive, byMode.multiplicative, 'the two modes mix the modifiers differently');
 });
 
 /**

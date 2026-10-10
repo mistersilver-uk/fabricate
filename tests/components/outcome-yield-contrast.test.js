@@ -64,6 +64,18 @@ test("the ladder's yield chip clears 4.5:1 for its name, quantity and members", 
   assert.equal(ink, '--fab-text-secondary');
   const chip = token(LADDER, '.fab-outcome-yield', 'background');
   assert.deepEqual(shortfalls(ink, [chip, tierGround()]), []);
+  const recoloured = rulesIn(corpus[LADDER]).filter(
+    (rule) =>
+      propertiesOf(rule).has('color') &&
+      splitSelectorList(rule.selector).some((selector) =>
+        /\.fab-outcome-yield-(?:name|quantity|detail)$/u.test(selector.trim())
+      )
+  );
+  assert.deepEqual(
+    recoloured.map((rule) => rule.selector),
+    [],
+    "the name, quantity and members inherit the chip's ink"
+  );
 });
 
 const rowGround = () => token(SHEET, '.fabricate-list-row', 'background');

@@ -636,6 +636,25 @@ describe('ListRow inset and detailAlign (issue 2321)', () => {
     assert.ok(!end.attributes.includes('detailalign'), 'the prop never reaches the root');
   });
 
+  it('writes is-body-fill only on a form row given `bodyBasis="fill"` (issue 2257 D15)', async () => {
+    const open = () => {};
+    const cases = [
+      ['the default form', { name: 'Idol', onOpen: open }, false],
+      ['a dense row with no form prop', { name: 'Idol', bodyBasis: 'fill' }, false],
+      ['a filled form', { name: 'Idol', onOpen: open, bodyBasis: 'fill' }, true],
+    ];
+    const seen = [];
+    for (const [label, props] of cases) {
+      const { classes, attributes } = await rootOf(props);
+      seen.push([label, classes.includes('is-body-fill')]);
+      assert.ok(!attributes.includes('bodybasis'), `${label}: the prop never reaches the root`);
+    }
+    assert.deepEqual(
+      seen,
+      cases.map(([label, , expected]) => [label, expected])
+    );
+  });
+
   it('keeps inset and detailAlign out of the byte-pinned DENSE_MATRIX, so the markup pin covers their absent defaults', () => {
     for (const [label, props] of DENSE_MATRIX) {
       assert.ok(!('inset' in props) && !('detailAlign' in props), label);
