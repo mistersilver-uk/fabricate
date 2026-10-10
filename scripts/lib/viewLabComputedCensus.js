@@ -55,6 +55,12 @@ export const RULED_KINDS = Object.freeze([
       'token lands',
   }),
   Object.freeze({
+    selector: '.essence-source-picker-option',
+    heights: [44],
+    corner: 9,
+    reason: 'a list row in its 11px panel takes the row rung',
+  }),
+  Object.freeze({
     selector: '.manager-nav-subitem',
     heights: [34, 36, 38],
     corner: 7,

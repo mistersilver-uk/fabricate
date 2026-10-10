@@ -2083,11 +2083,6 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
     "an option takes its 6px panel's inner rung",
   ],
   [
-    'styles/fabricate.css: .fabricate-source-picker-popover.essence-source-picker-popover .essence-source-picker-option',
-    ['9px'],
-    'a list row in its 11px panel takes the row rung',
-  ],
-  [
     'styles/fabricate.css: .fabricate-manager .manager-recipe-option-suggestion',
     ['6px'],
     "an option takes its suggestion panel's inner rung",

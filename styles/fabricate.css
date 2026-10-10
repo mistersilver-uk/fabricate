@@ -7408,6 +7408,8 @@
   min-height: 44px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border);
+
+  /* ratchet-exempt(design-system): a list row in its 11px panel takes the row rung */
   border-radius: 9px;
   background: var(--fab-surface-soft);
   text-align: left;
@@ -12839,6 +12841,7 @@
   height: 28px;
   min-height: 28px;
   padding-block: 0;
+  border-radius: 7px;
 }
 
 .fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {

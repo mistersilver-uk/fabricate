@@ -261,7 +261,7 @@ const COMPACT_BOX = Object.freeze({
   glyph: 'absolute',
 });
 const COMPACT_SITE_BOXES = Object.freeze({
-  'manager-drop-inspector-stack': { input: 28 },
+  'manager-drop-inspector-stack': { input: 28, inputRadius: '7px' },
   'manager-component-entry-systems-search': { input: 30, inputRadius: '7px' },
 });
 

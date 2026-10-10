@@ -30,6 +30,7 @@ const ALLOWLIST = Object.freeze([
       'styles/fabricate.css': 1,
     },
   ],
+  ['a list row in its 11px panel takes the row rung', { 'styles/fabricate.css': 1 }],
   [
     "the remove overlay covering a 32 portrait tile, drawn at the tile's 9 so no corner of the " +
       'portrait shows past it',
