@@ -2126,7 +2126,7 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name:focus {
+.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name:focus-visible {
   text-overflow: clip;
 }
 
