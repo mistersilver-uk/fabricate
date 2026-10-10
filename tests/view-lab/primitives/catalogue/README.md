@@ -25,7 +25,9 @@ this programme has already measured what happens to those.
 | `draws`   | yes      | A CSS selector for the hand-drawn element this row replaces, evaluated inside the scope above. Usually a kit class: `.k-btn`, `.k-step`, `.k-tog`, `.k-cb`, `.k-seg`.                                                                                                                                                                                                         |
 | `path`    | yes      | Repository-relative POSIX path to the component, exactly as `scripts/lib/designSystemPrimitives.json` and a `git diff` write it. Also the identity `npm run lab:check` compares the page against.                                                                                                                                                                             |
 | `slot`    | no       | `{width?, height?}`, in CSS px. Present at all, the slot's window subtree generates real BOXES at that size rather than `display: contents`. Omit it unless the specimen needs a containing block or a query container — an overlay, or a panel that restyles at a breakpoint. See below.                                                                                     |
+| `fixture` | no       | The name of a component in `tests/view-lab/primitives/fixtures/`, without `.svelte`: the row's call site, for a component that needs a function, a snippet handed an argument, or a state only an interaction reaches. See below.                                                                                                                                            |
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
+| `data`    | no       | A plain object of the fixture's own props, beside `fixture` only. Plain JSON, like `props`. See below.                                                                                                                                                                                                                                                                       |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
 | `snippets` | no      | Named snippets (`actions`, `body`, `footer`, `meta`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                     |
 | `note`    | no       | Why the row is shaped the way it is, in a sentence: the intent of a `slot` box, say. Read by people only; the page ignores it.                                                                                                                                                                                                                                              |
@@ -205,8 +207,41 @@ Only the names `specimenSnippets.js` lists are rendered, because a Svelte snippe
 cannot be built from a name at runtime; any other name is refused rather than
 dropped, and the coverage gate checks each name is a prop the component declares.
 They are `actions`, `body`, `footer` and `meta`, and each takes no argument.
-A snippet a component hands an item, such as `<LogList>`'s `action(entry)`, draws
-once per item, which one node array cannot, so a row leaves that unit drawn.
+A snippet a component hands an item, such as `<LogList>`'s `action(entry)`, draws once per item, which one node array cannot, so a row supplies it through a `fixture`.
+
+## `fixture` — a row that needs a function
+
+A row is JSON, posted into its specimen's `<iframe>`, so it cannot carry a function, a snippet handed an argument, or a state only an interaction reaches.
+A row that needs one names a `fixture`: a Svelte component in `tests/view-lab/primitives/fixtures/`, which `fixtures.js` resolves inside the `<iframe>` by name, so the row itself stays JSON.
+
+```json
+"fixture": "ChipRemovable"
+```
+
+The fixture is the row's call site, copied from the component's shipped caller.
+It is handed the row's component as `component` and the row's `props` as `props`, renders the component with `{...props}`, and supplies the functions and snippets that caller would.
+Every other attribute it passes the component is a prop the component declares.
+`data` is the fixture's own props, as plain JSON: each key is a prop the fixture declares, and `component`, `props`, `children` and the snippet names are refused.
+
+**A fixture authors no word.**
+Every string it hands a component comes from the row's `props`, `content`, `snippets` or `data`, from a lang key passed in a `data` key ending in `Key` and resolved by the lab's localizer, or from a pure helper the shipped caller imports.
+`tests/primitive-lab-fixtures.test.js` holds every fixture to that on its syntax tree, and the drawing-text gate reads `data` as it reads `props`, and a `…Key` as the shipped string it names.
+
+A fixture's template holds only the component, shipped primitives and snippet wiring.
+It renders no raw element, so it has no class, style or ancestor context class of its own, and markup only the shipped caller's own scope draws is left out and named in `partial`.
+A part may stand inside its real parent: `NavSidebarRows` stands in `<NavSidebar>`'s `content` snippet.
+Every callback a fixture passes is a no-op, so nothing writes back.
+
+### `act` — the one state an interaction reaches
+
+A fixture may export `act(root, data)` from its `<script module>`, and one that does also exports `reached(root)`, which says whether the drawn state holds.
+The specimen waits for the page's act turn, which the page grants one specimen at a time, runs `act` under a five-second limit, and fails, naming the fixture, when the act throws or hangs or `reached` is false.
+An act drives events only through `fixtureActs.js` — `press`, `type`, `focus`, `click`, `settle` and `waitFor` — on elements the specimen rendered, and every word it types comes from `data`.
+
+**A state an act reaches must not depend on holding document focus.**
+`focus` dispatches a synthetic focus event and never calls `.focus()`, because another specimen's act, or a press anywhere on the page, takes real focus away.
+The page asks every acted specimen's `reached` again after the last act and after it reports ready, and a state that has reverted is a page error that `npm run lab:check` fails on.
+Pointer hover and the focus ring cannot be reached, so a specimen whose drawing shows one names it in `partial`.
 
 ## `partial` — a specimen that draws only part of its drawing
 
@@ -240,6 +275,8 @@ There is no `knobs`, no `stories`, no `states`, no `fillers`, no `context` and n
 `theme`.
 Those fields existed to drive a workbench, and a workbench is not what this page
 is.
+A `fixture` is not one of them: it is one call site with fixed values, and its `act` reaches the single state the drawing shows, once.
+The gate refuses a row key the table above does not document, so a misspelt `fixture` fails rather than mounting the plain specimen.
 
 There is also no write-back: a specimen's props are fixed, so a Stepper's `+`
 reports through `onChange` and the value does not move — exactly as the library's

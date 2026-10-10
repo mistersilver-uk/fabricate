@@ -20,11 +20,17 @@ import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
 import { placeSpecimen } from './liveness.js';
 import { readSlotBox } from './slot.js';
 import {
+  SPECIMEN_ACT_DONE,
+  SPECIMEN_ACT_GRANT,
+  SPECIMEN_ACT_REQUEST,
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
   SPECIMEN_MOUNTED,
   SPECIMEN_READY,
+  SPECIMEN_RECHECK,
+  SPECIMEN_REACHED,
   SPECIMEN_RESIZE,
+  createActTurns,
 } from './specimenProtocol.js';
 import { armReadyWatchdog } from './specimenWatchdog.js';
 import { SILENT, standUpSlots } from './standUp.js';
@@ -231,6 +237,64 @@ function placeSpecimenFrame(slot) {
 }
 
 /**
+ * Grant or end a specimen's act turn, recording each specimen that acted for the re-checks.
+ *
+ * @returns {boolean} Whether `data` was an act-turn message.
+ */
+function onActMessage(data, iframe, row, acts) {
+  if (data.type === SPECIMEN_ACT_REQUEST) {
+    acts.acted.set(iframe, row);
+    acts.turns.request(iframe, () =>
+      iframe.contentWindow.postMessage({ type: SPECIMEN_ACT_GRANT }, globalThis.location.origin)
+    );
+    return true;
+  }
+  if (data.type !== SPECIMEN_ACT_DONE) return false;
+  acts.turns.release(iframe);
+  return true;
+}
+
+/** How long an acted specimen has to answer a re-check before its silence is the problem. */
+const RECHECK_MS = 2000;
+
+/** Ask one acted specimen whether its fixture's `reached` still holds. */
+function askReached(iframe) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => finish(null), RECHECK_MS);
+    function finish(reached) {
+      clearTimeout(timer);
+      globalThis.removeEventListener('message', onMessage);
+      resolve(reached);
+    }
+    function onMessage(event) {
+      if (event.origin !== globalThis.location.origin) return;
+      if (event.source !== iframe.contentWindow) return;
+      if (event.data?.type === SPECIMEN_REACHED) finish(event.data.reached === true);
+    }
+    globalThis.addEventListener('message', onMessage);
+    iframe.contentWindow.postMessage({ type: SPECIMEN_RECHECK }, globalThis.location.origin);
+  });
+}
+
+/**
+ * Re-ask every acted specimen's `reached`: a state an act reached can be undone by a later act or
+ * a press, which the act's own check at mount cannot see. Each failure is a problem and an error.
+ */
+async function recheckActs(acted, problems, when) {
+  const specimens = [...acted];
+  const answers = await Promise.all(specimens.map(([iframe]) => askReached(iframe)));
+  for (const [index, reached] of answers.entries()) {
+    if (reached) continue;
+    const [, row] = specimens[index];
+    const problem =
+      `${row.spec} / ${row.path}: fixture ${row.fixture} ` +
+      (reached === null ? `did not answer the re-check ${when}` : `no longer holds ${when}`);
+    console.error(`Fabricate Primitive Lab: ${problem}`);
+    problems.push(problem);
+  }
+}
+
+/**
  * Load one placed specimen and run the `specimenProtocol.js` handshake. The listener stays after
  * MOUNTED, because every later RESIZE is the same specimen re-measured.
  *
@@ -238,9 +302,11 @@ function placeSpecimenFrame(slot) {
  * @param {string[]} problems The collector.
  * @param {{mounted: number}} results Mutated in place: `mounted` counts settled, mounted iframes.
  * @param {() => void} onReady Called when the specimen announces ready.
+ * @param {{turns: object, acted: Map<HTMLIFrameElement, object>}} acts The page's act turns, and
+ *   each specimen that acted with its row.
  * @returns {Promise<string|undefined>} Settles once mounted or errored, or as `SILENT`.
  */
-function loadSpecimen({ slot, iframe, host }, problems, results, onReady) {
+function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) {
   const admit = createSizeGovernor();
   const history = [];
   let runaway = false;
@@ -251,6 +317,7 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady) {
       if (event.origin !== globalThis.location.origin) return;
       if (event.source !== iframe.contentWindow) return;
       const data = event.data ?? {};
+      if (onActMessage(data, iframe, slot.row, acts)) return;
       if (data.type === SPECIMEN_READY) {
         cancelWatchdog();
         onReady();
@@ -287,6 +354,9 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady) {
         return;
       }
       if (data.type === SPECIMEN_ERROR) {
+        // Its failure is already the problem; a re-check would only report it again as silent.
+        acts.acted.delete(iframe);
+        acts.turns.release(iframe);
         applySize(iframe, data, host);
         problems.push(`${slot.row.spec} / ${slot.row.path}: ${data.message}`);
         globalThis.removeEventListener('message', onMessage);
@@ -324,17 +394,22 @@ async function boot() {
     ...MANIFEST.notAPrimitive,
   ]);
   const results = { mounted: 0 };
+  const acts = { turns: createActTurns(), acted: new Map() };
   // Every specimen settles before the report is published, a bounded few loading at a time.
   await standUpSlots(slots, {
     place: placeSpecimenFrame,
-    load: (placed, onReady) => loadSpecimen(placed, problems, results, onReady),
+    load: (placed, onReady) => loadSpecimen(placed, problems, results, onReady, acts),
     poolSize: STAND_UP_POOL_SIZE,
     problems,
   });
   // A late font or container query re-measures a specimen; ready must not precede that.
   await whenSizesAreQuiet();
+  await recheckActs(acts.acted, problems, 'after the last act');
 
   publishReport({ mounted: results.mounted, problems });
+  const published = problems.length;
+  await recheckActs(acts.acted, problems, 'after the page reported ready');
+  if (problems.length > published) refreshProblems(problems);
 }
 
 try {

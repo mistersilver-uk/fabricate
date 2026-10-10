@@ -276,6 +276,109 @@
     }
   },
   {
+    "spec": "<NavSidebar>",
+    "cap": "sidebar 220 — expanded",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/NavSidebarRows.svelte",
+    "fixture": "InNavSidebar",
+    "partial": "rows only — no scope card, section kickers or rail box",
+    "undrawn": {
+      "page": "the current row's `aria-current` value, which the drawing shows as the active plate",
+      "Manager sections": "the nav’s accessible name, the shipped rail’s own copy; the drawing names no landmark",
+      "Collapse crafting menu": "the chevron’s accessible name; the drawing draws its glyph",
+      "Crafting sections": "the submenu group’s accessible name; the drawing names no group"
+    },
+    "props": {
+      "entries": [
+        {
+          "id": "overview",
+          "domId": "pl-nav-overview",
+          "icon": "fas fa-table-cells-large",
+          "label": "System Overview",
+          "active": false,
+          "markers": [
+            {
+              "kind": "count",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "kind": "group",
+          "id": "crafting",
+          "expanded": true,
+          "parent": {
+            "id": "crafting",
+            "domId": "pl-nav-crafting",
+            "icon": "fas fa-hammer",
+            "label": "Crafting",
+            "active": false,
+            "markers": [
+              {
+                "kind": "count",
+                "value": 418
+              }
+            ]
+          },
+          "toggle": {
+            "domId": "pl-nav-crafting-toggle",
+            "label": "Collapse crafting menu"
+          },
+          "submenu": {
+            "domId": "pl-nav-crafting-submenu",
+            "label": "Crafting sections"
+          },
+          "children": [
+            {
+              "id": "recipes",
+              "domId": "pl-nav-recipes",
+              "icon": "fas fa-list",
+              "label": "Recipes",
+              "current": "page",
+              "active": true,
+              "markers": [
+                {
+                  "kind": "count",
+                  "value": 412
+                }
+              ]
+            },
+            {
+              "id": "books",
+              "domId": "pl-nav-books",
+              "icon": "fas fa-book",
+              "label": "Books & Scrolls",
+              "active": false,
+              "markers": [
+                {
+                  "kind": "count",
+                  "value": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "component-catalogue",
+          "domId": "pl-nav-component-catalogue",
+          "icon": "fas fa-table-cells-large",
+          "label": "Component catalogue",
+          "active": false,
+          "markers": [
+            {
+              "kind": "count",
+              "value": 412
+            }
+          ]
+        }
+      ]
+    },
+    "data": {
+      "labelKey": "FABRICATE.Admin.Manager.ManagerSections"
+    },
+    "note": "The rows stand inside `<NavSidebar variant=\"labelled\">`'s own `content` snippet, the parent the sheet roots their family at; the scope card, the kickers and the box around them are the manager rail's own markup."
+  },
+  {
     "spec": "<PageHeader> <TabBar>",
     "draws": ".stage.b0.col > div > div:nth-child(1)",
     "path": "src/ui/svelte/components/PageHeader.svelte",
@@ -440,6 +543,120 @@
         }
       ]
     }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "selectable dense — the Journal’s Active run",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowRunCard",
+    "partial": "no bolt or countdown",
+    "undrawn": {
+      "Progress": "the stage bars' accessible name, the Journal's own copy; the drawing names no group"
+    },
+    "props": {
+      "name": "Karrun Warblade",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "markSize": 30,
+      "truncateName": true,
+      "selected": true
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Brenna"
+        },
+        {
+          "tag": "span",
+          "text": "Stage 2 of 2"
+        },
+        {
+          "tag": "span",
+          "text": "Day 214"
+        }
+      ]
+    },
+    "data": {
+      "statusKey": "FABRICATE.App.Journal.Status.inProgress",
+      "tone": "info",
+      "stages": [
+        {
+          "status": "done"
+        },
+        {}
+      ],
+      "current": 1,
+      "progress": 40,
+      "progressKey": "FABRICATE.App.Journal.Progress.Label"
+    },
+    "note": "Wired as `RunCard` wires it: the status chip as a badge, the meta as spans, and the stage bars as the aside beneath the one button. The bolt and the countdown are `RunCard`'s own scoped markup."
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "selectable dense — the Journal’s Active run",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowRunCard",
+    "props": {
+      "name": "Ingotwort Oil",
+      "icon": "fas fa-flask",
+      "tint": "lavender",
+      "markSize": 30,
+      "truncateName": true,
+      "selected": false
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Brenna"
+        },
+        {
+          "tag": "span",
+          "text": "Stage 1 of 2"
+        }
+      ]
+    },
+    "data": {
+      "statusKey": "FABRICATE.App.Journal.Status.paused",
+      "tone": "neutral"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "default with an aside — a leading thumb, block content beneath",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowGatheringTask",
+    "partial": "no thumb or badges; the caption stands above its bar",
+    "props": {
+      "name": "Gather Ironvale ore",
+      "icon": "fas fa-leaf",
+      "tint": "sage",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Ironvale"
+        },
+        {
+          "tag": "span",
+          "text": "Mining"
+        }
+      ]
+    },
+    "data": {
+      "chanceLabelKey": "FABRICATE.App.Gathering.Detail.SuccessChanceLabel",
+      "chanceKey": "FABRICATE.App.Gathering.Detail.SuccessChance",
+      "percent": 62,
+      "fill": "success"
+    },
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",

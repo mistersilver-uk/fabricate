@@ -15,6 +15,7 @@ import { Window } from 'happy-dom';
 import { catalogueEntries } from '../scripts/lib/primitiveLabSmoke.js';
 
 import { readDesignLibrary } from './helpers/designLibrary.js';
+import { VALUE_PROP, WORD_ATTRIBUTES } from './helpers/primitiveLabWords.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
 
@@ -24,29 +25,57 @@ const MANIFEST = JSON.parse(
   readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.json'), 'utf8')
 );
 
-/**
- * Props whose values are identifiers, enumerations, icon classes or styles rather than words: the
- * drawing shows what they select, never the value. Any other string prop is a word to check.
- */
-const VALUE_PROP =
-  /^(?:\w+(?:Id|Key|Keys|Icon)|id|key|icon|class|style|tone|state|status|kind|kinds|tint|type|role|density|as|variant|color|colorToken|ink|art|side|layout|fill|pipKind|shape|orientation|align|direction|emphasis|marks|tag|tagMatch|chooser|awardStrategy|vehicle|target|binding|controls|pageSelectionState|activeTab|selectedValue|groupName)$/;
-
-/** The attributes of a row's node, or of the drawing, that hold words a reader meets. */
-const WORD_ATTRIBUTES = Object.freeze(['aria-label', 'placeholder', 'title', 'alt']);
-
 /** A drawing also writes a field's shown value as an attribute, as a `readonly` input does. */
 const DRAWN_ATTRIBUTES = Object.freeze([...WORD_ATTRIBUTES, 'value']);
 
-/** Every non-empty word string a row's props, content and snippets pass, in order. */
-function rowWords(row) {
-  const words = [];
-  const fromProps = (value, key) => {
+/** Every shipped string, keyed on its dotted lang key. */
+const LANG = (function flatten(source, prefix = '', sink = new Map()) {
+  for (const [key, value] of Object.entries(source)) {
+    const at = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object') flatten(value, at, sink);
+    else sink.set(at, value);
+  }
+  return sink;
+})(JSON.parse(readFileSync(path.join(REPO_ROOT, 'lang/en.json'), 'utf8')));
+
+/** A `data` key whose value is a lang key the fixture resolves through the lab's localizer. */
+const LANG_KEY = /Key$/;
+
+/** An en string that is a template rather than the words it draws. */
+const PLACEHOLDER = /\{\w+\}/;
+
+/** The `…Key` values in a row's `data` that `lang/en.json` has no string for. */
+function missingLangKeys(row, lang = LANG) {
+  const missing = [];
+  const walk = (value, key) => {
     if (typeof value === 'string') {
-      if (value.trim() && !VALUE_PROP.test(key)) words.push(normalize(value));
-    } else if (Array.isArray(value)) {
-      for (const item of value) fromProps(item, key);
+      if (LANG_KEY.test(key) && !lang.has(value)) missing.push(value);
     } else if (value && typeof value === 'object') {
-      for (const [name, item] of Object.entries(value)) fromProps(item, name);
+      for (const [name, item] of Object.entries(value))
+        walk(item, Array.isArray(value) ? key : name);
+    }
+  };
+  walk(row.data ?? {}, '');
+  return missing;
+}
+
+/**
+ * Every non-empty word string a row's props, data, content and snippets pass, in order. A `data`
+ * value under a `…Key` is read as the en string it names, unless that string is a template.
+ */
+function rowWords(row, lang = LANG) {
+  const words = [];
+  const fromProps = (value, key, inData = false) => {
+    if (typeof value === 'string') {
+      if (inData && LANG_KEY.test(key)) {
+        const shipped = lang.get(value);
+        if (typeof shipped === 'string' && !PLACEHOLDER.test(shipped))
+          words.push(normalize(shipped));
+      } else if (value.trim() && !VALUE_PROP.test(key)) words.push(normalize(value));
+    } else if (Array.isArray(value)) {
+      for (const item of value) fromProps(item, key, inData);
+    } else if (value && typeof value === 'object') {
+      for (const [name, item] of Object.entries(value)) fromProps(item, name, inData);
     }
   };
   const fromNodes = (nodes = []) => {
@@ -64,6 +93,7 @@ function rowWords(row) {
     }
   };
   fromProps(row.props ?? {}, '');
+  fromProps(row.data ?? {}, '', true);
   fromNodes(row.content);
   for (const nodes of Object.values(row.snippets ?? {})) fromNodes(nodes);
   return words;
@@ -139,6 +169,18 @@ test('every word a row passes appears in its drawing, or its `undrawn` says why 
   assert.deepEqual(problems, []);
 });
 
+test('every `…Key` a row’s `data` passes names a string `lang/en.json` ships', () => {
+  const fixtured = SLOTS.filter((slot) => slot.row.fixture !== undefined);
+  assert.ok(fixtured.length > 0, 'no row names a fixture, so no row can pass `data`');
+  for (const slot of SLOTS) {
+    assert.deepEqual(missingLangKeys(slot.row), [], `${WHERE.get(slot.row)} ${slot.row.spec}`);
+  }
+  assert.deepEqual(
+    missingLangKeys({ data: { removeKey: 'FABRICATE.No.Such.Key', items: [{ labelKey: 'X' }] } }),
+    ['FABRICATE.No.Such.Key', 'X']
+  );
+});
+
 test('an `undrawn` entry is a word with its reason', () => {
   for (const slot of SLOTS) {
     const { undrawn } = slot.row;
@@ -165,9 +207,24 @@ test('the gate reads words, skips values, and finds a drifted title', () => {
       items: [{ id: 'a', name: 'Iron' }],
     },
     content: [{ tag: 'input', attrs: { placeholder: 'Search', type: 'search' } }, ' ', 'Body'],
+    data: { typed: 'smith', kind: 'multiplier', titleKey: 'T', countKey: 'C', gone: 'Gone' },
     snippets: { actions: [{ tag: 'button', text: 'Save', children: ['Now'] }] },
   };
-  assert.deepEqual(rowWords(row), ['Zzz drifted', 'Iron', 'Search', 'Body', 'Save', 'Now']);
+  const lang = new Map([
+    ['T', 'Remove  Perception'],
+    ['C', '{matched} of {total}'],
+  ]);
+  assert.deepEqual(rowWords(row, lang), [
+    'Zzz drifted',
+    'Iron',
+    'smith',
+    'Remove Perception',
+    'Gone',
+    'Search',
+    'Body',
+    'Save',
+    'Now',
+  ]);
   const drawing = new Window().document;
   drawing.body.innerHTML =
     '<div><h3>Frontier</h3> <span class="ph" title="Iron">Search</span></div>';

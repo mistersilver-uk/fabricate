@@ -135,6 +135,27 @@
     }
   },
   {
+    "spec": "<Stepper>",
+    "cap": "formatted",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "fixture": "StepperFormatted",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 0.5,
+      "ariaLabel": "Tier adjustment"
+    },
+    "data": {
+      "kind": "multiply"
+    },
+    "note": "The value reads through the shipped multiplier formatter and steps through its stops, as the check tiers wire it."
+  },
+  {
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
@@ -304,6 +325,25 @@
     },
     "props": {
       "ariaLabel": "Remove this row"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "icon 24 · numeric size, issue 1648",
+    "draws": "button",
+    "path": "src/ui/svelte/components/IconButton.svelte",
+    "props": {
+      "size": 24,
+      "ariaLabel": "Dismiss finished run"
     },
     "content": [
       {
@@ -799,6 +839,45 @@
   },
   {
     "spec": "<Typeahead>",
+    "cap": "open — the second suggestion active from the keyboard, the first under the pointer",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/Typeahead.svelte",
+    "fixture": "TypeaheadOpen",
+    "slot": {
+      "width": 300,
+      "height": 158
+    },
+    "partial": "no focus ring, no pointer hover",
+    "undrawn": {
+      "Search recipes": "the field’s accessible name; the drawing draws the field without its label"
+    },
+    "props": {
+      "query": "brew",
+      "ariaLabel": "Search recipes"
+    },
+    "data": {
+      "items": [
+        {
+          "id": "brew-healing",
+          "name": "Brew Potion of Healing",
+          "icon": "fas fa-book"
+        },
+        {
+          "id": "brew-greater-healing",
+          "name": "Brew Greater Healing",
+          "icon": "fas fa-book"
+        },
+        {
+          "id": "brew-antitoxin",
+          "name": "Brew Antitoxin",
+          "icon": "fas fa-book"
+        }
+      ]
+    },
+    "note": "A boxed slot, because the list is portalled to the window: 158px is the least height at which the list stays beneath the field with all three rows (157 floors it to two). The list keeps the layout's 16px margin from the box edges, so it stands 268px wide and 16px in from the field. The act focuses the field synthetically and presses ArrowDown twice."
+  },
+  {
+    "spec": "<Typeahead>",
     "cap": "what a pick writes — the caller’s own list, beside the field",
     "draws": ".k-field",
     "path": "src/ui/svelte/components/Typeahead.svelte",
@@ -806,7 +885,7 @@
       "ariaLabel": "Search recipes",
       "placeholder": "Search recipes…"
     },
-    "note": "The resting field, at its default 38 shell. The open unit stays drawn: a plain-JSON row can pass neither the `source` and `itemLabel` functions its list needs nor the focus that opens it."
+    "note": "The resting field, at its default 38 shell."
   },
   {
     "spec": "<Checkbox>",
