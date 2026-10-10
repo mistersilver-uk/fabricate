@@ -424,18 +424,18 @@ async function openPanelAndReadLabels(page) {
 function neutraliseCallerBand(page) {
   return page.evaluate(() => {
     const RUNG_RULE = '.fabricate-picker-popover.fabricate-select-popover-inline';
-    let band = null;
-    for (const sheet of document.styleSheets) {
-      let rules;
+    // The module sheet's rules sit in the partials it imports (issue 1711).
+    const rulesOf = (sheet) => {
       try {
-        rules = [...sheet.cssRules];
+        return [...sheet.cssRules].flatMap((rule) => (rule.styleSheet ? rulesOf(rule.styleSheet) : [rule]));
       } catch {
-        continue;
+        return [];
       }
-      for (const rule of rules) {
-        if (rule.selectorText !== RUNG_RULE) continue;
-        band = { min: parseFloat(rule.style.minWidth), max: parseFloat(rule.style.maxWidth) };
-      }
+    };
+    let band = null;
+    for (const rule of [...document.styleSheets].flatMap(rulesOf)) {
+      if (rule.selectorText !== RUNG_RULE) continue;
+      band = { min: parseFloat(rule.style.minWidth), max: parseFloat(rule.style.maxWidth) };
     }
     if (!band || !Number.isFinite(band.min) || !Number.isFinite(band.max)) return null;
 

@@ -22,10 +22,15 @@ const ALLOWED_CALLERS = [
 });
 const OWN_FRAMES = /node:internal|node_modules|stylesheetReadGuard\.js/u;
 
+/** The absolute path an fs call names, from a string, Buffer or `file:` URL; `null` for an fd. */
 function targetOf(argument) {
-  if (typeof argument === 'number') return null;
-  const raw = argument instanceof URL ? fileURLToPath(argument) : String(argument ?? '');
-  return path.resolve(raw);
+  if (argument === null || argument === undefined || typeof argument === 'number') return null;
+  const text = typeof argument.href === 'string' ? argument.href : String(argument);
+  try {
+    return path.resolve(text.startsWith('file:') ? fileURLToPath(text) : text);
+  } catch {
+    return null;
+  }
 }
 
 function isGuarded(target) {

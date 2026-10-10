@@ -79,6 +79,18 @@ readFileSync(${JSON.stringify(SHEET)}, 'utf8');`;
   assert.match(refused.stderr, REFUSED);
 });
 
+test('the guard resolves a file: URL even where a DOM shim has replaced the URL global', () => {
+  const script = `import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const sheetUrl = pathToFileURL(${JSON.stringify(SHEET)});
+delete globalThis.URL;
+readFileSync(${JSON.stringify(path.join(repoRoot, 'package.json'))}, 'utf8');
+readFileSync(sheetUrl, 'utf8');`;
+  const run = node(['--input-type=module', '-e', script]);
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, REFUSED);
+});
+
 test('with a log named, the guard records each refused read and lets it through', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'fabricate-guard-log-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
