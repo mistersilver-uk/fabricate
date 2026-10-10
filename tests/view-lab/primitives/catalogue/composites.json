@@ -668,6 +668,66 @@
     }
   },
   {
+    "spec": "<SetPicker>",
+    "cap": "the picker it opens — searchable, scrolling, counted, staged",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SetPicker.svelte",
+    "fixture": "SetPickerOpen",
+    "slot": {
+      "width": 386,
+      "height": 363
+    },
+    "undrawn": {
+      "Recipe tags": "the token group's and the panel's accessible name; the drawing names neither",
+      "#Smithcraft": "the sixth match, below the list's scroll fold"
+    },
+    "props": {
+      "value": ["#Smithing", "#Refined"],
+      "options": [
+        {
+          "id": "#Smithing",
+          "label": "#Smithing"
+        },
+        {
+          "id": "#Refined",
+          "label": "#Refined"
+        }
+      ],
+      "ariaLabel": "Recipe tags"
+    },
+    "data": {
+      "typed": "smith",
+      "total": 412,
+      "matches": [
+        {
+          "id": "#Smithing",
+          "label": "#Smithing"
+        },
+        {
+          "id": "#Smithy",
+          "label": "#Smithy"
+        },
+        {
+          "id": "#Blacksmith",
+          "label": "#Blacksmith"
+        },
+        {
+          "id": "#Refined",
+          "label": "#Refined"
+        },
+        {
+          "id": "#Raw",
+          "label": "#Raw"
+        },
+        {
+          "id": "#Smithcraft",
+          "label": "#Smithcraft"
+        }
+      ]
+    },
+    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The panel stands at the shared popover's 240px, where the drawing draws it 330px wide. The act opens Add and types the query, nothing more, so the footer reads 2 selected. The drawing's enabled Apply cannot stand beside that: the shipped Apply is disabled until something is staged."
+  },
+  {
     "spec": "<RuleRow> <RuleSentence>",
     "cap": "unauthored — presets only",
     "draws": ":scope > div",
@@ -796,6 +856,106 @@
       },
       "style": "font-size: 11px; line-height: 1.5; color: var(--fab-text-muted)"
     }
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "one line — a rule that does not collapse",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "fixture": "RuleRowOneLine",
+    "partial": "no value field",
+    "props": {
+      "value": {
+        "conditionId": "forest"
+      },
+      "class": "manager-condition-modifier-row-reference is-positive"
+    },
+    "data": {
+      "icon": "fas fa-leaf",
+      "title": "Forest",
+      "removeLabel": "Delete modifier"
+    },
+    "note": "Wired as `GatheringModifierEditor` wires a condition modifier, with its sheet class for the positive tone. The value field is that editor's own snippet markup, so the rule carries no steps."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "expanded — the row opens to its editing body",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "fixture": "SortableListExpanded",
+    "partial": "no row hints or name field",
+    "props": {
+      "numbered": true,
+      "removable": true,
+      "expandable": true,
+      "expandedId": "brittle",
+      "items": [
+        {
+          "id": "brittle",
+          "name": "Brittle temper",
+          "badge": "Major",
+          "tone": "warning",
+          "severity": "Major",
+          "shown": true
+        },
+        {
+          "id": "shattered",
+          "name": "Shattered edge",
+          "badge": "Severe",
+          "tone": "danger",
+          "severity": "Severe",
+          "shown": false
+        }
+      ]
+    },
+    "data": {
+      "severityLabel": "Severity",
+      "shownLabel": "Shown to the player",
+      "severities": [
+        {
+          "value": "Minor",
+          "fallback": "Minor"
+        },
+        {
+          "value": "Major",
+          "fallback": "Major"
+        },
+        {
+          "value": "Severe",
+          "fallback": "Severe"
+        }
+      ],
+      "shownHint": "They see the complication when it fires."
+    },
+    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, then the player toggle. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "always-open — no disclosure, every row rendered",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "fixture": "SortableListAlwaysOpen",
+    "props": {
+      "numbered": true,
+      "reorderable": false,
+      "alwaysOpen": true,
+      "items": [
+        {
+          "id": "billet",
+          "name": "Draw the billet",
+          "badge": "4 h"
+        },
+        {
+          "id": "fold",
+          "name": "Fold & quench",
+          "badge": "6 h"
+        }
+      ]
+    },
+    "data": {
+      "bodyLabel": "Results"
+    },
+    "note": "Wired as `RecipeStepAccordion` wires `alwaysOpen` on a tab whose subject is the body: every row open, no disclosure."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",
@@ -1033,6 +1193,51 @@
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "stage nav — a five-stage window over a longer run",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/StageNav.svelte",
+    "fixture": "StageNavReadings",
+    "props": {
+      "stages": [
+        {
+          "id": "s1"
+        },
+        {
+          "id": "s2"
+        },
+        {
+          "id": "s3"
+        },
+        {
+          "id": "s4"
+        },
+        {
+          "id": "s5"
+        },
+        {
+          "id": "s6"
+        },
+        {
+          "id": "s7"
+        },
+        {
+          "id": "s8"
+        }
+      ],
+      "current": 3,
+      "view": 2,
+      "previousLabel": "Show the previous stage",
+      "nextLabel": "Show the next stage"
+    },
+    "data": {
+      "stageKey": "FABRICATE.App.Journal.Stage.Number",
+      "positionKey": "FABRICATE.App.Journal.Stage.Position",
+      "returnKey": "FABRICATE.App.Journal.Stage.Return"
+    },
+    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
     "cap": "the worked stage — the only one with controls",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
@@ -1228,6 +1433,170 @@
           ]
         }
       ]
+    }
+  },
+  {
+    "spec": "<EssencePool>",
+    "cap": "two thresholds, one spend — a bar each, a source list once",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/EssencePool.svelte",
+    "fixture": "EssencePoolReadings",
+    "props": {
+      "label": "Essence pool",
+      "hint": "one spend feeds every pool",
+      "thresholds": [
+        {
+          "essence": "Radiant",
+          "amount": 4,
+          "icon": "fas fa-star",
+          "tint": "butter",
+          "sources": [
+            {
+              "id": "sunmote",
+              "label": "Sunmote",
+              "icon": "fas fa-star",
+              "tint": "butter"
+            },
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            }
+          ]
+        },
+        {
+          "essence": "Shadow",
+          "amount": 3,
+          "icon": "fas fa-droplet",
+          "tint": "mauve",
+          "sources": [
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            },
+            {
+              "id": "shade-ink",
+              "label": "Shade Ink",
+              "icon": "fas fa-droplet",
+              "tint": "mauve"
+            }
+          ]
+        }
+      ],
+      "allocation": {
+        "sunmote": 1,
+        "duskglass": 2,
+        "shade-ink": 0
+      }
+    },
+    "data": {
+      "names": {
+        "Radiant": "Radiant channelled",
+        "Shadow": "Shadow channelled"
+      },
+      "readings": {
+        "sunmote": "+2 Radiant each · 3 held · 2 spare",
+        "duskglass": "+1 Radiant · +2 Shadow each · 2 held",
+        "shade-ink": "+3 Shadow each · 1 held"
+      },
+      "yields": {
+        "sunmote": {
+          "Radiant": 2
+        },
+        "duskglass": {
+          "Radiant": 1,
+          "Shadow": 2
+        },
+        "shade-ink": {
+          "Shadow": 3
+        }
+      },
+      "held": {
+        "sunmote": 3,
+        "duskglass": 2,
+        "shade-ink": 1
+      },
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
+      "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
+      "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
+      "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
+    },
+    "note": "Wired as `StepDetails` wires the open stage's pool. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author; the overshoot line and the steppers' names are the Journal's own copy."
+  },
+  {
+    "spec": "<EssencePool>",
+    "cap": "short — the bar carries the entity tint until it is met",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/EssencePool.svelte",
+    "fixture": "EssencePoolReadings",
+    "props": {
+      "label": "Channel 5 Clarity",
+      "hint": "combine what you hold",
+      "thresholds": [
+        {
+          "essence": "Clarity",
+          "amount": 5,
+          "icon": "fas fa-droplet",
+          "tint": "aqua",
+          "sources": [
+            {
+              "id": "dewglass",
+              "label": "Dewglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            },
+            {
+              "id": "moonpetal",
+              "label": "Moonpetal",
+              "icon": "fas fa-leaf",
+              "tint": "lavender"
+            },
+            {
+              "id": "spring-water",
+              "label": "Spring Water",
+              "icon": "fas fa-droplet",
+              "tint": "mist"
+            }
+          ]
+        }
+      ],
+      "allocation": {
+        "dewglass": 1,
+        "moonpetal": 0,
+        "spring-water": 0
+      }
+    },
+    "data": {
+      "names": {
+        "Clarity": "Clarity channelled"
+      },
+      "readings": {
+        "dewglass": "+2 Clarity each · 4 held · 3 spare",
+        "moonpetal": "+3 Clarity each · 1 held",
+        "spring-water": "no essence · 2 held"
+      },
+      "yields": {
+        "dewglass": {
+          "Clarity": 2
+        },
+        "moonpetal": {
+          "Clarity": 3
+        }
+      },
+      "held": {
+        "dewglass": 4,
+        "moonpetal": 1,
+        "spring-water": 2
+      },
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
+      "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
+      "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
+      "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
     }
   }
 ]

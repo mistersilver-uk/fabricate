@@ -723,33 +723,18 @@ function unsectionedManifestRows({ library, manifestRows }) {
  */
 const AWAITING_SPECIMEN = Object.freeze({
   pickers: [
-    // The parent's portaled panel: it needs `optionIsSelected`, `chooseOption`, `close`,
-    // `popoverLayout` and an anchor element, and a row passes plain JSON. The list-form
-    // `SearchablePopover` specimen mounts it through its one real caller.
+    // The parent's portaled panel, drawn as the grid form: six columns of icon-only tiles, which
+    // is not a shipped form, since the sheet lays out two columns and no icon-only tile ships. The
+    // list-form `SearchablePopover` specimen mounts the panel through its one real caller.
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
-  ],
-  structures: [
-    // The labelled variant's rows: `NavSidebar` hands them to its `content(rows)` snippet, a
-    // snippet given the rows to draw, and the sheet roots their family at `.fabricate-nav`, so
-    // standing alone they draw unstyled buttons. The icon variant stands up `NavSidebar` itself.
-    '<NavSidebar> src/ui/svelte/components/NavSidebarRows.svelte',
   ],
   composites: [
     // Each candidate's held count, claim and reading come from the `held`, `claimed` and
     // `candidateReading` functions; without them every candidate reads short, dimmed and blank.
     '<ChoiceOptionList> src/ui/svelte/components/ChoiceOptionList.svelte',
-    // Every bar, source row and stepper is read through `yield`, `spare`, `held` and six label
-    // functions, and the allocation is bindable state.
-    '<EssencePool> src/ui/svelte/components/EssencePool.svelte',
     // A tile's held-over-needed pip and its met or short state are read through `held`, so with
     // none every fixed tile reads 0 and short; its candidate list needs the readings above.
     '<SlotRow> src/ui/svelte/components/SlotRow.svelte',
-    // A row's content is the `row(item, index)` snippet and its name `itemLabel(item)`, so with
-    // neither every row is an empty numbered shell.
-    '<SortableList> src/ui/svelte/components/SortableList.svelte',
-    // The "Stage 3 of 8" line and the return button's words come from the `positionLabel` and
-    // `returnLabel` functions; without them the line is absent and the button has no name.
-    '<StageNav> src/ui/svelte/components/StageNav.svelte',
     // Every reading, chance and cut note is worded by a `labels` callback, so with none the
     // chances read as bare numbers and the readings are empty.
     '<YieldScale> src/ui/svelte/components/YieldScale.svelte',

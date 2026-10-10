@@ -372,6 +372,10 @@ const FIXTURES = readdirSync(path.join(REPO_ROOT, FIXTURE_DIRECTORY))
 test('the fixture corpus is alive', () => {
   assert.ok(FIXTURES.length > 0, 'no fixture file, so every rule below has no domain');
   assert.ok(FIXTURE_ROWS.length > 0, 'no catalogue row names a fixture');
+  const acting = FIXTURES.filter(({ source }) =>
+    moduleExports(parse(source, { modern: true })).includes('act')
+  );
+  assert.ok(acting.length > 0, 'no fixture exports `act`, so the act rules have no real domain');
 });
 
 test('every fixture is named by a catalogue row', () => {
