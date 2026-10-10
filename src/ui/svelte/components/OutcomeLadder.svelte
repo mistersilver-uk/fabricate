@@ -84,7 +84,12 @@
         <div class="fab-outcome-yields">
           {#each tier.yields ?? [] as item, itemIndex (item.id || `${item.name}-${itemIndex}`)}
             {@const mark = markOf(item)}
-            <span {...item.props} class="fab-outcome-yield" data-outcome-yield>
+            <span
+              {...item.props}
+              class="fab-outcome-yield"
+              class:is-group={Boolean(item.detail)}
+              data-outcome-yield
+            >
               {#if mark.art}
                 <!-- ratchet-exempt(design-system): a 14px inline mark inside a 24px yield chip, not a record tile; the art ladder's 22 would grow every chip -->
                 <Medallion art={mark.art} icon={mark.icon} alt="" size={14} />
@@ -180,7 +185,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* Secondary, not the specimen's subtle: subtle and muted fall under 4.5:1 on the success head. */
   .fab-outcome-band {
     flex: 0 0 auto;
     color: var(--fab-text-secondary);
@@ -206,7 +210,7 @@
   .fab-outcome-yield {
     box-sizing: border-box;
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--fab-space-chip);
     max-width: 100%;
     min-width: 0;
@@ -218,6 +222,11 @@
     color: var(--fab-text-secondary);
     font-size: 10.5px;
     font-weight: 500;
+  }
+
+  .fab-outcome-yield > :global(.fab-medallion),
+  .fab-outcome-yield-glyph {
+    align-self: center;
   }
 
   .fab-outcome-yield-glyph {
@@ -233,6 +242,15 @@
     white-space: nowrap;
   }
 
+  /* The 24px chip's content height, so a baseline-aligned one-line chip still centres its text. */
+  .fab-outcome-yield-name {
+    line-height: 18px;
+  }
+
+  .fab-outcome-yield.is-group .fab-outcome-yield-name {
+    font-weight: 600;
+  }
+
   .fab-outcome-yield-quantity {
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
@@ -240,7 +258,9 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A zero basis leaves the group's name its full width; the members wrap in what remains. */
   .fab-outcome-yield-detail {
+    flex: 1 1 0;
     min-width: 0;
     overflow-wrap: break-word;
   }
