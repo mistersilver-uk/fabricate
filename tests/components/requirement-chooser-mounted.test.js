@@ -173,24 +173,6 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('.fab-slot-pip'));
   });
 
-  // Issue 2257 D16: met and short keep their on-colour; every other pip takes the page ground.
-  it('inks each pip by its fill: on-success, on-danger, else the page ground', async () => {
-    await harness.mount({ slots: SLOTS });
-    const css = injectedCss();
-    for (const [selector, ink] of [
-      [String.raw`\.fab-slot-pip`, '--fab-on-success'],
-      [String.raw`\.is-short\S* \.fab-slot-pip`, '--fab-on-danger'],
-      [String.raw`\.fab-slot-pip\S*\.is-candidate`, '--fab-bg-0'],
-      [String.raw`\.is-partial\S* \.fab-slot-pip`, '--fab-bg-0'],
-    ]) {
-      assert.match(
-        css,
-        new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]color:\s*var\(${ink}\)`),
-        `${selector} is inked ${ink}`
-      );
-    }
-  });
-
   // No on-warning ink is declared, so the warning fill takes the page ground (library, Chip).
   it('draws the partial face on the warning ground: ring, solid pip and caption ink', async () => {
     await harness.mount({ slots: [{ ...ESSENCE, state: 'partial' }] });

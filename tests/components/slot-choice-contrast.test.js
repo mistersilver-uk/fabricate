@@ -18,7 +18,7 @@ const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
 
 const declared = (file, selector, property) =>
-  declaredToken(rulesIn(corpus[file]), selector, property);
+  declaredToken(rulesIn(corpus[file]), selector, property, file);
 const shortfalls = (ink, stack) => inkShortfalls(themes, ink, stack);
 
 test('each slot pip is inked per D16 and clears 4.5:1 on its solid fill', () => {
