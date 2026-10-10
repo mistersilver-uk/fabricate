@@ -18,7 +18,7 @@
   | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
   | `formatValue` / `parseValue` | functions \| `null` | `null` | Both together opt into the FORMATTED mode below; without them the `type="number"` path and its commit-on-input are unchanged. `parseValue(text)` returns a finite number, `null` for the null endpoint, or anything else for invalid text. |
   | `stops` | `number[]` | `[]` | The formatted mode's ordered stepping values. Empty steps by `step` within `min`/`max`. |
-  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop. Without it a `null` value is unset: blank, with the placeholder. |
+  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop. Without it a `null` value is unset: blank, with the placeholder. At the endpoint the input carries `data-stepper-endpoint`, reads muted at rest and, horizontal and unfilled, widens to the label's character count, so only a mono Latin label fits exactly. |
 
   Callbacks:
   - `onChange(value)` — the clamped number on every accepted edit, and `null` when an `allowUnset`
@@ -217,6 +217,8 @@
       role="spinbutton"
       class="fab-stepper-input"
       data-stepper-input
+      data-stepper-endpoint={atEndpoint ? '' : undefined}
+      style:--fab-stepper-endpoint-ch={hasEndpoint ? Array.from(nullLabel).length : undefined}
       value={formattedDisplay}
       {disabled}
       aria-label={ariaLabel || undefined}
@@ -427,6 +429,15 @@
     box-sizing: border-box;
     height: 24px;
     margin-block: -1px;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input[data-stepper-endpoint] {
+    /* 4px is the border-box input's two 2px inline paddings, around the label's own width. */
+    width: max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 4px));
+  }
+
+  .fab-stepper-input[data-stepper-endpoint]:not(:focus-visible) {
+    color: var(--fab-text-muted);
   }
 
   .fab-stepper-input::-webkit-outer-spin-button,
