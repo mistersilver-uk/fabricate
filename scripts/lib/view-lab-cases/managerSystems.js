@@ -95,6 +95,10 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
+    // The hero panel pads the specimen's 16 on every side (issue 2257 D9).
+    expectLayout: {
+      controls: [{ selector: '.manager-table-scroll > .manager-empty', styles: 'padding: 16px' }],
+    },
     kinds: ['manager', 'systems'],
     // No pattern for `components/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [

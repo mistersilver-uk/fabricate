@@ -800,7 +800,7 @@ It joins a rule to a same-selector twin elsewhere in the same file, so a family 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
 Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
-Ordinary empty panels retain their existing geometry.
+Ordinary empty panels retain their existing geometry (the hero `EmptyState` pads `--fab-space-4`, 16, on every side; issue 2257 D9).
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
 #### Scenario: A gathering availability selection is empty
@@ -905,6 +905,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
+An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, because muted measures under 4.5:1 on the raised hover ground; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
 A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4).

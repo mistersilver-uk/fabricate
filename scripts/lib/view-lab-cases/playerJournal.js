@@ -136,6 +136,20 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'journal' },
     steps: [],
+    // The Finished list's time is the mono log line, muted on a failed entry too (issue 2257).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-history-run-id="lab-run-failed"] .fab-log-list-when',
+          styles:
+            'font-family: var(--fab-font-mono); font-size: 9.5px; text-overflow: ellipsis; color: var(--fab-text-muted)',
+        },
+        {
+          selector: '.fab-log-list-entry:has([data-history-run-id="lab-run-failed"])',
+          styles: 'box-sizing: border-box; height: 44px',
+        },
+      ],
+    },
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/, PLAYER_VIEW_STATE],
   }),

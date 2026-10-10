@@ -290,6 +290,15 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-state="filtered"]',
+    // A compact panel keeps its own padding when the hero's moves (issue 2257 D9).
+    expectLayout: {
+      controls: [
+        {
+          selector: '.manager-empty.is-compact[data-scoped-list-inspector-state]',
+          styles: 'padding: 16px 12px',
+        },
+      ],
+    },
     // The action, inside the panel.
     expectContained: [
       {

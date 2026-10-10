@@ -2060,7 +2060,7 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
   [
     'src/ui/svelte/components/LogList.svelte: .fab-log-list-entry',
     ['9px'],
-    'LogList geometry is issue 2257',
+    'a log entry is a row; rows take 9',
   ],
   [
     'src/ui/svelte/components/NavSidebar.svelte: .fabricate-app-nav-well',
