@@ -232,7 +232,7 @@ export const KIND_MENU_COMPILED_MODULES = Object.freeze([
 
 // The result rows beyond `<Select>` (issue 1516): the requirement row, its amount slot, its kind
 // menu and the amount floor their callers read. A tree rendering result or salvage rows spreads
-// both lists, which restate the kind menu's paths because the harness guard reads literals only.
+// both lists, which restate the kind menu's paths: the harness guard follows one spread level.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/actionMenuLayout.js',
   // Issue 1521: the card and the requirement row localize through `localizeOr`.
@@ -278,7 +278,7 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
 
 // Issue 1773: what `ChoiceGroup`'s result-side form adds to every tree compiling the group — its
 // award header and range cell, the edits they write and the amount floor they read. Restated as
-// literals, because the harness guard reads literals only.
+// literals, because the harness guard follows a nested spread one level only.
 export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
@@ -630,16 +630,13 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders the composition, so this roster is where the crafting suites acquire it.
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
-  // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for the
-  // reason `SELECT_COMPILED_MODULES` records above — the static guard in
-  // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
-  // literals, and a nested `...NAME` is not one.
+  // What the Crafting tab reaches as of issue 1514's crafting phase.
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Notice.svelte',
-  // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
+  // The identity row `RecipeDetailHeader` composes (issue 1518).
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
