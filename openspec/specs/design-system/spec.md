@@ -720,6 +720,7 @@ The values 32, 36 and 40 are RETIRED as CONTROL heights and MUST NOT be reintrod
 The search field is 38 at radius 9 on every non-compact site, the journal included (maintainer ruling 2, 2026-09-19), and it carries the one named EXCEPTION to the retired 32: `SearchField`'s `density="compact"` at its four ruled sites, recorded as an exception and never as a rung, so the 26 / 28 / 30 / 34 / 38 / 44 ladder stays closed.
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
+The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
 A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.

@@ -5445,7 +5445,7 @@
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category); row two is the two VIEW controls (grouping, ordering), split by a rule; row three is the active-filter chips and the count. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* The whole bar reads at the shared --fab-manager-recipe-control-font (issue 643): the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
+  /* One type line across the bar (issue 643): the segmented status/lock toggles and the sort-direction toggle at 0.72rem, and the `toolbar` rung's select triggers at 11.5px at that toggle's weight (issue 2257 D8). */
   gap: var(--fab-space-2);
 }
 
@@ -14484,7 +14484,7 @@
   font-weight: 600;
 }
 
-/* The rail column's full width, which the `toolbar` rung's trigger deliberately never declares (issue 1510); the rung paints the 34px box, the 9px corner and the `--fab-bg-1` fill this rule used to state, at its own 0.72rem rather than the 0.68rem declared here. */
+/* The rail column's full width, which the `toolbar` rung's trigger deliberately never declares (issue 1510); the rung paints the 34px box, the 9px corner and the `--fab-bg-1` fill this rule used to state, at its own 11.5px rather than the 0.68rem declared here. */
 .fabricate-manager .manager-tool-actor-select .fabricate-select-trigger {
   width: 100%;
 }
@@ -17959,13 +17959,13 @@
   font-weight: 500;
 }
 
-/* THE LITERAL IS THE POINT. `--fab-manager-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */
+/* 11.5px at the weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8), as literals: `--fab-manager-recipe-control-font` is declared only inside `.fabricate-manager`, so a player surface reading it would fall back to inheritance. */
 .fabricate-select .fabricate-select-trigger-toolbar {
   min-height: 34px;
   border-radius: 9px;
   background: var(--fab-bg-1);
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 /* THE FOCUS TREATMENT, and why it is written at three compounds. `.fabricate button:focus` and `.fabricate button:focus-visible` reach this button at (0,2,1) — the first strips Foundry's orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus state is "border to accent-border, no glow" (issue 1511). */
@@ -20808,7 +20808,7 @@
   line-height: 1.5;
 }
 
-/* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, `0.72rem`, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
+/* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, 11.5px at 600, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
 .fabricate-manager .manager-salvage-dc-select {
   flex: 0 0 auto;
   width: auto;
@@ -20922,12 +20922,11 @@
   letter-spacing: 0.09em;
 }
 
-/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ── `proto:578` and `proto:583` ink every toolbar select `--text2` at weight 500, where the shared scoped-list rule inks them `--fab-text` at the inherited 400 — so the two filters and the sort key read at the same weight as the row names below them (issue 1504). */
+/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ── `proto:578` and `proto:583` ink every toolbar select `--text2`; each `<Select>` rung states its own weight (issue 2257 D8). */
 .fabricate-manager[data-manager-view='world-components']
   .manager-scoped-list-toolbar
   .fabricate-select-trigger {
   color: var(--fab-text-secondary);
-  font-weight: 500;
 }
 
 /* ── THE INSPECTOR'S IDENTITY TYPE (UX F4, gap-list rows 25-26) ── `proto:641`-`642`: a 9.5px kicker over a 16px/600 serif name. */

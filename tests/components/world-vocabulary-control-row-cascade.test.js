@@ -338,8 +338,8 @@ perRoute('the sort trigger takes the toolbar rung under the panel’s own fill',
       );
       assert.equal(
         select.fontSize,
-        '11.52px',
-        `${select.kind}: the manager control-font scale, which the rung states as a literal`
+        '11.5px',
+        `${select.kind}: the type ladder's 11.5px, which the rung states as a literal`
       );
     }
   } finally {

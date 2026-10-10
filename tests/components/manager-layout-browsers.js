@@ -454,7 +454,7 @@ test('manager components browser defines drop target and compact responsive list
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
   // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its select
-  // triggers take the shared `Select`'s `toolbar` rung's 0.72rem; its search field states its
+  // triggers take the shared `Select`'s `toolbar` rung's 11.5px; its search field states its
   // own 500 12.5px since issue 1782, so no toolbar rule types it.
   assert.ok(
     blockFor(
