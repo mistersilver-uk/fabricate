@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { Window } from 'happy-dom';
+
+import { readDesignLibrary } from '../helpers/designLibrary.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   declaredToken,
@@ -20,6 +23,23 @@ const themes = themePalettes(sheet);
 const rulesFor = (rules, selector) =>
   rules.filter((rule) => splitSelectorList(rule.selector).includes(selector));
 
+/** The Stepper rules on the endpoint that declare `property`. */
+const endpointRules = (property) =>
+  stepper.filter(
+    (rule) => rule.selector.includes('[data-stepper-endpoint]') && propertiesOf(rule).has(property)
+  );
+
+/** The inline `color` of the library's `formatted · null endpoint` drawing. */
+function drawnEndpointInk() {
+  const { document } = new Window();
+  document.write(readDesignLibrary());
+  const unit = [...document.querySelectorAll('.unit')].find(
+    (candidate) => candidate.querySelector('.cap')?.textContent === 'formatted · null endpoint'
+  );
+  assert.ok(unit, 'the library draws no formatted null endpoint unit');
+  return unit.querySelector(':scope .k-step input').style.getPropertyValue('color');
+}
+
 test('the endpoint label reads muted at rest and clears 4.5:1 on the outcome row in every theme', () => {
   const ink = declaredToken(
     stepper,
@@ -28,6 +48,8 @@ test('the endpoint label reads muted at rest and clears 4.5:1 on the outcome row
     STEPPER
   );
   assert.equal(ink, '--fab-text-muted');
+  assert.equal(endpointRules('color').length, 1, 'one endpoint ink rule');
+  assert.equal(drawnEndpointInk(), `var(${ink})`, 'the library draws the shipped ink');
   const stack = [
     declaredToken(stepper, '.fab-stepper', 'background', STEPPER),
     declaredToken(
@@ -58,9 +80,7 @@ test('the endpoint label reads muted at rest and clears 4.5:1 on the outcome row
 });
 
 test('only the horizontal unfilled endpoint widens, to its label and never under 64px', () => {
-  const widths = stepper.filter(
-    (rule) => rule.selector.includes('[data-stepper-endpoint]') && propertiesOf(rule).has('width')
-  );
+  const widths = endpointRules('width');
   assert.equal(widths.length, 1, 'one endpoint width rule');
   assert.deepEqual(splitSelectorList(widths[0].selector), [
     '.fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input[data-stepper-endpoint]',

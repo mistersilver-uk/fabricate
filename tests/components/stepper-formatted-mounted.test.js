@@ -106,9 +106,23 @@ describe('Stepper formatted mode: identity and ARIA', () => {
   it('marks only a named null endpoint, in the fill form as well', async () => {
     const unset = await mountStepper({ ...FORMATTED, value: null, allowUnset: true });
     assert.ok(!unset.input.hasAttribute('data-stepper-endpoint'), 'an unset value is unmarked');
+    assert.equal(unset.input.style.getPropertyValue('--fab-stepper-endpoint-ch'), '');
     harness.remount();
     const filled = await mountStepper({ ...OTHERWISE, value: null, fill: true });
     assert.ok(filled.input.hasAttribute('data-stepper-endpoint'), 'the fill form marks it');
+  });
+
+  it('marks the committed endpoint, never a draft', async () => {
+    const endpoint = await mountStepper({ ...OTHERWISE, value: null });
+    type(endpoint.input, '×½');
+    assert.ok(endpoint.input.hasAttribute('data-stepper-endpoint'), 'a draft leaves the mark');
+    key(endpoint.input, 'Enter');
+    await settle();
+    assert.ok(!endpoint.input.hasAttribute('data-stepper-endpoint'), 'the commit drops it');
+    harness.remount();
+    const half = await mountStepper({ ...OTHERWISE, value: 0.5 });
+    type(half.input, 'Otherwise');
+    assert.ok(!half.input.hasAttribute('data-stepper-endpoint'), 'a typed label is not committed');
   });
 
   it('renders an unset value blank with the placeholder when there is no null endpoint', async () => {
