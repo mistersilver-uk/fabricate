@@ -1363,32 +1363,41 @@ export const CASES = Object.freeze([
     ],
     expectSelector: '.fabricate-manager [data-check-attribute-fields]',
   }),
-  parityCase({
+  managerCase({
+    ...parityCase({
+      label: 'outcome tiers against a multiplied character value',
+      frame: 11,
+      query: { system: 'lab-runework' },
+      steps: [
+        ...parityFormula('1d100'),
+        ...previewAsActor('lab-actor-idrin'),
+        ...PARITY_UNDER,
+        ...parityAttribute('@skills.med.mod + 51'),
+        ...PARITY_MULTIPLY,
+        ...parityType('[data-check-base-adjustment]', 1, '1'),
+        ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
+        ...parityPreview(1),
+        ...parityOutcomes(
+          ['Failure', 'Regular', 'Hard', 'Extreme'],
+          '[data-outcome-adjustment]',
+          [
+            [2, '1'],
+            [3, '1/2'],
+            [4, '1/5'],
+          ],
+          ['failure', 'success', 'success', 'success']
+        ),
+      ],
+      expectSelector: '.fabricate-manager [data-outcome-adjustment][data-stepper-endpoint]',
+    }),
     id: 'manager-checks-parity-outcomes-multiply',
-    label: 'outcome tiers against a multiplied character value',
-    frame: 11,
-    query: { system: 'lab-runework' },
-    steps: [
-      ...parityFormula('1d100'),
-      ...previewAsActor('lab-actor-idrin'),
-      ...PARITY_UNDER,
-      ...parityAttribute('@skills.med.mod + 51'),
-      ...PARITY_MULTIPLY,
-      ...parityType('[data-check-base-adjustment]', 1, '1'),
-      ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
-      ...parityPreview(1),
-      ...parityOutcomes(
-        ['Failure', 'Regular', 'Hard', 'Extreme'],
-        '[data-outcome-adjustment]',
-        [
-          [2, '1'],
-          [3, '1/2'],
-          [4, '1/5'],
-        ],
-        ['failure', 'success', 'success', 'success']
-      ),
-    ],
-    expectSelector: '.fabricate-manager [data-outcome-adjustment][data-stepper-endpoint]',
+    expectLayout: {
+      containerSelector: '.manager-checks-tier-list',
+      oneLineRows: '.manager-checks-tier-list [data-outcome-row]',
+      unclipped: '.manager-checks-tier-list [data-outcome-adjustment]',
+      alignedLeft: '.manager-checks-tier-list .manager-checks-tier-stepper',
+    },
+    expectCenterHit: '[data-outcome-adjustment][data-stepper-endpoint]',
   }),
   parityCase({
     id: 'manager-checks-parity-outcomes-under-fixed',
