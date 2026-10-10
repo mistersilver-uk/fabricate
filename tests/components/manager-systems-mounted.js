@@ -1575,9 +1575,9 @@ export function registerSystemsCases() {
       null,
       'the validation list is not rendered while Settings is active'
     );
-    // The renamed nav item carries the open-issue badge (critical + warning = 2).
+    // The renamed nav item carries the open-issue count (critical + warning = 2), its unit read.
     const navBadge = navButton('System Overview').querySelector('.manager-nav-count');
-    assert.equal(navBadge?.textContent.trim(), '2');
+    assert.equal(navBadge?.textContent.trim(), '2 Open validation issues');
     // The Validation tab carries a danger + warning badge of open issues.
     assert.equal(
       validationTab.querySelector('.manager-environment-tab-badge.is-danger')?.textContent.trim(),

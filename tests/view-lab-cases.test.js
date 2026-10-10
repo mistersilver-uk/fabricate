@@ -741,8 +741,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
 // The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
-// primer's item list offset and lead (issue 1521), and each open action menu's panel and item
-// corners (issue 2257).
+// primer's item list offset and lead (issue 1521), each open action menu's panel and item
+// corners, each open nav group's box, and every `toolbar`-rung Select a case draws (issue 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
 /** An open action menu's panel at 11 and the named item at 7. */
 const menuCorners = (panel, item) => [
@@ -750,7 +750,43 @@ const menuCorners = (panel, item) => [
   { selector: item, styles: 'border-radius: 7px' },
 ];
 const OR_MENU = '.manager-recipe-or-menu';
+/** An open nav group drawn as one box (issue 2257 E3). */
+const navGroupBox = (selector) => ({
+  selector,
+  styles:
+    'border-radius: 9px; padding: var(--fab-space-2xs); background-color: var(--fab-surface-soft); box-shadow: inset 0 0 0 1px var(--fab-border)',
+});
+/** `toolbar`-rung Selects at 11.5px and the weight of the sort-direction `Button` (D8). */
+const toolbarSelects = (...selectors) =>
+  selectors.map((selector) => ({ selector, styles: 'font-size: 11.5px; font-weight: 600' }));
+/** A browser's sort Select and its sort-direction `Button`, at one weight (D8). */
+const sortRow = (select, direction) => [
+  ...toolbarSelects(select),
+  { selector: direction, styles: 'font-weight: 600' },
+];
 const NON_VERB_CONTROLS = Object.freeze({
+  'manager-recipes-normal': [
+    navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
+    ...toolbarSelects('[data-recipe-category-filter]'),
+    ...sortRow('[data-recipe-sort]', '[data-recipe-sort-direction]'),
+  ],
+  'manager-components-normal': sortRow('[data-component-sort]', '[data-component-sort-direction]'),
+  'manager-essences-normal': sortRow('[data-essence-sort]', '[data-essence-sort-direction]'),
+  'world-vocabulary': toolbarSelects('[data-vocabulary-sort="recipeCategories"]'),
+  'manager-component-complications-expanded': toolbarSelects(
+    '[data-complication-roll-condition-cmp]'
+  ),
+  'manager-component-complications-check-trigger': toolbarSelects('[data-complication-trigger]'),
+  'manager-component-edit-salvage': toolbarSelects('[data-salvage-dc-preset]'),
+  'manager-checks-simple-two-band-strip': toolbarSelects(
+    '[data-simple-band-record]',
+    '[data-checks-preview-record]'
+  ),
+  'manager-tool-editor-rail-scrolled-1280x720': toolbarSelects('[data-tool-preview-actor]'),
+  'world-component-catalogue': toolbarSelects(
+    '[data-scoped-list-sort]',
+    '[data-scoped-list-filter="membership"]'
+  ),
   'world-essence-catalogue': [
     {
       selector: '[data-scoped-list-inherit-note="effectSource"]',
@@ -784,6 +820,10 @@ const NON_VERB_CONTROLS = Object.freeze({
     '.manager-recipe-result-menu',
     '.manager-recipe-result-menu [data-recipe-add="result-currency"]'
   ),
+  'manager-world-travel-with-gathering-expanded': [
+    navGroupBox('.manager-nav-group:has(#manager-gathering-submenu)'),
+    navGroupBox('.manager-world-travel-group'),
+  ],
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))

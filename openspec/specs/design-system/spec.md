@@ -720,6 +720,7 @@ The values 32, 36 and 40 are RETIRED as CONTROL heights and MUST NOT be reintrod
 The search field is 38 at radius 9 on every non-compact site, the journal included (maintainer ruling 2, 2026-09-19), and it carries the one named EXCEPTION to the retired 32: `SearchField`'s `density="compact"` at its four ruled sites, recorded as an exception and never as a rung, so the 26 / 28 / 30 / 34 / 38 / 44 ladder stays closed.
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
+The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
 A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.
@@ -2202,8 +2203,9 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
-`NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
-At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 2257.
+`NavSidebar`'s `labelled` variant MUST draw an expanded group on the expanded rail as one box (radius 9, soft ground, inset hairline, `--fab-space-2xs` padding) with the parent row unshifted, borderless and unplated unless the rail marks it active, and its children one `--fab-space-3` step in; the collapsed rail draws no box.
+Its rows MUST stay 34px at radius 9 with a 12.5px label over a 24px icon column, and 47×34 at radius 9 on the collapsed rail (its 56px column less 8px of padding and the rail's 1px divider), and the library's `labelled` units are drawn to them (issue 2257).
+Its `icon` variant MUST keep 8/0/6 item padding and the `--fab-success` pip (rulings 2026-09-19, 2026-10-07 E3).
 
 #### Scenario: A manager route draws its header
 
@@ -2218,11 +2220,12 @@ At issue 1777 both callers kept their shipped geometry, which disagreed with the
 - **THEN** no caller rule sets its padding, trail, title, subtitle or action size
 - **AND** any surviving caller rule only places it or fills it
 
-#### Scenario: NavSidebar's geometry disagrees with its specimen
+#### Scenario: A GM expands a nav group
 
-- **WHEN** `NavSidebar`'s geometry disagrees with its specimen
-- **THEN** the entry stays `target`
-- **AND** the geometry converges in issue 2257
+- **WHEN** a `labelled` parent's chevron expands its group
+- **THEN** the parent and its rows draw inside one radius-9 box
+- **AND** the parent's icon, label and chevron do not move
+- **AND** on the collapsed rail the group draws no box and the parent's icon does not move
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 

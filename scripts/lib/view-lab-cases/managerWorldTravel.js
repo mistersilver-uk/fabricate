@@ -46,6 +46,17 @@ export const CASES = Object.freeze([
     expectSelector:
       '.manager-nav:has(.manager-nav-group #manager-gathering-submenu)' +
       ':has(.manager-world-travel-group #manager-travel-submenu)',
+    // Each open group is one box (issue 2257 E3).
+    expectLayout: {
+      controls: [
+        '.manager-nav-group:has(#manager-gathering-submenu)',
+        '.manager-world-travel-group',
+      ].map((selector) => ({
+        selector,
+        styles:
+          'border-radius: 9px; padding: var(--fab-space-2xs); background-color: var(--fab-surface-soft); box-shadow: inset 0 0 0 1px var(--fab-border)',
+      })),
+    },
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
