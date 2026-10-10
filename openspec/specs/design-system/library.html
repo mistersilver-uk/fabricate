@@ -44,7 +44,9 @@
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-2:8px; --fab-space-3:12px; --fab-space-4:16px; --fab-space-6:24px; --fab-space-chip:6px;
   --fab-font-serif:"Spectral",Georgia,serif; /* The interface face is HOST-OWNED and deliberately untokenized (ui-visual-style spec).
      This page names it once, locally, only so the specimens render in the face the product
-     inherits from Foundry. It is not a Fabricate token and must not be referenced as one. */
+     inherits from Foundry. It is not a Fabricate token and must not be referenced as one. In the shipped `Kicker` the
+     host face is `var(--font-body, var(--font-primary, sans-serif))`; this page is not a Foundry
+     window, so `--page-ui-face` stands in for it in the specimens. */
   --page-ui-face:"Signika",system-ui,sans-serif;
   --fab-font-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   /* Backs only the soft premium chip specimen, which has no shipped token behind it;
