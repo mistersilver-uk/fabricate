@@ -21,7 +21,7 @@ const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus[SHEET]));
 
 const token = (file, selector, property) =>
-  declaredToken(rulesIn(corpus[file]), selector, property);
+  declaredToken(rulesIn(corpus[file]), selector, property, file);
 const shortfalls = (ink, stack) => inkShortfalls(themes, ink, stack);
 
 const tierGround = () => token(LADDER, '.fab-outcome-tier', 'background');

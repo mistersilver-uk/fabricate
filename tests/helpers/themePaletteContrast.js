@@ -54,15 +54,19 @@ export function contrast(ink, ground) {
   return (high + 0.05) / (low + 0.05);
 }
 
-/** The one `--fab-*` token `rules` declare for `property` on the rule listing `selector`. */
-export function declaredToken(rules, selector, property) {
+/** The one `--fab-*` token `rules` declare for `property` on the rule listing `selector`; `label` (a file) heads a failure. */
+export function declaredToken(rules, selector, property, label = selector) {
   const values = rules
     .filter((rule) => splitSelectorList(rule.selector).includes(selector))
     .map((rule) => propertiesOf(rule).get(property))
     .filter(Boolean);
-  assert.equal(values.length, 1, `${property} on ${selector} is declared ${values.length} times`);
+  assert.equal(
+    values.length,
+    1,
+    `${label}: ${property} on ${selector} is declared ${values.length} times`
+  );
   const name = values[0].match(/^var\((--fab-[\w-]+)\)$/u)?.[1];
-  assert.ok(name, `${selector} ${property} is not one palette token: ${values[0]}`);
+  assert.ok(name, `${label}: ${selector} ${property} is not one palette token: ${values[0]}`);
   return name;
 }
 
