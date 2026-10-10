@@ -85,7 +85,7 @@
     cursor: pointer;
   }
 
-  /* The edge is a ring outside the tile, declared on each state so no `:focus` reset strips it. */
+  /* The edge is a ring outside the tile, declared per state because the open face draws its dashed border instead. */
   .fab-slot-tile.is-met {
     box-shadow: 0 0 0 1px var(--fab-border);
   }
