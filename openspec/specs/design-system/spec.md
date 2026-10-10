@@ -592,6 +592,7 @@ A property a shared primitive declares for itself is overridden by EXTENDING tha
 That is the same `reuse, then extend, then add` order this capability already states, reached from the cascade instead of from the vocabulary.
 A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
 Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
+`Kicker` MUST state the UI face itself, as `var(--font-body, var(--font-primary, sans-serif))`, rather than inherit its parent's, so a kicker under a mono evidence band still draws the UI face (issue 2257 D21, with #2312).
 
 Where the module sheet must supply a BASELINE for a bare element a component may re-declare, it is written at a specificity deliberately BELOW a Svelte scoped compound's (0,2,0), so the sheet is a floor components override rather than a rule that overrides them; `:where()` is how the scoping is bought without paying specificity for it.
 The same arithmetic runs in the other direction for a module-root rule that must NOT be beaten: a flat `.fabricate a:focus` list is (0,2,1), while the `:is()` form of the same list takes its most specific argument — `[tabindex]`, at (0,3,0) — and would newly outrank every per-component ring in the sheet, so the flat spelling is prescribed rather than stylistic.

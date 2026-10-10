@@ -44,7 +44,9 @@
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-2:8px; --fab-space-3:12px; --fab-space-4:16px; --fab-space-6:24px; --fab-space-chip:6px;
   --fab-font-serif:"Spectral",Georgia,serif; /* The interface face is HOST-OWNED and deliberately untokenized (ui-visual-style spec).
      This page names it once, locally, only so the specimens render in the face the product
-     inherits from Foundry. It is not a Fabricate token and must not be referenced as one. */
+     inherits from Foundry. It is not a Fabricate token and must not be referenced as one. In the shipped `Kicker` the
+     host face is `var(--font-body, var(--font-primary, sans-serif))`; this page is not a Foundry
+     window, so `--page-ui-face` stands in for it in the specimens. */
   --page-ui-face:"Signika",system-ui,sans-serif;
   --fab-font-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   /* Backs only the soft premium chip specimen, which has no shipped token behind it;
@@ -466,7 +468,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
     <div class="notes">
       <div><h5>Mono ships 400 and 500 only</h5><ul><li><code>assets/fonts/</code> ships exactly <code>jetbrains-mono-latin-400</code> and <code>-500</code>, and canon says ship only the weights the product uses.</li><li>Those steps would synthesize as faux-bold. Emphasis in mono comes from <b>size and ink</b>.</li><li>Every mono numeric sets <b>tabular-nums</b>, so 9 to 10 cannot shift the control beside it.</li></ul></div>
-      <div><h5>The UI face is host-owned</h5><ul><li>Canon leaves it as Foundry's <code>--font-primary</code>, deliberately <b>untokenized</b>.</li><li>So the ladder gives sizes, weights and roles and never names the family. A theme changing that face is a supported outcome.</li><li>Only serif and mono are Fabricate tokens.</li></ul></div>
+      <div><h5>The UI face is host-owned</h5><ul><li>Canon reads it as Foundry's <code>var(--font-body, var(--font-primary, sans-serif))</code>, deliberately <b>untokenized</b>; <code>Kicker</code> states it itself.</li><li>So the ladder gives sizes, weights and roles and never names the family. A theme changing that face is a supported outcome.</li><li>Only serif and mono are Fabricate tokens.</li></ul></div>
     </div>
     <div class="delta"><span class="cite"><b>ui-visual-style/spec.md</b> &sect;Typographic contract · verified in <b>assets/fonts/</b></span></div>
   </div>
