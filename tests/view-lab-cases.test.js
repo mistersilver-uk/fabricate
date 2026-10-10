@@ -776,6 +776,7 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-component-complications-expanded': toolbarSelects(
     '[data-complication-roll-condition-cmp]'
   ),
+  'manager-component-complications-check-trigger': toolbarSelects('[data-complication-trigger]'),
   'manager-component-edit-salvage': toolbarSelects('[data-salvage-dc-preset]'),
   'manager-checks-simple-two-band-strip': toolbarSelects(
     '[data-simple-band-record]',
