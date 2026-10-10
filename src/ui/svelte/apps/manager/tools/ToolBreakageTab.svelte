@@ -13,7 +13,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import { TOOL_BREAKAGE_TRACK, toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -410,7 +410,7 @@
             )}
             rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
             resolveColor={toolBreakageChanceColor}
-            trackGradient="var(--fab-manager-tool-breakage-chance-track-gradient)"
+            trackGradient={TOOL_BREAKAGE_TRACK}
             controlClass="manager-tool-breakage-chance-control"
             numberInputProps={{
               'data-tool-breakage-chance-input': '',

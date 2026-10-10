@@ -539,8 +539,7 @@
 {/snippet}
 
 <style>
-  /* The panel is a transparent pass-through: the sections keep the detail column's
-     own rhythm rather than nesting inside a second box. */
+  /* A transparent pass-through: the sections keep the detail column's rhythm, unboxed. */
   .inventory-detail-panel {
     display: flex;
     flex-direction: column;
@@ -550,6 +549,7 @@
 
   .inventory-chip-qty {
     font-family: var(--fab-font-mono);
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
   }

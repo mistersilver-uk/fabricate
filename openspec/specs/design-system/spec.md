@@ -293,7 +293,7 @@ The same issue gives `SearchField` a labelled form, which emits `fabricate-searc
 The same issue adds `Typeahead`, which emits `fabricate-typeahead` on its field's root and `fabricate-typeahead-list`, `-option` and `-note` on the list it floats to the application root, rooted in the module sheet, so the suggestion rules rooted at `.fabricate-manager` under `manager-tag-suggestion(s)` are re-rooted at an unchanged (0,2,0); the roll-data chips that borrowed the option's box keep it under their own class.
 Issue 2321 adds `XrefList`, which emits `fab-xref-list` on its own root, `fab-xref-list-label` on its label and `fab-xref-list-items` on its list, all painted from its own scoped block; its rows are `ListRow`'s, whose family it does not restate, and it portals nothing, so it needs one root.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
-The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
+The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
 All six that issue 1508 names are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
@@ -528,6 +528,7 @@ BOTH HALVES are held to that rooting, not the reset alone: a per-area copy of th
 A SKIN is a utility whose declaration set is a shared visual treatment the design system already names — a border, a radius and a fill at published rungs — rather than a layout mechanic.
 A skin is rooted at `.fabricate` exactly as any other utility, and it is a shared treatment rather than a rename only where TWO OR MORE blocks already carry its exact values on every property it declares.
 A skin with fewer than two such blocks MUST NOT be declared; the candidate blocks are recorded instead.
+The field and card skins, `.fab-field-skin` and `.fab-card-skin`, were measured and are not shipped (issue 1523, decision D4); `tests/components/design-system-debt-ratchets.test.js` records each with its reason, and a block carrying either tuple keeps its own declarations.
 
 A UTILITY and a SKIN are adopted differently, and the difference is normative.
 A utility's adoption DELETES the donor rule, so the donor's declaration set MUST equal the utility's, property for property and value for value.
@@ -743,6 +744,14 @@ A pill that CONTAINS a square element — an icon chip, a thumbnail — takes th
 
 `tests/components/design-system-debt-ratchets.test.js` holds the RADIUS ladder over both stylesheet corpora, resolving a `var()` token to its definitions first so that moving a banned value into a custom property does not pay the debt down.
 `tests/components/control-height-ladder.test.js` holds the control-height ladder the same way.
+Heights, radii, art and portraits MUST hold zero unmarked off-ladder sites, the books pair included.
+Each surviving off-ladder site carries a reasoned `ratchet-exempt(design-system)` marker stating its library specimen, issue 2257 where a specimen and its shipped geometry are still to converge, the compact search exception this requirement names, why the site is not a control or a record tile, or why its corner is not its height's band (a nav row a long label wraps taller keeps its 30px rung's corner, and the stepper adjunct's hit-area padding outsets its button's corner).
+`tests/components/design-system-exempt-allowlist.test.js` pins every `ratchet-exempt(design-system)` marker under `src/` and `styles/` by its reason and by how many times each file states that reason, so a marker added, dropped, reworded or copied to a second site without its allowlist entry fails.
+The View Lab capture measures what the browser resolved on every frame it renders (`scripts/lib/viewLabComputedCensus.js`), over the whole frame, portaled overlays included, bar Foundry's window header and the companion mount points.
+A painted control or art tile whose rendered height is 22 to 38 in steps of 2 or is 44, the retired 32 and 36 included, fails the frame when its computed corner is neither square, nor half its height or more, nor that height's band, unless it matches a ruled kind at that kind's measured height and corner.
+The bands are `scripts/lib/radiusLadder.js`, which the stylesheet corner gate reads too, so the retired 40 has no band in either and is held by the control-height gate instead.
+Each ruled kind states the reason its site marker carries, and the exempt allowlist fails a ruled kind whose reason no allowlisted marker states.
+Mono text computing above weight 500 fails the frame too, and so does a frame with no root or no resolved `--fab-font-mono`, because either would make a clean census an empty one.
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
 `tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
@@ -757,13 +766,19 @@ Type follows the ladder in `ui-visual-style`: the serif face names things, the m
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.
 Emphasis in mono comes from size and ink.
 `tests/components/design-system-debt-ratchets.test.js` holds both halves of the weight rule: that no `font-weight` anywhere leaves the 400/500/600/700 ramp, and that no rule setting `var(--fab-font-mono)` asks for a weight above 500.
-It joins a rule to a same-selector twin elsewhere in the same file, because the corpus repeatedly sets the family in a base rule and the weight in a `@media`-nested copy, and a rule-local reading would exempt every one of those.
+It joins a rule to a same-selector twin elsewhere in the same file, so a family set in one rule and a weight set in another rule for the same selector, such as an at-rule-nested copy, is read as one mono rule rather than exempted by a rule-local reading.
 
 #### Scenario: A geometry falls between two rungs
 
 - **WHEN** a NEW or RESIZED control height, radius or spacing value is not on a published ladder
 - **THEN** it snaps to the nearest rung
 - **AND** a value that genuinely cannot snap mints a scale member rather than shipping a literal
+
+#### Scenario: A change adds an unmarked off-ladder site
+
+- **WHEN** a change adds a control height, radius, art tile or portrait off its published ladder
+- **THEN** its ratchet fails unless the site carries a reasoned `ratchet-exempt(design-system)` marker
+- **AND** that marker fails the exempt allowlist until the allowlist names it with the same reason
 
 #### Scenario: A spacing value is arithmetic over the scale
 
@@ -2188,7 +2203,7 @@ The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
 `NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
-At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 1523.
+At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 2257.
 
 #### Scenario: A manager route draws its header
 
@@ -2207,7 +2222,7 @@ At issue 1777 both callers kept their shipped geometry, which disagreed with the
 
 - **WHEN** `NavSidebar`'s geometry disagrees with its specimen
 - **THEN** the entry stays `target`
-- **AND** the geometry converges in issue 1523
+- **AND** the geometry converges in issue 2257
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
@@ -2372,6 +2387,8 @@ It stays a bare line until a second independent caller justifies naming the shap
 A converted select's KICKER-SHAPED caption is recorded as a caption the `Kicker` primitive does not serve, and is not to be re-proposed as one.
 The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
 The second difference is structural and smaller — `Kicker` takes no `class` and no `style`, and its rest spread carries a hook and no `id`, so it cannot be the `aria-labelledby` target the trigger's accessible name now comes from — and it is second because it is a one-prop fix where the type is a design decision.
+
+An `asidePlacement` prop on `ListRow`, which would draw the selectable form's `aside` inline beside its button, is recorded as declined (issue 1523, decision D1): the aside stays beneath the button, as "Dense result rows and compact rail pagination retain their meaning" states, and the library's list row specimens draw it there.
 
 A chip remove-control wrapper is recorded as declined with its measurement: `Chip` imports nothing today, so extracting its remove control into a child component or helper puts a new node in the graph of the tree's most-imported primitive and obliges a roster edit in every mounted suite whose tree contains it, against a 15-line file-size overage on a 500-line threshold.
 The chip keeps drawing its own remove control.

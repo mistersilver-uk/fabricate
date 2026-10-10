@@ -705,6 +705,7 @@ Fix the code, or, when the regression is legitimate, record why at the site with
 `lang-orphan` alone takes no marker, because `lang/en.json` cannot carry a comment, so an orphaned key is wired up or deleted.
 The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
 A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
+A new `ratchet-exempt(design-system)` marker must also be added to `tests/components/design-system-exempt-allowlist.test.js` with its reason and the file's marker count, or that test fails.
 A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.
 
 A stale `origin/main` can give a false positive: run `git fetch origin main`.
@@ -715,6 +716,9 @@ Locally, with no `origin/main` and no `RATCHET_BASE`, the ratchets skip and name
 
 The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no Docker, and no world.
 It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
+
+Every frame also passes a computed census (`scripts/lib/viewLabComputedCensus.js`) before its screenshot: a painted control or art tile at a ladder height must draw its band's corner, and no mono text may compute above weight 500.
+A census failure names the offending box, so put it on its band's height and corner, or add a ruled kind for it with an allowlisted `ratchet-exempt(design-system)` site marker.
 
 ```sh
 npm run viewlab:chrome:harvest              # one-off; see below

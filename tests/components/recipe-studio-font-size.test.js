@@ -388,9 +388,9 @@ const EXPECTED = {
   // control-text scale and `RecipeBulkEditPanel.svelte` renders two of these tracks directly
   // beneath the converted select. Equalising them would mean either dragging the shared rung
   // down to one caller's neighbour or re-typing a primitive nine other surfaces render. Issue
-  // 1523 is the child that may collapse the rung and re-flatten the pair; until it does, the
-  // ORDERING is asserted below rather than only described here, so a later edit cannot quietly
-  // put them back on one number and call it tidying.
+  // 2257 ruled on the Select that the 34px `toolbar` rung is kept (D8), so the ORDERING is
+  // asserted below rather than only described here, and a later edit cannot quietly put them
+  // back on one number and call it tidying.
   'bulk-segment-label': 11.52, // 0.72rem — SegmentedControl's own, not the select's
   // 11.5px, the design system's own callout specimen, and a REAL change (issue 1505). It was
   // 11.2 — the 0.7rem the shared strip carried while it drew the "taller treatment". The
@@ -480,8 +480,9 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
         "shared <Select> on the form rung's own 12.5px, while the segments keep " +
         'SegmentedControl’s independent 0.72rem on the manager control-text scale. Equal ' +
         'numbers here mean one of the two was dragged onto the other — see the note beside ' +
-        '`bulk-segment-label`, and issue 1523, which owns collapsing the rung if it is to be ' +
-        `collapsed. Measured: select ${measured['bulk-select']}px, segment ` +
+        '`bulk-segment-label`. Issue 2257 ruled that `Select` keeps its rungs, the 34px ' +
+        '`toolbar` rung included, so neither is collapsed onto the other. Measured: select ' +
+        `${measured['bulk-select']}px, segment ` +
         `${measured['bulk-segment-label']}px.`
     );
   } finally {

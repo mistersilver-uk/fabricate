@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, hint line and a short candidate's undimmed reading still disagree with the specimen, carried to issue 1523 -->
+<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, hint line and a short candidate's undimmed reading still disagree with the specimen, carried to issue 2257 -->
 <!--
   One open slot's candidates: a single-select radiogroup with a roving tab stop, whose arrows,
   Home and End move both focus and the choice, passing `{ via: 'arrow' }` as `onChoose`'s third
@@ -182,7 +182,7 @@
   }
 
   /* Dimmed and still offered (design-system spec, "A player chooses the item"); the reading keeps
-     full opacity so its danger ink clears 4.5:1 (issue 1523 records the specimen difference). */
+     full opacity so its danger ink clears 4.5:1 (issue 2257 records the specimen difference). */
   .fab-choice-option.is-short > :global(.fab-medallion),
   .fab-choice-option.is-short .fab-choice-option-name,
   .fab-choice-option:disabled {

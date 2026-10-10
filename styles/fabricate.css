@@ -1025,8 +1025,6 @@
 }
 
 /* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). */
-
-/* skin census (issue 1523): not an adopter — an element-level baseline with no class; `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across hundreds of unmarked manager text fields. */
 .fabricate-manager input[type="text"],
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
@@ -1747,8 +1745,6 @@
 }
 
 /* ── WHAT THIS MODE DOES: the roll section's opening callout ── The prototype opens The roll with a titled explanation of the resolution mode: a glyph in a rounded tile, the mode's name, one paragraph, and a row of three facts (issues 1096, 1505, 1521). */
-
-/* skin census (issue 1523): the 11px CARD tuple rather than the 9px field one — with `.manager-component-identity-strip` this block is one of the TWO carriers of `1px solid var(--fab-info-border)` behind `var(--fab-info-soft)` at radius 11, a pair that clears the same two-adopter floor the proposed `.fab-card-skin` clears, so issue 1523 weighs the two together. */
 .fabricate-manager .manager-checks-mode-callout {
   display: flex;
   align-items: flex-start;
@@ -1987,7 +1983,7 @@
   min-width: 0;
 }
 
-/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. skin census (issue 1523): a pinned carrier — `tests/components/manager-checks-mounted.js` reads `.manager-checks-tier-row` by name. */
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. */
 .fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
   display: flex;
   align-items: center;
@@ -4162,6 +4158,8 @@
   height: 34px;
   padding: 0 34px;
   border: 1px solid var(--fab-border);
+
+  /* ratchet-exempt(design-system): the compact search's ruled box, 34 at radius 6, the geometry requirement's named exception rather than a rung */
   border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
@@ -4409,9 +4407,7 @@
   white-space: nowrap;
 }
 
-/* ListRow dense: the library's inline image / name / quantity form.
-   skin census (issue 1523): not a field-skin adopter; this read-only result row
-   takes its geometry from the ListRow dense specimen (issue 1648). */
+/* ListRow dense: the library's inline image / name / quantity form, at the ListRow dense specimen's geometry (issue 1648). */
 .fabricate-list-row {
   display: flex;
   align-items: center;
@@ -5727,7 +5723,6 @@
   min-width: 0;
 }
 
-/* skin census (issue 1523): pinned by tests/components/component-studio-font-size.test.js (fixture markup rendered against this sheet, `:163`). */
 .fabricate-manager .manager-recipe-stat,
 .fabricate-manager .manager-component-stat,
 .fabricate-manager .manager-essence-stat {
@@ -5786,7 +5781,6 @@
   min-width: 0;
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its emitters are `RecipeBrowserInspector.svelte` and `RecipeProduceRow.svelte`, and `.manager-component-flow-row` has none. */
 .fabricate-manager .manager-recipe-flow-row,
 .fabricate-manager .manager-component-flow-row {
   display: flex;
@@ -7414,6 +7408,8 @@
   min-height: 44px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border);
+
+  /* ratchet-exempt(design-system): a list row in its 11px panel takes the row rung */
   border-radius: 9px;
   background: var(--fab-surface-soft);
   text-align: left;
@@ -9303,7 +9299,7 @@
   align-items: flex-end;
 }
 
-/* A NAME input is set in the serif, exactly as the name it authors renders elsewhere — the set name here, the recipe name on the Overview tab (issue 643). skin census (issue 1523): a carrier pinned by tests/components/manager-layout-browsers.js. */
+/* A NAME input is set in the serif, exactly as the name it authors renders elsewhere — the set name here, the recipe name on the Overview tab (issue 643). */
 .fabricate-manager .manager-recipe-ingredient-set-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -9473,7 +9469,7 @@
   gap: var(--fab-space-1);
 }
 
-/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). skin census (issue 1523): a carrier pinned by tests/components/picker-row-matrix-mounted.test.js and the recipe and component studio font-size suites. */
+/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
@@ -10550,6 +10546,8 @@
   min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
+
+  /* ratchet-exempt(design-system): a nav row keeps its 30px rung's corner when a long label wraps it taller */
   border-radius: 7px;
   color: var(--fab-text-muted);
   background: transparent;
@@ -11759,7 +11757,6 @@
   min-width: 0;
 }
 
-/* skin census (issue 1523): a carrier pinned by tests/components/pill-family-routing.test.js and the gathering mounted suites. */
 .fabricate-pill-select .manager-availability-menu-button,
 .fabricate-manager .manager-condition-menu-button {
   display: flex;
@@ -12844,6 +12841,7 @@
   height: 28px;
   min-height: 28px;
   padding-block: 0;
+  border-radius: 7px;
 }
 
 .fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
@@ -13062,7 +13060,6 @@
   min-width: 0;
 }
 
-/* skin census (issue 1523): a carrier pinned by tests/components/manager-layout-gathering.js. */
 .fabricate-manager .manager-condition-pill {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 24px;
@@ -14202,7 +14199,6 @@
   background: var(--fab-surface-soft);
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolSystemScopeCards.svelte`. */
 .fabricate-manager .manager-tool-system-label {
   display: grid;
   gap: var(--fab-space-1);
@@ -14355,11 +14351,7 @@
 
 .fabricate-manager .manager-tool-label-field input {
   width: 100%;
-  height: 30px;
   box-sizing: border-box;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-surface-soft);
   font-size: 0.74rem;
@@ -14496,7 +14488,6 @@
   width: 100%;
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolBehaviorPreview.svelte`. */
 .fabricate-manager .manager-tool-required-row {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) max-content;
@@ -14761,8 +14752,6 @@
 }
 
 /* `:not(.fab-stepper-input)` on BOTH selectors — same collision, same reason as :7854. */
-
-/* skin census (issue 1523): not an adopter — its `:not(.fab-stepper-input)` guard is rule-level and cannot be expressed by a stamped markup class. */
 .fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
@@ -15007,8 +14996,6 @@
 /* The identity strip (issue 676, rebuilt at 1371): ONE copy column — the name row over the attribution note. */
 
 /* `proto:1310`: ONE info-soft callout — the chip, the copy column, the exit — at radius 12 (snapped to the 11 card rung) with 13/15 padding (snapped to 12/16) and a 13px gap (12). */
-
-/* skin census (issue 1523): the 11px CARD tuple rather than the 9px field one — the second carrier of the `1px solid var(--fab-info-border)` / `var(--fab-info-soft)` pair whose first is `.manager-checks-mode-callout`. */
 .fabricate-manager .manager-component-identity-strip {
   display: flex;
   align-items: center;
@@ -19523,8 +19510,6 @@
 }
 
 /* ── A4. THE SOURCE IDENTITY CARD ── `proto:845-879`. */
-
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `WorldComponentEntrySourceCard.svelte:106`. */
 .fabricate-manager .manager-component-entry-uuid-well {
   display: flex;
   align-items: center;
@@ -19988,7 +19973,6 @@
   font-size: 10px;
 }
 
-/* skin census (issue 1523): not an adopter — a CONTEXTUAL override keyed on an ancestor chain (`.manager-component-entry-page >` the shared rail), which a class stamped on the element cannot express: the same strip paints at the Tool rails' values everywhere else, so the stamped set would be wider than the matched set. */
 .fabricate-manager .manager-component-entry-page > .manager-scoped-preview .manager-scoped-preview-live {
   align-items: center;
   padding: var(--fab-space-2) var(--fab-space-3);
@@ -20422,8 +20406,6 @@
 }
 
 /* `proto:1261` and `proto:1264`: a recessed well on `--fab-bg-1` behind a hairline at radius 9. The category value is 11.5px/600 serif; the salvage note is 11px/1.5 sans in the muted ink. */
-
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; both of its emitters are in `ComponentBrowserInspector.svelte`. */
 .fabricate-manager .manager-component-inspector-well {
   margin: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
@@ -20643,7 +20625,7 @@
   list-style: none;
 }
 
-/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. skin census (issue 1523): an unpinned carrier of the border/radius/fill tuple — nothing reads this selector by name, so it adopts `.fab-field-skin` once that class ships and its blocker walk is done. */
+/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. */
 .fabricate-sortable-list-row {
   display: flex;
   flex-direction: column;
@@ -20770,8 +20752,6 @@
 /* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */
 
 /* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
-
-/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-group-card {
   min-width: 0;
   padding: var(--fab-space-3);
@@ -20792,8 +20772,6 @@
 }
 
 /* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by a micro-label. */
-
-/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for either under tests/ or scripts/; both are emitted by `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-routing-card,
 .fabricate-manager .manager-salvage-dc-card {
   padding: var(--fab-space-3);
