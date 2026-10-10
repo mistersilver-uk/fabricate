@@ -375,13 +375,23 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
     stepperCases.includes('manager-gathering-economy-actors'),
     `a Stepper change selected ${JSON.stringify(stepperCases)}, none of which renders a stepper`
   );
+  assert.ok(
+    stepperCases.includes('manager-checks-parity-outcomes-multiply'),
+    `a Stepper change selected ${JSON.stringify(stepperCases)}, none of which reaches its endpoint`
+  );
 
   // Containment, not equality: the shipped selectors are scoped ('.fabricate-manager
   // [data-band-strip-band]'), so an equality criterion would fail a correct implementation.
+  const selectorsOf = (caseIds) =>
+    caseIds
+      .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
+      .join(' ');
+  assert.ok(
+    selectorsOf(stepperCases).includes('[data-stepper-endpoint]'),
+    `no selected case anchors on the null endpoint: ${JSON.stringify(stepperCases)}`
+  );
   const stripCases = selectedFor('src/ui/svelte/components/ThresholdBandStrip.svelte');
-  const stripSelectors = stripCases
-    .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
-    .join(' ');
+  const stripSelectors = selectorsOf(stripCases);
   assert.ok(
     stripSelectors.includes('[data-band-strip-band]'),
     `no selected case anchors on a band: ${JSON.stringify(stripCases)}`

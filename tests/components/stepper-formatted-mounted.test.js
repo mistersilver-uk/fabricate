@@ -96,6 +96,19 @@ describe('Stepper formatted mode: identity and ARIA', () => {
     assert.equal(input.value, 'Otherwise');
     assert.equal(input.getAttribute('aria-valuetext'), 'Otherwise');
     assert.ok(!input.hasAttribute('aria-valuenow'), 'the endpoint is not a number');
+    assert.equal(
+      input.style.getPropertyValue('--fab-stepper-endpoint-ch'),
+      String('Otherwise'.length),
+      'the label length the unfilled endpoint width reads'
+    );
+  });
+
+  it('marks only a named null endpoint, in the fill form as well', async () => {
+    const unset = await mountStepper({ ...FORMATTED, value: null, allowUnset: true });
+    assert.ok(!unset.input.hasAttribute('data-stepper-endpoint'), 'an unset value is unmarked');
+    harness.remount();
+    const filled = await mountStepper({ ...OTHERWISE, value: null, fill: true });
+    assert.ok(filled.input.hasAttribute('data-stepper-endpoint'), 'the fill form marks it');
   });
 
   it('renders an unset value blank with the placeholder when there is no null endpoint', async () => {
@@ -219,6 +232,13 @@ describe('Stepper formatted mode: stepping by stops', () => {
     assert.deepEqual(calls, [null], 'and ArrowDown emits nothing there either');
     increment.click();
     assert.deepEqual(calls, [null, 0.2], 'increment selects the minimum stop');
+    harness.remount();
+    const keyed = await mountStepper({ ...OTHERWISE, value: 0.2 });
+    assert.ok(!keyed.input.hasAttribute('data-stepper-endpoint'), 'the lowest stop is unmarked');
+    key(keyed.input, 'ArrowDown');
+    await settle();
+    assert.deepEqual(keyed.calls, [null]);
+    assert.ok(keyed.input.hasAttribute('data-stepper-endpoint'), 'ArrowDown reaches the endpoint');
   });
 
   it('clamps at both ends when there is no null endpoint', async () => {
@@ -264,6 +284,15 @@ describe('Stepper formatted mode: the keyboard', () => {
     await settle();
     key(input, 'ArrowDown');
     assert.deepEqual(calls, [1, 0.5]);
+  });
+
+  it('drops the endpoint marker when ArrowUp leaves it', async () => {
+    const { input, calls } = await mountStepper({ ...OTHERWISE, value: null });
+    assert.ok(input.hasAttribute('data-stepper-endpoint'), 'the endpoint is marked');
+    key(input, 'ArrowUp');
+    await settle();
+    assert.deepEqual(calls, [0.2]);
+    assert.ok(!input.hasAttribute('data-stepper-endpoint'), 'the lowest stop is unmarked');
   });
 
   it('selects the lowest and highest numeric stop from Home and End, never the endpoint', async () => {
