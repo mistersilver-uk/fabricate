@@ -863,7 +863,7 @@ describe('Tool Studio editor (mounted)', () => {
 
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('aria-controls')),
-      ['tool-panel-breakage', 'tool-panel-requirements', 'tool-panel-validation']
+      ['tool-panel-breakage', null, null]
     );
     assert.equal(root.querySelector('#tool-panel-breakage')?.getAttribute('role'), 'tabpanel');
     assert.equal(

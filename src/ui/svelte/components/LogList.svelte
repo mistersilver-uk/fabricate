@@ -31,7 +31,7 @@
   <div class="fab-log-list-copy">
     <span class="fab-log-list-text" title={entry.text}>{entry.text}</span>
     <div class="fab-log-list-meta">
-      {#if entry.when}<span class="fab-log-list-when">{entry.when}</span>{/if}
+      {#if entry.when}<span class="fab-log-list-when" title={entry.when}>{entry.when}</span>{/if}
     </div>
   </div>
   {#if entry.outcome}
@@ -158,8 +158,18 @@
   }
 
   .fab-log-list-when {
-    font-size: 9.5px;
+    overflow: hidden;
     color: var(--fab-text-muted);
+    font-family: var(--fab-font-mono);
+    font-size: 9.5px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Muted falls under 4.5:1 on the raised ground (`log-list-time-contrast.test.js`). */
+  .fab-log-list-entry.is-open:not(.is-selected):hover .fab-log-list-when {
+    color: var(--fab-text-secondary);
   }
 
   .fab-log-list-outcome {

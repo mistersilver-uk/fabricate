@@ -676,6 +676,15 @@ export const CASES = Object.freeze([
     // The portaled panel and an option inside it: either alone is satisfied by a state this case is not about.
     expectSelector:
       '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
+    // A field-sized panel keeps its own padding when the hero's moves (issue 2257 D9).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-gathering-task-availability-pills="weather"] .manager-empty.is-field',
+          styles: 'padding: 4px 8px',
+        },
+      ],
+    },
     kinds: ['manager', 'environments'],
     sourceMatches: [
       // The biome options are the modifier handlers' vocabulary read (issue 1721).

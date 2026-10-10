@@ -128,6 +128,12 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [],
+    // The shopping list's hero panel pads the specimen's 16 on every side (issue 2257 D9).
+    expectLayout: {
+      controls: [
+        { selector: '.crafting-shopping-empty > .manager-empty', styles: 'padding: 16px' },
+      ],
+    },
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SHARED,

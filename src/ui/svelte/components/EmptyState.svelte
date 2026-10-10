@@ -103,7 +103,7 @@
     box-sizing: border-box;
     display: grid;
     place-items: center;
-    padding: var(--fab-space-6) var(--fab-space-5);
+    padding: var(--fab-space-4);
     border: 1.5px dashed var(--fab-border);
     border-radius: 11px;
     color: var(--fab-text-subtle);

@@ -1,13 +1,18 @@
 /** Issue 1782 — the library's `<LogList>`, a named list of past entries a caller may open. */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { chromium } from 'playwright';
+
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const LOG_LIST = 'src/ui/svelte/components/LogList.svelte';
+const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -42,6 +47,35 @@ const action = createRawSnippet((entry) => ({
 
 const listIn = (root) => root.querySelector('[role="list"]');
 const openOf = (root, key) => root.querySelector(`[data-probe-entry="${key}"]`);
+
+/** The first entry's time as Chromium draws it, with the two inks it may take, resolved in place. */
+function readTime() {
+  const time = globalThis.document.querySelector('[data-probe-entry="a"] .fab-log-list-when');
+  const style = globalThis.getComputedStyle(time);
+  const tokens = globalThis.getComputedStyle(time.closest('.fabricate'));
+  const ink = (name) => {
+    const probe = globalThis.document.createElement('i');
+    probe.style.color = tokens.getPropertyValue(name);
+    time.append(probe);
+    const value = globalThis.getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  };
+  const box = time.getBoundingClientRect();
+  return {
+    family: style.fontFamily,
+    size: style.fontSize,
+    weight: Number(style.fontWeight),
+    overflow: style.textOverflow,
+    cut: style.overflowX === 'hidden' && time.scrollWidth > time.clientWidth,
+    inside: box.right <= time.closest('.fab-log-list-copy').getBoundingClientRect().right + 0.5,
+    oneLine: box.height <= Number.parseFloat(style.fontSize) * 1.5,
+    entry: time.closest('.fab-log-list-entry').getBoundingClientRect().height,
+    color: style.color,
+    muted: ink('--fab-text-muted'),
+    secondary: ink('--fab-text-secondary'),
+  };
+}
 
 describe('LogList', () => {
   before(() => harness.setup());
@@ -221,6 +255,12 @@ describe('LogList', () => {
     assert.equal(second.querySelector('.fab-log-list-when'), null, 'an empty time draws no span');
   });
 
+  it('titles each time with its whole text, so an ellipsized time can still be read', async () => {
+    const root = await harness.mount({ entries: ENTRIES, ariaLabel: 'History' });
+    const time = listIn(root).querySelector('.fab-log-list-when');
+    assert.equal(time.getAttribute('title'), 'Today');
+  });
+
   it('tones an outcome mark by success, danger and warning', async () => {
     const entries = ['success', 'danger', 'warning', 'neutral'].map((tone) => ({
       key: tone,
@@ -232,6 +272,39 @@ describe('LogList', () => {
       ['is-success', 'is-danger', 'is-warning'].filter((name) => mark.classList.contains(name))
     );
     assert.deepEqual(tones, [['is-success'], ['is-danger'], ['is-warning'], []]);
+  });
+
+  it('sets the time in 9.5px mono, ellipsized on one line, and secondary on a hovered entry', async () => {
+    const when = 'Fourteen days, six hours and some minutes ago, by the long count';
+    const target = await harness.mount({
+      entries: [{ ...ENTRIES[0], when }, ENTRIES[1]],
+      ariaLabel: 'History',
+      onOpen: () => {},
+    });
+    const { css } = scopedComponentCss(resolve(repoRoot, LOG_LIST));
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage({ viewport: { width: 400, height: 300 } });
+      await page.setContent(
+        `<!doctype html><html><head><style>@layer modules { ${sheet} }</style><style>${css}</style>` +
+          '</head><body><div class="fabricate fabricate-app" data-fabricate-theme="ironblood-forge"' +
+          ` style="width:220px">${target.innerHTML}</div></body></html>`
+      );
+      const rest = await page.evaluate(readTime);
+      assert.match(rest.family, /^"JetBrains Mono"/u, 'the time is set in the mono face');
+      assert.equal(rest.size, '9.5px');
+      assert.equal(rest.weight, 400, 'the ladder sets the log line at Mono 400');
+      assert.equal(rest.overflow, 'ellipsis');
+      assert.ok(rest.cut, 'a time longer than its column is cut, not wrapped or spilled');
+      assert.ok(rest.inside && rest.oneLine, 'and stays on one line inside the copy column');
+      assert.equal(rest.entry, 44, 'the entry keeps its 44px row');
+      assert.equal(rest.color, rest.muted, 'at rest the time is muted');
+      await page.hover('[data-probe-entry="a"]');
+      const hovered = await page.evaluate(readTime);
+      assert.equal(hovered.color, hovered.secondary, 'on the raised hover ground it is secondary');
+    } finally {
+      await browser.close();
+    }
   });
 
   it('keeps each entry node when the list is reordered, keyed by entry key', async () => {
