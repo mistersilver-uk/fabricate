@@ -251,13 +251,22 @@
     "cap": "inline — a 28px strip in the editor’s column",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
-    "partial": "presets only",
-    "note": "The No-colour cell renders only with an `onClear` handler, which plain JSON cannot carry, so the live strip draws the eight presets, none pressed, as `unset` leaves them.",
+    "fixture": "TintPickerInlineClear",
+    "undrawn": {
+      "Essence colour presets": "the preset group’s accessible name; the drawing names no group",
+      "No colour": "the No-colour cell’s accessible name and title; the drawing draws the cell unlabelled"
+    },
     "props": {
       "unset": true,
       "layout": "inline",
-      "allowCustom": false
-    }
+      "allowCustom": false,
+      "colorToken": ""
+    },
+    "data": {
+      "presetsKey": "FABRICATE.Admin.Manager.Essence.Colour.Presets",
+      "noneKey": "FABRICATE.Admin.Manager.Essence.Colour.None"
+    },
+    "note": "Wired as `EssenceIdentityTab` wires its colour strip: the No-colour cell first, pressed because the row is `unset`. Drawn differently: the No-colour cell carries a muted `fa-slash` glyph where the drawing shows an empty bg-3 cell."
   },
   {
     "spec": "<TintPicker> <Menu>",
