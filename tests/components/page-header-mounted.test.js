@@ -1,4 +1,4 @@
-/** Issue 1777 — the library's `<PageHeader>`: a breadcrumb trail, a heading and two snippets. */
+/** Issues 1777 and 2257 — the library's `<PageHeader>`: a trail row, a heading and two snippets. */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -70,6 +70,7 @@ describe('PageHeader', () => {
     });
     const trail = root.querySelector('.manager-breadcrumbs');
     assert.equal(trail.tagName.toLowerCase(), 'nav');
+    assert.ok(trail === headerIn(root).firstElementChild, 'the trail is the root’s first row');
     assert.equal(trail.getAttribute('aria-label'), 'Breadcrumbs', 'the trail is a named nav');
     assert.deepEqual(trailOf(root), [
       ['button', 'Crafting Systems'],
@@ -138,7 +139,7 @@ describe('PageHeader', () => {
       subtitle: 'Which Tools this system uses.',
     });
     const heading = headerIn(root).querySelector(':scope > .manager-heading');
-    assert.ok(Boolean(heading), 'the heading block is the root’s first child');
+    assert.ok(heading === headerIn(root).firstElementChild, 'with no trail, the heading leads');
     assert.equal(
       heading.querySelector(':scope .manager-page-kicker [data-page-kicker]').textContent,
       'Browse'
@@ -165,13 +166,25 @@ describe('PageHeader', () => {
     assert.ok(!root.querySelector('.manager-subtitle'), 'the identity replaces the subtitle');
   });
 
-  it('renders the actions snippet as the root’s trailing child', async () => {
-    const root = await harness.mount({ title: 'Tool Rules', actions });
+  it('renders the trail row, then the heading block and the actions snippet trailing', async () => {
+    const root = await harness.mount({
+      breadcrumbs: [{ label: 'Crafting Systems' }, { label: 'Tool Rules' }],
+      title: 'Tool Rules',
+      actions,
+    });
     const header = headerIn(root);
     assert.deepEqual(
-      [...header.children].map((child) => child.matches('.manager-heading, [data-probe-actions]')),
-      [true, true],
-      'two children: the heading block and the actions'
+      [...header.children].map((child) =>
+        ['nav.manager-breadcrumbs', '.manager-heading', '[data-probe-actions]'].findIndex(
+          (selector) => child.matches(selector)
+        )
+      ),
+      [0, 1, 2],
+      'three children: the trail row, then the heading block and the actions'
+    );
+    assert.ok(
+      !root.querySelector(':scope .manager-heading nav'),
+      'the trail is not in the heading'
     );
     assert.ok(header.lastElementChild.hasAttribute('data-probe-actions'), 'the actions trail');
     assert.ok(

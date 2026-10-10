@@ -73,7 +73,7 @@ const ROUTES = Object.freeze([
 const caseFor = (route) => VIEW_LAB_CASES.find((entry) => entry.id === route.caseId);
 
 /** What the manager draws ABOVE `.manager-body` in the real app. */
-const MEASURED_CHROME = 168;
+const MEASURED_CHROME = 186;
 const CHROME_MARGIN = 24;
 const CHROME_ALLOWANCE = MEASURED_CHROME + CHROME_MARGIN;
 

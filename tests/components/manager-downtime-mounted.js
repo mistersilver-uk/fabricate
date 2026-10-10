@@ -1227,6 +1227,7 @@ export function registerDowntimeCases() {
     assert.ok(status.classList.contains('manager-chip'), 'a lookalike would be a second chip');
     assert.ok(status.classList.contains('is-warning'));
     assert.ok(status.classList.contains('is-truncated'), 'and truncates like Core’s own');
+    assert.ok(status.classList.contains('is-header'), 'at the header’s 38 rung (issue 2257 D10)');
     assert.equal(status.textContent.trim(), 'Unsaved');
     assert.equal(
       status.getAttribute('title'),
@@ -1234,7 +1235,11 @@ export function registerDowntimeCases() {
       'Core renders the string it is given — localization stays the companion’s'
     );
 
-    // Core's own Back / Delete / Save treatments, reachable through the seam at last.
+    // Core's own Back / Delete / Save treatments, reachable through the seam at last, on the
+    // 38 rung Core's own header actions stand on (issue 2257 D10).
+    for (const id of ['back', 'delete', 'save']) {
+      assert.ok(headerAction(id).classList.contains('is-size-38'), `${id} stands at 38`);
+    }
     assert.ok(headerAction('back').classList.contains('is-ghost'));
     assert.ok(Boolean(headerAction('back').querySelector('.fa-arrow-left')));
     assert.ok(headerAction('delete').classList.contains('is-danger'));

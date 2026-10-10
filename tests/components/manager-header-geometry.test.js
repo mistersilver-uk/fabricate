@@ -1,5 +1,7 @@
 /*
- * The Manager page header's three geometry contracts, measured in a real engine.
+ * The Manager page header's four geometry contracts, measured in a real engine.
+ *  0. `PageHeader` draws its library specimen (issue 2257 E4, D1, D2): the trail row, the 22px
+ *     title, the 12px/1.6 subtitle and 38px actions at the top of the title block.
  *  1. The `Unsaved` chip takes the geometry of the buttons it sits beside in full: height,
  *     corner, type size and inline padding. A chip matching only one of the four reads as a
  *     further control drawn wrong.
@@ -11,6 +13,11 @@ import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { borrowBrowser } from '../helpers/layout-harness.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -65,8 +72,8 @@ const LONG_SUBTITLE =
 function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
   return `
 <header class="fabricate-page-header manager-header">
+  <nav class="manager-breadcrumbs"><span>World</span></nav>
   <div class="manager-heading">
-    <nav class="manager-breadcrumbs"><span>World</span></nav>
     <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
       <span class="fab-medallion" style="width:44px;height:44px"></span>
       <div class="manager-recipe-edit-heading-copy">
@@ -75,15 +82,15 @@ function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
       </div>
     </div>
   </div>
-  <div class="manager-header-actions" aria-label="Actions">
-    <span class="manager-chip is-warning is-action" data-downtime-chrome-status>Unsaved</span>
-    <button type="button" class="fabricate-button fab-manager-button is-ghost" data-action="back">
+  <div class="manager-header-actions" role="group" aria-label="Actions">
+    <span class="manager-chip is-warning is-header" data-downtime-chrome-status>Unsaved</span>
+    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-ghost" data-action="back">
       <i class="fas fa-arrow-left"></i><span>All factions</span>
     </button>
-    <button type="button" class="fabricate-button fab-manager-button is-danger" data-action="delete">
+    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-danger" data-action="delete">
       <i class="fas fa-trash"></i><span>Delete faction</span>
     </button>
-    <button type="button" class="fabricate-button fab-manager-button is-primary" data-action="save">
+    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-primary" data-action="save">
       <i class="fas fa-floppy-disk"></i><span>Save faction</span>
     </button>
   </div>
@@ -102,16 +109,17 @@ function pageFor(subtitle, title) {
 
 /**
  * @param {string} markup the Manager's content, composed inside its real shell
- * @param {{width?: number, extraCss?: string}} [shell] the manager's width and any further
- *   component CSS the markup carries already scoped
+ * @param {{width?: number, extraCss?: string, view?: string}} [shell] the manager's width, any
+ *   further component CSS the markup carries already scoped, and its `data-manager-view`
  * @returns {string}
  */
-function pageAround(markup, { width = 1040, extraCss = '' } = {}) {
+function pageAround(markup, { width = 1040, extraCss = '', view = '' } = {}) {
+  const viewAttribute = view ? ` data-manager-view="${view}"` : '';
   const fixture = SCOPED_COMPONENTS.reduce(
     stampScopedClasses,
     `<div class="application theme-dark">
       <section class="window-content">
-        <div class="fabricate fabricate-manager" data-fabricate-theme="dark" style="width:${width}px">
+        <div class="fabricate fabricate-manager" data-fabricate-theme="dark"${viewAttribute} style="width:${width}px">
           ${markup}
         </div>
       </section>
@@ -179,18 +187,21 @@ async function measure(subtitle, title) {
 }
 
 /**
- * The two shipped clusters that stand a state chip beside 34px buttons. `is-primary` widens its
+ * The two shipped clusters that stand a state chip beside buttons: the page header's at 38 (its
+ * `header` density, issue 2257 D10) and an edit card's at 34 (`action`). `is-primary` widens its
  * own inline padding, so only the ghost composition compares that figure.
  */
 const CHIP_CLUSTERS = [
   {
     name: 'the page header beside a ghost button',
+    density: 'is-header',
+    height: 38,
     compared: ['height', 'radius', 'fontSize', 'paddingLeft', 'paddingRight'],
     markup: (chipClass) => `
 <header class="fabricate-page-header manager-header">
-  <div class="manager-header-actions" aria-label="Actions">
+  <div class="manager-header-actions" role="group" aria-label="Actions">
     <span class="${chipClass}" title="Unsaved">Unsaved</span>
-    <button type="button" class="fabricate-button fab-manager-button is-ghost">
+    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-ghost">
       <i class="fas fa-arrow-left"></i><span>Back</span>
     </button>
   </div>
@@ -198,6 +209,8 @@ const CHIP_CLUSTERS = [
   },
   {
     name: 'an edit card heading beside a primary button',
+    density: 'is-action',
+    height: 34,
     compared: ['height', 'radius', 'fontSize'],
     markup: (chipClass) => `
 <section class="manager-edit-card">
@@ -215,8 +228,8 @@ const CHIP_CLUSTERS = [
 ];
 
 const CHIP_FACES = [
-  { name: 'plain', chipClass: 'manager-chip is-warning is-action' },
-  { name: 'truncated', chipClass: 'manager-chip is-warning is-truncated is-action' },
+  { name: 'plain', chipClass: (density) => `manager-chip is-warning ${density}` },
+  { name: 'truncated', chipClass: (density) => `manager-chip is-warning is-truncated ${density}` },
 ];
 
 /**
@@ -252,9 +265,16 @@ async function measureCluster(markup) {
 for (const cluster of CHIP_CLUSTERS) {
   for (const face of CHIP_FACES) {
     test(`a ${face.name} action chip takes the button's geometry in ${cluster.name}`, async () => {
-      const { chip, button } = await measureCluster(cluster.markup(face.chipClass));
+      const { chip, button } = await measureCluster(
+        cluster.markup(face.chipClass(cluster.density))
+      );
 
       // A button the sheet failed to style would compare equal to a chip that also lost its rule.
+      assert.equal(
+        button.height,
+        cluster.height,
+        `the cluster's buttons stand at ${cluster.height}`
+      );
       assert.ok(button.radius > 0, 'the button computed no corner radius to compare against');
       assert.ok(button.fontSize > 0, 'the button computed no font size to compare against');
       for (const property of cluster.compared) {
@@ -289,7 +309,7 @@ test('a long identity subtitle truncates rather than wrapping the action cluster
   // `ch`, so a type-scale change moves the pixels and not the promise.
   assert.ok(measured.sublineCh > 0, 'the subtitle font could not be measured');
   assert.ok(
-    measured.sublineWidth <= Math.ceil(measured.sublineCh * 70),
+    measured.sublineWidth <= measured.sublineCh * 74 + 1,
     `the subtitle runs ${Math.round(measured.sublineWidth / measured.sublineCh)}ch wide`
   );
 
@@ -349,12 +369,12 @@ before(async () => {
 /** Component Rules' header: the longest title a GM can give a system, the advert, the action. */
 const advertHeader = () => `
 <header class="fabricate-page-header manager-header">
+  <nav class="manager-breadcrumbs"><span>Crafting Systems</span></nav>
   <div class="manager-heading">
-    <nav class="manager-breadcrumbs"><span>Crafting Systems</span></nav>
     <h1 class="manager-title">The Most Serene and Ancient Nimithernian Institute Component Rules</h1>
     <p class="manager-subtitle">${LONG_SUBTITLE}</p>
   </div>
-  <div class="manager-header-actions" aria-label="Component actions">
+  <div class="manager-header-actions" role="group" aria-label="Component actions">
     ${premiumAdMarkup}
     <button type="button" class="fabricate-button fab-manager-button is-primary is-size-38" data-component-add-from-catalogue>
       <i class="fas fa-plus"></i><span>Add from catalogue</span>
@@ -446,3 +466,215 @@ for (const { width, face } of ADVERT_WIDTHS) {
     );
   });
 }
+
+// ── The specimen's frame (issue 2257 E4, D1, D2) ───────────────────────────────────────────────
+
+const PAGE_HEADER = 'src/ui/svelte/components/PageHeader.svelte';
+const pageHeaderHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-page-header-geometry-',
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  compiledModules: ['src/ui/svelte/components/Kicker.svelte', PAGE_HEADER],
+  componentPath: PAGE_HEADER,
+});
+
+/** The classes `Button size="38"` writes, which every header action file passes (D10). */
+const HEADER_BUTTON = 'fabricate-button fab-manager-button is-size-38';
+
+/** Each caller that renders `PageHeader`, with the route its own CSS is scoped under. */
+const SPECIMEN_CALLERS = Object.freeze([
+  { name: 'the manager header', class: 'manager-header' },
+  {
+    name: 'the Tool library header',
+    class: 'manager-header manager-tools-context-header',
+    view: 'tools',
+  },
+  { name: 'the Tool editor header', class: 'manager-tool-edit-header', view: 'tool-edit' },
+]);
+
+/** The heading block each caller fills: the plain title and subtitle, or an identity snippet. */
+const SPECIMEN_HEADINGS = Object.freeze([
+  { name: 'title and subtitle', props: { title: 'Frontier Outpost', subtitle: LONG_SUBTITLE } },
+  {
+    name: 'the recipe editor identity',
+    props: {
+      identity: createRawSnippet(() => ({
+        render: () =>
+          `<div class="manager-recipe-edit-heading"><span class="fab-medallion" style="width:38px;height:38px"></span>` +
+          `<div class="manager-recipe-edit-heading-copy"><h1 class="manager-title">Frontier Outpost</h1>` +
+          `<p class="manager-subtitle">${LONG_SUBTITLE}</p></div></div>`,
+      })),
+    },
+  },
+  {
+    name: 'the Tool editor identity',
+    props: {
+      identity: createRawSnippet(() => ({
+        render: () =>
+          `<div class="manager-tool-edit-identity"><img alt="">` +
+          `<div class="manager-tool-edit-identity-copy"><h2 class="manager-title">Frontier Outpost</h2>` +
+          `<p class="manager-subtitle">${LONG_SUBTITLE}</p></div></div>`,
+      })),
+    },
+  },
+]);
+
+/** `PageHeader`'s own markup for one caller and heading, with a middle crumb that is no button. */
+async function renderSpecimen(caller, heading) {
+  try {
+    await pageHeaderHarness.setup();
+    const host = await pageHeaderHarness.mount({
+      class: caller.class,
+      breadcrumbs: [
+        { label: 'World', onSelect: () => {} },
+        { label: 'Economy' },
+        { label: 'Frontier Outpost' },
+      ],
+      ...heading.props,
+      actions: createRawSnippet(() => ({
+        render: () =>
+          `<div class="manager-header-actions" role="group" aria-label="Actions">` +
+          `<button type="button" class="${HEADER_BUTTON} is-ghost"><span>All templates</span></button>` +
+          `<button type="button" class="${HEADER_BUTTON} is-primary"><span>Save</span></button></div>`,
+      })),
+    });
+    return host.innerHTML;
+  } finally {
+    pageHeaderHarness.teardown();
+  }
+}
+
+/** The inks the specimen names, resolved through probes rather than restated as colours. */
+const INKS = Object.freeze({
+  muted: '--fab-text-muted',
+  secondary: '--fab-text-secondary',
+  border: '--fab-border',
+});
+
+/** Every figure the specimen draws, read off the rendered header at one manager width. */
+async function measureSpecimen(specimenMarkup, { view = '', width = 1040 } = {}) {
+  const browser = await borrowBrowser();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const probes = Object.entries(INKS)
+      .map(([ink, token]) => `<span data-ink="${ink}" style="color:var(${token})"></span>`)
+      .join('');
+    await page.setContent(pageAround(specimenMarkup + probes, { view, width }), {
+      waitUntil: 'load',
+    });
+    return await page.evaluate(() => {
+      const one = (selector) => document.querySelector(selector);
+      const style = (selector) => getComputedStyle(one(selector));
+      const box = (selector) => one(selector).getBoundingClientRect();
+      const px = (value) => Number.parseFloat(value);
+      const header = style('header.fabricate-page-header');
+      const subtitle = one('.manager-subtitle');
+      const ruler = document.createElement('span');
+      ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+      ruler.style.font = getComputedStyle(subtitle).font;
+      ruler.textContent = '0'.repeat(100);
+      subtitle.parentElement.append(ruler);
+      const ch = ruler.getBoundingClientRect().width / 100;
+      ruler.remove();
+      return {
+        padding: ['Top', 'Right', 'Bottom', 'Left'].map((side) => px(header[`padding${side}`])),
+        rule: [px(header.borderTopWidth), px(header.borderBottomWidth)],
+        ruleColor: header.borderBottomColor,
+        columnGap: px(header.columnGap),
+        trailFirst: one('header').firstElementChild === one('.manager-breadcrumbs'),
+        trail: {
+          size: px(style('.manager-breadcrumbs').fontSize),
+          weight: style('.manager-breadcrumbs').fontWeight,
+          ink: style('.manager-breadcrumbs button').color,
+          middle: style('.manager-breadcrumbs span:not([aria-current])').color,
+          leaf: style('.manager-breadcrumbs [aria-current="page"]').color,
+          chevron: px(style('.manager-breadcrumbs > i').fontSize),
+          gap: px(style('.manager-breadcrumbs').columnGap),
+          below: Math.round(box('.manager-heading').top - box('.manager-breadcrumbs').bottom),
+        },
+        ink: Object.fromEntries(
+          [...document.querySelectorAll('[data-ink]')].map((probe) => [
+            probe.dataset.ink,
+            getComputedStyle(probe).color,
+          ])
+        ),
+        title: px(style('.manager-title').fontSize),
+        subtitle: {
+          size: px(style('.manager-subtitle').fontSize),
+          line: px(style('.manager-subtitle').lineHeight),
+          above: px(style('.manager-subtitle').marginTop),
+        },
+        subtitleWidth: subtitle.getBoundingClientRect().width,
+        ch,
+        actions: [...document.querySelectorAll('.manager-header-actions .fabricate-button')].map(
+          (button) => Math.round(button.getBoundingClientRect().height)
+        ),
+        actionsTop: Math.round(box('.manager-header-actions').top),
+        headingTop: Math.round(box('.manager-heading').top),
+        headingBottom: Math.round(box('.manager-heading').bottom),
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+for (const caller of SPECIMEN_CALLERS) {
+  for (const heading of SPECIMEN_HEADINGS) {
+    test(`${caller.name} draws the specimen with ${heading.name}`, async () => {
+      const specimenMarkup = await renderSpecimen(caller, heading);
+      assert.ok(specimenMarkup.includes('fabricate-page-header'), 'the header rendered nothing');
+      const measured = await measureSpecimen(specimenMarkup, caller);
+
+      assert.deepEqual(measured.padding, [16, 16, 16, 16], 'the frame pads 16 on every side');
+      assert.deepEqual(measured.rule, [0, 1], 'bordered by its 1px bottom rule (D1)');
+      assert.equal(measured.ruleColor, measured.ink.border, 'the rule takes the border ink');
+      assert.equal(measured.columnGap, 16, 'the heading and the actions sit 16 apart');
+
+      assert.equal(measured.trailFirst, true, 'the trail is the header’s first row');
+      assert.equal(measured.trail.size, 12, 'the trail reads at 12px, not the specimen’s 10.5');
+      assert.equal(measured.trail.weight, '500');
+      assert.ok(measured.ink.muted !== measured.ink.secondary, 'the two inks are distinguishable');
+      assert.equal(measured.trail.ink, measured.ink.muted, 'a crumb takes the muted ink');
+      assert.equal(measured.trail.middle, measured.ink.muted, 'an inert crumb takes it too');
+      assert.equal(measured.trail.leaf, measured.ink.secondary, 'the leaf takes the secondary ink');
+      assert.equal(measured.trail.chevron, 7, 'the chevron is the specimen’s 7px');
+      assert.equal(measured.trail.gap, 8, 'the crumbs sit 8 apart');
+      assert.equal(
+        measured.trail.below,
+        8,
+        'the specimen’s 10 under the trail, snapped to the scale'
+      );
+
+      assert.equal(measured.title, 22, 'the title is 22px');
+      assert.deepEqual(
+        measured.subtitle,
+        { size: 12, line: 19.2, above: 6 },
+        'the subtitle is 12px/1.6'
+      );
+      assert.ok(measured.ch > 0, 'the subtitle font could not be measured');
+      assert.ok(
+        measured.subtitleWidth <= 74 * measured.ch + 1,
+        `the subtitle runs ${Math.round(measured.subtitleWidth / measured.ch)}ch wide`
+      );
+
+      assert.deepEqual(measured.actions, [38, 38], 'every header action stands at 38');
+      assert.equal(
+        measured.actionsTop,
+        measured.headingTop,
+        'the actions align to the heading’s top'
+      );
+    });
+  }
+}
+
+test('at a 680px manager the actions stack under the heading', async () => {
+  const [caller] = SPECIMEN_CALLERS;
+  const measured = await measureSpecimen(await renderSpecimen(caller, SPECIMEN_HEADINGS[0]), {
+    width: 680,
+  });
+  assert.ok(
+    measured.actionsTop >= measured.headingBottom,
+    `the actions start at ${measured.actionsTop}, above the heading's bottom at ${measured.headingBottom}`
+  );
+});

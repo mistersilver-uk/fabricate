@@ -1202,13 +1202,13 @@ test('a squeezed breadcrumb crumb ellipsises from its left edge under the core b
       '<style>a.button, button { display: flex; justify-content: center; align-items: center; }</style>' +
         `<style>${css}</style>` +
         '<div class="fabricate-manager" style="width: 300px">' +
-        '<header class="fabricate-page-header"><div class="manager-heading">' +
+        '<header class="fabricate-page-header">' +
         '<nav class="manager-breadcrumbs" aria-label="Breadcrumbs">' +
         '<button type="button">Crafting Systems</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<button type="button">Greenwarden Herbalism</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<button type="button">Environments</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<span>Sunlit Grove of the Long Evening</span>' +
-        '</nav></div></header></div>'
+        '</nav></header></div>'
     );
     return page.evaluate(() => {
       return [...document.querySelectorAll('.manager-breadcrumbs > button')].map((button) => {
@@ -1405,7 +1405,7 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
   );
 });
 
-test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
+test('a Modifiers card button renders like the tool studio button of the same role, a rung down', async () => {
   const context = await openLayoutContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
@@ -1415,7 +1415,7 @@ test('a Modifiers card button renders exactly like the tool studio button of the
   try {
     const toolButtons = AUTHORITY_PROBES.map(
       (role) =>
-        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="tool-${role}"><i class="fas fa-save"></i><span>Save tool</span></button>`
+        `<button type="button" class="${managerButtonClassesFor(role)} is-size-38" data-probe="tool-${role}"><i class="fas fa-save"></i><span>Save tool</span></button>`
     ).join('');
     const cardButtons = AUTHORITY_PROBES.map(
       (role) =>
@@ -1440,7 +1440,7 @@ test('a Modifiers card button renders exactly like the tool studio button of the
         </head>
         <body>
           <main class="fabricate-manager">
-            <header class="manager-tool-edit-header">
+            <header class="fabricate-page-header manager-tool-edit-header">
               <div class="manager-header-actions manager-tool-edit-actions">${toolButtons}</div>
             </header>
             <section class="manager-edit-card manager-character-modifier-card">
@@ -1479,7 +1479,9 @@ test('a Modifiers card button renders exactly like the tool studio button of the
 
     // The gate would be vacuous if the sheet styled nothing.
     assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
-    assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
+    // The page header's actions stand at 38 (issue 2257 D10); the card keeps the 34 rung.
+    assert.equal(measured['tool-primary'].height, '38px', 'at the page header action height');
+    assert.equal(measured['card-primary'].height, '34px', 'and the card one rung below it');
 
     // …and the control proves the conversion is doing work.
     assert.notEqual(
@@ -1491,7 +1493,8 @@ test('a Modifiers card button renders exactly like the tool studio button of the
     for (const role of AUTHORITY_PROBES) {
       const authority = measured[`tool-${role}`];
       const card = measured[`card-${role}`];
-      for (const property of ['fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+      assert.deepEqual([authority.height, card.height], ['38px', '34px'], `${role}: 38 over 34`);
+      for (const property of ['fontSize', 'fontWeight', 'padding', 'borderRadius']) {
         assert.equal(
           card[property],
           authority[property],

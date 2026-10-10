@@ -3260,6 +3260,10 @@ export function registerWorldScopeCases() {
         await openEntry(tool);
         const button = () => target.querySelector('[data-arm-token="world-tool-delete:pick"]');
         assert.ok(Boolean(button()), 'the page published its Delete to the header');
+        assert.ok(
+          button().classList.contains('is-size-38'),
+          'on the header’s 38 rung beside Back and Save (issue 2257 D10)'
+        );
         assert.equal(button().dataset.armed, 'false');
 
         button().click();

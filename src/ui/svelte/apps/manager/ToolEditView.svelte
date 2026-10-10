@@ -225,14 +225,14 @@
       <div class="manager-tool-edit-identity">
         <img src={displayImage} alt="" data-tool-editor-image />
         <div class="manager-tool-edit-identity-copy">
-          <h2 title={displayName}>{displayName}</h2>
-          <p data-tool-editor-source-context>{sourceContext}</p>
+          <h2 class="manager-title" title={displayName}>{displayName}</h2>
+          <p class="manager-subtitle" data-tool-editor-source-context>{sourceContext}</p>
         </div>
       </div>
     {/snippet}
     {#snippet actions()}
       <div class="manager-header-actions manager-tool-edit-actions">
-        {#if dirty}<Chip tone="warning" density="action" data-tool-editor-status
+        {#if dirty}<Chip tone="warning" density="header" data-tool-editor-status
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
@@ -244,6 +244,7 @@
         {#if worldRecordExists}
           <Button
             role="ghost"
+            size="38"
             data-tool-editor-world-tool={String(tool?.id ?? '')}
             aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
             onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
@@ -257,6 +258,7 @@
              screen saves is one crafting system's RULES for a Tool. -->
         <Button
           role="ghost"
+          size="38"
           data-tool-editor-back
           aria-label={text(
             'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
@@ -274,6 +276,7 @@
         >
         <Button
           role="primary"
+          size="38"
           data-tool-editor-save
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
           onclick={onSave}

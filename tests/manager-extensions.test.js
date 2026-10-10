@@ -273,28 +273,22 @@ test('route chrome and header actions are validated as shape, not as content', (
 
 // A companion's header must be INDISTINGUISHABLE from a Core one, which means it needs the
 // treatments Core's own editors use — a ghost Back, a danger Delete, a primary Save — not just
-// `primary`. `fabricate-button` LEADS every one of them (issue 1502).
+// `primary`, on the 38px rung Core's header actions stand on (issue 2257 D10). `fabricate-button`
+// leads every one of them (issue 1502).
+const HEADER_ACTION_BASE = 'fabricate-button fab-manager-button is-size-38';
+
 test('an action tone renders the Manager button class Core uses for its own controls', () => {
-  assert.equal(
-    managerHeaderActionClass({ tone: 'primary' }),
-    'fabricate-button is-primary'
-  );
-  assert.equal(
-    managerHeaderActionClass({ tone: 'ghost' }),
-    'fabricate-button is-ghost'
-  );
-  assert.equal(
-    managerHeaderActionClass({ tone: 'danger' }),
-    'fabricate-button is-danger'
-  );
-  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'fabricate-button');
+  assert.equal(managerHeaderActionClass({ tone: 'primary' }), `${HEADER_ACTION_BASE} is-primary`);
+  assert.equal(managerHeaderActionClass({ tone: 'ghost' }), `${HEADER_ACTION_BASE} is-ghost`);
+  assert.equal(managerHeaderActionClass({ tone: 'danger' }), `${HEADER_ACTION_BASE} is-danger`);
+  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), HEADER_ACTION_BASE);
   assert.equal(
     managerHeaderActionClass({ primary: true }),
-    'fabricate-button is-primary',
+    `${HEADER_ACTION_BASE} is-primary`,
     'the shipped `primary` spelling keeps its shipped rendering'
   );
-  assert.equal(managerHeaderActionClass({}), 'fabricate-button');
-  assert.equal(managerHeaderActionClass(undefined), 'fabricate-button');
+  assert.equal(managerHeaderActionClass({}), HEADER_ACTION_BASE);
+  assert.equal(managerHeaderActionClass(undefined), HEADER_ACTION_BASE);
 
   // The teeth: EVERY declared tone must map to something. A tone added to the list without a class
   // would otherwise render as a bare button and read as a stylesheet oversight.
@@ -305,7 +299,7 @@ test('an action tone renders the Manager button class Core uses for its own cont
       `${tone} must render through the Manager's own button`
     );
     assert.ok(
-      tone === 'neutral' || rendered !== 'fabricate-button',
+      tone === 'neutral' || rendered !== HEADER_ACTION_BASE,
       `${tone} declares a treatment, so it must add a modifier class`
     );
   }

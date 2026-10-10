@@ -5674,11 +5674,10 @@
   </p>
 </div>
 
-<!--
-  THE WORLD TOOL ENTRY'S HEADER `Delete` (issue 1373).
--->
+<!-- The world Tool entry's header Delete (issue 1373), on the header's 38 rung (issue 2257). -->
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
+    size="38"
     token={worldScope.worldToolEntryDelete?.token ?? ''}
     armed={Boolean(worldScope.worldToolEntryDelete?.token) &&
       worldScope.worldToolEntryDeleteArmed === worldScope.worldToolEntryDelete.token}

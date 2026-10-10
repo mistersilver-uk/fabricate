@@ -30,9 +30,9 @@ const OPTIONAL_ACTION_FIELDS = Object.freeze(['icon', 'tooltip']);
 const BOOLEAN_ACTION_FIELDS = Object.freeze(['primary', 'disabled']);
 // Named after the treatment rather than a colour, so a theme may repaint one without renaming it.
 export const ACTION_TONES = Object.freeze(['primary', 'ghost', 'danger', 'neutral']);
-// `fab-manager-button` is absent deliberately: it marks a control the `Button` primitive
-// rendered, and this hands a class list to a `<button>` the Manager root writes by hand.
-const HEADER_ACTION_BASE_CLASSES = 'fabricate-button';
+// The classes `Button size="38"` writes, so a companion action stands on the page header's 38px
+// rung beside Core's own (issue 2257 D10).
+const HEADER_ACTION_BASE_CLASSES = 'fabricate-button fab-manager-button is-size-38';
 
 // Beside the tones, not in the renderer, so adding a tone without its class is a visible omission.
 // `neutral` maps to NO modifier: the unadorned `.fabricate-button` IS the neutral treatment.

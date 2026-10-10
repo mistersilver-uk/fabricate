@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): <PageHeader> ships at target, because its callers keep the manager's shipped header geometry, which disagrees with the specimen's (issue 1777 decision E4; geometry converges in issue 1523) -->
 <!--
-  THE page header (`<PageHeader>`, `library.html`): a breadcrumb trail, an optional kicker, then a
-  title and subtitle or a caller's `identity` snippet, with an `actions` snippet trailing.
+  THE page header (`<PageHeader>`, `library.html`): a breadcrumb trail as its own first row, then
+  the heading block (an optional kicker, a title and subtitle or a caller's `identity` snippet)
+  with an `actions` snippet trailing, top-aligned beside it.
   A crumb is `{ label, onSelect? }`: with `onSelect` it is a button called with no argument, and
   without it a span; only its `data-*`, `aria-*` and `title` keys land on that element. The last
   crumb is the current page.
@@ -33,29 +33,29 @@
 </script>
 
 <header class={classes} {...rest}>
+  {#if breadcrumbs.length > 0}
+    <nav
+      class="manager-breadcrumbs"
+      aria-label={localizeOr('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
+    >
+      {#each breadcrumbs as crumb, index (index)}
+        {@const current = index === breadcrumbs.length - 1 ? 'page' : undefined}
+        {#if index > 0}<i class="fas fa-chevron-right" aria-hidden="true"></i>{/if}
+        {#if crumb.onSelect}
+          <button
+            {...crumbAttributes(crumb)}
+            type="button"
+            data-keyboard-focus="true"
+            aria-current={current}
+            onclick={() => crumb.onSelect()}>{crumb.label}</button
+          >
+        {:else}
+          <span {...crumbAttributes(crumb)} aria-current={current}>{crumb.label}</span>
+        {/if}
+      {/each}
+    </nav>
+  {/if}
   <div class="manager-heading">
-    {#if breadcrumbs.length > 0}
-      <nav
-        class="manager-breadcrumbs"
-        aria-label={localizeOr('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-      >
-        {#each breadcrumbs as crumb, index (index)}
-          {@const current = index === breadcrumbs.length - 1 ? 'page' : undefined}
-          {#if index > 0}<i class="fas fa-chevron-right" aria-hidden="true"></i>{/if}
-          {#if crumb.onSelect}
-            <button
-              {...crumbAttributes(crumb)}
-              type="button"
-              data-keyboard-focus="true"
-              aria-current={current}
-              onclick={() => crumb.onSelect()}>{crumb.label}</button
-            >
-          {:else}
-            <span {...crumbAttributes(crumb)} aria-current={current}>{crumb.label}</span>
-          {/if}
-        {/each}
-      </nav>
-    {/if}
     {#if kicker}
       <div class="manager-page-kicker"><Kicker data-page-kicker="">{kicker}</Kicker></div>
     {/if}

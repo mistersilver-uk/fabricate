@@ -23,13 +23,14 @@
   const saveHook = $derived({ [saveAttribute]: '' });
 </script>
 
-<Button {...backHook} onclick={() => onBack()}>
+<Button size="38" {...backHook} onclick={() => onBack()}>
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
 </Button>
 {#if danger}{@render danger()}{/if}
 <Button
   role="primary"
+  size="38"
   {...saveHook}
   disabled={saveDisabled || saving === true}
   onclick={() => onSave()}

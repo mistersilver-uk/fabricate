@@ -680,21 +680,21 @@ export const CASES = Object.freeze([
         value: '',
       },
       { selector: '.manager-header-actions', name: 'aria-label', value: 'Crew member actions' },
-      // Core's own three treatments, reached through the seam's `tone`.
+      // Core's three treatments, reached through the seam's `tone`, on the header's 38 size (issue 2257 D10).
       {
         selector: '[data-manager-header-action="lab-back"]',
         name: 'class',
-        value: 'fabricate-button is-ghost',
+        value: 'fabricate-button fab-manager-button is-size-38 is-ghost',
       },
       {
         selector: '[data-manager-header-action="lab-delete"]',
         name: 'class',
-        value: 'fabricate-button is-danger',
+        value: 'fabricate-button fab-manager-button is-size-38 is-danger',
       },
       {
         selector: '[data-manager-header-action="lab-save"]',
         name: 'class',
-        value: 'fabricate-button is-primary',
+        value: 'fabricate-button fab-manager-button is-size-38 is-primary',
       },
       // The companion's screen is still mounted: the header changed, the mount did not.
       {

@@ -710,11 +710,13 @@ const PRIMITIVES = Object.freeze([
     family: String.raw`manager-(?:heading|breadcrumbs|page-kicker)(?![\w-])`,
     anchors: Object.freeze(['manager-heading', 'manager-breadcrumbs', 'manager-page-kicker']),
     composesClasses: true,
-    // Measured at this commit: 3 written, 12 family selectors, 8 owned; the other four are the
-    // Tool editor's and the Tool library's caller-side rules on the trail and the heading.
+    // Measured at issue 2257: 3 written, 10 family selectors, all 10 owned, since the Tool
+    // editor's and the Tool library's caller-side trail and heading rules are gone.
     writtenFloor: 3,
-    familyFloor: 11,
-    ownedFloor: 8,
+    familyFloor: 10,
+    ownedFloor: 10,
+    // Every family selector is the primitive's, so a caller trail or heading rule fails.
+    exactOwned: true,
     // No pair: the root element carries no family class, so a fixture copying it has no anchor.
     mirrored: Object.freeze([]),
   }),
@@ -1748,6 +1750,14 @@ test('every rule a primitive owns is rooted at the primitive, not at an applicat
         'override of the caller’s own markup; a number this low means the ownership test has ' +
         'widened into an escape hatch.'
     );
+    if (primitive.exactOwned) {
+      const callerRules = family.filter((selector) => !owned.includes(selector));
+      assert.equal(
+        owned.length,
+        family.length,
+        `${primitive.name} owns its whole family, yet callers style it:\n  ${callerRules.join('\n  ')}`
+      );
+    }
 
     const gated = owned.filter((selector) =>
       classesOf(selector).some((cls) => isApplicationRoot(cls, primitive))
