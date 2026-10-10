@@ -1388,7 +1388,7 @@ export const CASES = Object.freeze([
         ['failure', 'success', 'success', 'success']
       ),
     ],
-    expectSelector: '.fabricate-manager [data-outcome-head]',
+    expectSelector: '.fabricate-manager [data-outcome-adjustment][data-stepper-endpoint]',
   }),
   parityCase({
     id: 'manager-checks-parity-outcomes-under-fixed',
