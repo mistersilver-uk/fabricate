@@ -904,6 +904,24 @@ describe('RunDetail mounted behavior', () => {
       assert.equal(target.querySelectorAll('[data-yield-entry]').length, 2);
       assert.equal(target.querySelectorAll('.is-cleared').length, hits);
       assert.equal(target.querySelectorAll('.is-missed').length, 2 - hits);
+      // Issue 2257 D15: a shared-model row reads its evidence under the name, beside its mark.
+      for (const row of target.querySelectorAll('[data-yield-entry]')) {
+        const listRow = row.querySelector('.fabricate-list-row.is-body-fill');
+        assert.ok(
+          listRow?.querySelector(
+            ':scope > .fabricate-list-row-leading > .fab-medallion.is-glyph-chip'
+          )
+        );
+        assert.ok(
+          listRow.querySelector(
+            ':scope > .fabricate-list-row-body > .fabricate-list-row-meta > [data-yield-reading]'
+          )
+        );
+        const pill = listRow.querySelector(
+          ':scope > .fabricate-list-row-trailing > .manager-chip.is-bare'
+        );
+        assert.equal(pill.classList.contains('is-secondary'), row.classList.contains('is-cleared'));
+      }
       const order = [...target.querySelector('.fab-yield-rows').children];
       assert.equal(
         order.indexOf(target.querySelector('[data-yield-cut]')),

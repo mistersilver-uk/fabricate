@@ -750,6 +750,11 @@ const routedBand = (tier, tone, ink) => ({
   selector: `[data-journal-detail] [data-outcome-tier="${tier}"] [data-outcome-band="${tone}"]`,
   styles: `font-size: 10px; border-width: 0; color: var(${ink})`,
 });
+/** A yield scale row's borderless 26px mark. */
+const yieldMark = (scope, entry) => ({
+  selector: `${scope} [data-yield-entry="${entry}"] .fab-medallion`,
+  styles: 'width: 26px; border-width: 0',
+});
 const CRAFTED_TIER = '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"]';
 const SALVAGED_TIER = '[data-inventory-salvage-outcome="rw-salv-masterwork"]';
 /** An open action menu's panel at 11 and the named item at 7. */
@@ -860,6 +865,11 @@ const NON_VERB_CONTROLS = Object.freeze({
   ],
   'player-journal-routed-bands-count-unordered': [
     routedBand('rw-standard', 'neutral', '--fab-text-secondary'),
+  ],
+  'player-gathering-task-ready': [yieldMark('[data-gathering-drops]', 'hb-ridgemoss-drop')],
+  'player-gathering-drop-open': [yieldMark('[data-gathering-drops]', 'row-1')],
+  'fabricate-journal-history-data-unknown-material-resolution-1240': [
+    yieldMark('[data-journal-detail]', 'unknown-silver-ore'),
   ],
 });
 const NON_VERB_SELECTORS = new Set(

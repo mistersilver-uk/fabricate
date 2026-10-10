@@ -111,6 +111,23 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':not(:has([data-history-summary]))',
 });
 
+/**
+ * Issue 2257 D15: a shared-model row after its roll, on the one history witness the scale's capture
+ * publishes — the borderless 26px mark, and the mark, body, quantity and chance on one flex line.
+ */
+const JOURNAL_HISTORY_DATA_LAYOUT = Object.freeze({
+  'unknown-material-resolution-1240': {
+    containerSelector: '[data-journal-detail] [data-yield-scale]',
+    oneLineRows: '[data-journal-detail] [data-yield-entry] > .fabricate-list-row',
+    controls: [
+      {
+        selector: '[data-journal-detail] [data-yield-entry="unknown-silver-ore"] .fab-medallion',
+        styles: 'width: 26px; border-width: 0',
+      },
+    ],
+  },
+});
+
 /** Issue 1773: a craft's credit and grants read as result rows, labelled, rolled and reasoned. */
 const REWARD_AWARDS_CASE = playerCase({
   id: 'player-journal-reward-awards',
@@ -189,6 +206,9 @@ export function journalHistoryDataCases() {
         steps: [{ selector: `[data-history-run-id="lab-v1-history-data-${state}"]` }],
         expectTab: 'journal',
         expectSelector: `[data-journal-detail]${evidence}`,
+        ...(JOURNAL_HISTORY_DATA_LAYOUT[`${state}-${width}`] && {
+          expectLayout: JOURNAL_HISTORY_DATA_LAYOUT[`${state}-${width}`],
+        }),
         kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
         // `YieldScale` is a broad signal routed by `BROAD_SIGNAL_CASE_OVERRIDES`, which is where it is named.
         sourceMatches: [

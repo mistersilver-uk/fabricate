@@ -4597,6 +4597,11 @@
   min-width: 0;
 }
 
+/* `bodyBasis="fill"`: the body claims the free space rather than its text's width, so a reading set under the name wraps inside it and the row stays one flex line. */
+.fabricate-list-row.is-body-fill .fabricate-list-row-body {
+  flex: 1 1 0;
+}
+
 .fabricate-list-row .fabricate-list-row-head,
 .fabricate-list-row .fabricate-list-row-badges,
 .fabricate-list-row .fabricate-list-row-meta {

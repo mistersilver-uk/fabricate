@@ -630,7 +630,7 @@ const HISTORY_DATA_WITNESS = {
   'history-data-shared-roll-control'(target) {
     // The control for #1648 A8: genuinely SHARED evidence has one cut to describe.
     assert.equal(
-      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      target.querySelector('[data-yield-scale] .fab-yield-heading > .fab-kicker').textContent,
       historyLabel('Scale')
     );
     const cut = target.querySelector('[data-yield-cut]');

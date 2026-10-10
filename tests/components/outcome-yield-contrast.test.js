@@ -1,6 +1,6 @@
 /**
- * Issue 2257 D13, D14: the ladder's band and yield chips clear 4.5:1 on each flattened ground they
- * are drawn on, in all seven themes.
+ * Issue 2257 D13–D15: the ladder's band and yield chips, and the scale's reading and pill, clear
+ * 4.5:1 on each flattened ground they are drawn on, in all seven themes.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -10,6 +10,8 @@ import { contrast, flatten, propertiesOf, themePalettes } from '../helpers/theme
 
 const SHEET = 'styles/fabricate.css';
 const LADDER = 'src/ui/svelte/components/OutcomeLadder.svelte';
+const SCALE = 'src/ui/svelte/components/YieldScale.svelte';
+const CHIP = 'src/ui/svelte/components/Chip.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus[SHEET]));
 
@@ -64,3 +66,38 @@ test("the ladder's yield chip clears 4.5:1 for its name, quantity and members", 
   assert.deepEqual(shortfalls(ink, [chip, tierGround()]), []);
 });
 
+const rowGround = () => token(SHEET, '.fabricate-list-row', 'background');
+const clearedWash = () => token(SHEET, '.fabricate-list-row.is-positive', 'background');
+
+test("the scale's sentence clears 4.5:1 in muted on its row and in secondary on a cleared row", () => {
+  const reading = token(SCALE, '.fab-yield-reading', 'color');
+  assert.equal(reading, '--fab-text-muted');
+  assert.deepEqual(shortfalls(reading, [rowGround()]), []);
+  const cleared = token(SCALE, '.fab-yield-row.is-cleared .fab-yield-reading', 'color');
+  assert.equal(cleared, '--fab-text-secondary');
+  assert.deepEqual(shortfalls(cleared, [clearedWash(), rowGround()]), []);
+});
+
+test("the scale's bare pill clears 4.5:1 on each ground its tone is drawn on", () => {
+  const chip = (tone, property) => token(CHIP, `.manager-chip.is-${tone}`, property);
+  const pillGround = token(CHIP, '.manager-chip', 'background');
+  // A cleared row's pill takes the secondary tone; the neutral one measures under 4.5:1 there.
+  assert.deepEqual(
+    shortfalls(chip('secondary', 'color'), [
+      chip('secondary', 'background'),
+      clearedWash(),
+      rowGround(),
+    ]),
+    []
+  );
+  assert.notDeepEqual(
+    shortfalls(chip('neutral', 'color'), [pillGround, clearedWash(), rowGround()]),
+    [],
+    'the neutral ink falls short on the success wash, which is why the cleared pill is secondary'
+  );
+  assert.deepEqual(shortfalls(chip('neutral', 'color'), [pillGround, rowGround()]), []);
+  assert.deepEqual(
+    shortfalls(chip('positive', 'color'), [chip('positive', 'background'), rowGround()]),
+    []
+  );
+});
