@@ -94,12 +94,6 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
-    "<PageHeader> ships at target, because its callers keep the manager's shipped header " +
-      "geometry, which disagrees with the specimen's (issue 1777 decision E4; geometry converges " +
-      'in issue 2257)',
-    { 'src/ui/svelte/components/PageHeader.svelte': 1 },
-  ],
-  [
     '<NavSidebar> ships at target: the pip and 8/0/6 padding are ruled, so the specimen is ' +
       "redrawn; the expanded group's box converges at issue 2257 (issue 1777 decision E3)",
     { 'src/ui/svelte/components/NavSidebar.svelte': 1 },
