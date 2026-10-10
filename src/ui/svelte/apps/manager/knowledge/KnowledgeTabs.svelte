@@ -62,4 +62,5 @@
   tabDataAttr="data-knowledge-tab"
   countDataAttr="data-knowledge-tab-count"
   containerClass="manager-editor-tabs manager-knowledge-tabs"
+  activePanelOnly
 />
