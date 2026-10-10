@@ -3,7 +3,9 @@
  * template renders the row's component with the row's props, shipped primitives and snippet wiring
  * only, with no style or class of its own; every string it hands a component comes from the row, its
  * imports are the closed list, an `act` drives no event itself and comes with its `reached`, and it
- * compiles with no warning. Each rule runs over the real fixtures and a synthetic source breaking it.
+ * compiles with no warning. A shipped primitive is a component under `src/ui/svelte/components/` or
+ * a composition the manifest lists under `designSystemPrimitives`. Each rule runs over the real
+ * fixtures and a synthetic source breaking it.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -22,11 +24,22 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE_DIRECTORY = 'tests/view-lab/primitives/fixtures';
 const COMPONENT_DIRECTORY = 'src/ui/svelte/components/';
 
+const MANIFEST_COMPOSITIONS = new Set(
+  JSON.parse(readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.json'), 'utf8'))
+    .designSystemPrimitives.map((entry) => entry.path)
+    .filter((entryPath) => entryPath.endsWith('.svelte'))
+);
+
+/** Whether a fixture may compose this path: a shipped component, or a manifest-listed composition. */
+const isShippedPrimitive = (resolved) =>
+  resolved.startsWith(COMPONENT_DIRECTORY) || MANIFEST_COMPOSITIONS.has(resolved);
+
 /** Every module a fixture may import besides `svelte` and a shipped component: the act helpers and the pure helpers a named shipped caller imports. */
 const IMPORTABLE = Object.freeze([
   'tests/view-lab/primitives/fixtureActs.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
+  'src/ui/svelte/util/statusChipTone.js',
 ]);
 
 /** The calls a `<script module>` literal may be an argument to: a query, an attribute read, a wait's description. */
@@ -370,7 +383,7 @@ function templateProblems(ast, { file, rows, propsOf }) {
   const alias = bindings.get('component');
   const primitives = new Map(
     importsOf(ast, file)
-      .filter(({ resolved }) => resolved.startsWith(COMPONENT_DIRECTORY))
+      .filter(({ resolved }) => isShippedPrimitive(resolved))
       .flatMap(({ resolved, locals }) => locals.map((local) => [local, resolved]))
   );
   const nodes = templateNodes(ast.fragment);
@@ -400,13 +413,11 @@ function importProblems(ast, file) {
   return importsOf(ast, file)
     .filter(
       ({ resolved }) =>
-        resolved !== 'svelte' &&
-        !resolved.startsWith(COMPONENT_DIRECTORY) &&
-        !IMPORTABLE.includes(resolved)
+        resolved !== 'svelte' && !isShippedPrimitive(resolved) && !IMPORTABLE.includes(resolved)
     )
     .map(
       ({ resolved }) =>
-        `imports ${resolved}, outside svelte, the shipped components and the named helpers`
+        `imports ${resolved}, outside svelte, the shipped primitives and the named helpers`
     );
 }
 
@@ -481,6 +492,16 @@ test('the fixture corpus is alive', () => {
     moduleExports(parse(source, { modern: true })).includes('act')
   );
   assert.ok(acting.length > 0, 'no fixture exports `act`, so the act rules have no real domain');
+  const composing = FIXTURES.filter(({ file, source }) =>
+    importsOf(parse(source, { modern: true }), file).some(
+      ({ resolved }) => resolved === BULK_EDIT_SECTION
+    )
+  );
+  assert.deepEqual(
+    composing.map(({ fixture }) => fixture),
+    ['BulkEditPanelStatus'],
+    'no fixture composes a manifest-listed composition, so that allowance has no real domain'
+  );
 });
 
 /** The fixture files no catalogue row names. */
@@ -527,6 +548,7 @@ function synthetic({
 }
 
 const CHIP = { path: 'src/ui/svelte/components/Chip.svelte' };
+const BULK_EDIT_SECTION = 'src/ui/svelte/apps/manager/BulkEditSection.svelte';
 const SYNTHETIC_FILE = `${FIXTURE_DIRECTORY}/Synthetic.svelte`;
 
 /** The problems a synthetic fixture yields beside the words its own `typed = ''` default does not author. */
@@ -580,7 +602,41 @@ test('a module script may query with literals and may not type one', () => {
 test('an import outside the closed list is refused', () => {
   const instance = "  import { localize } from '../../../../src/ui/svelte/util/foundryBridge.js';";
   assert.deepEqual(problemsOf({ instance }), [
-    'imports src/ui/svelte/util/foundryBridge.js, outside svelte, the shipped components and the named helpers',
+    'imports src/ui/svelte/util/foundryBridge.js, outside svelte, the shipped primitives and the named helpers',
+  ]);
+});
+
+/** A synthetic fixture importing `local` from `src/ui/svelte/apps/<target>`. */
+const importingApp = (local, target) =>
+  `  import ${local} from '../../../../src/ui/svelte/apps/${target}';`;
+
+const refusedApp = (target) => [
+  `imports src/ui/svelte/apps/${target}, outside svelte, the shipped primitives and the named helpers`,
+];
+
+test('a `notAPrimitive` composition is refused', () => {
+  const target = 'manager/SystemOverviewView.svelte';
+  assert.deepEqual(problemsOf({ instance: importingApp('Part', target) }), refusedApp(target));
+});
+
+test('a component the library names only in prose is refused', () => {
+  const target = 'journal/RunDetail.svelte';
+  assert.deepEqual(problemsOf({ instance: importingApp('Part', target) }), refusedApp(target));
+});
+
+test('a manifest-listed composition may be composed, passed only what it declares', () => {
+  const instance = importingApp('BulkEditSection', 'manager/BulkEditSection.svelte');
+  const composed = (attribute) =>
+    problemsOf({
+      instance,
+      template: [
+        '<Specimen {...props} onRemove={remove} />',
+        `<BulkEditSection ${attribute} />`,
+      ].join('\n'),
+    });
+  assert.deepEqual(composed('label={typed}'), []);
+  assert.deepEqual(composed('x={typed}'), [
+    `passes <BulkEditSection> \`x\`, which ${BULK_EDIT_SECTION} does not declare`,
   ]);
 });
 
