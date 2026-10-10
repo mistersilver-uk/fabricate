@@ -1,14 +1,17 @@
-<!-- ratchet-exempt(design-system): promoted on its third importer at issue 1644; its head glyph, band chip, row yields and kicker disagree with the specimen, recorded in the migrations table, so the row arrives at target -->
 <!-- Authored outcome bands preview possible yields, never confirmed historical awards. -->
 <!--
   `reachedId` marks the first tier whose `ids` (else its `id`) contain it with a `reachedLabel` pill.
-  A band is optional. `successLabel`/`failureLabel` name each tier's status glyph for a screen reader.
-  Each tier, its band chip, its pill and each yield take per-item `props`; the root takes `class` and
-  a rest spread.
+  A band is optional, a bare mono figure. `successLabel`/`failureLabel` name each tier's status
+  glyph for a screen reader. Each yield is a wrapping chip led by its 14px picture where
+  `resolveCraftingArt` finds art, else its 9px glyph. Each tier, its band, its pill and each yield
+  take per-item `props`; the root takes `class` and a rest spread.
 -->
 <script>
+  import { essenceTintStyle } from '../util/essenceTint.js';
+  import { resolveCraftingArt } from '../util/craftingArtResolution.js';
   import Chip from './Chip.svelte';
-  import ListRow from './ListRow.svelte';
+  import Kicker from './Kicker.svelte';
+  import Medallion from './Medallion.svelte';
 
   let {
     tiers = [],
@@ -27,12 +30,14 @@
   const reachedIndex = $derived(
     reachedId == null ? -1 : tiers.findIndex((tier) => tierIds(tier).includes(reachedId))
   );
+  const markOf = (item) =>
+    resolveCraftingArt(item.art ?? item.img ?? '', item.icon || 'fas fa-box');
 </script>
 
 <section class={['fab-outcome-ladder', extraClass]} {...rest} data-outcome-ladder>
   {#if label || hint}
     <header class="fab-outcome-heading">
-      {#if label}<span class="fab-outcome-kicker">{label}</span>{/if}
+      {#if label}<Kicker as="span">{label}</Kicker>{/if}
       {#if hint}<span class="fab-outcome-hint">{hint}</span>{/if}
     </header>
   {/if}
@@ -49,7 +54,12 @@
         data-outcome-rolled={isReached ? 'true' : undefined}
       >
         <header class="fab-outcome-tier-heading">
-          <i class={tier.fail ? 'fas fa-circle-xmark' : 'fas fa-circle-check'} aria-hidden="true"
+          <i
+            class={[
+              'fab-outcome-tier-glyph',
+              tier.fail ? 'fas fa-circle-xmark' : 'fas fa-circle-check',
+            ]}
+            aria-hidden="true"
           ></i>
           {#if status}<span class="visually-hidden" data-outcome-status>{status}</span>{/if}
           <span class="fab-outcome-tier-name">{tier.name}</span>
@@ -64,24 +74,33 @@
             >
           {/if}
           {#if tier.band}
-            <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the band -->
-            <Chip {...tier.bandProps} density="list" mono tone={tier.fail ? 'danger' : 'neutral'}
-              >{tier.band}</Chip
+            <span
+              {...tier.bandProps}
+              class="fab-outcome-band"
+              data-outcome-band={tier.fail ? 'danger' : 'neutral'}>{tier.band}</span
             >
           {/if}
         </header>
         <div class="fab-outcome-yields">
           {#each tier.yields ?? [] as item, itemIndex (item.id || `${item.name}-${itemIndex}`)}
-            <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the row -->
-            <ListRow
-              {...item.props}
-              name={item.name}
-              art={item.art ?? item.img ?? ''}
-              icon={item.icon || 'fas fa-box'}
-              tint={item.tint || ''}
-              quantity={item.quantity}
-              detail={item.detail ?? ''}
-            />
+            {@const mark = markOf(item)}
+            <span {...item.props} class="fab-outcome-yield" data-outcome-yield>
+              {#if mark.art}
+                <!-- ratchet-exempt(design-system): a 14px inline mark inside a 24px yield chip, not a record tile; the art ladder's 22 would grow every chip -->
+                <Medallion art={mark.art} icon={mark.icon} alt="" size={14} />
+              {:else}
+                <i
+                  class={['fab-outcome-yield-glyph', mark.icon]}
+                  style={essenceTintStyle(item.tint, '--fab-outcome-yield-tint')}
+                  aria-hidden="true"
+                ></i>
+              {/if}
+              <span class="fab-outcome-yield-name" title={item.name}>{item.name}</span>
+              {#if item.quantity != null}<span class="fab-outcome-yield-quantity"
+                  >{item.quantity}</span
+                >{/if}
+              {#if item.detail}<span class="fab-outcome-yield-detail">{item.detail}</span>{/if}
+            </span>
           {:else}
             <span class="fab-outcome-empty" data-outcome-empty
               >{tier.emptyText || emptyTierText}</span
@@ -106,15 +125,12 @@
     gap: var(--fab-space-2);
   }
 
-  .fab-outcome-kicker {
+  .fab-outcome-hint {
     color: var(--fab-text-subtle);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 10.5px;
+    line-height: 1.5;
   }
 
-  .fab-outcome-hint,
   .fab-outcome-empty {
     color: var(--fab-text-subtle);
     font-size: 10px;
@@ -151,6 +167,11 @@
     color: var(--fab-danger-text);
   }
 
+  .fab-outcome-tier-glyph {
+    flex: 0 0 auto;
+    font-size: 10px;
+  }
+
   .fab-outcome-tier-name {
     min-width: 0;
     flex: 1 1 auto;
@@ -159,9 +180,68 @@
     overflow-wrap: anywhere;
   }
 
+  /* Secondary, not the specimen's subtle: subtle and muted fall under 4.5:1 on the success head. */
+  .fab-outcome-band {
+    flex: 0 0 auto;
+    color: var(--fab-text-secondary);
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .is-failure .fab-outcome-band {
+    color: var(--fab-danger-text);
+  }
+
   .fab-outcome-yields {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: var(--fab-space-1);
     padding: var(--fab-space-2);
+  }
+
+  /* A group's members wrap at whitespace, so the chip grows rather than hiding an offered reward. */
+  .fab-outcome-yield {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-chip);
+    max-width: 100%;
+    min-width: 0;
+    min-height: 24px;
+    padding: var(--fab-space-2xs) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+    background: var(--fab-surface-soft);
+    color: var(--fab-text-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .fab-outcome-yield-glyph {
+    flex: 0 0 auto;
+    color: var(--fab-outcome-yield-tint, var(--fab-accent));
+    font-size: 9px;
+  }
+
+  .fab-outcome-yield-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fab-outcome-yield-quantity {
+    flex: 0 0 auto;
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fab-outcome-yield-detail {
+    min-width: 0;
+    overflow-wrap: break-word;
   }
 </style>

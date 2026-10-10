@@ -7,6 +7,7 @@ import {
   SELECT_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  OUTCOME_LADDER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
@@ -66,6 +67,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/runRecovery.js',
     // Issue 1506: the run's status is a `<Chip>` now.
     ...STATUS_TONE_RAW_MODULES,
+    ...OUTCOME_LADDER_RAW_MODULES,
   ],
   compiledModules: [
     // Issue 1506: the journal's status pill retired into the shared chip.

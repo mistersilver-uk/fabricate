@@ -364,6 +364,13 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/ListRow.svelte',
 ]);
 
+// The routed ladder's raw closure (issue 2257): its yield mark's art resolution and glyph tint.
+export const OUTCOME_LADDER_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/craftingArtResolution.js',
+  'src/ui/svelte/util/craftingImageDefaults.js',
+  'src/ui/svelte/util/essenceTint.js',
+]);
+
 // The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
 // them and the per-drop breakdown it opens.
 export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
@@ -592,7 +599,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // are already listed, so omitting this HANGS every mounted crafting suite.
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
-  // The shared ladder the table above adapts, and the row each award draws (issue 1644).
+  // The shared ladder the table above adapts (issue 1644), and the row the recipe list draws.
   'src/ui/svelte/components/OutcomeLadder.svelte',
   'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',

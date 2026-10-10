@@ -742,8 +742,16 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
 // The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
 // primer's item list offset and lead (issue 1521), each open action menu's panel and item
-// corners, each open nav group's box, and every `toolbar`-rung Select a case draws (issue 2257).
+// corners, each open nav group's box, every `toolbar`-rung Select a case draws, and the routed
+// ladder's and yield scale's converged figures (issue 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
+/** A Journal ladder tier's bare band, named by its tone and inked by it. */
+const routedBand = (tier, tone, ink) => ({
+  selector: `[data-journal-detail] [data-outcome-tier="${tier}"] [data-outcome-band="${tone}"]`,
+  styles: `font-size: 10px; border-width: 0; color: var(${ink})`,
+});
+const CRAFTED_TIER = '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"]';
+const SALVAGED_TIER = '[data-inventory-salvage-outcome="rw-salv-masterwork"]';
 /** An open action menu's panel at 11 and the named item at 7. */
 const menuCorners = (panel, item) => [
   { selector: panel, styles: 'border-radius: 11px' },
@@ -823,6 +831,35 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-world-travel-with-gathering-expanded': [
     navGroupBox('.manager-nav-group:has(#manager-gathering-submenu)'),
     navGroupBox('.manager-world-travel-group'),
+  ],
+  'player-crafting-routed-by-check': [
+    {
+      selector: `${CRAFTED_TIER} [data-outcome-yield]`,
+      styles: 'min-height: 24px; border-radius: 6px',
+    },
+    { selector: `${CRAFTED_TIER} .fab-outcome-tier-glyph`, styles: 'font-size: 10px' },
+    { selector: `${CRAFTED_TIER} [data-outcome-yield] .fab-medallion`, styles: 'width: 14px' },
+  ],
+  'player-salvage-count-routed': [
+    {
+      selector: `${SALVAGED_TIER} [data-outcome-band]`,
+      styles: 'border-width: 0; font-size: 10px',
+    },
+    {
+      selector: `${SALVAGED_TIER} [data-inventory-salvage-result="rw-bar"]`,
+      styles: 'min-height: 24px; border-radius: 6px',
+    },
+  ],
+  'player-journal-routed-bands-under': [
+    routedBand('lab-abundant', 'neutral', '--fab-text-secondary'),
+    routedBand('lab-failed', 'danger', '--fab-danger-text'),
+  ],
+  'player-journal-routed-bands-count': [
+    routedBand('rw-masterwork', 'neutral', '--fab-text-secondary'),
+    routedBand('rw-ruined', 'danger', '--fab-danger-text'),
+  ],
+  'player-journal-routed-bands-count-unordered': [
+    routedBand('rw-standard', 'neutral', '--fab-text-secondary'),
   ],
 });
 const NON_VERB_SELECTORS = new Set(

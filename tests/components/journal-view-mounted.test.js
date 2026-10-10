@@ -14,6 +14,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  OUTCOME_LADDER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -30,6 +31,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
+    ...OUTCOME_LADDER_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',

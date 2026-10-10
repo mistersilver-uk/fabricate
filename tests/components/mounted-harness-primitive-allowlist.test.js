@@ -169,9 +169,10 @@ const SHARED_PRIMITIVES = [
   // The browse pager (issue 1518): every player browse list and the inventory inspector's
   // per-section lists render it, beside the manager's browse screens.
   'src/ui/svelte/components/Pagination.svelte',
-  // The routed ladder and its dense row (issue 1644): crafting's routed tiers and salvage's routed
-  // body draw them, and the recipe-item preview carries that salvage body into the manager tree.
+  // The routed ladder (issue 1644): crafting's routed tiers and salvage's routed body draw it, and
+  // the recipe-item preview carries that salvage body into the manager tree.
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // The dense row (issue 1644): the yield scale, the recipe list and the Journal draw it.
   'src/ui/svelte/components/ListRow.svelte',
   // The cross-reference list over it (issue 2321): the inventory inspector draws it in the player
   // window, and the recipe-item preview carries that inspector into the manager tree.
