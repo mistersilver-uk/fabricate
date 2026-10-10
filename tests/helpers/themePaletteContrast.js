@@ -53,3 +53,27 @@ export function contrast(ink, ground) {
   const [high, low] = [lum(shown), lum(base.slice(0, 3))].sort((a, b) => b - a);
   return (high + 0.05) / (low + 0.05);
 }
+
+/** The one `--fab-*` token `rules` declare for `property` on the rule listing `selector`. */
+export function declaredToken(rules, selector, property) {
+  const values = rules
+    .filter((rule) => splitSelectorList(rule.selector).includes(selector))
+    .map((rule) => propertiesOf(rule).get(property))
+    .filter(Boolean);
+  assert.equal(values.length, 1, `${property} on ${selector} is declared ${values.length} times`);
+  const name = values[0].match(/^var\((--fab-[\w-]+)\)$/u)?.[1];
+  assert.ok(name, `${selector} ${property} is not one palette token: ${values[0]}`);
+  return name;
+}
+
+/** Each of the seven `themes` where `ink` reads under 4.5:1 on `stack`, its grounds top first. */
+export function shortfalls(themes, ink, stack) {
+  assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
+  return [...themes].flatMap(([theme, tokens]) => {
+    const ground = stack
+      .slice(0, -1)
+      .reduceRight((base, layer) => flatten(tokens.get(layer), base), tokens.get(stack.at(-1)));
+    const ratio = contrast(tokens.get(ink), ground);
+    return ratio < 4.5 ? [`${theme}: ${ink} on ${stack.join(' over ')} ${ratio.toFixed(2)}:1`] : [];
+  });
+}

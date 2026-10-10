@@ -173,40 +173,43 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('.fab-slot-pip'));
   });
 
-  it('inks each pip with the on-colour of the fill it stands on', async () => {
+  // Issue 2257 D16: met and short keep their on-colour; every other pip takes the page ground.
+  it('inks each pip by its fill: on-success, on-danger, else the page ground', async () => {
     await harness.mount({ slots: SLOTS });
     const css = injectedCss();
     for (const [selector, ink] of [
       [String.raw`\.fab-slot-pip`, '--fab-on-success'],
       [String.raw`\.is-short\S* \.fab-slot-pip`, '--fab-on-danger'],
-      [String.raw`\.fab-slot-pip\S*\.is-candidate`, '--fab-on-accent'],
+      [String.raw`\.fab-slot-pip\S*\.is-candidate`, '--fab-bg-0'],
       [String.raw`\.is-partial\S* \.fab-slot-pip`, '--fab-bg-0'],
     ]) {
       assert.match(
         css,
         new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]color:\s*var\(${ink}\)`),
-        `${selector} is inked ${ink}, the ink the solid chip takes on the same fill`
+        `${selector} is inked ${ink}`
       );
     }
   });
 
   // No on-warning ink is declared, so the warning fill takes the page ground (library, Chip).
-  it('draws the partial face on the warning ground: hairline, solid pip and caption ink', async () => {
+  it('draws the partial face on the warning ground: ring, solid pip and caption ink', async () => {
     await harness.mount({ slots: [{ ...ESSENCE, state: 'partial' }] });
     const css = injectedCss();
-    for (const [selector, property, token] of [
-      [String.raw`\.fab-slot-tile\S*\.is-partial`, 'border-color', '--fab-warning-border'],
-      [String.raw`\.is-partial\S* \.fab-slot-pip`, 'background', '--fab-warning'],
+    for (const [selector, declaration] of [
+      [
+        String.raw`\.fab-slot-tile\S*\.is-partial`,
+        String.raw`box-shadow:\s*0 0 0 1px var\(--fab-warning-border\)`,
+      ],
+      [String.raw`\.is-partial\S* \.fab-slot-pip`, String.raw`background:\s*var\(--fab-warning\)`],
       [
         String.raw`\[data-slot-state='partial'\]\S* \.fab-slot-caption`,
-        'color',
-        '--fab-warning-text',
+        String.raw`color:\s*var\(--fab-warning-text\)`,
       ],
     ]) {
       assert.match(
         css,
-        new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]${property}:\s*var\(${token}\)`),
-        `${selector} sets ${property} to ${token}`
+        new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]${declaration}`),
+        `${selector} declares ${declaration}`
       );
     }
   });

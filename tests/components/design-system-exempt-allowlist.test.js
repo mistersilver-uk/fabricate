@@ -62,7 +62,7 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte': 1 },
   ],
   [
-    "the library's 56px slot tile; its geometry against the specimen is issue 2257's to converge",
+    "the specimen's own 56px tap target, not a record tile",
     { 'src/ui/svelte/components/SlotTile.svelte': 1 },
   ],
   [
@@ -97,11 +97,6 @@ const ALLOWLIST = Object.freeze([
       'resolves against its own palette. --fab-control-outline outlines an unchecked selection ' +
       'control at 3:1 on its surface in every palette (issue 2047).',
     { 'styles/fabricate.css': 1 },
-  ],
-  [
-    'promoted on its second importer at issue 1644; its icon chip, hint line and a short ' +
-      "candidate's undimmed reading still disagree with the specimen, carried to issue 2257",
-    { 'src/ui/svelte/components/ChoiceOptionList.svelte': 1 },
   ],
   [
     'the die tiles are promoted to a shared primitive at target, because the player result box ' +
