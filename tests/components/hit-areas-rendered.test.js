@@ -13,6 +13,7 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -205,7 +206,7 @@ const reachOf = (size) => (24 - size) / 2 + 1;
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 ${['Stepper', 'SelectionCheckbox', 'Chip']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}

@@ -9,15 +9,16 @@
  * list also looks like.
  */
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, before, test } from 'node:test';
+
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 
 const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
 const ESSENCE_ROW = 'src/ui/svelte/apps/manager/essences/EssenceRow.svelte';

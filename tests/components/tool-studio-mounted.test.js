@@ -1,9 +1,21 @@
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+
 import { tick } from 'svelte';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
   CHOICE_GROUP_COMPILED_MODULES,
@@ -16,25 +28,16 @@ import {
   TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
-import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import {
-  assertSelectHasResolvedName,
-  chooseSelectOption,
-  selectOptionLabels,
-  selectOptionValues,
-  selectTriggerText,
-} from '../helpers/select-control.js';
 
 /** The `Preview as` roster's trigger, which the conversion moved its hook onto (issue 1510). */
 const PREVIEW_ACTOR = '.fabricate-select-trigger[data-tool-preview-actor]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-editor-',

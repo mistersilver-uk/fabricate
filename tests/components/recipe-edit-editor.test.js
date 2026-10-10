@@ -8,17 +8,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
 import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import { calledName, identifierNames } from '../helpers/moduleAst.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
+import { repoRoot } from '../helpers/sourceScan.js';
+import { defineStructureContract, renderedNodes } from '../helpers/structureContract.js';
 import {
   attributeExpression,
   attributeValue,
   rendersElement,
 } from '../helpers/svelteStructureContract.js';
-import { defineStructureContract, renderedNodes } from '../helpers/structureContract.js';
-import { repoRoot } from '../helpers/sourceScan.js';
 
 const MANAGER = 'src/ui/svelte/apps/manager';
 const EDIT = `${MANAGER}/RecipeEditView.svelte`;
@@ -52,7 +53,7 @@ const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
 const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
 
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
-const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const css = readStylesheet();
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';

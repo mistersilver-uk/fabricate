@@ -1,22 +1,26 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { compile } from 'svelte/compiler';
-import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+
+import { compile } from 'svelte/compiler';
+
+import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
+
 // The raw `.js` closure of `SearchablePopover`.
-import {
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
+import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -546,7 +550,7 @@ describe('CompositionList mounted layout', () => {
       'and an unavailable record says so'
     );
 
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     for (const state of ['is-selected', 'is-unavailable']) {
       assert.ok(
         sheet.includes(`.manager-environment-comp-entry.${state} {`),

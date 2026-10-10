@@ -1,9 +1,9 @@
 /** Issue 2006 — the shared die tiles, MOUNTED, and laid out at chat-sidebar width (N28). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { projectCountResults } from '../../src/systems/countEvaluation.js';
 import {
   DICE_TILE_GLYPHS,
@@ -196,7 +196,7 @@ describe('2006 DiceTiles', () => {
       more: 0,
       bought: 3,
     };
-    const tokens = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const tokens = readStylesheet();
     for (const host of ['', 'fabricate-craft-chat']) {
       const view = await renderWithCascade(
         `<div class="${host}">${renderDiceTilesHtml(model)}</div>`,
@@ -243,7 +243,7 @@ describe('2006 DiceTiles', () => {
     }));
     const root = await harness.mount({ model: { ...tileModel({ results }), more: 959 }, legend: true });
     const componentCss = [...document.head.querySelectorAll('style')].map((node) => node.textContent);
-    const tokens = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const tokens = readStylesheet();
     // Styled once, globally: a chat card draws these tiles outside every Fabricate window.
     assert.ok(tokens.includes('.fabricate-dice-tiles__list {'), 'the family is in the sheet');
     assert.ok(!componentCss.some((sheet) => sheet.includes('fabricate-dice-tiles__list')));

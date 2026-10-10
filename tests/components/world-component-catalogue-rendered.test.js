@@ -8,6 +8,7 @@ import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
 // The frame's lifted view-state factory, so the paged mount below states the SHIPPED shape.
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
 import {
   COMPONENT_SYSTEMS,
@@ -17,7 +18,7 @@ import {
 } from '../helpers/componentScopeMountModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const { harness, compiledModules } = createWorldComponentCatalogueHarness({
   repoRoot,

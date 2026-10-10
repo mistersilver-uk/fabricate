@@ -1,16 +1,16 @@
 /** Issue 1782 — the library `<Rail>`'s rhythm and kicker type, measured in a real browser. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 
 /** The components whose compiled scoped CSS decides the rail: the primitive and one caller. */
 const SCOPED_COMPONENTS = [

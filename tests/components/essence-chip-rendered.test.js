@@ -8,11 +8,12 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { MANAGER_COLOR_TOKEN_KEYS } from '../../src/ui/svelte/util/managerColorTokens.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const CHIP_PATH = 'src/ui/svelte/components/Chip.svelte';
 const ESSENCE_CHIP_PATH = 'src/ui/svelte/apps/manager/components/EssenceChip.svelte';

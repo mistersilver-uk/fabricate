@@ -8,17 +8,17 @@
  * runtime at `node_modules/svelte/src/index-client.js`, and a snippet built from a second copy of
  * that runtime is a different type the component refuses to render.
  */
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
 
 import {
   createRawSnippet,
   flushSync,
 } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -305,7 +305,7 @@ describe('SortableList — a collapsed body is retained and inert (maintainer ru
   });
 
   it('declares `display: none` for the hidden body in the sheet, which the harness cannot load', () => {
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const start = sheet.indexOf('.fabricate-sortable-list-body[hidden] {');
     assert.notEqual(start, -1, 'the sheet no longer states what a hidden body draws');
     assert.match(

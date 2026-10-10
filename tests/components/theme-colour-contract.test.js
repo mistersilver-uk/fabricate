@@ -1,9 +1,13 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, relative, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  STYLESHEET_PART_PATTERN,
+  readStylesheet,
+} from '../../scripts/lib/stylesheetSource.js';
 import {
   dropRateTierColor,
   hazardFill,
@@ -69,12 +73,21 @@ function collectProductFiles(rootPath, extensions = allowedExtensions) {
       continue;
     }
 
-    if (extensions.has(extname(entry.name))) {
+    if (extensions.has(extname(entry.name)) && !isStylesheetPart(fullPath)) {
       files.push(fullPath);
     }
   }
 
   return files;
+}
+
+/** A partial is read as part of the module sheet, never on its own (issue 1711). */
+function isStylesheetPart(fullPath) {
+  return STYLESHEET_PART_PATTERN.test(relative(repoRoot, fullPath).replaceAll('\\', '/'));
+}
+
+function readProductFile(filePath) {
+  return filePath === cssPath ? readStylesheet() : readFileSync(filePath, 'utf8');
 }
 
 function lineNumber(source, index) {
@@ -131,7 +144,7 @@ function tokensReadByProduct() {
   for (const filePath of readCorpusRoots.flatMap(root =>
     collectProductFiles(root, readCorpusExtensions)
   )) {
-    for (const token of tokenReferences(stripCommentedSource(readFileSync(filePath, 'utf8')))) {
+    for (const token of tokenReferences(stripCommentedSource(readProductFile(filePath)))) {
       read.add(token);
     }
   }
@@ -144,7 +157,7 @@ function findColourLiteralOffenders() {
 
   // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument.
   for (const filePath of productRoots.flatMap(root => collectProductFiles(root))) {
-    const source = readFileSync(filePath, 'utf8');
+    const source = readProductFile(filePath);
     let match;
 
     while ((match = colourLiteralPattern.exec(source))) {
@@ -164,7 +177,7 @@ function findColourLiteralOffenders() {
 
 describe('Theme colour contract', () => {
   it('defines the full supported theme catalog with complete Fabricate token coverage', () => {
-    const css = readFileSync(cssPath, 'utf8');
+    const css = readStylesheet();
     const rootBlock = blockFor(css, ':root');
     const themeBlocks = Object.fromEntries(
       Object.entries(themeSelectors).map(([themeId, selector]) => [themeId, blockFor(css, selector)])
@@ -205,7 +218,7 @@ describe('Theme colour contract', () => {
 
   // The only absolute presence check here.
   it('declares every companion-read token in every theme block', () => {
-    const css = readFileSync(cssPath, 'utf8');
+    const css = readStylesheet();
     const themeIdsInSheet = [
       ...new Set([...css.matchAll(/\[data-fabricate-theme="([^"]+)"\]/g)].map(match => match[1]))
     ].sort();
@@ -238,7 +251,7 @@ describe('Theme colour contract', () => {
   });
 
   it('declares no root-layer token the product never reads', () => {
-    const css = readFileSync(cssPath, 'utf8');
+    const css = readStylesheet();
     const declared = new Set([
       ...tokenNames(stripCommentedSource(blockFor(css, ':root'))),
       ...tokenNames(stripCommentedSource(blockFor(css, themeSelectors.fabricate)))
@@ -276,7 +289,7 @@ describe('Theme colour contract', () => {
   // Issue 1782: a banded fill is a ramp key or a semantic tone, so the ramp's tokens are the whole
   // of what a fill can paint. A token this module emits that no theme declares paints nothing.
   it('declares every token the drop-rate ramp emits, and the banded bars mix no colour', () => {
-    const css = readFileSync(cssPath, 'utf8');
+    const css = readStylesheet();
     const declared = tokenNames(stripCommentedSource(blockFor(css, themeSelectors.fabricate)));
     // Every fill the ramp can resolve, read through its own functions rather than its text.
     const fills = [

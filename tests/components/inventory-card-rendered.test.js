@@ -12,6 +12,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { installFixtureI18n } from '../fixtures/select-fixture-shared.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
@@ -61,7 +62,7 @@ const GRIDS = {
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, CARD)).css}\n${GRID.css}</style>
 <style>:root{--font-primary:Arial,sans-serif}</style>
 </head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">

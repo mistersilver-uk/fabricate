@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 import { chatModeOption } from '../src/systems/bulkChatVisibility.js';
 import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
 import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
@@ -661,7 +662,7 @@ for (const card of Object.keys(BUILDERS)) {
  */
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const FABRICATE_CSS = readFileSync(resolve(REPO_ROOT, 'styles/fabricate.css'), 'utf8');
+const FABRICATE_CSS = readStylesheet();
 const FOUNDRY_CSS = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 
 /** A description of the length the feature is FOR. */

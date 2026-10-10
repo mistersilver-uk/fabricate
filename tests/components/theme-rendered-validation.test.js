@@ -1,14 +1,16 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { extname, resolve } from 'node:path';
-import { borrowBrowser } from '../helpers/layout-harness.js';
+import test from 'node:test';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FABRICATE_THEME_IDS } from '../../src/ui/theme.js';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const css = readStylesheet();
 const themeIds = Object.values(FABRICATE_THEME_IDS);
 
 // The bulk edit panels' muted copy is SVELTE-SCOPED, not in the global sheet.

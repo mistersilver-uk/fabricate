@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FIXTURE_ALLOWLIST,
   FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
@@ -1030,7 +1031,7 @@ const classesOf = (compound) => [...compound.matchAll(/\.([\w-]+)/g)].map((entry
 
 /** The stylesheet's selector list, parsed once. */
 let stylesheetSelectors = null;
-const allSelectors = () => (stylesheetSelectors ??= selectorsIn(read(STYLESHEET)));
+const allSelectors = () => (stylesheetSelectors ??= selectorsIn(readStylesheet()));
 
 /** Selectors that name at least one class the primitive writes. */
 function pickerSelectors(written, primitive) {

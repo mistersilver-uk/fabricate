@@ -1,13 +1,14 @@
 /*
  * THE PANEL IS AS WIDE AS ITS CALLER ASKED, MEASURED IN A REAL BROWSER (issue 1520 review round 2).
  */
-import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
+import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 const { anchoredPopover, hostRelativePopoverLayout } = await import(
@@ -18,7 +19,7 @@ const { computeIconPickerPopoverLayout } = await import(
 );
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
+const css = readStylesheet();
 
 /** The `form` rung's own ceiling, which every case below is measured against. */
 const FORM_RUNG_MAX_WIDTH = 340;

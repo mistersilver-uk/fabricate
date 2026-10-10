@@ -10,6 +10,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -49,7 +50,7 @@ const LABELS = {
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${SCOPED.map((name) => scopedComponentCss(resolve(repoRoot, component(name))).css).join('\n')}</style>
 <style>:root{--font-primary:Arial,sans-serif}</style>
 </head><body class="game"><div class="fabricate fabricate-app">

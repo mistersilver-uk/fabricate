@@ -1,16 +1,18 @@
 /** The System Tool Rules LIST screen. */
-import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 
 /**
  * The components whose appearance lives in their own scoped `<style>` rather than in the

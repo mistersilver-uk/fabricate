@@ -1,8 +1,10 @@
 /** Numeric steppers show no native spinner arrows (maintainer round, issue 1036). */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it } from 'node:test';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   BARE_NUMBER_FIELD_REGISTER,
   BARE_NUMBER_INPUT,
@@ -16,7 +18,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
 const stepperSource = read(STEPPER_PATH);
-const globalCss = read('styles/fabricate.css');
+const globalCss = readStylesheet();
 
 /** The `{ … }` body of the first RULE whose selector list matches `selectorPattern`. */
 function ruleBody(source, selectorPattern) {

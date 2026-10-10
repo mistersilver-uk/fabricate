@@ -1,9 +1,6 @@
 /** `styles/fabricate.css` may not carry a rule block that matches nothing (issue 1498). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   FOUNDRY_CORE_CLASSES,
@@ -12,8 +9,8 @@ import {
   declaredClasses,
   ruleBlocks,
 } from '../scripts/lib/stylesheetLiveClasses.js';
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHEET = 'styles/fabricate.css';
 
 /** The one exemption, and it is temporary (issue 1480). */
@@ -22,7 +19,7 @@ const AVAILABILITY_MENU_PREFIX = 'manager-availability-';
 /** The chat-card block prefixes, whose every declared class must be live. See the file header. */
 const CHAT_CARD_PREFIXES = Object.freeze(['fabricate-craft-chat', 'fabricate-gather-chat']);
 
-const css = readFileSync(path.join(REPO_ROOT, SHEET), 'utf8');
+const css = readStylesheet();
 const live = buildLiveClassSet();
 const exempt = (name) => name.startsWith(AVAILABILITY_MENU_PREFIX);
 

@@ -7,12 +7,12 @@
  * inputs outside `SearchField`, so such a rule names its own class rather than that attribute.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { collectWorkingTreeSources } from '../helpers/sourceScan.js';
 import {
@@ -74,7 +74,7 @@ const { roots: ROOTS, nonLiteral: NON_LITERAL_CLASSES } = searchRoots();
 
 /** The CSS each file contributes: the sheet as written, a component's scoped block compiled. */
 function corpus() {
-  const files = { [SHEET]: stripCssComments(readFileSync(resolve(repoRoot, SHEET), 'utf8')) };
+  const files = { [SHEET]: stripCssComments(readStylesheet()) };
   const mentions = new RegExp(
     String.raw`\.(?:${[...ROOTS].join('|')})(?![\w-])|\[type=["']?search`
   );

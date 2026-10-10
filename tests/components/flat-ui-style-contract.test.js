@@ -4,6 +4,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  STYLESHEET_ENTRY,
+  STYLESHEET_PART_PATTERN,
+  readStylesheet,
+} from '../../scripts/lib/stylesheetSource.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const specPath = resolve(repoRoot, 'openspec/specs/ui-visual-style/spec.md');
@@ -28,7 +34,8 @@ function collectProductFiles(rootPath) {
       continue;
     }
 
-    if (allowedExtensions.has(extname(entry.name))) {
+    const file = relative(repoRoot, fullPath).replaceAll('\\', '/');
+    if (allowedExtensions.has(extname(entry.name)) && !STYLESHEET_PART_PATTERN.test(file)) {
       files.push(fullPath);
     }
   }
@@ -37,7 +44,7 @@ function collectProductFiles(rootPath) {
 }
 
 function isAllowedGradientUse(filePath, source, index) {
-  if (filePath !== resolve(repoRoot, 'styles/fabricate.css')) return false;
+  if (filePath !== resolve(repoRoot, STYLESHEET_ENTRY)) return false;
 
   const ruleStart = source.lastIndexOf('}', index) + 1;
   const ruleOpen = source.lastIndexOf('{', index);
@@ -93,7 +100,10 @@ describe('Flat UI style contract', () => {
     const offenders = productRoots
       .flatMap((rootPath) => collectProductFiles(rootPath))
       .filter((filePath) => {
-        const source = readFileSync(filePath, 'utf8');
+        const source =
+          filePath === resolve(repoRoot, STYLESHEET_ENTRY)
+            ? readStylesheet()
+            : readFileSync(filePath, 'utf8');
         let match;
 
         gradientPattern.lastIndex = 0;

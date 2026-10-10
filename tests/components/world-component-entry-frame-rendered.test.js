@@ -1,9 +1,9 @@
 /* THE WORLD COMPONENT ENTRY'S FRAME. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   SCOPED_SHARED_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -26,7 +26,7 @@ import {
 } from '../helpers/renderedManagerShell.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 /** Foundry's own stylesheet, where a harvest exists; `''` in CI, where the arms below skip. */
 const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 

@@ -9,6 +9,8 @@ import test from 'node:test';
 
 // The parsers, the anchor and the aside assertion are SHARED with the two recipe-edit suites
 // through this helper (issue 1362 review S4).
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
+
 import {
   assertAsideBuiltFromSet,
   assertPredicatesMatchTheirIds,
@@ -23,10 +25,9 @@ import {
 } from './helpers/fullWidthRoute.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const CSS_PATH = 'styles/fabricate.css';
 const ROOT_COMPONENT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 
-const css = readFileSync(resolve(ROOT, CSS_PATH), 'utf8');
+const css = readStylesheet();
 const rootSource = readFileSync(resolve(ROOT, ROOT_COMPONENT_PATH), 'utf8');
 
 /** The routes that suppress the aside AND keep three tracks. */

@@ -1,21 +1,22 @@
 /** The GM component library's group headers (issue 676). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
+import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   componentScopeFor,
   createComponentScopeHarness,
   createComponentsBrowserViewHarness,
 } from '../helpers/componentScopeMountModules.js';
-import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
-import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
-import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
-import { describeBrowserListState } from '../helpers/browserListStateCases.js';
-import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
+import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
@@ -1010,7 +1011,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     const warning = root.querySelector('[data-component-source-missing]');
     assert.ok(Boolean(warning), 'the remediation paragraph renders in the dangling-link state');
 
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const painted = [...warning.classList].filter((token) => sheet.includes(`.${token} {`));
     assert.deepEqual(
       painted,

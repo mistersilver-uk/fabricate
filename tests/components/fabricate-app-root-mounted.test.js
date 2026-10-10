@@ -1,9 +1,20 @@
 /** The player shell's mounted tier. */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { tick } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
+import {
+  DOMAIN_CONSUMERS,
+  INVALIDATION_DOMAIN_NAMES,
+  INVALIDATION_DOMAINS,
+  INVALIDATION_STORES,
+} from '../../src/systems/invalidationDomains.js';
+import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
+import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
@@ -15,16 +26,6 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
-import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
-import {
-  DOMAIN_CONSUMERS,
-  INVALIDATION_DOMAIN_NAMES,
-  INVALIDATION_DOMAINS,
-  INVALIDATION_STORES,
-} from '../../src/systems/invalidationDomains.js';
-import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -850,7 +851,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       pip.parentElement.classList.contains('fabricate-app-nav-well'),
       'the pip is positioned against the icon well, never against the whole item'
     );
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const pipRule = /\.fabricate-nav \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
     assert.match(pipRule, /top:\s*-3px/, 'the pip overhangs the top edge of the well');
     assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');

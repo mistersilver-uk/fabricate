@@ -1,21 +1,22 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { describe, it, before, after, afterEach } from 'node:test';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
+import { chipToneOf } from '../helpers/chipTone.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
-import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
-import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
-import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
-import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
+const THEMES = themeTokens(readStylesheet());
 
 const harness = createMountedComponentHarness({
   repoRoot,

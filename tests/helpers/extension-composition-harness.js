@@ -29,10 +29,22 @@ after(async () => {
   await vite.close();
 });
 
+/** `src/main.js` imports the module sheet, which a boot never needs, so it is not read (issue 1711). */
+function withoutModuleSheet() {
+  const emptyId = '\0composition-module-sheet';
+  return {
+    name: 'composition-without-module-sheet',
+    enforce: 'pre',
+    resolveId: (source) => (source.endsWith('styles/fabricate.css') ? emptyId : null),
+    load: (id) => (id === emptyId ? '' : null),
+  };
+}
+
 /** Each boot evaluates every module afresh in its own runner, against the process's one server. */
 async function startCompositionServer() {
   serverPromise ??= createServer({
     root: repoRoot,
+    plugins: [withoutModuleSheet()],
     cacheDir: viteDepCacheDir(),
     // Test processes own their cache; sequential boots retain warm prebundles.
     server: { middlewareMode: true, hmr: false, ws: false, watch: null },

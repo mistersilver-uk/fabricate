@@ -8,13 +8,15 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
+
 import { byCodePoint } from './helpers/codePointOrder.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const PREMIUM_DIR = 'assets/premium';
 const ICON_SIDE = 68;
 
-const stylesheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const stylesheet = readStylesheet();
 const referenced = [
   ...stylesheet.matchAll(/url\(["']?\.\.\/assets\/premium\/([^"')]+)["']?\)/g),
 ].map(([, file]) => file);

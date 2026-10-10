@@ -1,13 +1,16 @@
 /* Resolution-mode config-card layout gate. */
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test from 'node:test';
+
 import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 // The exact DOM RadioCardGroup.svelte emits with `configCards`.
 const FIXTURE = `

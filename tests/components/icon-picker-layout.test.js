@@ -1,12 +1,13 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const cssPath = resolve(__dirname, '../../styles/fabricate.css');
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 test('manager establishes a positioning root for portaled picker overlays', () => {
   const match = css.match(/\.fabricate-manager \{[\s\S]*?\}/);

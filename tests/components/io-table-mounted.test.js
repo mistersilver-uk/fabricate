@@ -1,25 +1,25 @@
 /** IoTable (issue 917) as the requirement surface's COMPOSITION ROOT. */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
 
-import {
-  createMountedComponentHarness,
-  CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
   essenceChoiceCraftability,
   essenceCraftability,
   sharedEssenceCraftability,
 } from '../helpers/crafting-fixtures.js';
-import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
-import { chipToneOf } from '../helpers/chipTone.js';
+import {
+  createMountedComponentHarness,
+  CRAFTING_APP_RAW_MODULES,
+  CRAFTING_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
+const THEMES = themeTokens(readStylesheet());
 
 const harness = createMountedComponentHarness({
   repoRoot,

@@ -1,10 +1,12 @@
 /** The manager's ONE multi-select toolbar (issue 772, extracted for issue 1010). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { describe, it, before, after, afterEach } from 'node:test';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const TOOLBAR_PATH = 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte';
@@ -396,7 +398,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     );
 
     // COMMENTS STRIPPED FIRST, and that is not tidiness.
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').replace(
+    const sheet = readStylesheet().replace(
       /\/\*[\s\S]*?\*\//g,
       ''
     );

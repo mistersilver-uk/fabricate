@@ -1,12 +1,13 @@
-import { describe, it } from 'node:test';
 // Shared with recipe-edit-editor.test.js: the aside/column pairing is ONE question.
-import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -15,7 +16,6 @@ const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/Reci
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
@@ -26,7 +26,7 @@ const craftingActionsSource = readFileSync(
   'utf8'
 );
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 
@@ -223,7 +223,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     // ASKED AS SET MEMBERSHIP since issue 1362.
     assertFullWidthRoute({
       rootSource,
-      css: readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'),
+      css: readStylesheet(),
       routeId: 'recipe-edit',
     });
   });

@@ -30,20 +30,21 @@
  *                        12px out of column or missing its bottom gutter.
  */
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { before, describe, it } from 'node:test';
+
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
-import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
 const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL_PATH));
 const cardCss = scopedComponentCss(resolve(repoRoot, CARD_PATH));
 

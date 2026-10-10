@@ -10,15 +10,18 @@
  * free space and a centring container has nothing to distribute. A NEW entry has an empty
  * expression, the `→ path` span is not rendered at all, nothing grows, and the row centres.
  */
-import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test, { after, before } from 'node:test';
+
 import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 /*
  * Core's bare `button` rule, copied from a harvested Foundry 14.365 `css/foundry2.css`

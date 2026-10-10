@@ -1,11 +1,12 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { compile } from 'svelte/compiler';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { withFabricateLifecycleReplay } from '../helpers/extension-composition-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,7 +27,7 @@ const responsiveViewSources = [
 const journalSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
-const cssSource = read('../../styles/fabricate.css');
+const cssSource = readStylesheet();
 const cardCss = compile(cardSource, { filename: 'EnvironmentCard.svelte', css: 'external' }).css.code;
 
 /** The compiled declarations of the card rule whose selector starts with `selector`. */
