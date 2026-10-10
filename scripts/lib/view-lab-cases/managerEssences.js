@@ -19,6 +19,13 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-essence-rules' }],
     expectView: 'essences',
+    // The sort Select and its sort-direction `Button` at one weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-essence-sort]', styles: 'font-size: 11.5px; font-weight: 600' },
+        { selector: '[data-essence-sort-direction]', styles: 'font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,

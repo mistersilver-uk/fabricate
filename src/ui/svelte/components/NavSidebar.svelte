@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): <NavSidebar> ships at target: the pip and 8/0/6 padding are ruled, so the specimen is redrawn; the expanded group's box converges at issue 2257 (issue 1777 decision E3) -->
 <!--
   The app navigation (`<NavSidebar>`, `library.html`) in two variants named by shape (issue 1777):
   `icon`, the player's 72px icon-well column, and `labelled`, the manager's 220/56 sidebar.

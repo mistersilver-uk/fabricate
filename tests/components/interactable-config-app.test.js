@@ -274,6 +274,12 @@ describe('InteractableConfigApp shell', () => {
     callsWith: [['listTaskSourceOptions', 'systemId']],
   });
 
+  defineStructureContract('names its source through the shared label resolver', seam('resolveSourceLabel'), {
+    calls: ['resolveInteractableSourceLabel'],
+    callsNo: ['listSystemTools', 'listSystemComponents'],
+    callsWith: [['resolveInteractableSourceLabel', 'system']],
+  });
+
   defineStructureContract(
     'the hidden reconcile routes the active-GM visual-update edge and writes the tile flag',
     { file: APP, member: '_reconcileMarkerHidden' },
@@ -692,8 +698,18 @@ describe('InteractableConfigRoot body', () => {
     }
   });
 
-  // The two controls that declined the conversion.
-  defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
+  // The two controls that declined the conversion, labelled by state (issue 1625).
+  defineStructureContract('keeps Disabled and Locked as state-labelled pressed buttons, state on aria-pressed', ROOT, {
+    spells: [
+      'FABRICATE.Canvas.Interactable.Config.StateDisabled',
+      'FABRICATE.Canvas.Interactable.Config.StateLocked',
+    ],
+    spellsNo: [
+      'FABRICATE.Canvas.Interactable.Config.Enable',
+      'FABRICATE.Canvas.Interactable.Config.Disable',
+      'FABRICATE.Canvas.Interactable.Config.Lock',
+      'FABRICATE.Canvas.Interactable.Config.Unlock',
+    ],
     passesProps: [['Button', 'onclick']],
     writes: ['aria-pressed'],
     passesPropsNo: [['Button', 'on']],

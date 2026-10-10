@@ -14,6 +14,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  OUTCOME_LADDER_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -30,6 +31,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
+    ...OUTCOME_LADDER_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
@@ -205,8 +207,12 @@ const award = (componentId, quantity, name) => ({
   name,
 });
 
-/** The ` · `-joined evidence line, split back into the independent fields that built it. */
-const fieldsOf = (row) => row.querySelector('.fabricate-list-row-detail').textContent.split(' · ');
+/**
+ * The ` · `-joined evidence line, split back into the independent fields that built it: the
+ * sentence under the name, or a `perRow` row's inline detail.
+ */
+const fieldsOf = (row) =>
+  row.querySelector('[data-yield-reading], .fabricate-list-row-detail').textContent.split(' · ');
 
 function oddsChipOf(row) {
   const chips = row.querySelectorAll('.manager-chip');
@@ -707,6 +713,11 @@ describe('JournalView mounted behavior', () => {
         `${HISTORY}ThresholdNotRecorded`,
         `${HISTORY}OutcomeNotRecorded`,
       ]);
+      assert.ok(
+        row.querySelector(':scope .fabricate-list-row-meta > [data-yield-reading]') &&
+          !row.querySelector('.fabricate-list-row-detail'),
+        'outside perRow the evidence is a sentence under the name (issue 2257 D15)'
+      );
       assert.equal(row.className.includes('is-cleared'), false, 'an unknown outcome is not a hit');
       assert.equal(row.className.includes('is-missed'), false, 'nor a miss');
       assert.equal(oddsChipOf(row).textContent, `${HISTORY}NotRecorded`);
@@ -722,7 +733,7 @@ describe('JournalView mounted behavior', () => {
       'no recorded roll, so nothing cuts the scale and no shared roll is shown'
     );
     assert.equal(
-      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      target.querySelector('[data-yield-scale] .fab-yield-heading > .fab-kicker').textContent,
       `${HISTORY}ScalePerRow`,
       'and the heading does not assert "where THE roll landed" over a record with no roll at all'
     );
@@ -744,7 +755,7 @@ describe('JournalView mounted behavior', () => {
     const target = await mountHistory(run);
     // #1648 A8: two INDEPENDENT rolls.
     assert.equal(
-      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      target.querySelector('[data-yield-scale] .fab-yield-heading > .fab-kicker').textContent,
       `${HISTORY}ScalePerRow`
     );
     const rows = [...target.querySelectorAll('[data-yield-entry]')];
@@ -752,6 +763,13 @@ describe('JournalView mounted behavior', () => {
       rows.map((row) => row.getAttribute('data-yield-entry')),
       ['grit', 'ore'],
       'rows read down from the highest recorded chance'
+    );
+    assert.ok(
+      rows.every(
+        (row) =>
+          row.querySelector('.fabricate-list-row-detail') && !row.querySelector('[data-yield-reading]')
+      ),
+      'a perRow row keeps its dense inline reading (issue 2257 D15)'
     );
     const evidence = 'exactly three fields: an effective roll equal to the raw roll adds nothing';
     assert.deepEqual(

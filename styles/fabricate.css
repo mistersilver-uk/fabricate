@@ -1445,9 +1445,17 @@
   display: none;
 }
 
+/* The collapsed rail draws no group box, and its parent keeps the plain row's insets. */
 .fabricate-manager .manager-body.is-rail-collapsed .manager-nav-group.is-expanded {
+  padding: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-group.is-expanded .manager-nav-parent {
+  min-height: 34px;
+  padding: var(--fab-space-2);
+  border-radius: 9px;
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-world-nav {
@@ -4589,6 +4597,11 @@
   min-width: 0;
 }
 
+/* `bodyBasis="fill"`: the body claims the free space rather than its text's width, so a reading set under the name wraps inside it and the row stays one flex line. */
+.fabricate-list-row.is-body-fill .fabricate-list-row-body {
+  flex: 1 1 0;
+}
+
 .fabricate-list-row .fabricate-list-row-head,
 .fabricate-list-row .fabricate-list-row-badges,
 .fabricate-list-row .fabricate-list-row-meta {
@@ -5437,7 +5450,7 @@
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category); row two is the two VIEW controls (grouping, ordering), split by a rule; row three is the active-filter chips and the count. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* The whole bar reads at the shared --fab-manager-recipe-control-font (issue 643): the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
+  /* One type line across the bar (issue 643): the segmented status/lock toggles and the sort-direction toggle at 0.72rem, and the `toolbar` rung's select triggers at 11.5px at that toggle's weight (issue 2257 D8). */
   gap: var(--fab-space-2);
 }
 
@@ -10445,9 +10458,13 @@
   min-width: 0;
 }
 
-/* AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE, NOT A SECOND CARD (issue 1373). */
+/* An expanded group is one box, its hairline inset so the box shifts nothing (issue 2257 E3). */
 .fabricate-nav .manager-nav-group.is-expanded {
   gap: var(--fab-space-chip);
+  padding: var(--fab-space-2xs);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-border);
 }
 
 /* 36px, not 40px: the toggle is 28px wide and sits at `right: 4px`, so 36px still clears it by 4px and returns the other 4px to the label track. */
@@ -10456,15 +10473,14 @@
   padding-right: 36px;
 }
 
+/* Each inset gives back the group's padding, so the parent's icon, label and chevron hold still; 34px is the 36px toggle clearance less that padding, and 7 nests the 30px row's corner 2px inside the box's 9. */
 .fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent {
+  min-height: 30px;
+  padding: var(--fab-space-chip);
+  padding-right: 34px;
   border-color: transparent;
-  background: transparent;
+  border-radius: 7px;
   box-shadow: none;
-}
-
-.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent.is-active {
-  color: var(--fab-text);
-  background: var(--fab-surface-active);
 }
 
 .fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent:hover {
@@ -10515,21 +10531,11 @@
   outline-offset: 2px;
 }
 
-/* The guide the group's box used to be. `border-left` on the submenu rather than a pseudo-element, so it starts and ends exactly where the children do. */
 .fabricate-nav .manager-nav-submenu {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   padding-left: var(--fab-space-3);
-  padding-bottom: var(--fab-space-chip);
-  padding-right: var(--fab-space-chip);
-  border-left: 1px solid var(--fab-border);
-  margin-left: var(--fab-space-3);
-}
-
-/* The submenu's bottom padding closes the expanded group when nothing follows it, and every group except Downtime ends there. */
-.fabricate-nav .manager-nav-submenu:not(:last-child) {
-  padding-bottom: 0;
 }
 
 .fabricate-nav .manager-nav-subitem {
@@ -10557,7 +10563,6 @@
 
 .fabricate-nav .manager-nav-subitem:hover {
   color: var(--fab-text);
-  border-color: var(--fab-border);
   background: var(--fab-surface-raised);
 }
 
@@ -10578,14 +10583,15 @@
   box-shadow: none;
 }
 
+/* Inset, because the nav scrolls and clips: a child ends 2px inside its group's box and a row spans the nav. */
 .fabricate-nav .manager-nav-subitem:focus-visible {
   outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .fabricate-nav .manager-nav-button:focus-visible {
   outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .fabricate-nav .manager-nav-button:disabled {
@@ -10655,7 +10661,7 @@
   flex-direction: column;
   gap: var(--fab-space-2xs);
 
-  /* Top gutter left to the group's own gap (see the submenu rule above), so the callout sits the same 6px below the sub-items that the parent row sits above them. */
+  /* Top gutter left to the group's own gap, so the callout sits the same 6px below the sub-items that the parent row sits above them. */
   margin: 0 var(--fab-space-chip) var(--fab-space-chip);
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-accent-border);
@@ -14483,7 +14489,7 @@
   font-weight: 600;
 }
 
-/* The rail column's full width, which the `toolbar` rung's trigger deliberately never declares (issue 1510); the rung paints the 34px box, the 9px corner and the `--fab-bg-1` fill this rule used to state, at its own 0.72rem rather than the 0.68rem declared here. */
+/* The rail column's full width, which the `toolbar` rung's trigger deliberately never declares (issue 1510); the rung paints the 34px box, the 9px corner and the `--fab-bg-1` fill this rule used to state, at its own 11.5px rather than the 0.68rem declared here. */
 .fabricate-manager .manager-tool-actor-select .fabricate-select-trigger {
   width: 100%;
 }
@@ -17958,13 +17964,13 @@
   font-weight: 500;
 }
 
-/* THE LITERAL IS THE POINT. `--fab-manager-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */
+/* 11.5px at the weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8), as literals: `--fab-manager-recipe-control-font` is declared only inside `.fabricate-manager`, so a player surface reading it would fall back to inheritance. */
 .fabricate-select .fabricate-select-trigger-toolbar {
   min-height: 34px;
   border-radius: 9px;
   background: var(--fab-bg-1);
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 /* THE FOCUS TREATMENT, and why it is written at three compounds. `.fabricate button:focus` and `.fabricate button:focus-visible` reach this button at (0,2,1) — the first strips Foundry's orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus state is "border to accent-border, no glow" (issue 1511). */
@@ -20807,7 +20813,7 @@
   line-height: 1.5;
 }
 
-/* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, `0.72rem`, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
+/* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, 11.5px at 600, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
 .fabricate-manager .manager-salvage-dc-select {
   flex: 0 0 auto;
   width: auto;
@@ -20921,12 +20927,11 @@
   letter-spacing: 0.09em;
 }
 
-/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ── `proto:578` and `proto:583` ink every toolbar select `--text2` at weight 500, where the shared scoped-list rule inks them `--fab-text` at the inherited 400 — so the two filters and the sort key read at the same weight as the row names below them (issue 1504). */
+/* ── THE TOOLBAR SELECTS' INK (gap-list rows 8 and 10) ── `proto:578` and `proto:583` ink every toolbar select `--text2`; each `<Select>` rung states its own weight (issue 2257 D8). */
 .fabricate-manager[data-manager-view='world-components']
   .manager-scoped-list-toolbar
   .fabricate-select-trigger {
   color: var(--fab-text-secondary);
-  font-weight: 500;
 }
 
 /* ── THE INSPECTOR'S IDENTITY TYPE (UX F4, gap-list rows 25-26) ── `proto:641`-`642`: a 9.5px kicker over a 16px/600 serif name. */
@@ -20958,7 +20963,7 @@
 
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
 
-/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; the `toolbar` rung already states their weight 500. */
+/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; each `<Select>` rung states its own weight. */
 .fabricate-manager[data-manager-view="components"] .manager-component-toolbar .fabricate-select-trigger {
   color: var(--fab-text-secondary);
 }

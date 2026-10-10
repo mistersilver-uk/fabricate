@@ -165,6 +165,7 @@ A selected visible d100 task's inspector previews its drop rows under "What you 
 
 - The rows are one `YieldScale` in authored row order under every `rewardSelectionMode`, because the system's reward selection is by authored order: `allDrops` keeps every dropped row, `highestRankedDrop` and `limitedDrops` take the first by authored rank.
   Each row's modifier-adjusted chance is its figure and never re-sorts it.
+- Beneath its name each row states the effective roll its find needs, the engine's own `threshold` (`101 − finalDropRate` for that same modifier-adjusted chance), as "Effective roll N or higher" in the words the Journal's d100 preview uses; the task's gathering modifier and any situational bonus move the roll, never this figure, so no chance is stated as certain.
 - A drop row authored without a name takes its component's name.
 - The reward-selection hint and the event hint stay above the scale.
   The reward-selection hint for `highestRankedDrop` and `limitedDrops` says the list is in priority order and the first successful find, or first N, on it is awarded.

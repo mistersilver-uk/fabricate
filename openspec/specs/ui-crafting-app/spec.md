@@ -914,9 +914,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   `awardedResults`).
 - A collapsed tier carries `ids`, every merged tier's id in first-appearance order, beside
   `id`, the first of them.
-- The detail draws the tiers through the shared `OutcomeLadder`: each award a dense list row
-  (an item's `×qty`, a reward's own amount, a choice group's members as its detail), no band
-  chip, and `No award` for a tier that awards nothing.
+- The detail draws the tiers through the shared `OutcomeLadder`: each award a wrapping chip at least 24px tall, led by its 14px picture, else its 9px glyph (an item's `×qty`, a reward's own amount, a choice group's members as its detail, wrapping at whitespace), no band, and `No award` for a tier that awards nothing.
 - After a successful roll, the one row whose `ids` contain the craft result's recorded outcome
   id (`checkResult.data.outcomeId`) carries "Your roll"; a failing outcome marks no row.
 - A successful versioned stage records that id on its craft result, in the run record's
@@ -1290,9 +1288,9 @@ The player's route to salvage.
   A fixed-range or progressive salvage states no target.
   Its post-roll summary states the chat card's `Target`, `Pre-rolled` and `Margin` rows (or `Needed` and `Margin` for a fixed DC read roll-high), withheld only for a blind or secret roll, and keeps the space before `with a roll of`.
 - **A counting salvage.** Its simple body reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}` for the salvaging character in place of a DC, and its banner says the count must reach the successes needed.
-  Its relative-routed body states each tier's band in net successes from those successes needed, through the Journal's own band presenter and the band chip of the shared `OutcomeLadder` the body composes (`density="list"`, mono, `danger` for a failing tier), with the Journal's `Botch` row while cancelling is on (see `ui-journal-app` _Journal App_), in place of a `Reached at` threshold; a band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
+  Its relative-routed body states each tier's band in net successes from those successes needed, through the Journal's own band presenter and the bare mono band of the shared `OutcomeLadder` the body composes, in `--fab-text-secondary` and `--fab-danger-text` for a failing tier, with the Journal's `Botch` row while cancelling is on (see `ui-journal-app` _Journal App_), in place of a `Reached at` threshold; a band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
   A successful roll whose net falls below the Botch row's floor marks that row "Your roll" in place of the least demanding tier it routed to; a failed salvage marks no row, as for any failing tier.
-  Every routed tier's figure, a fixed range, a count band or a `Reached at` threshold, renders as that ladder's band chip, and each recovered result as its dense list row.
+  Every routed tier's figure, a fixed range, a count band or a `Reached at` threshold, renders as that ladder's bare band, and each recovered result as its yield chip.
   Its post-roll summary states the die tiles and count rows the crafting result box states, withheld only for a blind or secret roll (the result box rule, which also shows a private or self roll to its roller), and a pool reduced to zero shows no tile and no roll total.
 - **Post-roll reconciliation.** The routed body marks the matched tier with the ladder's "Your roll" pill (`reachedId`) from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure.**

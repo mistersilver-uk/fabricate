@@ -47,6 +47,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte': 1 },
   ],
   [
+    "a 14px inline mark inside a 24px yield chip, not a record tile; the art ladder's 22 would " +
+      'grow every chip',
+    { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
+  ],
+  [
     "a 124px preview of the GM's colour and icon choice, not a record tile; the art ladder's 38 " +
       'would shrink it to a speck',
     { 'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte': 1 },
@@ -94,20 +99,9 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
-    '<NavSidebar> ships at target: the pip and 8/0/6 padding are ruled, so the specimen is ' +
-      "redrawn; the expanded group's box converges at issue 2257 (issue 1777 decision E3)",
-    { 'src/ui/svelte/components/NavSidebar.svelte': 1 },
-  ],
-  [
     'promoted on its second importer at issue 1644; its icon chip, hint line and a short ' +
       "candidate's undimmed reading still disagree with the specimen, carried to issue 2257",
     { 'src/ui/svelte/components/ChoiceOptionList.svelte': 1 },
-  ],
-  [
-    'promoted on its third importer at issue 1644; its head glyph, band chip, row yields and ' +
-      'kicker disagree with the specimen, recorded in the migrations table, so the row arrives ' +
-      'at target',
-    { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
   ],
   [
     'the die tiles are promoted to a shared primitive at target, because the player result box ' +
@@ -195,14 +189,6 @@ const ALLOWLIST = Object.freeze([
   ],
   [
     "per-item props carry the caller's data-* hook onto the pill",
-    { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
-  ],
-  [
-    "per-item props carry the caller's data-* hook onto the band",
-    { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
-  ],
-  [
-    "per-item props carry the caller's data-* hook onto the row",
     { 'src/ui/svelte/components/OutcomeLadder.svelte': 1 },
   ],
   [

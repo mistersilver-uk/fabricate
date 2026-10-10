@@ -15,6 +15,7 @@ import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js'
 import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
+  OUTCOME_LADDER_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -52,6 +53,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
+    ...OUTCOME_LADDER_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
@@ -628,7 +630,7 @@ const HISTORY_DATA_WITNESS = {
   'history-data-shared-roll-control'(target) {
     // The control for #1648 A8: genuinely SHARED evidence has one cut to describe.
     assert.equal(
-      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      target.querySelector('[data-yield-scale] .fab-yield-heading > .fab-kicker').textContent,
       historyLabel('Scale')
     );
     const cut = target.querySelector('[data-yield-cut]');

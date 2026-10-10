@@ -5,7 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 import { createRawSnippet } from 'svelte';
 
-import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -54,8 +54,12 @@ const progressHarness = createHarness(
 const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
 const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
-const yieldHarness = createHarness('YieldScale', resultModules);
-const outcomeHarness = createHarness('OutcomeLadder', resultModules);
+const yieldHarness = createHarness('YieldScale', [...resultModules, component('Kicker')]);
+const outcomeHarness = createHarness(
+  'OutcomeLadder',
+  ['Medallion', 'Chip', 'Kicker'].map(component),
+  OUTCOME_LADDER_RAW_MODULES
+);
 const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], [
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
@@ -1077,8 +1081,8 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelector('[data-outcome-tier].is-failure').textContent.includes('Barren'), true);
     assert.match(target.querySelector('[data-outcome-empty]').textContent, /trail goes cold/u);
     assert.equal(target.querySelectorAll('button, input, select').length, 0);
-    assert.equal(target.querySelectorAll('[data-list-row="dense"]').length, 1, 'empty tier never gains a result');
-    assert.equal(target.querySelector('.fabricate-list-row-quantity').textContent, '×4');
+    assert.equal(target.querySelectorAll('[data-outcome-yield]').length, 1, 'empty tier never gains a result');
+    assert.equal(target.querySelector('.fab-outcome-yield-quantity').textContent, '×4');
     expectGeometry('OutcomeLadder', '.fab-outcome-tier', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
   });
 });

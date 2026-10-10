@@ -24,6 +24,23 @@ export const CASES = Object.freeze([
     query: {},
     steps: ['Crafting'],
     expectView: 'recipes',
+    // The Crafting group, open on its own route, is one box (issue 2257 E3); the `toolbar` rung's two
+    // Selects and the sort-direction `Button` share one weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        {
+          selector: '.manager-nav-group:has(#manager-crafting-submenu)',
+          styles:
+            'border-radius: 9px; padding: var(--fab-space-2xs); background-color: var(--fab-surface-soft); box-shadow: inset 0 0 0 1px var(--fab-border)',
+        },
+        {
+          selector: '[data-recipe-category-filter]',
+          styles: 'font-size: 11.5px; font-weight: 600',
+        },
+        { selector: '[data-recipe-sort]', styles: 'font-size: 11.5px; font-weight: 600' },
+        { selector: '[data-recipe-sort-direction]', styles: 'font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,

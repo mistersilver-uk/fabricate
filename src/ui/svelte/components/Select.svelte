@@ -12,7 +12,7 @@
   | `value` | string \| number \| null | `null` | The chosen option's `value`; `null` shows `placeholder`. BOTH SIDES OF THE SELECTION TEST MUST BE STRINGIFIED, because the primitive writes a STRICT `option.id === value` and `'25' === 25` leaves no row marked. `valueForId` maps back, so `onChange` hands the caller the value it passed in. |
   | `onChange(value)` | function | no-op | REQUIRED. Called with the option's own `value`, typed as the caller passed it. |
   | `options` | `[{ value, label, hint?, badge?, disabled?, disabledReason?, group? }]` | `[]` | `hint` is a second line, `badge` a trailing pill, and `group` is both the bucket id and the heading TEXT — so it is LOCALIZED COPY, and nothing may key off `data-popover-group` for a grouped `<Select>`. `disabled` is a recorded divergence from the specimen, which lists `disabledReason` without it. An empty-string `value` takes `UNCHANGED_OPTION_ID` as its hook, because the primitive omits `data-popover-option` for an empty `dataId`. |
-  | `size` | `'form'` \| `'inline'` \| `'toolbar'` | `'form'` | 38px/radius 9/12.5px/`--fab-surface-soft`, 30px/radius 7/11.5px/`--fab-bg-2`, 34px/radius 9/`0.72rem`/`--fab-bg-1`. It names a height, a corner, a type size AND a fill, because the fill is its own axis. There is deliberately no trigger-box prop: the trigger's width and fill are per-site skin, stated in a descendant rule of the caller's own wrapper class. |
+  | `size` | `'form'` \| `'inline'` \| `'toolbar'` | `'form'` | 38px/radius 9/12.5px/`--fab-surface-soft`, 30px/radius 7/11.5px/`--fab-bg-2`, 34px/radius 9/11.5px at 600/`--fab-bg-1`. It names a height, a corner, a type size AND a fill, because the fill is its own axis. There is deliberately no trigger-box prop: the trigger's width and fill are per-site skin, stated in a descendant rule of the caller's own wrapper class. |
   | `showTick` / `placeholder` | boolean / string | `true` / `''` | The selected column, a property of the LIST rather than of an option and with callers on both polarities; and the trigger's text while `value` is null. |
   | `minWidth` / `maxWidth` | px | `0` | The PANEL's width band; `0` takes the rung's own. Either DECIDES a measured panel's box, because `anchoredPopover` resolves the band into one width and writes it as both bounds; `SIZES` is the single source of the numbers. |
   | `triggerProps` / `triggerTitle` | `{ 'data-x': 'value' }` / string | `{}` / `''` | Hooks stamped verbatim on the trigger button, and the only route to a native `title` on it. `triggerProps` cannot carry a name or a tooltip: `SearchablePopover` spreads it first and then writes `title`, `aria-label` and `aria-labelledby` from its own props. |
@@ -31,9 +31,9 @@
   - THIS COMPONENT HAS NO `<style>` AT ALL, and the `.fabricate-select*` family lives in
     `styles/fabricate.css`, for the two reasons `openspec/specs/design-system/spec.md` states; a
     CALL SITE stating its own per-site skin is the licensed exception.
-  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of
-    `--fab-manager-recipe-control-font`, which is declared only inside `.fabricate-manager` — the
-    area-scoped-property rule; `tests/token-generation-gate.test.js` ratchets that read out.
+  - The `toolbar` rung's type is the literal 11.5px at the sort-direction `Button`'s 600 (issue
+    2257 D8), never a read of `--fab-manager-recipe-control-font`, which is declared only inside
+    `.fabricate-manager`; `tests/token-generation-gate.test.js` ratchets that read out.
   - THE LABELLED FORM'S HOST IS A `<div>`, NEVER A `<label>`. A `<label>` forwards a caption click
     into the control it wraps, and this control toggles a portaled panel dismissed on `mousedown` in
     the capture phase — so from open, the caption's mousedown dismissed the list and the forwarded

@@ -1656,8 +1656,8 @@ test('the Checks rail states its own control type scale instead of inheriting on
     // 11.5px/500 is the prototype's own declaration on both of its rail pickers
     // (`font: 500 11.5px var(--sans)`), read off the artefact rather than chosen. The
     // sandbox input is joined to them because it stands in the same card, in the same slot.
-    // The record control left this loop when it converted: the `toolbar` rung's own `0.72rem`
-    // computes 11.52px, which is the same reading at the ladder's own numeral.
+    // The record control left this loop when it converted: the `toolbar` rung draws the same
+    // 11.5px at its own 600 (issue 2257 D8).
     for (const probe of ['preview-actor', 'preview-difficulties']) {
       assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the prototype's size`);
       assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
@@ -1682,7 +1682,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
       measured['preview-record'].fontSize,
       'the `toolbar` rung reads the same outside the rail as inside it'
     );
-    assert.equal(measured['preview-record'].fontSize, '11.52px', 'at the rung’s own literal');
+    assert.equal(measured['preview-record'].fontSize, '11.5px', 'at the rung’s own literal');
 
     // THE TWO WIDTH COUNTERPARTS the conversion owes the card bodies, measured rather than read off
     // the sheet: `.fabricate-field.fabricate-field select` is element-typed and reaches no `<button>`,

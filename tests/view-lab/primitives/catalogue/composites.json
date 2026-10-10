@@ -1168,6 +1168,11 @@
               "name": "Silver Seam",
               "icon": "fas fa-star",
               "quantity": "×1"
+            },
+            {
+              "name": "You choose one of…",
+              "icon": "fas fa-layer-group",
+              "detail": "Binding Chalk · Rune Bar"
             }
           ]
         },
@@ -1200,7 +1205,8 @@
     "path": "src/ui/svelte/components/OutcomeLadder.svelte",
     "undrawn": {
       "Success": "the status glyph’s accessible name; the drawing draws the glyph",
-      "Failure": "the status glyph’s accessible name; the drawing draws the glyph"
+      "Failure": "the status glyph’s accessible name; the drawing draws the glyph",
+      "icons/commodities/metal/ingot-plain-steel.webp": "the yield's art path, drawn as its 14px picture rather than as text"
     },
     "props": {
       "reachedId": "fruitful",
@@ -1215,6 +1221,7 @@
           "yields": [
             {
               "name": "Iron Nodule",
+              "img": "icons/commodities/metal/ingot-plain-steel.webp",
               "icon": "fas fa-hammer",
               "quantity": "×2"
             }

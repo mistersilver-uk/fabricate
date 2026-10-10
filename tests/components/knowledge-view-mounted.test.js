@@ -252,6 +252,26 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.equal(panel(target), KNOWLEDGE_TAB_RECIPE_ITEMS, 'a switch lands on the new default');
   });
 
+  it('points only the selected tab at its panel', async () => {
+    const tab = (target, id) => target.querySelector(`[data-knowledge-tab="${id}"]`);
+    const assertSelected = (target, selectedId, otherId) => {
+      const selected = tab(target, selectedId);
+      assert.equal(selected.getAttribute('aria-selected'), 'true');
+      assert.equal(selected.getAttribute('aria-controls'), `knowledge-panel-${selectedId}`);
+      const panel = target.querySelector(`#${selected.getAttribute('aria-controls')}`);
+      assert.ok(panel?.matches('[data-knowledge-panel]'), 'aria-controls resolves to the panel');
+      assert.equal(panel.getAttribute('role'), 'tabpanel');
+      assert.equal(panel.getAttribute('aria-labelledby'), selected.id);
+      assert.ok(!tab(target, otherId).hasAttribute('aria-controls'), 'the hidden panel is unnamed');
+    };
+    const target = await harness.mount(makeProps());
+    assertSelected(target, KNOWLEDGE_TAB_RECIPE_ITEMS, KNOWLEDGE_TAB_LEARNED_RECIPES);
+
+    tab(target, KNOWLEDGE_TAB_LEARNED_RECIPES).click();
+    await harness.setProps({});
+    assertSelected(target, KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS);
+  });
+
   // The five chip COMBINATIONS. `inert` is an independent chip.
   const CHIP_CASES = [
     {

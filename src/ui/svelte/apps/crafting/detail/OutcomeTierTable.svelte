@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   OutcomeTierTable adapts a routed-by-check recipe's tiers onto the shared `OutcomeLadder`: one row
-  per distinct result, its merged tier names joined and each award a list row. The builder collapses
+  per distinct result, its merged tier names joined and each award a yield chip. The builder collapses
   tiers that award the same, so a row's `ids` may hold several, and `reachedId`, a successful
   roll's recorded outcome, marks the row it was merged into. Crafting tiers carry no band.
 -->
@@ -14,7 +14,7 @@
 
   let { tiers = [], reachedId = null } = $props();
 
-  /** One award as a row: an item's count, a reward's own amount, a choice group's members. */
+  /** One award as a chip: an item's count, a reward's own amount, a choice group's members. */
   function awardRow(item) {
     const group = item?.kind === 'group';
     return {

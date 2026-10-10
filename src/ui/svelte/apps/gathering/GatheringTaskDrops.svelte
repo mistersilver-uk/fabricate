@@ -5,7 +5,8 @@
   `YieldScale` in authored row order (issue 1644), and one `RowDisclosure` beneath
   the scale that opens every drop's modifier breakdown, each headed by its drop.
 
-  Reward selection takes rows by authored rank, so the list never re-sorts by chance.
+  Reward selection takes rows by authored rank, so the list never re-sorts by chance. Each row
+  states the engine's own `threshold`, the effective roll its find needs (issue 2257 D20).
 
   Data comes from `services.getGatheringDropBreakdown` (resolved lazily by the
   parent for the selected task); `breakdown` is
@@ -43,11 +44,15 @@
       art: drop.img || DEFAULT_DROP_IMG,
       qty: Number(drop.quantity) || 1,
       chance: pct(drop.finalChance),
+      threshold: drop.threshold,
       drop,
     }))
   );
-  // No threshold sentence: the dense row draws it inline, which in this column wraps every name.
   const scaleLabels = {
+    threshold: (entry) =>
+      Number.isFinite(entry.threshold)
+        ? localize('FABRICATE.App.Gathering.Detail.DropThreshold', { threshold: entry.threshold })
+        : '',
     quantity: (entry) => localize('FABRICATE.App.Gathering.Detail.DropQuantity', { x: entry.qty }),
     chance: (entry) => `${entry.chance}%`,
   };

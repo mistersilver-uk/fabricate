@@ -1775,7 +1775,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 2 button class=\"fabricate-button fab-manager-button is-size-38\" data-keyboard-focus=\"true\" data-world-tool-back=\"\" type=\"button\"",
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",
       "+ 3 span | Back to tools",
-      "+ 2 button aria-label=\"Delete Mining Pick from the world catalogue — Removes it from the world catalogue and from the 1 crafting system that has it.\" class=\"fabricate-button is-danger fab-manager-button is-size-38\" data-arm-token=\"world-tool-delete:pick\" data-armed=\"false\" data-busy=\"false\" title=\"Delete Mining Pick from the world catalogue — Removes it from the world catalogue and from the 1 crafting system that has it.\" type=\"button\"",
+      "+ 2 button aria-label=\"Delete Mining Pick from the world catalogue — Removes it from the world catalogue and from the 1 crafting system that has it.\" class=\"fabricate-button is-danger fab-manager-button is-size-38\" data-arm-token=\"world-tool-delete:pick\" data-armed=\"false\" data-busy=\"false\" data-keyboard-focus=\"true\" title=\"Delete Mining Pick from the world catalogue — Removes it from the world catalogue and from the 1 crafting system that has it.\" type=\"button\"",
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-trash\"",
       "+ 3 span | Delete",
       "+ 2 button class=\"fabricate-button fab-manager-button is-primary is-size-38\" data-keyboard-focus=\"true\" data-world-tool-save=\"\" disabled=\"\" type=\"button\"",

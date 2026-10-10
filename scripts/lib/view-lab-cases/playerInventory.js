@@ -516,7 +516,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
-      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] .manager-chip[data-inventory-outcome-threshold="16"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-outcome-band][data-inventory-outcome-threshold="16"])' +
       ':not(:has([data-inventory-outcome-band]))',
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -541,7 +541,28 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
-      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] .manager-chip.is-danger[data-inventory-outcome-band="0"])',
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-outcome-band="danger"][data-inventory-outcome-band="0"])',
+    // Issue 2257 D14, D19: the band a bare figure, and a 24px yield chip inside its tier's body.
+    expectContained: [
+      {
+        container: '[data-inventory-salvage-outcome="rw-salv-masterwork"] .fab-outcome-yields',
+        target:
+          '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-salvage-result="rw-chalk"]',
+      },
+    ],
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-outcome-band]',
+          styles: 'border-width: 0; font-size: 10px',
+        },
+        {
+          selector:
+            '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-salvage-result="rw-bar"]',
+          styles: 'min-height: 24px; border-radius: 6px',
+        },
+      ],
+    },
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -566,7 +587,7 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
-      ' .manager-chip[data-inventory-outcome-band="<−4"])',
+      ' [data-outcome-band][data-inventory-outcome-band="<−4"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -617,6 +638,8 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"][data-outcome-rolled="true"]' +
       ' .manager-chip[data-inventory-outcome-your-roll])',
+    // Issue 2257: the shorter ladder no longer pushes the salvage note below the pane's fold.
+    expectCenterHit: '[data-inventory-salvage-ribbon]',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,

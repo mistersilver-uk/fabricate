@@ -345,6 +345,13 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-simple-band-record]', styles: 'font-size: 11.5px; font-weight: 600' },
+        { selector: '[data-checks-preview-record]', styles: 'font-size: 11.5px; font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'checks'],
     // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
     sourceMatches: [
