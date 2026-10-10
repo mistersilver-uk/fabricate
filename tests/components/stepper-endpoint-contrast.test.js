@@ -87,6 +87,6 @@ test('only the horizontal unfilled endpoint widens, to its label and never under
   ]);
   assert.equal(
     propertiesOf(widths[0]).get('width'),
-    'max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 2 * var(--fab-space-2xs)))'
+    'max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 4px))'
   );
 });

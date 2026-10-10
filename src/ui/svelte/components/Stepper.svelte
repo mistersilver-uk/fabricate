@@ -432,7 +432,8 @@
   }
 
   .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input[data-stepper-endpoint] {
-    width: max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 2 * var(--fab-space-2xs)));
+    /* 4px is the border-box input's two 2px inline paddings, around the label's own width. */
+    width: max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 4px));
   }
 
   .fab-stepper-input[data-stepper-endpoint]:not(:focus-visible) {
