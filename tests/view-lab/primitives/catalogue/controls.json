@@ -353,7 +353,8 @@
           "aria-hidden": "true"
         }
       }
-    ]
+    ],
+    "note": "The live glyph is a 14px `fa-xmark`, where the drawing draws a text × of about 10px; the shipped `HistoryList` caller also adds `is-ghost`."
   },
   {
     "spec": "<Button> <IconButton>",
@@ -847,7 +848,7 @@
       "width": 300,
       "height": 158
     },
-    "partial": "no focus ring, no pointer hover",
+    "partial": "no focus ring, no pointer hover, list inset by the lab box",
     "undrawn": {
       "Search recipes": "the field’s accessible name; the drawing draws the field without its label"
     },

@@ -1,4 +1,7 @@
-<!-- A formatted stepper's call site, as the check tiers wire it: the shipped multiplier helpers. -->
+<!--
+  A formatted stepper's call site, as the check tiers wire it: the shipped multiplier helpers. It serves
+  only the multiplier kind, because it always passes `MULTIPLIER_STOPS`.
+-->
 <script>
   import {
     MULTIPLIER_STOPS,

@@ -13,7 +13,7 @@
     "cap": "empty — where every row starts",
     "draws": ":scope > div:nth-of-type(1) > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "The search's open list beneath stays drawn: it opens on focus and typing, which a row cannot carry.",
+    "note": "The search's open list beneath stays drawn until phase 2.",
     "props": {
       "value": {
         "kind": "component",
@@ -625,7 +625,7 @@
     "cap": "membership — one record’s set",
     "draws": ".k-lbl",
     "path": "src/ui/svelte/components/SetPicker.svelte",
-    "note": "Seven members, so three tokens and \"+4 more\". The open panel stays drawn: it opens on a press, which a row cannot carry.",
+    "note": "Seven members, so three tokens and \"+4 more\". The open panel is live through the `SetPickerOpen` row.",
     "undrawn": {
       "#Smithy": "a member behind “+4 more”, named from the list of the picker it opens",
       "#Blacksmith": "a member behind “+4 more”, named from the list of the picker it opens",
@@ -673,13 +673,14 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/SetPicker.svelte",
     "fixture": "SetPickerOpen",
+    "partial": "no scroll, Apply disabled",
     "slot": {
       "width": 386,
       "height": 363
     },
     "undrawn": {
       "Recipe tags": "the token group's and the panel's accessible name; the drawing names neither",
-      "#Smithcraft": "the sixth match, below the list's scroll fold"
+      "#Smithcraft": "the sixth match; the shipped list grows to the window, where the drawing scrolls at five rows"
     },
     "props": {
       "value": ["#Smithing", "#Refined"],
@@ -725,14 +726,14 @@
         }
       ]
     },
-    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The panel stands at the shared popover's 240px, where the drawing draws it 330px wide. The act opens Add and types the query, nothing more, so the footer reads 2 selected. The drawing's enabled Apply cannot stand beside that: the shipped Apply is disabled until something is staged."
+    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The panel stands at the shared popover's 240px, where the drawing draws it 330px wide. The act opens Add and types the query, nothing more, so the footer reads 2 selected. The drawing's enabled Apply cannot stand beside that: the shipped Apply is disabled until something is staged. The shipped list scrolls only once the window bounds it."
   },
   {
     "spec": "<RuleRow> <RuleSentence>",
     "cap": "unauthored — presets only",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RuleRow.svelte",
-    "note": "An unauthored rule, its two presets. The collapsible and one-line rules stay drawn: an authored rule is drawn through its schema's `head` function and its steps' `render` snippets, which a row cannot carry.",
+    "note": "An unauthored rule, its two presets. The one-line rule is live through `RuleRowOneLine`. The collapsible rule stays drawn: it needs its schema's `head` function and its steps' `render` snippets, which no fixture yet supplies.",
     "props": {
       "class": "manager-checks-trigger-presets",
       "presets": [
@@ -927,7 +928,7 @@
       ],
       "shownHint": "They see the complication when it fires."
     },
-    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, then the player toggle. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
+    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The open row's ordinal takes the accent. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
   },
   {
     "spec": "<SortableList>",
@@ -955,7 +956,7 @@
     "data": {
       "bodyLabel": "Results"
     },
-    "note": "Wired as `RecipeStepAccordion` wires `alwaysOpen` on a tab whose subject is the body: every row open, no disclosure."
+    "note": "Wired as `RecipeStepAccordion` wires `alwaysOpen`, without the delete the drawing omits, on a tab whose subject is the body: every row open, no disclosure. The trailing badge is a bare `Chip`, its placement the caller's scoped style."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",
@@ -1225,16 +1226,20 @@
         }
       ],
       "current": 3,
-      "view": 2,
-      "previousLabel": "Show the previous stage",
-      "nextLabel": "Show the next stage"
+      "view": 2
+    },
+    "undrawn": {
+      "Previous stage": "the back arrow's accessible name, as `RunDetail` words it; the drawing words it Show the previous stage",
+      "Next stage": "the forward arrow's accessible name, as `RunDetail` words it; the drawing words it Show the next stage"
     },
     "data": {
-      "stageKey": "FABRICATE.App.Journal.Stage.Number",
+      "openKey": "FABRICATE.App.Journal.Stage.Open",
+      "previousKey": "FABRICATE.App.Journal.Stage.Previous",
+      "nextKey": "FABRICATE.App.Journal.Stage.Next",
       "positionKey": "FABRICATE.App.Journal.Stage.Position",
       "returnKey": "FABRICATE.App.Journal.Stage.Return"
     },
-    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
+    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its accessible names follow `RunDetail`, so each numeral is named View stage N and the arrows Previous stage and Next stage, where the drawing says Show stage N and Show the previous stage; its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
@@ -1525,7 +1530,7 @@
       "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
       "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
     },
-    "note": "Wired as `StepDetails` wires the open stage's pool. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author; the overshoot line and the steppers' names are the Journal's own copy."
+    "note": "Wired as `StepDetails` wires the open stage's pool. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author, and the steppers' names are the Journal's own copy. The overshoot line uses the Journal's copy, the carrier readings follow the drawing where `StepDetails` prints \"· N unallocated\", and the kicker sits inside the well."
   },
   {
     "spec": "<EssencePool>",
@@ -1597,6 +1602,7 @@
       "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
       "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
       "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
-    }
+    },
+    "note": "Wired as the pool above. The overshoot line uses the Journal's copy, the carrier readings follow the drawing where `StepDetails` prints \"· N unallocated\", and the kicker sits inside the well."
   }
 ]

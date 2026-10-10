@@ -591,7 +591,7 @@
       "progress": 40,
       "progressKey": "FABRICATE.App.Journal.Progress.Label"
     },
-    "note": "Wired as `RunCard` wires it: the status chip as a badge, the meta as spans, and the stage bars as the aside beneath the one button. The bolt and the countdown are `RunCard`'s own scoped markup."
+    "note": "Wired as `RunCard` wires it: the status chip as a badge, the meta as spans, and the stage bars as the aside beneath the one button. The bolt and the countdown are `RunCard`'s own scoped markup. `RunCard` puts the stage bars in the full-width aside, where the drawing puts them in the name column, and its status chip carries a glyph the drawing and this fixture omit."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -630,7 +630,7 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowGatheringTask",
-    "partial": "no thumb or badges; the caption stands above its bar",
+    "partial": "art mark, not the 56px thumb; no badges; the caption stands above its bar",
     "props": {
       "name": "Gather Ironvale ore",
       "icon": "fas fa-leaf",
@@ -656,7 +656,7 @@
       "percent": 62,
       "fill": "success"
     },
-    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button, `ChanceBar`'s composition inlined because `ChanceBar` is app-scoped. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",

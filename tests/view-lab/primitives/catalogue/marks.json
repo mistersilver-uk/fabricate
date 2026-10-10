@@ -384,7 +384,9 @@
       "removeLabel": "Remove Athletics",
       "disabled": true
     },
-    "content": ["Athletics"]
+    "content": ["Athletics"],
+    "partial": "the disabled chip fades only its remove control",
+    "note": "A disabled chip keeps its label at full strength and fades only its remove control, where the drawing fades the whole token."
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
