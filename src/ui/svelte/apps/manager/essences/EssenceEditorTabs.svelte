@@ -4,8 +4,8 @@
 
   A thin caller of the promoted `EditorTabs` primitive. This file owns the tab SET, the two badges
   and this site's DOM contract — the `data-essence-tab` hook, the `essence-tab-*` /
-  `essence-panel-*` id stem, the container class and the strip's aria-label — and no rendered id,
-  `aria-controls`, `data-*` attribute or class changed in the conversion.
+  `essence-panel-*` id stem whose one panel `EssenceEditView` renders, the container class and the
+  strip's aria-label — and no rendered id, `data-*` attribute or class changed in the conversion.
 
   THE KEYBOARD MODEL CAME WITH THE PRIMITIVE, WHICH IS WHY THE VARIABLE SET IS SAFE: this file used
   to close over `tabs.length` in its own handler, so two-tab and three-tab sets were two things to
@@ -103,4 +103,5 @@
   tabDataAttr="data-essence-tab"
   containerClass="manager-essence-editor-tabs manager-editor-tabs"
   danger
+  activePanelOnly
 />
