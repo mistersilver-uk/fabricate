@@ -740,10 +740,7 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
-// The measured controls that are not verbs: the `rule` fact row's subtitle ink, the On craft
-// primer's item list offset and lead (issue 1521), each open action menu's panel and item
-// corners, each open nav group's box, every `toolbar`-rung Select a case draws, and the routed
-// ladder's and yield scale's converged figures (issue 2257).
+// The measured controls that are not verbs, each listed under the case that draws it (issues 1521, 2257).
 const PRIMER = '[data-essence-on-craft-explainer]';
 /** A Journal ladder tier's bare band, named by its tone and inked by it. */
 const routedBand = (tier, tone, ink) => ({
@@ -777,6 +774,7 @@ const sortRow = (select, direction) => [
   ...toolbarSelects(select),
   { selector: direction, styles: 'font-weight: 600' },
 ];
+const FAILED_RUN = '[data-history-run-id="lab-run-failed"]';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -870,6 +868,17 @@ const NON_VERB_CONTROLS = Object.freeze({
   'player-gathering-drop-open': [yieldMark('[data-gathering-drops]', 'row-1')],
   'fabricate-journal-history-data-unknown-material-resolution-1240': [
     yieldMark('[data-journal-detail]', 'unknown-silver-ore'),
+  ],
+  'fabricate-journal': [
+    {
+      selector: `${FAILED_RUN} .fab-log-list-when`,
+      styles:
+        'font-family: var(--fab-font-mono); font-size: 9.5px; text-overflow: ellipsis; color: var(--fab-text-muted)',
+    },
+    {
+      selector: `.fab-log-list-entry:has(${FAILED_RUN})`,
+      styles: 'box-sizing: border-box; height: 44px',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
