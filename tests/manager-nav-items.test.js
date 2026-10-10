@@ -251,7 +251,11 @@ describe('the crafting-system section', () => {
       systemProps({ systemOverviewCount: 1, toolsNavCount: 1 }),
       text
     );
-    assert.equal(countOf(byId(single, 'system-overview')), 1, 'one issue is a count');
+    assert.deepEqual(
+      byId(single, 'system-overview').markers,
+      [{ kind: 'count', value: 1, label: 'Open validation issue' }],
+      'one issue is a count, and its unit is singular'
+    );
     assert.equal(countOf(byId(single, 'tool-rules')), 1, 'one Tool is a count');
   });
 

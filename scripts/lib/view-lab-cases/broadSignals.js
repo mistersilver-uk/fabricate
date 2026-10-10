@@ -277,11 +277,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-world-downtime-collapsed',
     'fabricate-app-shell',
   ]),
-  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws.
+  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws, and the two
+  // cases that measure an open group's box (issue 2257 E3).
   'src/ui/svelte/components/NavSidebarRows.svelte': Object.freeze([
     'manager-rail-expanded',
     'manager-rail-collapsed',
     'manager-world-downtime-collapsed',
+    'manager-recipes-normal',
+    'manager-world-travel-with-gathering-expanded',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

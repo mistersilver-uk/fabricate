@@ -29,7 +29,6 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test('manager gathering rail submenu controls clear host mouse focus and keep green keyboard focus', () => {
-  const expandedGroupBlock = blockFor('.fabricate-nav .manager-nav-group.is-expanded');
   const parentBlock = blockFor('.fabricate-nav .manager-nav-parent');
   const expandedParentBlock = blockFor(
     '.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent'
@@ -54,39 +53,6 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     '.fabricate-nav .manager-nav-subitem:focus-visible'
   );
 
-  // AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE.
-  assert.equal(
-    expandedGroupBlock.includes('border-radius: 8px;'),
-    false,
-    'an expanded group draws no card corner'
-  );
-  assert.equal(
-    expandedGroupBlock.includes('background: var(--fab-overlay-light-035);'),
-    false,
-    'and no card fill: it is a guide, not a container'
-  );
-  assert.equal(
-    expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-border);'),
-    false,
-    'and no inset ring: that WAS the container edge, drawn as a shadow so it shifted nothing'
-  );
-  // THE GUIDE IS ON THE SUBMENU, which is where the children actually are — so it starts and
-  // ends exactly where they do, which a rule around the whole group could not do.
-  const submenuGuide = blockFor('.fabricate-nav .manager-nav-submenu');
-  assert.ok(
-    submenuGuide.includes('border-left: 1px solid var(--fab-border);'),
-    'the indented children are marked with a thin vertical rule instead'
-  );
-  assert.equal(
-    expandedGroupBlock.includes('padding:'),
-    false,
-    'expanded gathering nav should not add layout padding that shifts the parent row'
-  );
-  assert.equal(
-    expandedGroupBlock.includes('border:'),
-    false,
-    'expanded gathering nav should not add layout border that shifts the parent row'
-  );
   assert.ok(
     parentBlock.includes('grid-template-columns: 24px minmax(0, 1fr) auto;'),
     'gathering parent should keep count chips inside the row before the toggle'
@@ -94,10 +60,6 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   assert.ok(
     expandedParentBlock.includes('border-color: transparent;'),
     'expanded gathering parent should not use selected border styling'
-  );
-  assert.ok(
-    expandedParentBlock.includes('background: transparent;'),
-    'expanded gathering parent should not use selected fill styling'
   );
   assert.ok(
     expandedParentBlock.includes('box-shadow: none;'),

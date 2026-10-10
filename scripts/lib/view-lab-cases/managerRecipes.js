@@ -24,6 +24,16 @@ export const CASES = Object.freeze([
     query: {},
     steps: ['Crafting'],
     expectView: 'recipes',
+    // The Crafting group, open on its own route, is one box (issue 2257 E3).
+    expectLayout: {
+      controls: [
+        {
+          selector: '.manager-nav-group:has(#manager-crafting-submenu)',
+          styles:
+            'border-radius: 9px; padding: var(--fab-space-2xs); background-color: var(--fab-surface-soft); box-shadow: inset 0 0 0 1px var(--fab-border)',
+        },
+      ],
+    },
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
