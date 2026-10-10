@@ -52,8 +52,9 @@ export function resolveToolName(tool, component) {
 }
 
 /**
- * A behaviour system's source name: a Tool by `data-models` "Tool" requirement 13, a Task by its
- * name. Null when nothing resolves, so each caller applies its own fallback.
+ * A behaviour system's source name. A Tool reads as its Display label, else its own name, else its
+ * linked component's name; a gathering task reads as its name. Null when nothing resolves, so each
+ * caller applies its own fallback.
  */
 export function resolveInteractableSourceLabel(deps, system) {
   if (!system) return null;
