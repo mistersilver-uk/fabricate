@@ -8,12 +8,11 @@
   mapping the retired name, because a stale caller must fail loudly rather than land on a tab the
   design does not have.
 
-  IT IS A THIN CALLER OF THE `EditorTabs` PRIMITIVE. This file owns the tab list, the two badges
+  It is a thin caller of the `EditorTabs` primitive. This file owns the tab list, the two badges
   and this site's DOM contract — the `tool-tab-*` / `tool-panel-*` id stem whose one panel
-  `ToolEditView` renders, the container class three `styles/fabricate.css` rules key on, and the
-  strip's aria-label. It renders no `data-*` tab hook, so it passes `tabDataAttr=""`: its mounted
-  assertions reach the buttons by `role="tab"` and by id, and a hook added for the primitive's
-  default would be new markup in a conversion that claims to add none.
+  `ToolEditView` renders, the container class `styles/fabricate.css` keys on, and the strip's
+  aria-label. It renders no `data-*` tab hook, so it passes `tabDataAttr=""`: its mounted
+  assertions reach the buttons by `role="tab"` and by id.
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
