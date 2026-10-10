@@ -1,6 +1,9 @@
 /**
  * Issue 2257 D22: the world clock's glyph, label and value clear 4.5:1 on the ground the Journal
  * draws the chip on — the info chip over the clock topbar over the app shell — in all seven themes.
+ * `GROUND` is named by hand from `FabricateAppRoot.svelte`'s nesting, so a new layer between the
+ * chip and the shell needs a matching edit here; `declaredToken` fails unless each layer's selector
+ * declares exactly one background, and that a palette token.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

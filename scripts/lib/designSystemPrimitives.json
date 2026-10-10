@@ -22,7 +22,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match. `shipped` at issue 2257 (D22): re-measured on those frames, its specimen is redrawn to the one 12px region inset issue 1648 chose and to io as the four-column truncated `ListRow` grid. DEBT: its 10.5px summary, note and fact label in `--fab-text-subtle` measure under the 4.5:1 floor and are not redrawn; owned by issue 2353."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match. `shipped` at issue 2257 (D22): re-measured on those frames, its specimen is redrawn to the one 12px region inset issue 1648 chose and to io as the four-column truncated `ListRow` grid. DEBT: its 10.5px summary, note and fact label, its inactive 12px/600 name and 11px numeral, and its io rows' 10.5px quantity (the row ink `ListRow` sets), all in `--fab-text-subtle`, measure 3.01-3.98:1, under the 4.5:1 floor, and are not redrawn; owned by issue 2353."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",
@@ -803,7 +803,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/ActionsPanel.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch, the hand-rolled kicker and the armed-cancel layout disagree, so its library specimen reads target with those recorded in the migrations table."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch is a recorded deviation the specimen draws (issue 2257 D22), and the hand-rolled kicker disagrees, so its library specimen reads target until issue 2257 converges it."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",
