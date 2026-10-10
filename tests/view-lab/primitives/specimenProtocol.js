@@ -12,7 +12,7 @@ export const SPECIMEN_READY = 'primitive-lab-specimen-ready';
 /** The parent hands the iframe the one catalogue row it stands up. */
 export const SPECIMEN_ASSIGN = 'primitive-lab-specimen-assign';
 
-/** The specimen mounted; carries its first measured `{width, height}`. Counted once. */
+/** The specimen mounted; carries its first measured `{width, height}` and `acts`. Counted once. */
 export const SPECIMEN_MOUNTED = 'primitive-lab-specimen-mounted';
 
 /** The mounted specimen's measured size changed again. Never counted. */

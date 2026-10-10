@@ -51,11 +51,19 @@ export async function focus(element) {
  * @returns {Promise<void>}
  */
 export async function waitFor(predicate, description, limitMs = 2000) {
-  const started = Date.now();
-  while (!predicate()) {
-    if (Date.now() - started > limitMs) throw new Error(`timed out waiting for ${description}`);
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-    await settle();
+  // A real timer, because the lab pins `Date.now` and fakes `performance.now` (labRandom.js).
+  let expired = false;
+  const limit = setTimeout(() => {
+    expired = true;
+  }, limitMs);
+  try {
+    while (!predicate()) {
+      if (expired) throw new Error(`timed out waiting for ${description}`);
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      await settle();
+    }
+  } finally {
+    clearTimeout(limit);
   }
 }
 

@@ -104,9 +104,10 @@ function rendersBlock(parent) {
  *
  * @param {Element} target The `.pl-specimen` wrapper (default slot) or `.application` (boxed).
  * @param {boolean} fill Whether the parent sizes the inline axis, so only the height is the report.
+ * @param {boolean} acts Whether the fixture exports `act`, carried on MOUNTED.
  * @returns {Promise<void>} Resolves once the first (MOUNTED) report has been sent.
  */
-function reportSize(target, fill) {
+function reportSize(target, fill, acts) {
   return new Promise((resolve) => {
     let reported = false;
     const observer = new ResizeObserver((entries) => {
@@ -119,7 +120,7 @@ function reportSize(target, fill) {
         postToParent({ type: SPECIMEN_RESIZE, ...size });
       } else {
         reported = true;
-        postToParent({ type: SPECIMEN_MOUNTED, ...size });
+        postToParent({ type: SPECIMEN_MOUNTED, ...size, acts });
         resolve();
       }
     });
@@ -174,7 +175,7 @@ async function boot() {
   if (inset) wrapper.style.padding = `${inset}px`;
   const fill = !box && hostIsBlock && rendersBlock(wrapper);
   document.body.classList.toggle('pl-fill', fill);
-  await reportSize(box ? frame : wrapper, fill);
+  await reportSize(box ? frame : wrapper, fill, Boolean(fixture?.act));
 }
 
 try {

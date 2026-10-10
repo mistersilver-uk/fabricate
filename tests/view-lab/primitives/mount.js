@@ -237,13 +237,13 @@ function placeSpecimenFrame(slot) {
 }
 
 /**
- * Grant or end a specimen's act turn, recording each specimen that acted for the re-checks.
+ * Grant or end a specimen's act turn, recording each specimen that asked for one.
  *
  * @returns {boolean} Whether `data` was an act-turn message.
  */
-function onActMessage(data, iframe, row, acts) {
+function onActMessage(data, iframe, acts) {
   if (data.type === SPECIMEN_ACT_REQUEST) {
-    acts.acted.set(iframe, row);
+    acts.requested.add(iframe);
     acts.turns.request(iframe, () =>
       iframe.contentWindow.postMessage({ type: SPECIMEN_ACT_GRANT }, globalThis.location.origin)
     );
@@ -254,13 +254,29 @@ function onActMessage(data, iframe, row, acts) {
   return true;
 }
 
+/**
+ * Enrol a mounted specimen whose fixture exports `act` for the re-checks; one that mounted without
+ * asking for its turn skipped its act, which is the problem.
+ */
+function enrolActing(data, iframe, row, { acts, problems }) {
+  if (!data.acts) return;
+  acts.acted.set(iframe, row);
+  if (acts.requested.has(iframe)) return;
+  problems.push(
+    `${row.spec} / ${row.path}: fixture ${row.fixture} exports \`act\` and mounted without running it`
+  );
+}
+
 /** How long an acted specimen has to answer a re-check before its silence is the problem. */
 const RECHECK_MS = 2000;
 
+/** The re-check after ready answers within this, below the smoke's 750 ms `SETTLE_MS`. */
+const AFTER_READY_RECHECK_MS = 500;
+
 /** Ask one acted specimen whether its fixture's `reached` still holds. */
-function askReached(iframe) {
+function askReached(iframe, limitMs) {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => finish(null), RECHECK_MS);
+    const timer = setTimeout(() => finish(null), limitMs);
     function finish(reached) {
       clearTimeout(timer);
       globalThis.removeEventListener('message', onMessage);
@@ -280,9 +296,9 @@ function askReached(iframe) {
  * Re-ask every acted specimen's `reached`: a state an act reached can be undone by a later act or
  * a press, which the act's own check at mount cannot see. Each failure is a problem and an error.
  */
-async function recheckActs(acted, problems, when) {
+async function recheckActs(acted, problems, when, limitMs = RECHECK_MS) {
   const specimens = [...acted];
-  const answers = await Promise.all(specimens.map(([iframe]) => askReached(iframe)));
+  const answers = await Promise.all(specimens.map(([iframe]) => askReached(iframe, limitMs)));
   for (const [index, reached] of answers.entries()) {
     if (reached) continue;
     const [, row] = specimens[index];
@@ -302,8 +318,8 @@ async function recheckActs(acted, problems, when) {
  * @param {string[]} problems The collector.
  * @param {{mounted: number}} results Mutated in place: `mounted` counts settled, mounted iframes.
  * @param {() => void} onReady Called when the specimen announces ready.
- * @param {{turns: object, acted: Map<HTMLIFrameElement, object>}} acts The page's act turns, and
- *   each specimen that acted with its row.
+ * @param {{turns: object, requested: Set<Element>, acted: Map<Element, object>}} acts The page's
+ *   act turns, each specimen that asked for one, and each acting specimen with its row.
  * @returns {Promise<string|undefined>} Settles once mounted or errored, or as `SILENT`.
  */
 function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) {
@@ -317,7 +333,7 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) 
       if (event.origin !== globalThis.location.origin) return;
       if (event.source !== iframe.contentWindow) return;
       const data = event.data ?? {};
-      if (onActMessage(data, iframe, slot.row, acts)) return;
+      if (onActMessage(data, iframe, acts)) return;
       if (data.type === SPECIMEN_READY) {
         cancelWatchdog();
         onReady();
@@ -330,6 +346,7 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) 
       if (data.type === SPECIMEN_MOUNTED) {
         admit(data, 'mounted');
         applySize(iframe, data, host);
+        enrolActing(data, iframe, slot.row, { acts, problems });
         results.mounted += 1;
         resolve();
         return;
@@ -394,7 +411,7 @@ async function boot() {
     ...MANIFEST.notAPrimitive,
   ]);
   const results = { mounted: 0 };
-  const acts = { turns: createActTurns(), acted: new Map() };
+  const acts = { turns: createActTurns(), requested: new Set(), acted: new Map() };
   // Every specimen settles before the report is published, a bounded few loading at a time.
   await standUpSlots(slots, {
     place: placeSpecimenFrame,
@@ -408,7 +425,7 @@ async function boot() {
 
   publishReport({ mounted: results.mounted, problems });
   const published = problems.length;
-  await recheckActs(acts.acted, problems, 'after the page reported ready');
+  await recheckActs(acts.acted, problems, 'after the page reported ready', AFTER_READY_RECHECK_MS);
   if (problems.length > published) refreshProblems(problems);
 }
 

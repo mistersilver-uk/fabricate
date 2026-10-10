@@ -36,6 +36,7 @@ import {
   MINIMAL_LAB_WORLD_FIELDS,
   createMinimalLabWorld,
 } from './view-lab/foundry/minimalLabWorld.js';
+import { waitFor } from './view-lab/primitives/fixtureActs.js';
 import { fixtureImporters, loadFixture } from './view-lab/primitives/fixtures.js';
 import {
   MAX_APPLIED_RESIZES,
@@ -665,4 +666,19 @@ test('act turns run one at a time, in the order asked, and an errored asker leav
   turns.release('c');
   ask('d');
   assert.deepEqual(granted, ['a', 'c', 'd']);
+});
+
+test('an act’s wait gives up on a real timer, though the lab pins the clock', async () => {
+  const pinned = Date.now;
+  Date.now = () => 0;
+  try {
+    const started = performance.now();
+    await assert.rejects(
+      waitFor(() => false, 'the open panel', 50),
+      /waiting for the open panel/
+    );
+    assert.ok(performance.now() - started < 1000, 'the wait outlived its limit');
+  } finally {
+    Date.now = pinned;
+  }
 });
