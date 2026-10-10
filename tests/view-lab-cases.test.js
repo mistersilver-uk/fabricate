@@ -774,6 +774,8 @@ const sortRow = (select, direction) => [
   ...toolbarSelects(select),
   { selector: direction, styles: 'font-weight: 600' },
 ];
+/** An empty panel's padding, by the one selector a case draws it with (issue 2257 D9). */
+const emptyPadding = (selector, padding) => [{ selector, styles: `padding: ${padding}` }];
 const FAILED_RUN = '[data-history-run-id="lab-run-failed"]';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
@@ -880,6 +882,16 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'box-sizing: border-box; height: 44px',
     },
   ],
+  'manager-systems-empty': emptyPadding('.manager-table-scroll > .manager-empty', '16px'),
+  'fabricate-app-shell': emptyPadding('.crafting-shopping-empty > .manager-empty', '16px'),
+  'world-tool-catalogue-filtered-empty': emptyPadding(
+    '.manager-empty.is-compact[data-scoped-list-inspector-state]',
+    '16px 12px'
+  ),
+  'manager-gathering-task-availability-menu': emptyPadding(
+    '[data-gathering-task-availability-pills="weather"] .manager-empty.is-field',
+    '4px 8px'
+  ),
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))

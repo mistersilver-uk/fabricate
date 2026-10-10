@@ -800,7 +800,7 @@ It joins a rule to a same-selector twin elsewhere in the same file, so a family 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
 Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
-Ordinary empty panels retain their existing geometry.
+Ordinary empty panels retain their existing geometry (the hero `EmptyState` pads `--fab-space-4`, 16, on every side; issue 2257 D9).
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
 #### Scenario: A gathering availability selection is empty
