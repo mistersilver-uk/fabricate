@@ -34,8 +34,6 @@
     items={menuItems}
     ariaLabel={format(menuForKey, { name: props.name })}
     triggerTitle={localize(menuKey)}
-    triggerIcon="fas fa-ellipsis"
-    align="end"
     onSelect={ignore}
   />
 {/snippet}

@@ -96,7 +96,7 @@
       "value": "unchanged",
       "groupName": "essence-bulk-status"
     },
-    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it."
+    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it; the chosen segment is `SegmentedControl`’s raised dark tile (`--fab-surface-active` on a `--fab-border-strong` edge, `--fab-text` ink) where the drawing fills it with the accent, and the track is 34px where the drawing’s is 36."
   },
   {
     "spec": "<Modal>",
@@ -556,7 +556,7 @@
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
       "menuKey": "FABRICATE.Admin.Manager.SystemActions"
     },
-    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px, and the kebab trigger is 34px where the drawing’s is 28."
+    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and the kebab is `ActionMenu`’s `IconButton` trigger, 34px with a 1px border at radius 9 and the vertical `fa-ellipsis-vertical` every shipped menu uses, where the drawing’s is a 28px borderless square at radius 7 with horizontal dots."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -630,7 +630,8 @@
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
       "menuKey": "FABRICATE.Admin.Manager.SystemActions"
-    }
+    },
+    "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -1096,7 +1097,7 @@
       "searchKey": "FABRICATE.App.Journal.Filters.SearchLabel",
       "placeholder": "Search"
     },
-    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the per-page choice is a `Select` where the drawing draws segments; the drawing’s pager figures (1–3 of 128, page 1 of 43) contradict its count, so the live pager reads its own; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; and the Outcome chips are bordered."
+    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the per-page choice is a `Select` where the drawing draws segments; the drawing’s pager figures (1–3 of 128, page 1 of 43) mean three a page against its chosen 10, so the live pager reads 1–10 and page 1 of 13 over the drawing’s three rows; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; the Outcome chips carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and `Pagination` adds a ‘Per page’ label, a footer ground lighter than the drawn bg-1, and bordered arrows."
   },
   {
     "spec": "<DataTable>",
@@ -1210,7 +1211,7 @@
     "data": {
       "name": "Karrun Warblade"
     },
-    "note": "The second section, its body a dense `ListRow`. No shipped `Rail` caller hosts a list row, so this composition is the drawing’s. Drawn differently: the untinted `Medallion` takes the accent ink, at 14.4px, where the drawing draws a 10px glyph in text-secondary."
+    "note": "The second section, its body a dense `ListRow`. No shipped `Rail` caller hosts a list row, so this composition is the drawing’s. Drawn differently: the untinted `Medallion` takes the accent ink, at 14.4px, where the drawing draws a 10px glyph in text-secondary; the tile carries a 1px border the drawn tile lacks."
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
@@ -1271,7 +1272,7 @@
       "dismissKey": "FABRICATE.App.Journal.History.Dismiss",
       "class": "is-ghost"
     },
-    "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`."
+    "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`. Drawn differently: the dismiss glyph takes the ghost `IconButton`’s text-subtle ink where the drawing’s is text-muted."
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",

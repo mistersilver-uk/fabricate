@@ -24,17 +24,22 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE_DIRECTORY = 'tests/view-lab/primitives/fixtures';
 const COMPONENT_DIRECTORY = 'src/ui/svelte/components/';
 
+const MANIFEST = JSON.parse(
+  readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.json'), 'utf8')
+);
 const MANIFEST_COMPOSITIONS = new Set(
-  JSON.parse(readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.json'), 'utf8'))
-    .designSystemPrimitives.map((entry) => entry.path)
+  MANIFEST.designSystemPrimitives
+    .map((entry) => entry.path)
     .filter((entryPath) => entryPath.endsWith('.svelte'))
 );
+const NOT_A_PRIMITIVE = new Set(MANIFEST.notAPrimitive.map((entry) => entry.path));
 
-/** Whether a fixture may compose this path: a shipped component, or a manifest-listed composition. */
+/** Whether a fixture may compose this path: a shipped component or a manifest-listed composition, never a `notAPrimitive` path. */
 const isShippedPrimitive = (resolved) =>
-  resolved.startsWith(COMPONENT_DIRECTORY) || MANIFEST_COMPOSITIONS.has(resolved);
+  !NOT_A_PRIMITIVE.has(resolved) &&
+  (resolved.startsWith(COMPONENT_DIRECTORY) || MANIFEST_COMPOSITIONS.has(resolved));
 
-/** Every module a fixture may import besides `svelte` and a shipped component: the act helpers and the pure helpers a named shipped caller imports. */
+/** Every module a fixture may import besides `svelte` and a shipped primitive: the act helpers and the pure helpers a named shipped caller imports. */
 const IMPORTABLE = Object.freeze([
   'tests/view-lab/primitives/fixtureActs.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
@@ -233,10 +238,13 @@ function passedProps(node) {
   return [...named, ...snippets, ...content];
 }
 
+/** The passed names a component does not declare; `...rest` admits any but `children`. */
 const undeclared = (passed, declared) =>
   declared === null
     ? passed
-    : passed.filter((name) => !declared.includes(name) && !declared.includes(REST_PROP));
+    : passed.filter(
+        (name) => !declared.includes(name) && (name === 'children' || !declared.includes(REST_PROP))
+      );
 
 /** Visit every ESTree or template node under `node`. */
 function eachNode(node, visit) {
@@ -260,6 +268,17 @@ function soleExpression(attribute) {
   return value?.type === 'ExpressionTag' ? value.expression : null;
 }
 
+/** Whether an expression is the `local` binding whole, or a condition that may yield it. */
+function yields(expression, local) {
+  if (expression?.type === 'ConditionalExpression') {
+    return yields(expression.consequent, local) || yields(expression.alternate, local);
+  }
+  if (expression?.type === 'LogicalExpression') {
+    return yields(expression.left, local) || yields(expression.right, local);
+  }
+  return expression?.type === 'Identifier' && expression.name === local;
+}
+
 /** Whether a node renders the `local` binding or hands it on whole as an attribute. */
 function passesOn(node, local) {
   if (node.type === 'RenderTag') {
@@ -268,12 +287,12 @@ function passesOn(node, local) {
     return call.callee?.name === local;
   }
   return (node.attributes ?? []).some(
-    (attribute) => attribute.type === 'Attribute' && soleExpression(attribute)?.name === local
+    (attribute) => attribute.type === 'Attribute' && yields(soleExpression(attribute), local)
   );
 }
 
-/** The `content` and snippets a fixture's rows hand it, each of which it declares and passes on. */
-function handedProblems(nodes, { bindings, rows }) {
+/** The `content` and snippets its rows hand a fixture, and the snippets it declares, each passed on. */
+function handedProblems(ast, nodes, { bindings, rows }) {
   const handed = (local) => local !== undefined && nodes.some((node) => passesOn(node, local));
   const problems =
     rows.some((row) => row.content !== undefined) && !handed(bindings.get('children'))
@@ -283,6 +302,11 @@ function handedProblems(nodes, { bindings, rows }) {
   for (const name of snippets) {
     if (!handed(bindings.get(name))) {
       problems.push(`is handed the \`${name}\` snippet by its row and does not pass it on`);
+    }
+  }
+  for (const node of ast.fragment.nodes) {
+    if (node.type === 'SnippetBlock' && !handed(node.expression.name)) {
+      problems.push(`declares the \`${node.expression.name}\` snippet and does not pass it on`);
     }
   }
   return problems;
@@ -403,7 +427,7 @@ function templateProblems(ast, { file, rows, propsOf }) {
   }
   return [
     ...problems,
-    ...handedProblems(nodes, { bindings, rows }),
+    ...handedProblems(ast, nodes, { bindings, rows }),
     ...presentationProblems(ast, nodes, bindings),
   ];
 }
@@ -494,12 +518,12 @@ test('the fixture corpus is alive', () => {
   assert.ok(acting.length > 0, 'no fixture exports `act`, so the act rules have no real domain');
   const composing = FIXTURES.filter(({ file, source }) =>
     importsOf(parse(source, { modern: true }), file).some(
-      ({ resolved }) => resolved === BULK_EDIT_SECTION
+      ({ resolved }) =>
+        MANIFEST_COMPOSITIONS.has(resolved) && !resolved.startsWith(COMPONENT_DIRECTORY)
     )
   );
-  assert.deepEqual(
-    composing.map(({ fixture }) => fixture),
-    ['BulkEditPanelStatus'],
+  assert.ok(
+    composing.map(({ fixture }) => fixture).includes('BulkEditPanelStatus'),
     'no fixture composes a manifest-listed composition, so that allowance has no real domain'
   );
 });
@@ -619,6 +643,14 @@ test('a `notAPrimitive` composition is refused', () => {
   assert.deepEqual(problemsOf({ instance: importingApp('Part', target) }), refusedApp(target));
 });
 
+test('a `notAPrimitive` component is refused', () => {
+  const instance =
+    "  import Part from '../../../../src/ui/svelte/components/TintPickerButton.svelte';";
+  assert.deepEqual(problemsOf({ instance }), [
+    'imports src/ui/svelte/components/TintPickerButton.svelte, outside svelte, the shipped primitives and the named helpers',
+  ]);
+});
+
 test('a component the library names only in prose is refused', () => {
   const target = 'journal/RunDetail.svelte';
   assert.deepEqual(problemsOf({ instance: importingApp('Part', target) }), refusedApp(target));
@@ -675,6 +707,14 @@ test('an attribute the component or a composed primitive does not declare is ref
 test('a row with `content` needs a fixture that renders `children`', () => {
   assert.deepEqual(problemsOf({}, [{ ...CHIP, content: ['Perception'] }]), [
     'is handed `content` by its row and renders no `children`',
+  ]);
+});
+
+test('`...rest` does not admit `children` a component does not declare', () => {
+  const logList = { path: 'src/ui/svelte/components/LogList.svelte', content: ['Perception'] };
+  const template = '<Specimen {...props} onRemove={remove}>{@render children?.()}</Specimen>';
+  assert.deepEqual(problemsOf({ template }, [logList]), [
+    'passes `children`, which src/ui/svelte/components/LogList.svelte does not declare',
   ]);
 });
 
@@ -748,4 +788,15 @@ test('a row snippet needs a fixture that declares it and passes it on', () => {
     problemsOf({ declares: ', meta', template: '<Specimen {...props} {meta} />' }, [listRow]),
     []
   );
+});
+
+test('a snippet the fixture declares and never passes on is refused', () => {
+  const declaring = (alias) =>
+    problemsOf({ template: ['{#snippet action()}{/snippet}', alias].join('\n') });
+  assert.deepEqual(declaring('<Specimen {...props} onRemove={remove} />'), [
+    'declares the `action` snippet and does not pass it on',
+  ]);
+  for (const handed of ['{action}', 'action={typed ? action : undefined}']) {
+    assert.deepEqual(declaring(['<Specimen {...props}', handed, '/>'].join(' ')), [], handed);
+  }
 });
