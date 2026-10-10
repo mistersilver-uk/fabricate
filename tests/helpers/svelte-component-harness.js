@@ -623,14 +623,13 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders the composition, so this roster is where the crafting suites acquire it.
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
-  // The four the Crafting tab reaches as of issue 1514's crafting phase, written flat because the
-  // guard in `mounted-harness-primitive-allowlist.test.js` follows a nested spread one level only.
+  // What the Crafting tab reaches as of issue 1514's crafting phase.
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Notice.svelte',
-  // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
+  // The identity row `RecipeDetailHeader` composes (issue 1518).
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);

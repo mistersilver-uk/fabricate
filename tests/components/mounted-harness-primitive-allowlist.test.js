@@ -29,7 +29,7 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-  // THE APP'S ONE SELECT (issue 1504), which pulls `SearchablePopover` in behind it. The guard
+  // The app's one select (issue 1504), which pulls `SearchablePopover` in behind it. The guard
   // names it for a suite whose roster it reads: inline, by name or shorthand, and one spread deep.
   'src/ui/svelte/components/Select.svelte',
   // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
@@ -208,7 +208,7 @@ test('a component adjudicated OUT of the shared set is really out of it, and rea
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
 const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
 
-// A suite DECLARES its temp tree in a `writeCompiledSvelte(…)` argument or a `compiledModules`
+// A suite declares its temp tree in a `writeCompiledSvelte(…)` argument or a `compiledModules`
 // array, roster name or shorthand. A spread is followed one level into the file declaring it, and
 // a call on a roster (`NAME.filter(…)`) is not read.
 const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;

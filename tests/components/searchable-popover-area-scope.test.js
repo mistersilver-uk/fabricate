@@ -1851,11 +1851,12 @@ function imperativeClassValues(text) {
 }
 
 /**
- * Every `class="…"` value that is actually ON AN ELEMENT TAG in fixture text, then the value of
+ * Every `class="…"` value that is on an element tag in fixture text, then the value of
  * each literal imperative class write.
  *
  * @param {string} text A JavaScript source file that contains fixture markup.
- * @returns {Array<string>} The value of every `class` attribute inside an element tag.
+ * @returns {Array<string>} The value of every `class` attribute inside an element tag, then each
+ *   imperative write's value.
  */
 function classAttributesInFixture(text) {
   const tagged = [...text.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)].flatMap((tag) =>
@@ -1869,7 +1870,8 @@ function classAttributesInFixture(text) {
  * ancestor-less element per literal imperative class write.
  *
  * @param {string} text A JavaScript source file that contains fixture markup.
- * @returns {Array<{name: string, classes: string[], ancestry: string[]}>} One entry per open tag.
+ * @returns {Array<{name: string, classes: string[], ancestry: string[]}>} One entry per open tag,
+ *   then one per literal imperative class write.
  */
 function elementsWithAncestry(text) {
   const VOID_ELEMENTS = new Set([
