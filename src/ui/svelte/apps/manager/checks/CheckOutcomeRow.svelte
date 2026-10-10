@@ -90,7 +90,6 @@
     data-outcome-name
     aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}
     value={outcome.name || ''}
-    title={outcome.name || ''}
     oninput={(event) => onUpdate({ name: event.currentTarget.value })}
   />
 

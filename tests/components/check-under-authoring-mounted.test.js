@@ -259,19 +259,6 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     assert.equal(field().value, '+4');
   });
 
-  it('titles each tier name with its full text, so a truncated name is disclosed (issue 2360)', async () => {
-    const state = await mount();
-    const name = () =>
-      state.root.querySelector('[data-outcome-row="hard"]').querySelector('[data-outcome-name]');
-    assert.ok(name().value, 'the tier has a name');
-    assert.equal(name().title, name().value);
-    await state.act(() => {
-      name().value = 'Hard won';
-      name().dispatchEvent(new globalThis.Event('input', { bubbles: true }));
-    });
-    assert.equal(name().title, 'Hard won');
-  });
-
   it("toggles an outcome's break-tools switch under a check-driven authority", async () => {
     const state = await mount(routedCheck(), { breakageAuthority: 'checkDriven' });
     const toggle = () => state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-break]');
