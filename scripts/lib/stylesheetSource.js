@@ -5,7 +5,7 @@
  * checkout reads through the same loader; it defaults to this checkout.
  */
 import { readFileSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 
 export const STYLESHEET_ENTRY = 'styles/fabricate.css';
 
@@ -41,7 +41,7 @@ export function checkoutReader(root = REPO_ROOT) {
   return (file) => {
     const target = resolve(base, file);
     if (!target.startsWith(base + sep)) throw new Error(`${file} is outside ${base}`);
-    if (loaderReads === 0 && isSheetPath(file)) {
+    if (loaderReads === 0 && isSheetPath(relative(base, target).split(sep).join('/'))) {
       throw new Error(`${file} is read through readStylesheet(), not a checkout reader`);
     }
     try {

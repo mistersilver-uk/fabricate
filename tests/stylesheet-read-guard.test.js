@@ -5,12 +5,15 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
+
+import { STYLESHEET_ENTRY, stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import { stylesFileFor } from './helpers/vite-fixture-server.js';
@@ -207,11 +210,21 @@ function freePort() {
 const VITE = import.meta.resolve('vite');
 const DEP_CACHE = pathToFileURL(path.join(repoRoot, 'tests/helpers/vite-dep-cache-dir.js')).href;
 
-// A child process, because Node 22 can crash on exit after Vite has bundled a config; the status
-// is printed before then.
-test('the View Lab serves the module sheet raw from its own bundled config', async () => {
+/** Every file the module sheet is served as: the entry, then each partial it imports. */
+function servedSheetFiles() {
+  const { entry, parts } = stylesheetSources();
+  return [{ file: STYLESHEET_ENTRY, text: entry }, ...parts];
+}
+
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+
+// A child process, because Node 22 can crash on exit after Vite has bundled a config; the digests
+// are printed before then.
+test('the View Lab serves the module sheet and its partials raw from its bundled config', async () => {
   const port = await freePort();
-  const boot = `import { createServer } from ${JSON.stringify(VITE)};
+  const files = servedSheetFiles();
+  const boot = `import { createHash } from 'node:crypto';
+import { createServer } from ${JSON.stringify(VITE)};
 import { viteDepCacheDir } from ${JSON.stringify(DEP_CACHE)};
 const server = await createServer({
   configFile: ${JSON.stringify(path.join(repoRoot, 'tests/view-lab/vite.config.js'))},
@@ -220,10 +233,19 @@ const server = await createServer({
   logLevel: 'silent',
 });
 await server.listen();
-const response = await fetch('http://127.0.0.1:${port}/@fabricate-styles/fabricate.css');
-console.log(JSON.stringify({ status: response.status }));
+const served = [];
+for (const file of ${JSON.stringify(files.map(({ file }) => path.basename(file)))}) {
+  const response = await fetch('http://127.0.0.1:${port}/@fabricate-styles/' + file);
+  const body = await response.text();
+  served.push({ status: response.status, sha256: createHash('sha256').update(body).digest('hex') });
+}
+console.log(JSON.stringify(served));
 await server.close();`;
   const run = node(['--conditions=browser', '--input-type=module', '-e', boot]);
   const [line] = run.stdout.trim().split('\n');
-  assert.equal(JSON.parse(line ?? '{}').status, 200, run.stdout + run.stderr);
+  assert.deepEqual(
+    JSON.parse(line ?? '[]'),
+    files.map(({ text }) => ({ status: 200, sha256: sha256(text) })),
+    run.stdout + run.stderr
+  );
 });

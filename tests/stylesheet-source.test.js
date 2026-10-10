@@ -99,7 +99,13 @@ test('a checkout reader reads another tree, and a partial path maps to the entry
     }
     assert.equal(readStylesheet(checkoutReader(root)), readStylesheet(mapReader(SPLIT)));
     assert.equal(checkoutReader(root)('styles/absent.css'), undefined);
-    for (const file of ['styles/fabricate.css', 'styles/fabricate-rules.css']) {
+    for (const file of [
+      'styles/fabricate.css',
+      'styles/fabricate-rules.css',
+      './styles/fabricate.css',
+      'styles//fabricate.css',
+      'styles/../styles/fabricate-x.css',
+    ]) {
       assert.throws(() => checkoutReader(root)(file), /read through readStylesheet\(\)/, file);
     }
     for (const file of ['../outside.css', '/etc/hosts', 'styles/../../outside.css']) {
