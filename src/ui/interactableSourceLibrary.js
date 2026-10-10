@@ -3,7 +3,7 @@
 // picker reading a divergent path is what made it report "No sources" for a system that had one.
 // Every read goes through an injected dependency bag, so the helpers are pure and need no globals.
 
-import { resolveToolDisplayName } from '../models/toolDisplay.js';
+import { linkedComponentFor, resolveToolDisplayName } from '../models/toolDisplay.js';
 
 function resolveSystem(deps, systemId) {
   if (!systemId) return null;
@@ -49,6 +49,26 @@ export function resolveToolName(tool, component) {
   // item-sourced Tool, which carries `componentId: null` by construction (issue 1119). The id stays
   // the last resort, because this surface has no localized fallback.
   return resolveToolDisplayName(tool, component, String(tool?.id ?? ''));
+}
+
+/**
+ * A behaviour system's source name: a Tool by `data-models` "Tool" requirement 13, a Task by its
+ * name. Null when nothing resolves, so the caller's stored-name-then-id fallback applies.
+ */
+export function resolveInteractableSourceLabel(deps, system) {
+  if (!system) return null;
+  if (system.interactableType === 'tool') {
+    const tool = listSystemTools(deps, system.systemId).find(
+      (candidate) => String(candidate?.id) === String(system.toolId)
+    );
+    if (!tool) return null;
+    const component = linkedComponentFor(tool, listSystemComponents(deps, system.systemId));
+    return resolveToolDisplayName(tool, component, '') || null;
+  }
+  const task = listSystemTasks(deps, system.systemId).find(
+    (candidate) => String(candidate?.id) === String(system.taskId)
+  );
+  return task?.name ? String(task.name) : null;
 }
 
 export function listToolSourceOptions(deps, systemId) {

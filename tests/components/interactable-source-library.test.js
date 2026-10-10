@@ -12,6 +12,7 @@ import {
   resolveToolName,
   listToolSourceOptions,
   listTaskSourceOptions,
+  resolveInteractableSourceLabel,
 } from '../../src/ui/interactableSourceLibrary.js';
 
 /** A deps bag over an in-memory system map + gathering config. */
@@ -113,4 +114,50 @@ describe('interactableSourceLibrary — system + tool + task enumeration', () =>
     assert.deepEqual(listToolSourceOptions(d, 's'), []);
     assert.deepEqual(listTaskSourceOptions(d, 's'), []);
   });
+});
+
+const SMITHING_SYSTEM = {
+  id: 'sys-smith',
+  tools: [
+    { id: 'tool-labelled', label: 'Master Hammer', name: 'Smith’s Hammer', componentId: 'comp-ingot' },
+    { id: 'tool-snapshot', label: '', name: 'Smith’s Hammer', componentId: 'comp-ingot' },
+    { id: 'tool-blank-label', label: ' \t', name: 'Smith’s Hammer', componentId: 'comp-ingot' },
+    { id: 'tool-item', label: '', name: 'Tongs', componentId: null },
+    { id: 'tool-orphan', name: 'Bellows', componentId: 'comp-missing' },
+    { id: 'tool-component', label: '', componentId: 'comp-ingot' },
+    { id: 'tool-bare', label: '', componentId: null },
+  ],
+  components: [{ id: 'comp-ingot', name: 'Iron Ingot' }],
+};
+
+const SOURCE_DEPS = deps({
+  systems: { [SMITHING_SYSTEM.id]: SMITHING_SYSTEM },
+  gatheringConfig: {
+    systems: { 'sys-smith': { tasks: [{ id: 'task-mine', name: 'Mine Ore' }, { id: 'task-unnamed' }] } },
+  },
+});
+
+const tool = (toolId, systemId = 'sys-smith') => ({ interactableType: 'tool', systemId, toolId });
+const task = (taskId) => ({ interactableType: 'gatheringTask', systemId: 'sys-smith', taskId });
+
+describe('resolveInteractableSourceLabel — `data-models` "Tool" requirement 13 (issue 1624)', () => {
+  const rows = [
+    ['an authored label wins', tool('tool-labelled'), 'Master Hammer'],
+    ['an empty label yields the snapshot over the linked component', tool('tool-snapshot'), 'Smith’s Hammer'],
+    ['a whitespace-only label yields the snapshot', tool('tool-blank-label'), 'Smith’s Hammer'],
+    ['an item-sourced tool yields its snapshot', tool('tool-item'), 'Tongs'],
+    ['a snapshot whose component is missing yields the snapshot', tool('tool-orphan'), 'Bellows'],
+    ['no label or snapshot yields the linked component', tool('tool-component'), 'Iron Ingot'],
+    ['a tool with nothing to show is null', tool('tool-bare'), null],
+    ['an unknown tool is null', tool('tool-missing'), null],
+    ['an unknown system is null', tool('tool-labelled', 'sys-missing'), null],
+    ['no system is null', null, null],
+    ['a task yields its name', task('task-mine'), 'Mine Ore'],
+    ['an unnamed task is null', task('task-unnamed'), null],
+  ];
+  for (const [title, system, expected] of rows) {
+    it(title, () => {
+      assert.equal(resolveInteractableSourceLabel(SOURCE_DEPS, system), expected);
+    });
+  }
 });

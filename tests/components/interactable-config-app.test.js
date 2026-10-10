@@ -274,6 +274,12 @@ describe('InteractableConfigApp shell', () => {
     callsWith: [['listTaskSourceOptions', 'systemId']],
   });
 
+  defineStructureContract('names its source through the shared label resolver', seam('resolveSourceLabel'), {
+    calls: ['resolveInteractableSourceLabel'],
+    callsNo: ['listSystemTools', 'listSystemComponents'],
+    callsWith: [['resolveInteractableSourceLabel', 'system']],
+  });
+
   defineStructureContract(
     'the hidden reconcile routes the active-GM visual-update edge and writes the tile flag',
     { file: APP, member: '_reconcileMarkerHidden' },
