@@ -110,6 +110,13 @@ function areaUseShapes(name) {
   ];
 }
 
+/** The labels of the use shapes of the property `name` that `text` matches. */
+function areaUsesIn(name, text) {
+  return areaUseShapes(name)
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ label }) => label);
+}
+
 /**
  * The compounds of a selector LIST that FAIL `predicate` — trap 4.
  *
@@ -535,37 +542,32 @@ test('no Svelte scoped style reaches an area-scoped property', (t) => {
 test('a use shape matches the whole property name and not a longer one starting with it', () => {
   // BOTH POLARITIES OVER A SYNTHETIC PAIR, because no such pair exists in the corpus today — which
   // is exactly the condition under which an unbounded pattern reads as correct.
-  const shapes = (name, text) =>
-    areaUseShapes(name)
-      .filter(({ pattern }) => pattern.test(text))
-      .map(({ label }) => label);
-
   const shorter = '--fab-recipe-col';
   const longer = `${shorter}-io`;
 
   assert.deepEqual(
-    shapes(shorter, `  color: var(${longer});`),
+    areaUsesIn(shorter, `  color: var(${longer});`),
     [],
     `\`var(${longer})\` is a use of ${longer} and of nothing else. A pattern with no trailing ` +
       'boundary reports it against every name that is a prefix of it.'
   );
   assert.deepEqual(
-    shapes(shorter, `  el.style.setProperty('${longer}', value);`),
+    areaUsesIn(shorter, `  el.style.setProperty('${longer}', value);`),
     [],
     'the CSSOM shape is anchored by a quote at one end only, so it needs the boundary at the other'
   );
   assert.deepEqual(
-    shapes(shorter, `  ${longer}: 4px;`),
+    areaUsesIn(shorter, `  ${longer}: 4px;`),
     [],
     'the declaration shape is bounded by its own colon, which the longer name never reaches'
   );
 
   // The positives, so the boundary is narrowing the gate rather than emptying it.
-  assert.deepEqual(shapes(longer, `  color: var(${longer});`), ['read']);
-  assert.deepEqual(shapes(longer, `  ${longer}: 4px;`), ['declaration']);
-  assert.deepEqual(shapes(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
+  assert.deepEqual(areaUsesIn(longer, `  color: var(${longer});`), ['read']);
+  assert.deepEqual(areaUsesIn(longer, `  ${longer}: 4px;`), ['declaration']);
+  assert.deepEqual(areaUsesIn(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
   assert.deepEqual(
-    shapes(shorter, `  color: var(${shorter});`),
+    areaUsesIn(shorter, `  color: var(${shorter});`),
     ['read'],
     'the shorter name must still match its OWN use'
   );
@@ -585,7 +587,7 @@ function areaScopedStringUses(readFile, files) {
       if (!text.includes(TOKEN_PREFIX)) continue;
       for (const name of names) {
         if (!text.includes(name)) continue;
-        if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) {
+        if (areaUsesIn(name, text).length > 0) {
           found.push({
             file,
             line: index + 1,
@@ -678,6 +680,18 @@ test('the area-scoped gates fail a new or grown use against base, measuring the 
         'src/a.js':
           "// ratchet-exempt(design-system): a probe\nexport const a = 'var(--fab-manager-gap)';\n",
       },
+      failures: [],
+    },
+    {
+      head: { 'src/a.js': 'export const a = `--fab-manager-gap: 4px`;\n' },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-gap is new (1)'],
+    },
+    {
+      head: { 'src/a.js': "el.style.setProperty('--fab-manager-gap', v);\n" },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-gap is new (1)'],
+    },
+    {
+      head: { 'src/a.js': '// Spaced by `--fab-manager-gap` in the sheet.\nexport const a = 1;\n' },
       failures: [],
     },
   ]);

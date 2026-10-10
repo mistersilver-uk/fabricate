@@ -22,10 +22,6 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-edit-salvage-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
   runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
-  // SPREAD rather than passed by name (issue 1040). `mounted-harness-primitive-allowlist`
-  // resolves a shared list only through a `compiledModules: [ … ]` region, so the bare
-  // identifier made this harness read as compiling NOTHING and every primitive it needs
-  // passed vacuously.
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
