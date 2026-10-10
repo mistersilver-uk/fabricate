@@ -1,11 +1,10 @@
-<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, hint line and a short candidate's undimmed reading still disagree with the specimen, carried to issue 2257 -->
 <!--
   One open slot's candidates: a single-select radiogroup with a roving tab stop, whose arrows,
   Home and End move both focus and the choice, passing `{ via: 'arrow' }` as `onChoose`'s third
   argument so a caller can keep the list open. Stock is caller-owned and choosing consumes none.
   A candidate is disabled only when it is held but the stage claims it elsewhere; one held short
-  of the need is dimmed, still offered, and described by its reading. `option.disabled` is the
-  caller's own refusal. The rest spread lands on the root.
+  of the need is still offered, its chip and name dimmed, and described by its reading at full
+  opacity. `option.disabled` is the caller's own refusal. The rest spread lands on the root.
 -->
 <script>
   import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
@@ -122,6 +121,8 @@
           tint={row.option.tint || ''}
           alt=""
           size={26}
+          glyph={11}
+          variant="glyph-chip"
         />
         <span class="fab-choice-option-copy">
           <span class="fab-choice-option-name" id={`${uid}-name-${index}`}>{row.option.label}</span>
@@ -154,6 +155,10 @@
     font-size: 10.5px;
   }
 
+  .fab-choice-option-summary {
+    line-height: 1.5;
+  }
+
   .fab-choice-option-items {
     display: flex;
     flex-wrap: wrap;
@@ -181,8 +186,8 @@
     background: var(--fab-accent-soft);
   }
 
-  /* Dimmed and still offered (design-system spec, "A player chooses the item"); the reading keeps
-     full opacity so its danger ink clears 4.5:1 (issue 2257 records the specimen difference). */
+  /* A short candidate dims only its chip and name, so its danger reading keeps 4.5:1
+     (design-system spec, "Run detail composes the specified run controls"). */
   .fab-choice-option.is-short > :global(.fab-medallion),
   .fab-choice-option.is-short .fab-choice-option-name,
   .fab-choice-option:disabled {

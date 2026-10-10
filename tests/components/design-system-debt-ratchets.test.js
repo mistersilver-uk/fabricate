@@ -1223,7 +1223,7 @@ const STATE_TINTS = Object.freeze([
     `${COMPONENTS}/ChoiceOptionList.svelte`,
     '.fab-choice-option.is-selected',
     'var(--fab-accent-soft)',
-    'a single-select answer whose specimen is owed (spec.md:2255, #2257); held until drawn',
+    'a single-select answer, the accent-soft face its library specimen draws',
   ],
   [
     `${COMPONENTS}/CollapsibleGroupHeader.svelte`,

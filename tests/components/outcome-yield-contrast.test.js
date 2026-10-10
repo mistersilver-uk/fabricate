@@ -6,7 +6,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
-import { contrast, flatten, propertiesOf, themePalettes } from '../helpers/themePaletteContrast.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls as inkShortfalls,
+  themePalettes,
+} from '../helpers/themePaletteContrast.js';
 
 const SHEET = 'styles/fabricate.css';
 const LADDER = 'src/ui/svelte/components/OutcomeLadder.svelte';
@@ -15,36 +20,9 @@ const CHIP = 'src/ui/svelte/components/Chip.svelte';
 const corpus = collectStyleCorpus();
 const themes = themePalettes(rulesIn(corpus[SHEET]));
 
-/** The palette token `file` declares for `property` on the rule whose selector list holds `selector`. */
-function token(file, selector, property) {
-  const values = rulesIn(corpus[file])
-    .filter((rule) => splitSelectorList(rule.selector).includes(selector))
-    .map((rule) => propertiesOf(rule).get(property))
-    .filter(Boolean);
-  assert.equal(
-    values.length,
-    1,
-    `${file} declares ${property} on ${selector} ${values.length} times`
-  );
-  const name = values[0].match(/^var\((--fab-[\w-]+)\)$/u)?.[1];
-  assert.ok(name, `${file} ${selector} ${property} is not one palette token: ${values[0]}`);
-  return name;
-}
-
-/** Every theme where `ink` measures under 4.5:1 on `stack`, its grounds listed top first. */
-function shortfalls(ink, stack) {
-  assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
-  const short = [];
-  for (const [theme, tokens] of themes) {
-    const ground = stack
-      .slice(0, -1)
-      .reduceRight((base, layer) => flatten(tokens.get(layer), base), tokens.get(stack.at(-1)));
-    const ratio = contrast(tokens.get(ink), ground);
-    if (ratio < 4.5)
-      short.push(`${theme}: ${ink} on ${stack.join(' over ')} ${ratio.toFixed(2)}:1`);
-  }
-  return short;
-}
+const token = (file, selector, property) =>
+  declaredToken(rulesIn(corpus[file]), selector, property, file);
+const shortfalls = (ink, stack) => inkShortfalls(themes, ink, stack);
 
 const tierGround = () => token(LADDER, '.fab-outcome-tier', 'background');
 

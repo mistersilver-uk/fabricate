@@ -42,7 +42,7 @@
     onclick={interactive && !disabled ? onActivate : undefined}
     {...attributes}
   >
-    <!-- ratchet-exempt(design-system): the library's 56px slot tile; its geometry against the specimen is issue 2257's to converge -->
+    <!-- ratchet-exempt(design-system): the specimen's own 56px tap target, not a record tile -->
     <Medallion {art} {icon} {tint} alt="" size={56} glyph={19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
@@ -74,7 +74,7 @@
     padding: 0;
     place-items: center;
     overflow: visible;
-    border: 1px solid var(--fab-border);
+    border: 0;
     border-radius: 11px;
     background: var(--fab-bg-3);
     color: inherit;
@@ -85,17 +85,21 @@
     cursor: pointer;
   }
 
+  /* The edge is a ring outside the tile, declared per state because the open face draws its dashed border instead. */
+  .fab-slot-tile.is-met {
+    box-shadow: 0 0 0 1px var(--fab-border);
+  }
+
   .fab-slot-tile.is-short {
-    border-color: var(--fab-danger-border);
+    box-shadow: 0 0 0 1px var(--fab-danger-border);
   }
 
   .fab-slot-tile.is-partial {
-    border-color: var(--fab-warning-border);
+    box-shadow: 0 0 0 1px var(--fab-warning-border);
   }
 
   .fab-slot-tile.is-open {
-    border-style: dashed;
-    border-color: var(--fab-accent-border);
+    border: 1px dashed var(--fab-accent-border);
   }
 
   .fab-slot-tile.is-selected {
@@ -133,7 +137,7 @@
     font-size: 9px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
+    line-height: 1.6;
     white-space: nowrap;
   }
 
@@ -142,7 +146,7 @@
     color: var(--fab-on-danger);
   }
 
-  /* No on-warning ink exists, so the warning fill takes the page ground as every solid chip does. */
+  /* Met and short pips keep their on-colours; every other pip takes the page ground (issue 2257). */
   .is-partial .fab-slot-pip {
     background: var(--fab-warning);
     color: var(--fab-bg-0);
@@ -150,7 +154,7 @@
 
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
-    color: var(--fab-on-accent);
+    color: var(--fab-bg-0);
   }
 
   .fab-slot-caption {
