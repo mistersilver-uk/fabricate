@@ -1011,7 +1011,7 @@
     "path": "src/ui/svelte/components/SlotRow.svelte",
     "fixture": "SlotRowReadings",
     "inset": 8,
-    "partial": "no pressed tile",
+    "partial": "list opens beneath",
     "props": {
       "requirements": [
         {
@@ -1040,13 +1040,22 @@
           "affordanceLabel": "1 of 3",
           "candidates": [
             {
-              "id": "rune-stylus"
+              "id": "rune-stylus",
+              "label": "Rune Stylus",
+              "icon": "fas fa-star",
+              "tint": "butter"
             },
             {
-              "id": "rune-chalk"
+              "id": "rune-chalk",
+              "label": "Rune Chalk",
+              "icon": "fas fa-leaf",
+              "tint": "sage"
             },
             {
-              "id": "duskglass"
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
             }
           ]
         },
@@ -1060,15 +1069,31 @@
           "poolsRequired": 2,
           "affordanceLabel": "channel"
         }
-      ]
+      ],
+      "openSlot": "binder"
     },
     "data": {
       "held": {
         "charcoal": 4,
-        "moonsilver": 0
-      }
+        "moonsilver": 0,
+        "rune-stylus": 2,
+        "rune-chalk": 5,
+        "duskglass": 2
+      },
+      "claimed": {
+        "duskglass": 2
+      },
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
+      "chooseKey": "FABRICATE.App.Journal.Stage.Choose",
+      "choicesKey": "FABRICATE.App.Journal.Stage.Choices"
     },
-    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` reads stock by component and each tile is named by its slot's label, so the open and essence tiles are named Any binder and Essence pool where the drawing says Choose a component for this slot and Channel essence for this step. The kicker and hint stay drawn above, outside `draws`. No tile is pressed, because pressing one opens its candidate list beneath the row, which the next caption draws. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`, and the open tile's glyph is the solid circle `SlotRow` defaults to. Inset by 8, because the pip sits 7px above the tile."
+    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` and `claimed` read stock by component, each tile is named by its slot's label, and the open slot's list takes the Journal's kicker, summary and readings (`:448-456`). The binder slot is open, as the Journal always shows a pressed tile with its list beneath; the drawing shows a pressed tile with no list, which the product never shows. The list's radiogroup is named Choose an ingredient, as in the Journal, and the open and essence tiles are named Any binder and Essence pool where the drawing says Choose a component for this slot and Channel essence for this step. The kicker and hint stay drawn above, outside `draws`. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`. The open tile's solid circle is `SlotRow`'s default; whether an unchosen slot should default to `fa-regular fa-circle` (Font Awesome Free) is a product question for P2-C, not a library redraw. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it.",
+    "undrawn": {
+      "Rune Stylus": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Rune Chalk": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Duskglass": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Choose an ingredient": "the open slot's list kicker and radiogroup name, as the Journal words them"
+    }
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
@@ -1119,7 +1144,7 @@
       },
       "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading"
     },
-    "note": "Wired as `SlotRow.svelte:115-127` hands its list the `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies; no candidate carries a reason, so each reading is the Journal's own copy alone, which adds `· N spare` where the drawing omits it and reads 0 spare where it says none spare. The kicker and summary stay drawn above, outside `draws`, so the row passes no `label`, and the live radiogroup has no accessible name where the drawing's is Choose a component."
+    "note": "Wired as `SlotRow.svelte:115-127` hands its list the `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies; no candidate carries a reason, so each reading is the Journal's own copy alone, which adds `· N spare` where the drawing omits it and reads 0 spare where it says none spare. The kicker and summary stay drawn above, outside `draws`, because the drawing does not wrap them with the group, so the row passes no `label` and the specimen's radiogroup is unnamed; `StepDetails` names it Choose an ingredient through `SlotRow`'s `choiceLabel`."
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
@@ -1536,7 +1561,7 @@
     "undrawn": {
       "Anything rarer than this fell short": "the cut note as `HistoricalRunDetail` words it; the drawing begins it in lower case"
     },
-    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the cut chip and cut note are the Journal's own copy, and the top and bottom cut notes go unwired because this roll cuts between rows. Each reading and chance is the row's string, because `dropEvidence` (`HistoricalRunDetail.svelte:33-57`) joins its parts with a separator a fixture may not author; it would read Needed 71 or higher · Missed the roll. The kicker and hint stay drawn above, outside `draws`."
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the cut chip and cut note are the Journal's own copy, and the top and bottom cut notes go unwired because this roll cuts between rows. Each reading and chance is the row's string, because `dropEvidence` (`HistoricalRunDetail.svelte:33-57`) joins its parts with a separator a fixture may not author; it would read Needed 71 or higher · Missed the roll. The kicker and hint stay drawn above, outside `draws`, and the missed rows' neutral chance pills stand on a darker ground than the drawing's."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",
@@ -1566,7 +1591,7 @@
       },
       "quantityKey": "FABRICATE.App.Journal.Quantity"
     },
-    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls. The drawing has no wrapper around its two rows, so each stands as its own one-entry scale. Each reading and chance is the row's string, as in the shared record above; `dropEvidence` would read Rolled 12 · Needed 11 or higher · Cleared the roll. A cleared row takes the success ground, its reading sits at the row's end rather than under the name, and its chance is an outlined chip where the drawing fills a badge."
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls. The drawing has no wrapper around its two rows, so each stands as its own one-entry scale. Each reading and chance is the row's string, as in the shared record above; `dropEvidence` would read Rolled 12 · Needed 11 or higher · Cleared the roll. A cleared row takes the success ground, its reading sits at the row's end rather than under the name, and its chance is an outlined chip where the drawing fills a badge, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",
@@ -1595,7 +1620,8 @@
         "gem": "Rolled 94 · needed 81 or higher · cleared"
       },
       "quantityKey": "FABRICATE.App.Journal.Quantity"
-    }
+    },
+    "note": "Wired as the row above: a cleared row takes the success ground, its reading sits at the row's end, its chance is an outlined chip, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",

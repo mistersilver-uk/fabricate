@@ -17,14 +17,15 @@ export const MAX_APPLIED_RESIZES = 40;
  * @param {number} [facts.inset] The row's `inset`. A drawing that caps its own width drew the region
  *   the primitive sits in, so its width already holds the inset; one with no cap drew the primitive
  *   alone, so its slot adds the inset on both sides, unless stretched.
- * @returns {{fill: boolean, inlineSize: string, maxInlineSize: string, presize: string}} The
- *   slot's inline facts; `presize` is the width the iframe takes before the specimen first lays
- *   out, so its first report is already at its final width, or `''` for none.
+ * @returns {{fill: boolean, inlineSize: string, maxInlineSize: string, presize: string,
+ *   stretched: boolean, widened: boolean}} The slot's inline facts; `presize` is the width the
+ *   iframe takes before the specimen first lays out, or `''` for none; `stretched` when the drawing
+ *   filled its parent, and `widened` when the slot adds the inset.
  */
 export function describeHost({ display, maxWidth, drawnWidth, availableWidth, inset = 0 }) {
   const fill = !display.startsWith('inline');
   const drawn = drawnWidth > 0;
-  const stretched = !drawn || Math.abs(drawnWidth - availableWidth) < 1;
+  const stretched = drawn && Math.abs(drawnWidth - availableWidth) < 1;
   const around = drawn && !stretched && maxWidth === 'none' ? 2 * inset : 0;
   const width = drawn ? `${Math.ceil(drawnWidth) + around}px` : '';
   return {
@@ -32,6 +33,8 @@ export function describeHost({ display, maxWidth, drawnWidth, availableWidth, in
     inlineSize: stretched ? '' : width,
     maxInlineSize: maxWidth,
     presize: fill && drawn ? width : '',
+    stretched,
+    widened: around > 0,
   };
 }
 
