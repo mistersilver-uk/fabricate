@@ -611,18 +611,18 @@
     {
       "path": "src/ui/svelte/components/SlotTile.svelte",
       "library": "<SlotTile>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implemented the specified tile for the Journal through `components/SlotRow`. Issue 1518 gave it its second importer, `components/RequirementChooser`, which draws every requirement slot and every alternative as this tile, so it clears the two-importer bar and becomes a member. Issue 1644 gives it the `partial` face (a warning hairline, a pip on solid `--fab-warning` inked `--fab-bg-0`, warning caption ink), which both importers paint for a partly delivered essence, and measured it on its override frames: the hairline sits inside the tile rather than outside it, the pip is 12.8 high rather than 16.4, the short pip takes `--fab-on-danger` and a pressed tile adds a tick, so the specimen and this row stay `target` and the library's planned-migrations table carries them to issue 2257."
+      "why": "Issue 1648 implemented the specified tile for the Journal through `components/SlotRow`. Issue 1518 gave it its second importer, `components/RequirementChooser`, which draws every requirement slot and every alternative as this tile, so it clears the two-importer bar and becomes a member. Issue 1644 gives it the `partial` face (a warning hairline, a pip on solid `--fab-warning` inked `--fab-bg-0`, warning caption ink), which both importers paint for a partly delivered essence. Issue 2257 converges it on the specimen (ruling 2026-10-07, D16): the met, short and partial edge is a 1px ring outside the tile, declared on each state, the open face keeps its dashed border, the pip is 16.4px tall, the candidate pip takes `--fab-bg-0` while the met and short pips keep their on-colours (maintainer, 2026-10-10), and a pressed tile keeps its tick, which the specimen now draws, so it ships."
     },
     {
       "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
       "library": "<ChoiceOptionList>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implemented the specified candidate list for the Journal through `components/SlotRow`. Issue 1644 made it the single-select radiogroup the specs describe (roving arrows, Home and End; disabled only when held but claimed elsewhere; a short candidate dimmed, offered and described by its reading) and gave it its second importer, `apps/crafting/detail/IngredientOptionSelector`, the held-stack picker, which becomes its adapter, so it clears the two-importer bar. Measured on its override frames, the 26px icon chip is the bordered radius-9 `Medallion` with a 14.4px accent glyph, the hint's line-height is 1.25 and a short candidate keeps its danger reading at full opacity (the specimen's whole-candidate .6 puts it below 4.5:1 on four themes), so the specimen and this row stay `target` and the library's planned-migrations table carries them to issue 2257."
+      "why": "Issue 1648 implemented the specified candidate list for the Journal through `components/SlotRow`. Issue 1644 made it the single-select radiogroup the specs describe (roving arrows, Home and End; disabled only when held but claimed elsewhere; a short candidate offered and described by its reading) and gave it its second importer, `apps/crafting/detail/IngredientOptionSelector`, the held-stack picker, which becomes its adapter, so it clears the two-importer bar. Issue 2257 converges it on the specimen (ruling 2026-10-07, D13): each candidate's mark is the borderless 26px `Medallion` chip at radius 7 with an 11px glyph, the summary takes line-height 1.5, and a short candidate dims only its chip and name, keeping its danger reading at full opacity, to which the specimen is corrected, so it ships."
     },
     {
       "path": "src/ui/svelte/components/Meter.svelte",
@@ -821,7 +821,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/StepDetails.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar, and crafting keeps `RequirementChooser` (issue 1518 ruling). Issue 1644 paints a partly delivered essence `partial` from the importer's `poolsStarted`, and measured the row: its kicker is 9/700 at 0.08em in subtle ink against the specimen's `k-kicker`, so the library entry stays `target`. `fabricate-journal-lifecycle-legacy` draws it locked."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar, and crafting keeps `RequirementChooser` (issue 1518 ruling). Issue 1644 paints a partly delivered essence `partial` from the importer's `poolsStarted`. Issue 2257 converges the row on its specimen: the shared `Kicker` names it over a hint at line-height 1.5, and the library entry ships. `fabricate-journal-lifecycle-legacy` draws it locked."
     },
     {
       "path": "src/ui/svelte/components/StageNav.svelte",
