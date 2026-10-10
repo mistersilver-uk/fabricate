@@ -838,15 +838,15 @@
     </section>
 
     <!-- State toggle row: pressed buttons, not switches (issue 1520). Each label is the state it
-         asserts and never changes; `aria-pressed` is true while disabled and while locked, and the
-         glyph follows the state. Pinned by `interactable-config-state-toggles-mounted.test.js`. -->
+         asserts and never changes; `aria-pressed` is true while disabled and while locked; the
+         Locked glyph follows the state, the Disabled ban dims while unpressed. Pinned by `interactable-config-state-toggles-mounted.test.js`. -->
     <section class="fab-ic-section fab-ic-actions">
       <Button
         aria-pressed={view.state.enabled === false}
         onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
         data-interactable-state-toggle="disabled"
       >
-        <i class="fas {view.state.enabled ? 'fa-circle-check' : 'fa-ban'}" aria-hidden="true"></i>
+        <i class="fas fa-ban fab-ic-state-glyph" aria-hidden="true"></i>
         <span>{text('FABRICATE.Canvas.Interactable.Config.StateDisabled', 'Disabled')}</span>
       </Button>
       <Button
@@ -1067,13 +1067,18 @@
   }
 
   /* The pressed state's accent, keyed on `aria-pressed` so the drawn and announced states cannot
-     drift (issue 1520). `:global(...)` because the element is `Button`'s; the Disabled and Locked
-     toggles are the only `.fabricate-button`s here carrying `aria-pressed`. */
+     drift (issue 1520). The border is the pressed signal; the fill is subtle. `:global(...)`
+     because the element is `Button`'s; the Disabled and Locked toggles are the only
+     `.fabricate-button`s here carrying `aria-pressed`. */
   .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
     border-color: var(--fab-accent);
     background: var(--fab-surface-active);
     color: var(--fab-text);
-    font-weight: 600;
+  }
+
+  /* The Disabled glyph is always the ban, so it dims while the toggle is unpressed. */
+  .fab-ic-actions :global(.fabricate-button[aria-pressed='false'] .fab-ic-state-glyph) {
+    opacity: 0.55;
   }
 
   .fab-ic-actions-inline {

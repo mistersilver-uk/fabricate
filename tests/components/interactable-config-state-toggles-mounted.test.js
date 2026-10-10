@@ -111,8 +111,14 @@ for (const state of STATES) {
     );
     assert.equal(lockedGlyph?.getAttribute('aria-hidden'), 'true', 'the Locked glyph is hidden');
     assert.ok(
-      disabledGlyph.classList.contains(state.enabled ? 'fa-circle-check' : 'fa-ban'),
-      'the Disabled glyph follows the enabled state'
+      disabledGlyph.classList.contains('fa-ban') &&
+        !disabledGlyph.classList.contains('fa-circle-check'),
+      'the Disabled glyph is the ban in both states'
+    );
+    assert.equal(
+      globalThis.getComputedStyle(disabledGlyph).opacity,
+      state.enabled ? '0.55' : '',
+      'the ban is dimmed only while the Disabled toggle is unpressed'
     );
     assert.ok(
       lockedGlyph.classList.contains(state.locked ? 'fa-lock' : 'fa-lock-open'),

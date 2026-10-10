@@ -51,7 +51,7 @@ import { choiceDialog, localize } from './svelte/util/foundryBridge.js';
  * active-GM behaviour-update socket (`applyInteractableBehaviorUpdate` /
  * `emitInteractableBehaviorWrite`) — the panel never mutates a behaviour on the
  * client directly. Action buttons (Test as Player, Jump, Relink, Recreate,
- * Remove, Restock, Enable/Disable, Lock/Unlock, Delete) are wired to injected
+ * Remove, Restock, Disabled/Locked toggles, Delete) are wired to injected
  * services seams that own the live edges.
  *
  * Per-target instance keyed by `${sceneId}.${regionId}.${behaviorId}` so opening
