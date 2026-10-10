@@ -1413,6 +1413,28 @@ export const CASES = Object.freeze([
       '[data-recipe-section="stacks"][data-alt-kind="stack"] [role="radiogroup"]' +
       ':has([role="radio"][aria-checked="true"]:not(.is-short))' +
       ':has([role="radio"].is-short[aria-describedby]:not(:disabled))',
+    // Issue 2257: the borderless chip's 11px glyph, and a short stack dimming only its chip and
+    // name, so its reading stays at full opacity.
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-recipe-section="stacks"] [aria-checked="true"] .fab-medallion',
+          styles: 'border-width: 0; font-size: 11px',
+        },
+        {
+          selector: '[data-recipe-section="stacks"] [role="radio"].is-short',
+          styles: 'opacity: 1',
+        },
+        {
+          selector: '[data-recipe-section="stacks"] .is-short .fab-choice-option-copy',
+          styles: 'opacity: 1',
+        },
+        {
+          selector: '[data-recipe-section="stacks"] .is-short .fab-choice-option-reading',
+          styles: 'opacity: 1',
+        },
+      ],
+    },
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
@@ -1519,6 +1541,24 @@ export const CASES = Object.freeze([
       },
       { selector: '.requirement-rail-wand' },
     ],
+    // Issue 2257 D16: the short, met and partial tiles' rings outside the tile, and the 16.4px pip.
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-requirement-slot="s1-g2"] .fab-slot-tile',
+          styles: 'box-shadow: 0 0 0 1px var(--fab-border); border-width: 0',
+        },
+        {
+          selector: '[data-requirement-slot="s1-g1"] .fab-slot-tile',
+          styles: 'box-shadow: 0 0 0 1px var(--fab-danger-border)',
+        },
+        {
+          selector: '[data-requirement-slot="s1-g3"] .fab-slot-tile',
+          styles: 'box-shadow: 0 0 0 1px var(--fab-warning-border)',
+        },
+        { selector: '[data-requirement-slot="s1-g2"] .fab-slot-pip', styles: 'line-height: 1.6' },
+      ],
+    },
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),

@@ -626,9 +626,12 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 - Drag reorder controls
 - **Keyboard reorder controls** alongside them: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the result they move, with the new position announced through an `aria-live="polite"` region.
   Result order is load-bearing in progressive mode (the award loop spends the check budget down the list), so a drag-only reorder is an accessibility gap, not a convenience one.
-- A **reorder-permission toggle card** at the END of the progressive block, after the result sets — never directly beneath the roll-budget info strip.
-  The card is info-toned, defaults **on**, and writes `Recipe.allowPlayerResultReorder`.
-  Placement is a requirement, not a preference: the strip and the card are both info-toned, so adjacency renders them as one undifferentiated block, and the resulting reading order (strip = how this list is spent, list = the thing, card = who may reorder it) states the policy after the thing it governs.
+- A **reorder-permission toggle card** (`ToggleCard`, `variant="is-info"`) leads the progressive block, above the roll-budget strip and the result sets.
+  The card defaults **on** and writes `Recipe.allowPlayerResultReorder`.
+  The roll-budget strip is a neutral standing note (`Callout`, `tone="neutral"`, since issue 1505), placed directly above the result sets and below the card.
+  The card is an info-tinted control over who may reorder, and the strip is a neutral statement of how the list is spent, so the two never read as one block.
+  `tests/components/recipe-edit-mounted.test.js`, "progressive: the reorder card leads, and the info strip sits directly above the list", pins this order.
+  The salvage editor's `ComponentSalvageCard` inverts it: its neutral strip sits above the info-tinted card, and both sit above the stage list (issue 676).
   The strip's copy is NOT folded into the card's sub-line, because the strip states an invariant true of every progressive recipe while the card states a conditional the GM can switch off.
 - The **salvage editor** renders the same toggle card, gated on `salvageResolutionMode === 'progressive'`, writing `Component.salvage.allowPlayerResultReorder`.
 - The progressive **salvage** result list shows **ordinals** and a **read-only difficulty badge** per row.

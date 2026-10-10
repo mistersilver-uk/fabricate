@@ -36,6 +36,8 @@ import {
   MINIMAL_LAB_WORLD_FIELDS,
   createMinimalLabWorld,
 } from './view-lab/foundry/minimalLabWorld.js';
+import { waitFor } from './view-lab/primitives/fixtureActs.js';
+import { fixtureImporters, loadFixture } from './view-lab/primitives/fixtures.js';
 import {
   MAX_APPLIED_RESIZES,
   createSizeGovernor,
@@ -50,6 +52,7 @@ import {
   parseLabRelease,
 } from './view-lab/primitives/labFoundry.js';
 import { readSlotInset, readSlotWindow } from './view-lab/primitives/slot.js';
+import { createActTurns } from './view-lab/primitives/specimenProtocol.js';
 import {
   SPECIMEN_SNIPPET_NAMES,
   readSpecimenSnippets,
@@ -633,4 +636,49 @@ test('a specimen document that never announces ready is reported once its load h
     calls.some((call) => call.cleared === 2),
     'READY must cancel the pending watchdog'
   );
+});
+
+test('a fixture is keyed on its file name, and an unknown one is refused by name', async () => {
+  const module = { default: 'Chip fixture' };
+  const importers = fixtureImporters({ './fixtures/ChipRemovable.svelte': async () => module });
+  assert.deepEqual(Object.keys(importers), ['ChipRemovable']);
+  assert.equal(await loadFixture('ChipRemovable', importers), module);
+  await assert.rejects(loadFixture('NoSuchFixture', importers), /no fixture named NoSuchFixture/);
+  await assert.rejects(loadFixture('toString', importers), /no fixture named toString/);
+});
+
+test('act turns run one at a time, in the order asked, and an errored asker leaves the queue', () => {
+  const turns = createActTurns();
+  const granted = [];
+  const ask = (id) =>
+    turns.request(id, () => {
+      granted.push(id);
+    });
+  ask('a');
+  ask('b');
+  ask('c');
+  assert.deepEqual(granted, ['a'], 'a second turn never starts while the first is held');
+  turns.release('b');
+  turns.release('a');
+  assert.deepEqual(granted, ['a', 'c'], 'a withdrawn asker is skipped; the next waiting one acts');
+  turns.release('a');
+  assert.deepEqual(granted, ['a', 'c'], 'releasing a turn not held grants nothing');
+  turns.release('c');
+  ask('d');
+  assert.deepEqual(granted, ['a', 'c', 'd']);
+});
+
+test('an act’s wait gives up on a real timer, though the lab pins the clock', async () => {
+  const pinned = Date.now;
+  Date.now = () => 0;
+  try {
+    const started = performance.now();
+    await assert.rejects(
+      waitFor(() => false, 'the open panel', 50),
+      /waiting for the open panel/
+    );
+    assert.ok(performance.now() - started < 1000, 'the wait outlived its limit');
+  } finally {
+    Date.now = pinned;
+  }
 });

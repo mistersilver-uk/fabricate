@@ -2,6 +2,7 @@
 <script>
   import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
   import ChoiceOptionList from './ChoiceOptionList.svelte';
+  import Kicker from './Kicker.svelte';
   import SlotTile from './SlotTile.svelte';
 
   let {
@@ -82,7 +83,7 @@
 <div class="fab-slot-row" data-slot-row bind:this={root}>
   {#if label || hint}
     <div class="fab-slot-row-heading">
-      {#if label}<span class="fab-slot-row-kicker">{label}</span>{/if}
+      {#if label}<Kicker as="span">{label}</Kicker>{/if}
       {#if hint}<span class="fab-slot-row-hint">{hint}</span>{/if}
     </div>
   {/if}
@@ -139,17 +140,10 @@
     gap: var(--fab-space-2);
   }
 
-  .fab-slot-row-kicker {
-    color: var(--fab-text-subtle);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
   .fab-slot-row-hint {
     color: var(--fab-text-subtle);
     font-size: 10.5px;
+    line-height: 1.5;
   }
 
   .fab-slot-row-tiles {

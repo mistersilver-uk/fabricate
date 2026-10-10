@@ -1223,7 +1223,7 @@ const STATE_TINTS = Object.freeze([
     `${COMPONENTS}/ChoiceOptionList.svelte`,
     '.fab-choice-option.is-selected',
     'var(--fab-accent-soft)',
-    'a single-select answer whose specimen is owed (spec.md:2255, #2257); held until drawn',
+    'a single-select answer, the accent-soft face its library specimen draws',
   ],
   [
     `${COMPONENTS}/CollapsibleGroupHeader.svelte`,
@@ -2060,7 +2060,7 @@ const CORNER_KIND_EXCEPTIONS = Object.freeze([
   [
     'src/ui/svelte/components/LogList.svelte: .fab-log-list-entry',
     ['9px'],
-    'LogList geometry is issue 2257',
+    'a log entry is a row; rows take 9',
   ],
   [
     'src/ui/svelte/components/NavSidebar.svelte: .fabricate-app-nav-well',

@@ -3,9 +3,8 @@
   The environment editor's tab strip. A thin caller of the promoted `EditorTabs` primitive
   (issue 1362): this file owns the TAB LIST and this site's DOM contract — the
   `data-environment-tab-button` hook, the `environment-tab-*` / `environment-panel-*` id
-  stem whose panels `EnvironmentEditView.svelte` renders, and the strip's own aria-label —
-  and nothing else. No rendered id, `aria-controls`, `data-*` attribute or class changed in
-  the conversion.
+  stem whose one panel `EnvironmentEditView.svelte` renders, and the strip's own aria-label —
+  and nothing else.
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
@@ -52,4 +51,5 @@
   containerClass="manager-environment-tabs"
   buttonClass="manager-environment-tab-button"
   badgeClass="manager-environment-tab-badge"
+  activePanelOnly
 />

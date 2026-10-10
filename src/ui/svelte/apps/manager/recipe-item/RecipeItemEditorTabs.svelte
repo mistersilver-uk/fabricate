@@ -5,7 +5,7 @@
   A thin caller of the promoted `EditorTabs` primitive (issue 1362): this file owns the tab
   list and this site's DOM contract — the `data-recipe-item-tab-button` hook, the
   `data-recipe-item-tab-badge` badge hook with its `data-badge-tone`, the `recipe-item-tab-*`
-  / `recipe-item-panel-*` id stem whose panels `RecipeItemEditor.svelte` renders, and the
+  / `recipe-item-panel-*` id stem whose one panel `RecipeItemEditor.svelte` renders, and the
   strip's own aria-label. It is the site that needs the primitive's `danger` capability: the
   Validation tab's button turns danger when its badge is a failing count.
 
@@ -66,4 +66,5 @@
   buttonClass="manager-editor-tab-button"
   badgeClass="manager-editor-tab-badge"
   danger
+  activePanelOnly
 />

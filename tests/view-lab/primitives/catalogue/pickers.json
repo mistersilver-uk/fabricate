@@ -55,6 +55,50 @@
     }
   },
   {
+    "spec": "<RangeBar>",
+    "cap": "read-only picture — roll under against 55",
+    "draws": "[role=\"group\"]",
+    "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "props": {
+      "readonly": true,
+      "binding": "fixed",
+      "ariaLabel": "Outcome bands",
+      "bands": [
+        {
+          "id": "extreme",
+          "name": "Extreme",
+          "range": "11 or under",
+          "color": "color-mix(in oklab, var(--fab-accent) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 1,
+          "to": 11,
+          "index": 0
+        },
+        {
+          "id": "hard",
+          "name": "Hard",
+          "range": "12–27",
+          "color": "color-mix(in oklab, var(--fab-success) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 12,
+          "to": 27,
+          "index": 1
+        },
+        {
+          "id": "regular",
+          "name": "Regular",
+          "range": "28–55",
+          "color": "color-mix(in oklab, var(--fab-warning) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 28,
+          "to": 55,
+          "index": 2
+        }
+      ]
+    },
+    "note": "A fixed binding over 1–55, so each band takes the drawing's share of the track. The read-only strip also draws its boundary ticks, 12 and 28, under the track; the drawing draws none."
+  },
+  {
     "spec": "<LinkField>",
     "cap": "empty",
     "draws": ":scope > div",
