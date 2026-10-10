@@ -29,7 +29,7 @@
     nothing in the family. It is shared without being a family root of its
     own, which `openspec/specs/design-system/spec.md` admits.
   - It emits `data-keyboard-focus="true"`: Foundry's `KeyboardManager#hasFocus` is false for a formless
-    button without it, so Space would pause the game and the arrows pan the canvas while it is focused.
+    button without it, so every keybinding (Space, the arrows, Escape) would fire while it is focused.
   - THE CALLER KEYS THE ARMED TOKEN ON THE TARGET DOCUMENT ID, NEVER A ROW INDEX, because a surface
     that re-projects rows asynchronously turns an index-keyed token into a destructive misfire: arm
     row 2, let another client delete row 0, re-project, and the second click hits a different copy.

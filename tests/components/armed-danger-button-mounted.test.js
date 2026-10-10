@@ -76,4 +76,34 @@ describe('ArmedDangerButton declares itself focused to Foundry on every face', (
     assert.equal(event.defaultPrevented, true);
     assert.equal(reached, false);
   });
+
+  for (const [face, props] of Object.entries({ idle: {}, busy: { armed: true, busy: true } })) {
+    it(`leaves Escape alone on the ${face} face`, async () => {
+      const disarmed = [];
+      await harness.mount({
+        token: 'delete:a',
+        ...props,
+        onDisarm: (token) => {
+          disarmed.push(token);
+        },
+      });
+      const event = new globalThis.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      let reached = false;
+      document.body.addEventListener(
+        'keydown',
+        () => {
+          reached = true;
+        },
+        { once: true }
+      );
+      button().dispatchEvent(event);
+      assert.deepEqual(disarmed, []);
+      assert.equal(event.defaultPrevented, false);
+      assert.equal(reached, true);
+    });
+  }
 });
