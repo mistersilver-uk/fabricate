@@ -1834,24 +1834,43 @@ const ROOT_LESS_FIXTURE_EXEMPTIONS = Object.freeze(
   )
 );
 
+// A literal imperative class write: `.className =` a quoted or `${`-free backtick string, or
+// `classList.add(…)` with literal arguments only. A dynamic write is not read.
+const IMPERATIVE_CLASS_WRITE =
+  /\.className\s*=\s*(?:'([^']*)'|"([^"]*)"|`((?:[^`$]|\$(?!\{))*)`)(?!\s*\+)|classList\.add\(((?:\s*(?:'[^']*'|"[^"]*")\s*,?)+)\)/g;
+
+/** The class value each literal imperative class write in `text` sets. */
+function imperativeClassValues(text) {
+  return [...text.matchAll(IMPERATIVE_CLASS_WRITE)].map(
+    ([, single, double, template, listed]) =>
+      single ??
+      double ??
+      template ??
+      [...listed.matchAll(/'([^']*)'|"([^"]*)"/g)].map(([, one, other]) => one ?? other).join(' ')
+  );
+}
+
 /**
- * Every element in a hand-written markup string, with the class names of its ancestors.
- *
- * @param {string} text A JavaScript source file that contains fixture markup.
- * @returns {Array<{name: string, classes: string[], ancestry: string[]}>} One entry per open tag.
- */
-/**
- * Every `class="…"` value that is actually ON AN ELEMENT TAG in fixture text.
+ * Every `class="…"` value that is actually ON AN ELEMENT TAG in fixture text, then the value of
+ * each literal imperative class write.
  *
  * @param {string} text A JavaScript source file that contains fixture markup.
  * @returns {Array<string>} The value of every `class` attribute inside an element tag.
  */
 function classAttributesInFixture(text) {
-  return [...text.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)].flatMap((tag) =>
+  const tagged = [...text.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)].flatMap((tag) =>
     [...tag[0].matchAll(/class="([^"]*)"/g)].map((match) => match[1])
   );
+  return [...tagged, ...imperativeClassValues(text)];
 }
 
+/**
+ * Every element in a hand-written markup string, with the class names of its ancestors, then one
+ * ancestor-less element per literal imperative class write.
+ *
+ * @param {string} text A JavaScript source file that contains fixture markup.
+ * @returns {Array<{name: string, classes: string[], ancestry: string[]}>} One entry per open tag.
+ */
 function elementsWithAncestry(text) {
   const VOID_ELEMENTS = new Set([
     'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track',
@@ -1874,8 +1893,142 @@ function elementsWithAncestry(text) {
     }
     match = pattern.exec(text);
   }
+  for (const value of imperativeClassValues(text)) {
+    const classes = value.split(/\s+/).filter(Boolean);
+    out.push({ name: 'imperative', classes, ancestry: classes });
+  }
   return out;
 }
+
+/** Each mirrored anchor a fixture class value copies, with its root and whether it lacks it. */
+function attributeOffence(primitive, value) {
+  const classes = value.split(/\s+/);
+  return primitive.mirrored
+    .filter(({ anchor }) => classes.includes(anchor))
+    .map(({ root }) => ({ root, offends: !classes.includes(root) }));
+}
+
+/** A primitive's class value with each class-map read and map-defaulted prop resolved. */
+function resolvedClassValue(primitive, file, value) {
+  let resolved = value;
+  for (const map of primitive.classMaps ?? []) {
+    const region = classMapRegion(file, map);
+    const entry = (key) => new RegExp(String.raw`\b${key}:\s*'([^']*)'`).exec(region)?.[1] ?? '';
+    const defaults = new Map(
+      [...read(file).matchAll(new RegExp(String.raw`(\w+)\s*=\s*${map}\.(\w+)`, 'g'))].map(
+        ([, prop, key]) => [prop, entry(key)]
+      )
+    );
+    const everyValue = [...region.matchAll(/:\s*'([^']*)'/g)].map(([, cls]) => cls).join(' ');
+    resolved = resolved
+      .replaceAll(new RegExp(String.raw`\b${map}\[[^\]]*\]`, 'g'), everyValue)
+      .replaceAll(/\$\{\s*(\w+)\s*\}/g, (whole, prop) => defaults.get(prop) ?? whole);
+  }
+  return resolved;
+}
+
+/** Per root, the family classes the primitive writes in one class value beside that root. */
+function rootElementClasses(primitive) {
+  const byRoot = new Map(primitive.roots.map((root) => [root, new Set()]));
+  for (const file of primitive.components) {
+    const markup = markupRegion(file);
+    const values = [
+      ...classAttributeValues(markup),
+      ...classPropValues(primitive, file, markup),
+      ...(primitive.composesClasses ? [composedClassRegion(file)] : []),
+    ].map((value) => resolvedClassValue(primitive, file, value));
+    for (const value of values) {
+      const family = value.match(new RegExp(primitive.family, 'g')) ?? [];
+      for (const [root, classes] of byRoot) {
+        if (!new RegExp(String.raw`(?<![\w-])${root}(?![\w-])`).test(value)) continue;
+        for (const cls of family) classes.add(cls);
+      }
+    }
+  }
+  return byRoot;
+}
+
+const memoByPrimitive = (derive) => {
+  const cache = new Map();
+  return (primitive) => {
+    if (!cache.has(primitive)) cache.set(primitive, derive(primitive));
+    return cache.get(primitive);
+  };
+};
+const familyWrittenBy = memoByPrimitive(classesWrittenBy);
+const rootElementOf = memoByPrimitive(rootElementClasses);
+
+/**
+ * The family classes a fixture element copies, and whether a root reaches them: a strict ancestor
+ * carries a root, or the element carries one and copies only that root element's classes.
+ */
+function ancestryOffence(primitive, element) {
+  const isRoot = (cls) => primitive.roots.includes(cls);
+  const copied = element.classes.filter((cls) => familyWrittenBy(primitive).has(cls));
+  const ancestors = element.ancestry.slice(0, element.ancestry.length - element.classes.length);
+  const ownRoots = element.classes.filter(isRoot);
+  const onOwnRoot = (cls) => ownRoots.some((root) => rootElementOf(primitive).get(root).has(cls));
+  const rooted = ancestors.some(isRoot) || (ownRoots.length > 0 && copied.every(onOwnRoot));
+  return { copied, rooted };
+}
+
+test('every mirrored anchor is a class its primitive writes beside that root', () => {
+  // A root the primitive composes rather than writes (`Select`'s) pairs with any root it writes.
+  const pairs = (primitive, { anchor, root }) => {
+    const byRoot = rootElementOf(primitive);
+    const paired = byRoot.has(root) ? [byRoot.get(root)] : [...byRoot.values()];
+    return paired.some((classes) => classes.has(anchor));
+  };
+  const unpaired = PRIMITIVES.flatMap((primitive) =>
+    primitive.mirrored
+      .filter((mirror) => !pairs(primitive, mirror))
+      .map(({ anchor, root }) => `${primitive.name}: ${anchor} beside ${root}`)
+  );
+  assert.deepEqual(unpaired, [], 'a mirrored anchor must be a root-element class of its root');
+  const tabs = PRIMITIVES.find(({ name }) => name === 'EditorTabs');
+  assert.ok(
+    !rootElementOf(tabs).get('fabricate-tabs').has('manager-editor-tab-button'),
+    'a prop default resolves to its own map entry, never to the whole map'
+  );
+});
+
+// Assembled at run time, so this file holds no fixture the live clauses below read.
+const fixtureText = (text) =>
+  text
+    .replaceAll('@NAME', 'className')
+    .replaceAll('@ADD', 'classList.add')
+    .replaceAll('@ROOT', 'fabricate-picker')
+    .replaceAll('@FAMILY', 'manager-travel');
+const searchablePopover = PRIMITIVES.find(({ name }) => name === 'SearchablePopover');
+const unrootedIn = (text) =>
+  elementsWithAncestry(fixtureText(text))
+    .filter((element) => {
+      const { copied, rooted } = ancestryOffence(searchablePopover, element);
+      return copied.length > 0 && !rooted;
+    })
+    .map((element) => element.classes.join(' '));
+
+test('both fixture clauses read a literal imperative class write and skip a dynamic one', () => {
+  const assigned = classAttributesInFixture(fixtureText("x.@NAME = '@FAMILY-picker';"));
+  assert.deepEqual(
+    assigned.flatMap((value) => attributeOffence(searchablePopover, value)),
+    [{ root: 'fabricate-picker', offends: true }]
+  );
+  assert.deepEqual(unrootedIn("x.@ADD('@FAMILY-option');"), ['manager-travel-option']);
+  const dynamic = "x.@NAME = `${stem}-picker`; x.@NAME = '@FAMILY-' + part; x.@ADD(name);";
+  assert.deepEqual(classAttributesInFixture(fixtureText(dynamic)), []);
+});
+
+test('a family element sits under a root, or on that root element with its classes only', () => {
+  assert.deepEqual(unrootedIn('<li class="@ROOT-popover @FAMILY-option"></li>'), [
+    'fabricate-picker-popover manager-travel-option',
+  ]);
+  assert.deepEqual(
+    unrootedIn('<div class="@ROOT-popover @FAMILY-popover"><li class="@FAMILY-option"></li></div>'),
+    []
+  );
+  assert.deepEqual(unrootedIn('<div class="@ROOT @FAMILY-picker"></div>'), []);
+});
 
 test('hand-built fixture markup carries the namespace roots the primitive writes', () => {
   const sources = collectWorkingTreeSources(['tests'], ['.js']);
@@ -1896,11 +2049,9 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   for (const primitive of PRIMITIVES) {
     for (const [file, text] of blanked) {
       for (const value of classAttributesInFixture(text)) {
-        const classes = value.split(/\s+/);
-        for (const { anchor, root } of primitive.mirrored) {
-          if (!classes.includes(anchor)) continue;
+        for (const { root, offends } of attributeOffence(primitive, value)) {
           attributes += 1;
-          if (classes.includes(root)) continue;
+          if (!offends) continue;
           const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
             (entry) => entry.file === file && entry.classes === value
           );
@@ -2017,13 +2168,12 @@ test('every fixture element in a picker’s family sits under one of its namespa
   let elements = 0;
 
   for (const primitive of PRIMITIVES) {
-    const written = classesWrittenBy(primitive);
     for (const [file, text] of blanked) {
       for (const element of elementsWithAncestry(text)) {
-        const copied = element.classes.filter((cls) => written.has(cls));
+        const { copied, rooted } = ancestryOffence(primitive, element);
         if (copied.length === 0) continue;
         elements += 1;
-        if (element.ancestry.some((cls) => primitive.roots.includes(cls))) continue;
+        if (rooted) continue;
         const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
           (entry) => entry.file === file && entry.classes === element.classes.join(' ')
         );
@@ -2039,7 +2189,7 @@ test('every fixture element in a picker’s family sits under one of its namespa
         offenders.push(
           `${file}: <${element.name} class="${element.classes.join(' ')}"> copies ` +
             `${primitive.name}'s ${copied.join(', ')} with no ` +
-            `${primitive.roots.map((root) => `\`${root}\``).join(' or ')} above it`
+            `${primitive.roots.map((root) => `\`${root}\``).join(' or ')} above it or beside it`
         );
       }
     }
