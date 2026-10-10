@@ -1168,6 +1168,11 @@
               "name": "Silver Seam",
               "icon": "fas fa-star",
               "quantity": "×1"
+            },
+            {
+              "name": "You choose one of…",
+              "icon": "fas fa-layer-group",
+              "detail": "Binding Chalk · Rune Bar"
             }
           ]
         },
