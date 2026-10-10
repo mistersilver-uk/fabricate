@@ -1148,7 +1148,7 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
 `StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
-`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry keeps its own library block, `shipped` since its kicker adopted `Kicker` (issue 2257).
+`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry keeps its own entry in the run-surface block, `shipped` since its kicker adopted `Kicker` (issue 2257).
 A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a gathering condition modifier's condition and drop-chance change.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.

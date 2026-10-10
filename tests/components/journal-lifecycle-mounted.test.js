@@ -13,7 +13,9 @@ import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityServi
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { RUN_KICKER_CONTAINERS } from '../helpers/runKickerGround.js';
 import {
   OUTCOME_LADDER_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
@@ -2184,6 +2186,23 @@ describe('Journal versioned lifecycle (mounted)', () => {
       mounted.target.querySelector('[data-run-action="primary"]').title,
       english.FABRICATE.App.Journal.Actions.ExecutionInProgress
     );
+  });
+
+  it('draws the run kickers on the detail pane through the containers the contrast test reads', async () => {
+    const { target } = await mountState('waiting-auto-eligible');
+    const kickers = target.querySelectorAll(
+      ':scope .fab-run-action-completion .fab-kicker, :scope .fab-run-progress-heading .fab-kicker'
+    );
+    assert.equal(kickers.length, 2, 'the completion and progress kickers both render');
+    const containers = new Set();
+    for (const kicker of kickers) {
+      let node = kicker.parentElement;
+      for (; node && !node.classList.contains('journal-detail-pane'); node = node.parentElement) {
+        containers.add(`.${node.classList[0]}`);
+      }
+      assert.ok(node, 'the kicker sits inside the detail pane');
+    }
+    assert.deepEqual([...containers].sort(byCodePoint), [...RUN_KICKER_CONTAINERS].sort(byCodePoint));
   });
 
   it('persists completion preference and completion through a rebuild of raw records', async () => {

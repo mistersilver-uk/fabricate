@@ -62,6 +62,7 @@
     gap: var(--fab-space-2);
   }
 
+  /* A zero line-height leaves the label the kicker's own line box. */
   .fab-run-progress-label {
     line-height: 0;
   }
