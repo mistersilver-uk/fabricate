@@ -222,13 +222,19 @@ export const CASES = Object.freeze([
         target: '[data-pagination-page]',
       },
     ],
-    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
+    // the `toolbar` rung's two Selects at 11.5px/600 (issue 2257 D8).
     expectLayout: {
       controls: [
         {
           selector: '[data-scoped-component-open-entry]',
           styles:
             'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+        { selector: '[data-scoped-list-sort]', styles: 'font-size: 11.5px; font-weight: 600' },
+        {
+          selector: '[data-scoped-list-filter="membership"]',
+          styles: 'font-size: 11.5px; font-weight: 600',
         },
       ],
     },
@@ -612,6 +618,15 @@ export const CASES = Object.freeze([
     ],
     // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).
     position: { width: 1280, height: 1000 },
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-vocabulary-sort="recipeCategories"]',
+          styles: 'font-size: 11.5px; font-weight: 600',
+        },
+      ],
+    },
     kinds: ['manager', 'world', 'scoped'],
     // The `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns (issue 1392).
     sourceMatches: [

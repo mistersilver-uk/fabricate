@@ -107,10 +107,14 @@ function systemOverviewItem(
 }
 
 function overviewCount(count, text) {
-  return {
-    ...countMarker(count),
-    label: text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues'),
-  };
+  const label =
+    count === 1
+      ? text(
+          'FABRICATE.Admin.Manager.SystemOverview.CountBadgeAriaSingular',
+          'Open validation issue'
+        )
+      : text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues');
+  return { ...countMarker(count), label };
 }
 
 function craftingGroup(input, text) {

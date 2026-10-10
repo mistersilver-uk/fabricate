@@ -378,10 +378,9 @@ const EXPECTED = {
   // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
   'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
   // The two FILTER triggers share the search's row and take `Select`'s `form` rung, the search's
-  // own 500 12.5px (issue 1782). The SORT trigger is the `toolbar` rung's 0.72rem literal, which
-  // the reference draws at 11.5px (`proto:1066`); a fiftieth of a pixel is rounding, not drift.
+  // own 500 12.5px (issue 1782). The SORT trigger is the `toolbar` rung's 11.5px (`proto:1066`).
   'filter-select': 12.5, // the `form` rung, beside the search
-  'sort-select': 11.52, // proto:1066 draws 11.5; the residual is 0.02px
+  'sort-select': 11.5, // proto:1066
   'essence-select': 12.5, // the `form` rung, beside the search
   'toolbar-button': 11, // proto:1067 — the sort-direction toggle at `600 11px` (was 11.52)
   // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is

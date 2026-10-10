@@ -976,7 +976,8 @@ function ancestorProvenance({ files, trees, reach }) {
   const cache = new Map();
   const hostedInside = (host, element) => {
     const tree = trees.get(host);
-    const hosted = new Set();
+    // A component element counts itself: its `class` may be forwarded above the site (issue 1483).
+    const hosted = new Set([tree.imports.get(element.tag)].filter(Boolean));
     for (const candidate of tree.elements) {
       if (!isDescendant(candidate, element)) continue;
       const target = tree.imports.get(candidate.tag);
@@ -1209,10 +1210,11 @@ function repaintsAt(site, matches, primitives, matchOf) {
 /**
  * Builds the whole inventory.
  *
+ * @param {{ corpus?: ReturnType<typeof readCorpus> }} [options] a probe's corpus, else the tree's
  * @returns {object} the instrument's findings and its report renderer
  */
-export function managerButtonCascade() {
-  const { files, sources, sheet } = readCorpus();
+export function managerButtonCascade({ corpus = readCorpus() } = {}) {
+  const { files, sources, sheet } = corpus;
   const { trees, unbalanced } = componentTrees(files, sources);
   const rendered = new Map(files.map((file) => [file, new Set(trees.get(file).imports.values())]));
   const reach = new Map(files.map((file) => [file, reachableFrom(rendered, file)]));

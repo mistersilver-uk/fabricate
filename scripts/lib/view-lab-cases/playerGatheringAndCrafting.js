@@ -694,6 +694,16 @@ export const CASES = Object.freeze([
     ],
     // Issue 1644: the find section states its one drop on the shared yield scale.
     expectSelector: '[data-gathering-drops-state="ready"] [data-yield-scale] [data-yield-entry]',
+    // Issue 2257 D15: the borderless 26px mark.
+    expectLayout: {
+      containerSelector: '[data-gathering-drops] [data-yield-scale]',
+      controls: [
+        {
+          selector: '[data-gathering-drops] [data-yield-entry="hb-ridgemoss-drop"] .fab-medallion',
+          styles: 'width: 26px; border-width: 0',
+        },
+      ],
+    },
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
@@ -751,6 +761,16 @@ export const CASES = Object.freeze([
       '[data-gathering-drops]' +
       ':has([data-gathering-drops-disclosure][aria-expanded="true"][aria-controls])' +
       ' [data-gathering-drop-modifiers]',
+    // Issue 2257 D15: the borderless 26px mark on the five-row scale.
+    expectLayout: {
+      containerSelector: '[data-gathering-drops] [data-yield-scale]',
+      controls: [
+        {
+          selector: '[data-gathering-drops] [data-yield-entry="row-1"] .fab-medallion',
+          styles: 'width: 26px; border-width: 0',
+        },
+      ],
+    },
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
@@ -1064,6 +1084,37 @@ export const CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Runeblade' },
       { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
     ],
+    // Issue 2257 D14, D19: 24px chips led by a 14px picture inside their tier's body, under a 10px
+    // glyph, and the shorter ladder no longer pushes the Ruined tier below the pane's fold.
+    expectCenterHit:
+      '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-ruined"] [data-outcome-empty]',
+    expectContained: [
+      {
+        container:
+          '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"] .fab-outcome-yields',
+        target:
+          '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"] [data-outcome-yield]',
+      },
+    ],
+    expectLayout: {
+      controls: [
+        {
+          selector:
+            '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"] [data-outcome-yield]',
+          styles: 'min-height: 24px; border-radius: 6px',
+        },
+        {
+          selector:
+            '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"] .fab-outcome-tier-glyph',
+          styles: 'font-size: 10px',
+        },
+        {
+          selector:
+            '[data-recipe-section="outcome-tiers"] [data-outcome-tier="rw-masterwork"] [data-outcome-yield] .fab-medallion',
+          styles: 'width: 14px',
+        },
+      ],
+    },
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SHARED,

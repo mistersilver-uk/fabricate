@@ -453,9 +453,9 @@ test('manager components browser defines drop target and compact responsive list
     'manager toolbar grid should keep rows bounded to the main content width'
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
-  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its select
-  // triggers take the shared `Select`'s `toolbar` rung's 0.72rem; its search field states its
-  // own 500 12.5px since issue 1782, so no toolbar rule types it.
+  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its sort
+  // trigger takes the shared `Select`'s `toolbar` rung's 11.5px and its two filters the `form`
+  // rung; its search field states its own 500 12.5px since issue 1782, so no toolbar rule types it.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'

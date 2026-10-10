@@ -163,17 +163,26 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-alchemy-chooser',
   ]),
   // The preview scale, the two historical branches no other frame draws, and the gathering
-  // preview's authored-order scale, closed and with its breakdown open (issue 1644).
+  // preview's authored-order scale, closed and with its breakdown open (issue 1644); then the
+  // shared-model history rows at both widths (issue 2257).
   'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-history-data-legacy-row-rolls-1240',
     'fabricate-journal-history-data-unknown-material-resolution-1240',
+    'fabricate-journal-history-data-shared-roll-control-1240',
+    'fabricate-journal-history-data-shared-roll-control-1024',
+    'fabricate-journal-history-data-settled-zero-1240',
+    'fabricate-journal-history-data-settled-zero-1024',
     'player-gathering-task-ready',
     'player-gathering-drop-open',
   ]),
-  // The Journal's gathering ladder, crafting's and salvage's routed tiers, before and after a roll.
+  // The Journal's gathering ladder and its banded routes, crafting's and salvage's routed tiers,
+  // before and after a roll.
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
+    'player-journal-routed-bands-under-crafting',
+    'player-journal-routed-bands-under-attribute',
+    'player-journal-routed-bands-under-multiply',
     'player-crafting-routed-by-check',
     'player-crafting-routed-tier-reward',
     'player-crafting-routed-reached',
@@ -277,11 +286,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-world-downtime-collapsed',
     'fabricate-app-shell',
   ]),
-  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws.
+  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws, and the two
+  // cases that measure an open group's box (issue 2257 E3).
   'src/ui/svelte/components/NavSidebarRows.svelte': Object.freeze([
     'manager-rail-expanded',
     'manager-rail-collapsed',
     'manager-world-downtime-collapsed',
+    'manager-recipes-normal',
+    'manager-world-travel-with-gathering-expanded',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

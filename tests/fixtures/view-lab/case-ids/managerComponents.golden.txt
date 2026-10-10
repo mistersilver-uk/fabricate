@@ -33,6 +33,7 @@ manager-component-edit-salvage-kind-list
 manager-component-complications-empty
 manager-component-complications-collapsed
 manager-component-complications-expanded
+manager-component-complications-check-trigger
 manager-component-complications-salvage-stage-strip
 manager-recipe-complications-stage-strip
 manager-component-edit-salvage-override-fixed-over
