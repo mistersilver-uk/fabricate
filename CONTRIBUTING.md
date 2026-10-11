@@ -768,7 +768,8 @@ The four patch-narrowed inputs — the case registry, the actor fixture, the run
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
-The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because `npm run lab:check` verifies them, so a change there alone selects no frame — except that a `.svelte` or `.css` file there still arms the evidence gate and selects the fallback frame.
+The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because a local `npm run lab:check` verifies them, so a change there alone selects no frame.
+Nor are they render files, because no application window draws them: a change there alone does not arm the evidence gate, its `.svelte` and `.css` files included.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
 true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
@@ -851,6 +852,7 @@ Do not commit PR-scoped screenshots under docs or other asset directories.
 
 The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
 A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
+A Primitive Lab file (`tests/view-lab/primitives.html`, or anything under `tests/view-lab/primitives/`) is not a render file whatever its extension; a local `npm run lab:check` verifies it, and a PR that changes one beside a real render file is still armed by that file.
 
 ### Prerequisites
 
