@@ -168,10 +168,7 @@ const AWAITED_FILES = [
 const strandedIn = memoizedBySource((pattern) => [
   ...(tracked.some((file) => pattern.test(file)) ? [] : ['']),
   ...alternativesOf(pattern)
-    .filter(
-      (regex) =>
-        [...tracked, ...AWAITED_FILES].every((file) => !regex.test(file))
-    )
+    .filter((regex) => [...tracked, ...AWAITED_FILES].every((file) => !regex.test(file)))
     .map((regex) => ` (expansion ${regex})`),
 ]);
 
@@ -323,4 +320,13 @@ test('no file the app View Lab is built from loads anything of the Primitive Lab
     )
   );
   assert.deepEqual(reaching, [], 'these app lab inputs load the Primitive Lab');
+});
+
+test('an awaited file leaves the allowance the moment it is tracked', () => {
+  // Otherwise a later rename of the arrived file would hide behind its stale entry here.
+  assert.deepEqual(
+    AWAITED_FILES.filter((file) => tracked.includes(file)),
+    [],
+    'delete these from AWAITED_FILES now that they exist'
+  );
 });

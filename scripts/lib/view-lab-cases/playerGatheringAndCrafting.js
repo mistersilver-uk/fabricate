@@ -1750,8 +1750,7 @@ export const CASES = Object.freeze([
     position: { width: 1064, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
     sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/stores\/craftingStore/],
-    expectSelector:
-      '[data-recipe-mode="progressive"] [data-recipe-section="progressive-stages"]',
+    expectSelector: '[data-recipe-mode="progressive"] [data-recipe-section="progressive-stages"]',
   }),
   playerCase({
     id: 'player-crafting-stacked',
