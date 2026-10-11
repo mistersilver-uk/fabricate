@@ -1422,14 +1422,9 @@
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
     "cap": "progress — one track per stage, filled, part-filled, empty",
-    "draws": ".k-stage-row",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunProgress.svelte",
-    "note": "Beside the tracks. The live run progress draws its own Progress kicker above them, and names its stages from the stage cards below.",
-    "undrawn": {
-      "Draw the billet": "a stage’s name, from the stage cards below; the drawn tracks carry no names",
-      "Hammer the rivets": "a stage’s name, from the stage cards below; the drawn tracks carry no names",
-      "Quench and temper": "a stage’s name, from the stage cards below; the drawn tracks carry no names"
-    },
+    "note": "The component's root: the Progress kicker naming the track group, and a compact `FillBar` per stage, each a progressbar named by its stage card's name, success, accent at 64 and empty.",
     "props": {
       "label": "Progress",
       "current": 1,
