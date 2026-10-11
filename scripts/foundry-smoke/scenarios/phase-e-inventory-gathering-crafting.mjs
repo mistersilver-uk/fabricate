@@ -9,8 +9,20 @@ import {
 } from '../pageOps/pageLifecycle.mjs';
 import { ensureSlotOpen } from '../pageOps/toolStudio.mjs';
 
+/**
+ * The gathering attempts phase E clicks, with whether each opens the interactive roll prompt. Only
+ * a routed or progressive task does (the engine's versioned check descriptor); a d100 or timed
+ * gather resolves without one. A Node test pins every row against the engine.
+ */
+export const GATHERING_ATTEMPT_PROMPTS = [
+  { taskId: 'smoke-meadow-herbs', resolutionMode: undefined, prompts: false },
+  { taskId: 'smoke-slow-bloom', resolutionMode: undefined, prompts: false },
+];
+
 export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
   const { page, results, screenshot } = ctx;
+  const attemptPrompts = (taskId) =>
+    GATHERING_ATTEMPT_PROMPTS.find((entry) => entry.taskId === taskId).prompts;
   const { executionFixtures } = ctx.shared;
   const { RUN_SCREENSHOT_PHASES, RUN_FULL_ONLY_GATHERING_STATES } = ctx.profile;
   // The "Craft Item" and "Gathering" sidebar actions both open one shared window
@@ -377,8 +389,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  // `prompts` is by construction: an immediate (d100) gather opens the interactive roll prompt,
-  // and a timed one only starts its waiting run.
+  // `prompts` comes from GATHERING_ATTEMPT_PROMPTS: only a routed or progressive task opens the
+  // roll prompt (the engine's versioned check descriptor); a d100 or timed gather resolves
+  // without one.
   async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
@@ -424,7 +437,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt({ prompts: true });
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-meadow-herbs') });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -442,7 +455,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt({ prompts: false });
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-slow-bloom') });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
