@@ -896,45 +896,54 @@ function removedRuns(hunk) {
     }
     run.shapes.push(overrideLineShape(text));
   }
-  return { runs, kept };
+  return runs;
 }
 
 /** Where each run is removed — the 0-based line after it — under every anchor of the kept lines. */
-function removalPoints(hunk, runs, sourceLines) {
-  const kept = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
+function removalPoints(keptLines, runs, sourceLines) {
+  const kept = keptLines.map(({ text }) => text);
   return anchorOffsets(sourceLines, kept).flatMap((offset) =>
     runs.map((run) => ({ run, point: offset + run.follows }))
   );
 }
 
-/** The entry an id-only run was removed from: the one whose opener precedes the line after it. */
+/**
+ * The entry a run was removed from: the one holding the line after it. A run carrying an opener or
+ * a close credits it only when that line is strictly inside, so an entry removed beside it does not.
+ */
 function entryAround({ run, point }, regions) {
   const kinds = run.shapes.map((shape) => shape.kind);
-  if (!kinds.includes('id') || kinds.some((kind) => OVERRIDE_ENTRY_BOUNDS.has(kind))) return null;
-  return regions.find((region) => region.start <= point && point < region.end)?.key ?? null;
+  if (kinds.every((kind) => kind === 'inert')) return null;
+  const tail = kinds.some((kind) => OVERRIDE_ENTRY_BOUNDS.has(kind)) ? 1 : 0;
+  return regions.find((region) => region.start <= point && point < region.end - tail)?.key ?? null;
 }
 
 /**
  * Take a hunk's removed table lines out before it is located, since the loaded file no longer holds
  * them, when every `-` line fits the grammar and every anchor puts each removal inside the table.
- * A run with no line after it widens the hunk alone; any other hunk is located whole.
+ * A run with no line after it widens the hunk alone; any other hunk is located whole. Every path
+ * keeps the ids its `-` lines name.
  */
 function splitOverrideRemovals(hunk, sourceLines, regions) {
-  const whole = { hunk, ids: [], keys: [], widens: false };
-  const { runs, kept } = removedRuns(hunk);
+  const runs = removedRuns(hunk);
+  const ids = runs.flatMap((run) => run.shapes.map((shape) => shape?.id).filter(Boolean));
+  const whole = { hunk, ids, keys: [], widens: false };
   if (runs.length === 0 || !regions) return whole;
   const keptLines = hunk.filter(({ marker }) => marker !== '-');
-  if (runs.some((run) => run.follows === kept)) return { ...whole, hunk: keptLines, widens: true };
+  if (runs.some((run) => run.follows === keptLines.length)) {
+    return { ...whole, hunk: keptLines, widens: true };
+  }
   if (runs.some((run) => run.shapes.includes(null))) return whole;
 
   const span = overrideTableSpan(sourceLines);
-  const points = removalPoints(hunk, runs, sourceLines);
+  const points = removalPoints(keptLines, runs, sourceLines);
+  // The bound is inclusive at `});`: a removal just before it is the table's last line.
   if (points.length === 0 || points.some(({ point }) => point <= span.open || point > span.close)) {
     return whole;
   }
   return {
     hunk: keptLines,
-    ids: runs.flatMap((run) => run.shapes.map((shape) => shape.id).filter(Boolean)),
+    ids,
     keys: points.map((removal) => entryAround(removal, regions)).filter(Boolean),
     widens: false,
   };
@@ -948,6 +957,14 @@ function widenedByCoverage(ids, unattributable) {
   for (const id of LAB_SURFACE_CASE_IDS) ids.add(id);
   return ids;
 }
+
+const BROAD_SIGNAL_ATTRIBUTION = Object.freeze({
+  path: BROAD_SIGNALS_PATH,
+  sourceLines: broadSignalSourceLines,
+  regions: broadSignalRegions,
+  selectsRegion: (key) => selectsOverrideIds(BROAD_SIGNAL_CASE_OVERRIDES[key]),
+  readsRemovedLines: true,
+});
 
 /**
  * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
@@ -983,13 +1000,7 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     path: LAB_INTERACTABLES_PATH,
     selects: rendersInCanvasWindow,
   }),
-  Object.freeze({
-    path: BROAD_SIGNALS_PATH,
-    sourceLines: broadSignalSourceLines,
-    regions: broadSignalRegions,
-    selectsRegion: (key) => selectsOverrideIds(BROAD_SIGNAL_CASE_OVERRIDES[key]),
-    readsRemovedLines: true,
-  }),
+  BROAD_SIGNAL_ATTRIBUTION,
 ]);
 
 /**
@@ -1042,6 +1053,15 @@ function casesFromOverridePatch(patch, attribution) {
     for (const id of casesSelecting(selectsOverrideIds(removedIds))) ids.add(id);
   }
   return ids;
+}
+
+/** What a `broadSignals.js` patch selects when read against these lines of it, in no order. */
+export function casesFromBroadSignalPatch(patch, sourceLines) {
+  return casesFromOverridePatch(patch, {
+    ...BROAD_SIGNAL_ATTRIBUTION,
+    sourceLines: () => sourceLines,
+    regions: () => parseBroadSignalOverrideRegions(sourceLines),
+  });
 }
 
 /** What each touched region feeds, widened when part of the patch could not be attributed. */

@@ -29,6 +29,9 @@ const LIST_ROW = component('ListRow');
 const TINT_PICKER = component('TintPicker');
 const TINT_PICKER_BUTTON = component('TintPickerButton');
 const STATUS_TOGGLE = component('StatusToggle');
+const RUN_ACTION_BAR = component('RunActionBar');
+const SLOT_TILE = component('SlotTile');
+const REQUIREMENT_CHOOSER = component('RequirementChooser');
 const STYLESHEET = 'styles/fabricate.css';
 
 /** A real, publishable case that none of the entries these patches sit beside names. */
@@ -39,6 +42,7 @@ const SYNTHETIC_ENTRY = Object.freeze([
   `    '${REMOVED_ID}',`,
   '  ]),',
 ]);
+const SYNTHETIC_OPENER = SYNTHETIC_ENTRY[1];
 
 const range = (from, to) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
 
@@ -65,6 +69,7 @@ function entryLines(key) {
 const real = (from, to, added = []) =>
   range(from, to).map((line) => `${added.includes(line) ? '+' : ' '}${LINES[line - 1]}`);
 const removed = (texts) => texts.map((text) => `-${text}`);
+const context = (texts) => texts.map((text) => ` ${text}`);
 const hunk = (...rows) => ['@@ -1,1 +1,1 @@', ...rows.flat()].join('\n');
 
 /** A one-hunk patch marking these contiguous lines as added, with git's three context lines. */
@@ -113,7 +118,8 @@ test('the cases these patches lean on exist, so a rename cannot pass the tests v
     VIEW_LAB_CASES.some((viewCase) => viewCase.id === REMOVED_ID && viewCase.publish),
     `${REMOVED_ID} must be a publishable case`
   );
-  for (const key of [SELECT, MEDALLION, LIST_ROW, TINT_PICKER, TINT_PICKER_BUTTON, STATUS_TOGGLE]) {
+  const keys = [SELECT, MEDALLION, LIST_ROW, TINT_PICKER, TINT_PICKER_BUTTON, STATUS_TOGGLE];
+  for (const key of [...keys, RUN_ACTION_BAR, SLOT_TILE, REQUIREMENT_CHOOSER]) {
     assert.ok(KEYS.includes(key), `${key} must be an override key`);
     assert.ok(!BROAD_SIGNAL_CASE_OVERRIDES[key].includes(REMOVED_ID));
   }
@@ -207,6 +213,97 @@ test('removing an id inside an entry selects that id, the entry and the pair', (
   );
 });
 
+test('merging an entry into the one above it selects the absorbing entry and the pair', () => {
+  const { start, end } = entryLines(RUN_ACTION_BAR);
+  const split = start + 3;
+  assert.ok(split < end, 'the absorbed ids must sit strictly inside the merged entry');
+  const patch = hunk(
+    real(start, split - 1),
+    removed([SYNTHETIC_ENTRY.at(-1), SYNTHETIC_OPENER]),
+    real(split, end + 1)
+  );
+  assert.deepEqual(selected(patch), inRegistryOrder([...oracle(RUN_ACTION_BAR), ...withPair([])]));
+});
+
+test('renaming a multi-line entry selects what its new key selects', () => {
+  const { start } = entryLines(SELECT);
+  const patch = hunk(
+    real(start - 3, start - 1),
+    removed([SYNTHETIC_OPENER]),
+    real(start, start + 2, [start])
+  );
+  assert.deepEqual(selected(patch), oracle(SELECT));
+});
+
+test('a removal beside a docblock line the grammar cannot read keeps the id it removed', () => {
+  const last = entryLines(KEYS.at(-1));
+  assert.equal(MAP_CLOSE + 3, REPRESENTATIVE_OPEN, 'a blank line and a docblock separate them');
+  const patch = hunk(
+    real(last.end - 2, last.end - 1),
+    removed([`    '${REMOVED_ID}',`]),
+    real(last.end, MAP_CLOSE + 1),
+    removed([' * A docblock line the checkout no longer carries.']),
+    real(MAP_CLOSE + 2, REPRESENTATIVE_OPEN + 1)
+  );
+  assert.deepEqual(
+    selected(patch),
+    inRegistryOrder([...oracle(KEYS.at(-1)), ...withPair([REMOVED_ID])])
+  );
+});
+
+/** Context that recurs verbatim at the tail of two entries, so every hunk in it has two anchors. */
+const SHARED_TAIL = [
+  "    'player-crafting-essence-pool-shared',",
+  "    'player-crafting-essence-shopping',",
+  "    'player-crafting-pick-for-me',",
+  '  ]),',
+];
+const sharedTailAdded = hunk(
+  context(SHARED_TAIL.slice(0, 1)),
+  [`+${SHARED_TAIL[1]}`],
+  context(SHARED_TAIL.slice(2))
+);
+const sharedTailRemoved = hunk(
+  context(SHARED_TAIL.slice(0, 2)),
+  removed([`    '${REMOVED_ID}',`]),
+  context(SHARED_TAIL.slice(2))
+);
+const bothTails = () => [...oracle(SLOT_TILE), ...oracle(REQUIREMENT_CHOOSER)];
+
+test('a hunk whose context recurs in two entries selects both', () => {
+  for (const key of [SLOT_TILE, REQUIREMENT_CHOOSER]) {
+    const { end } = entryLines(key);
+    assert.deepEqual(LINES.slice(end - SHARED_TAIL.length, end), SHARED_TAIL, key);
+  }
+  assert.deepEqual(selected(sharedTailAdded), inRegistryOrder(bothTails()));
+  assert.deepEqual(
+    selected(sharedTailRemoved),
+    inRegistryOrder([...bothTails(), ...withPair([REMOVED_ID])])
+  );
+});
+
+test('a recurring anchor that lands outside the table widens to surface coverage', () => {
+  const echoed = [...LINES.slice(0, -1), 'const ECHO = [', ...SHARED_TAIL, '];', ''];
+  assert.ok(viewLabCases.parseBroadSignalOverrideRegions(echoed), 'the table itself is unchanged');
+  const casesAgainstEcho = (patch) =>
+    inRegistryOrder([...viewLabCases.casesFromBroadSignalPatch(patch, echoed)]);
+
+  assert.deepEqual(
+    casesAgainstEcho(sharedTailAdded),
+    inRegistryOrder([...COVERAGE, ...bothTails()])
+  );
+  assert.deepEqual(
+    casesAgainstEcho(sharedTailRemoved),
+    inRegistryOrder([...COVERAGE, ...bothTails(), ...withPair([REMOVED_ID])])
+  );
+});
+
+test('a removed line outside the grammar inside the map is located, not thrown on', () => {
+  const close = entryLines(TINT_PICKER).end;
+  const patch = hunk(real(close - 2, close), removed(['  /* gone */']), real(close + 1, close + 3));
+  assert.deepEqual(selected(patch), [FALLBACK_CASE_ID]);
+});
+
 test('a comment-only edit inside the map selects nothing from the file', () => {
   const between = lineOf('  // The shared icon picker (issue 1269).');
   const inside = lineWhere((line) => line.startsWith('    // Issue 2008:'), 'an in-entry comment');
@@ -229,6 +326,7 @@ test('a hunk spanning the last entry and the representative block selects both',
   const last = entryLines(KEYS.at(-1));
   const id = last.end - 1;
   assert.ok(REPRESENTATIVE_OPEN - id < 7, 'the two lines must share one hunk');
+  assert.ok(oracle(KEYS.at(-1)).some((caseId) => !COVERAGE.includes(caseId)));
   const patch = hunk(real(id - 3, REPRESENTATIVE_OPEN + 3, [id, REPRESENTATIVE_OPEN]));
   assert.deepEqual(selected(patch), inRegistryOrder([...COVERAGE, ...oracle(KEYS.at(-1))]));
 });
@@ -294,7 +392,7 @@ test('the #2412 shape: a new primitive and its entry select that entry, not surf
   );
 });
 
-test('a patch the table cannot account for selects exactly surface coverage', () => {
+test('a patch the table cannot account for selects surface coverage and any id it removed', () => {
   const managerPrimitives = lineWhere(
     (line) => line.startsWith('export const MANAGER_PRIMITIVES = '),
     'MANAGER_PRIMITIVES'
@@ -322,6 +420,16 @@ test('a patch the table cannot account for selects exactly surface coverage', ()
     'a - BROAD_SIGNAL_PATTERN element': removing(patternElement),
     'a - REPRESENTATIVE_CASE_IDS element': removing(representativeElement),
     'a - import': removing(importLine),
+  };
+  for (const [name, patch] of Object.entries(patches)) {
+    assert.deepEqual(selected(patch), COVERAGE, name);
+  }
+  assert.ok(
+    REPRESENTATIVE_CASE_IDS.every((id) => COVERAGE.includes(id)),
+    "the pattern's '^styles/' line parses as a removed id, which selects only the pair"
+  );
+
+  const removingTheId = {
     'a deletion-only hunk with zero context': hunk(removed([`    '${REMOVED_ID}',`])),
     'a trailing removal with no following context': hunk(
       real(listRow, listRow + 2),
@@ -333,7 +441,11 @@ test('a patch the table cannot account for selects exactly surface coverage', ()
       real(REPRESENTATIVE_OPEN, REPRESENTATIVE_OPEN + 2)
     ),
   };
-  for (const [name, patch] of Object.entries(patches)) {
-    assert.deepEqual(selected(patch), COVERAGE, name);
+  for (const [name, patch] of Object.entries(removingTheId)) {
+    assert.deepEqual(
+      selected(patch),
+      inRegistryOrder([...COVERAGE, ...withPair([REMOVED_ID])]),
+      name
+    );
   }
 });
