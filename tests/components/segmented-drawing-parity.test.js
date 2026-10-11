@@ -25,12 +25,12 @@ const library = readFileSync(
 );
 const shipped = scopedComponentCss(resolve(repoRoot, COMPONENT));
 
-/** Each form: the props its callers pass, and the drawn well that draws it. */
+/** Each form: the props its callers pass, the drawn well that draws it, and how many uses draw it. */
 const FORMS = Object.freeze({
-  default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field)' },
-  tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag' },
-  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline' },
-  field: { props: { density: 'field' }, drawn: '.k-seg.field' },
+  default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field)', uses: 10 },
+  tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag', uses: 4 },
+  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline', uses: 30 },
+  field: { props: { density: 'field' }, drawn: '.k-seg.field', uses: 1 },
 });
 
 /** D1: the shipped idle ink measures under 4.5:1 at these sizes, so the drawing passes (#2368). */
@@ -157,6 +157,16 @@ function onePaint(side, form) {
   }
   return parts;
 }
+
+it('draws each form at the uses its callers assign it', () => {
+  for (const [form, { uses }] of Object.entries(FORMS)) {
+    assert.equal(
+      paints.drawn[form].length,
+      uses,
+      `the library draws ${form} at the wrong number of uses`
+    );
+  }
+});
 
 it('reads a non-empty paint from every drawn and shipped form', () => {
   for (const side of ['drawn', 'live']) {

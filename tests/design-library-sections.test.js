@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseDesignLibrary } from './helpers/designLibrary.js';
+import { parseDesignLibrary, readDesignLibrary } from './helpers/designLibrary.js';
 import { readLibrarySections } from './helpers/designLibrarySections.js';
 
 /**
@@ -60,4 +60,16 @@ test('a nested .sec-head, .num or .lede cannot stand in for the section’s own'
     ].join('')
   );
   assert.deepEqual(sections, [{ id: 'outer', number: '07', title: 'Own', ledes: [] }]);
+});
+
+test('every icon the library uses resolves to a symbol in its sprite', () => {
+  const source = readDesignLibrary();
+  const used = new Set([...source.matchAll(/href="#(i-[^"]+)"/g)].map(([, id]) => id));
+  const symbols = new Set([...source.matchAll(/<symbol id="(i-[^"]+)"/g)].map(([, id]) => id));
+  assert.ok(used.size > 0, 'the library uses no sprite icon, so this proves nothing');
+  assert.deepEqual(
+    [...used].filter((id) => !symbols.has(id)),
+    [],
+    'these icons have no <symbol>'
+  );
 });
