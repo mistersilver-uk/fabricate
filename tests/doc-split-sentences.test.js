@@ -661,13 +661,13 @@ const SUPERSEDED_POLICY_COUNT = 60;
  * #1761).
  */
 const RENAMED = [
-  // Issue #2381 replaced ProgressiveStageList with ProgressiveStageBand, the text(key, fallback) example.
+  // Issue #2381 deleted ProgressiveStageList; InteractableBrowserRoot is now the text(key, fallback) example.
   {
     before:
       'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.',
     after:
-      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageBand.svelte`) quietly renders its **hardcoded English fallback**.',
-    identifiers: [['ProgressiveStageBand.svelte', 'ProgressiveStageList.svelte']],
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `InteractableBrowserRoot.svelte`) quietly renders its **hardcoded English fallback**.',
+    identifiers: [['InteractableBrowserRoot.svelte', 'ProgressiveStageList.svelte']],
   },
   {
     before:

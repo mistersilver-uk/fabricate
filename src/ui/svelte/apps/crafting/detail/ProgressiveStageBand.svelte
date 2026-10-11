@@ -30,16 +30,10 @@
 </script>
 
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import ComplicationSummaryRow from '../../manager/ComplicationSummaryRow.svelte';
 
   let { stage = null, tense = 'forecast' } = $props();
-
-  // ratchet-exempt(text-helper): moved verbatim from the deleted ProgressiveStageList; the architecture doc cites it as the text(key, fallback) example
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   // Full key literals per severity, so `tests/ui-lang-keys-resolve.test.js` can resolve each leaf.
   const SEVERITY_LABELS = Object.freeze({
@@ -67,7 +61,7 @@
 
   function severityLabel(severity) {
     const declared = SEVERITY_LABELS[severity];
-    return declared ? text(...declared) : String(severity ?? '');
+    return declared ? localizeOr(...declared) : String(severity ?? '');
   }
 
   /** The names behind the `+N more` count, so the count is not a dead end. */
@@ -94,7 +88,7 @@
       severity={lead.severity}
       severityLabel={severityLabel(lead.severity)}
       description={lead.description}
-      statusLabel={text(badge[0], badge[1])}
+      statusLabel={localizeOr(badge[0], badge[1])}
       statusTone={badge[2]}
       bodyClamp={3}
       data-progressive-stage-complication={lead.id || true}
@@ -104,7 +98,7 @@
         class="crafting-stage-complications-more"
         data-progressive-stage-complication-more={String(entries.length - 1)}
         title={overflowTitle || undefined}
-        >{text('FABRICATE.App.Complications.More', '+{count} more').replace(
+        >{localizeOr('FABRICATE.App.Complications.More', '+{count} more').replace(
           '{count}',
           String(entries.length - 1)
         )}</span
