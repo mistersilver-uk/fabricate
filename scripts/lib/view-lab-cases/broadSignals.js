@@ -410,13 +410,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-source-picker',
   ]),
   // The overflow action menu (issue 1477), extracted from four hand-rolled menus and one `SearchablePopover`.
-  // The requirement row's kind menu is its headed form with a caller's own trigger (issue 1516).
+  // The requirement row's kind menu is its headed form with a caller's own trigger (issue 1516), as
+  // is each of the ingredient and result adders' kind menus.
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
     'manager-systems-row-menu-open',
     'manager-recipe-edit-ingredients-or-menu',
     'manager-recipe-edit-choice-group-menu',
     'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-ingredients-adder-menu',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([

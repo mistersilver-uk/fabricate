@@ -38,13 +38,11 @@ const CATALOGUE_PROPS = [
   // on. It is the shell's because a page composes the shell and never the frame.
   'autoSelectFirst',
   'bulk',
-  // THE FLUSH LIST COLUMN (issue 1371 r16-cat, maintainer ruling M21). OPT-IN and OFF by default:
-  'flushColumn',
   // THE BULK DOCK TO THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24). OPT-IN and
   // OFF by default: with it unset the inspector column pads itself and the bulk panel's scroller
   // clips the shell's dock at that inset, exactly as it always did; the world Component catalogue
   // turns it on, the column hands its inset to the bulk scroller, and the shell's `space-4` bleed
-  // reaches the column's edges. Catalogue-only for the reason `flushColumn` is.
+  // reaches the column's edges. Catalogue-only for the reason `autoSelectFirst` is.
   'flushBulkDock',
   // The list's lifted view-state (issue 1438).
   'browserState',
@@ -189,10 +187,8 @@ describe('the shells declare the pinned prop sets', () => {
       // The five parity switches (issue 1373) are catalogue-only for the same reason.
       'describeEntry',
       'extraCards',
-      // M21's opt-in is catalogue-only for the reason M14's is: the rules-list shell's column is
-      // `ComponentsBrowserView`'s own `.manager-main`, which already runs edge to edge.
+      // M24's opt-in is catalogue-only as M14's is: the rules-list shell has no inspector.
       'flushBulkDock',
-      'flushColumn',
       // AND THE TWO PARITY OPT-OUTS (issue 1371).
       'inspectorBody',
       'inspectorBodyPlacement',
@@ -848,25 +844,6 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     assert.ok(
       !/autoSelectFirst[\s\S]{0,600}?inspectorElement\?\.focus/.test(frame),
       'and the auto-selection does not call the inspector focus a row CLICK calls'
-    );
-  });
-
-  it('hands the frame the flush list column, OFF by default (M21)', () => {
-    const source = shell();
-    assert.match(source, /\n\s*flushColumn = false,/, 'declared, and OFF by default');
-    assert.match(source, /\{flushColumn\}/, 'and forwarded to the frame');
-    const frame = sourceOf(FRAME);
-    assert.match(frame, /\n\s*flushColumn = false,/, 'the frame declares it OFF by default too');
-    // The class is emitted from the prop and nothing else.
-    assert.match(
-      frame,
-      /class="manager-scoped-list-column"\s+class:is-flush=\{flushColumn\}/,
-      'the frame`s column wears `is-flush` when and only when the prop is on'
-    );
-    assert.match(
-      frame,
-      /\.manager-scoped-list-column\.is-flush \{\s*padding: 0;\s*\}/,
-      'and the flush column drops the pane inset and nothing else'
     );
   });
 
