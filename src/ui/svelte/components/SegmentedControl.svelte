@@ -232,9 +232,14 @@
 
   .manager-segmented.is-tag.is-inline .manager-segment,
   .manager-segmented.is-tag.is-field .manager-segment {
-    flex: 0 1 auto;
     align-self: stretch;
     padding: 0 var(--fab-space-2);
+  }
+
+  /* `:not(.is-fill)`: at (0,4,0) this would otherwise out-specify `.is-fill`'s shared width. */
+  .manager-segmented.is-tag.is-inline:not(.is-fill) .manager-segment,
+  .manager-segmented.is-tag.is-field:not(.is-fill) .manager-segment {
+    flex: 0 1 auto;
   }
 
   .manager-segmented.is-tag.is-inline .manager-segment {
