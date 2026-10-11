@@ -192,7 +192,8 @@ Choose **Mark as broken** to author optional **Repair materials**.
 Repair materials use the same structure as recipe ingredients.
 Every required group must be satisfied, and any one option inside a group can satisfy that group.
 
-You can add requirements for Components, tags, essences, and currency.
+Add a requirement with the dashed **Ingredient** adder, which opens a menu offering Components, tags, essences, and currency.
+To give a requirement another way to be met, use its **or…** control, which opens an **Accept instead** menu of the same kinds.
 Every added group must be complete and every option must have a positive quantity before the Tool can be saved.
 
 {: .warning }

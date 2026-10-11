@@ -17,7 +17,7 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
-    // Whether the system's currency feature is enabled, gating the "Add cost" affordances and
+    // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
     // the read-only rendering of existing currency requirements. Forwarded to every set card.
     currencyEnabled = true,
     showSetName = true,

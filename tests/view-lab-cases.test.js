@@ -840,6 +840,17 @@ const NON_VERB_CONTROLS = Object.freeze({
     OR_MENU,
     `${OR_MENU} [data-recipe-add="alternative-tag"]`
   ),
+  'manager-recipe-edit-ingredients-adder-menu': menuCorners(
+    '.manager-recipe-ingredient-menu',
+    '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
+  ),
+  // A choice group's one adder: the dashed `Button`'s pinned 34px (issue 2367).
+  'manager-recipe-edit-ingredients-choice-group': [
+    {
+      selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
+      styles: 'height: 34px; border-top-style: dashed',
+    },
+  ],
   'manager-environment-edit-automatic-force-add': menuCorners(
     '.fabricate-action-menu-panel',
     '.fabricate-action-menu-panel [data-action="force-include"]'
@@ -2987,6 +2998,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
   'manager-recipe-edit-choice-group-menu',
+  'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',

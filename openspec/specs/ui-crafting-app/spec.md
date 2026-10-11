@@ -1074,7 +1074,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 ### Alchemy Tab
 
 The player Alchemy tab is an IMPLEMENTED route (it replaced the earlier `{:else}` "Coming soon" placeholder in `FabricateAppRoot.svelte`).
-Its content mounts inside `.fabricate-app-content` — the shell's nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
+Its content mounts inside `.fabricate-app-content` — the shell's nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views' column structure.
 The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; its named container stacks at the shared `@container fabricate-alchemy (max-width: 960px)` breakpoint with the **workbench leading** the stacked order.
 It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
 

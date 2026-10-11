@@ -137,6 +137,12 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte': 1 },
   ],
   [
+    'the composition licence of "The primitive set is a closed, versioned vocabulary" — this ' +
+      "is the kind menu's adder, wholly the members `ActionMenu` and `Button`, so its callers " +
+      'owe it no manifest row',
+    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
+  ],
+  [
     STEPPER_LABELS,
     {
       'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte': 3,
@@ -163,7 +169,7 @@ const ALLOWLIST = Object.freeze([
   [
     "the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), " +
       "never a caller's name",
-    { 'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte': 1 },
+    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
   ],
   [
     "the spread is the popover's own trigger contract (type, ARIA state, handlers, element " +

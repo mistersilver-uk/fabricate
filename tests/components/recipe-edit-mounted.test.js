@@ -3,6 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { describe, it, before, after, beforeEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { tick } from 'svelte';
+
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { Recipe } from '../../src/models/Recipe.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -10,6 +12,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 // The Overview cells and the ingredient row's kind control are the shared `<Select>` since issue
 // 1510, so choosing a value is an open-then-click on a panel portaled onto the mount target.
@@ -185,7 +188,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
+  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
@@ -401,12 +404,19 @@ function clickTab(target, tab) {
 // (e.g. componentOptions, itemTags, currencyUnits) and `set` merges extra fields
 // onto the single 'set-1' set (e.g. name). Returns the mounted target plus the
 // collector so callers assert on emitted onUpdateRecipe patches.
-async function mountIngredientGroups(groups, { props = {}, set = {} } = {}) {
+// `controlled` feeds each patch back synchronously inside the change callback, as the parent does.
+async function mountIngredientGroups(groups, { props = {}, set = {}, controlled = false } = {}) {
   const patches = [];
+  let recipe = { ...RECIPE, ingredientSets: [{ id: 'set-1', ...set, ingredientGroups: groups }] };
   const target = await editHarness.mount(
     identityProps({
-      recipe: { ...RECIPE, ingredientSets: [{ id: 'set-1', ...set, ingredientGroups: groups }] },
-      onUpdateRecipe: (patch) => patches.push(patch),
+      recipe,
+      onUpdateRecipe: (patch) => {
+        patches.push(patch);
+        if (!controlled) return;
+        recipe = { ...recipe, ...patch };
+        editHarness.setProps({ recipe });
+      },
       ...props,
     })
   );
@@ -487,25 +497,52 @@ async function addResultRow(target, scope = '') {
   await flushRender();
 }
 
-// Open a BARE row's single "or..." popover (bare rows keep the compact popover;
-// multi-alternative boxes use explicit dashed buttons instead — see pickOrOption).
-async function openOrMenu(target, groupId) {
-  target.querySelector(`[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`).click();
+// The portaled kind menu's items: a requirement's alternatives menu, and an ingredient set's.
+const OR_MENU_ITEMS = '.manager-recipe-or-menu [role="menuitem"]';
+const INGREDIENT_MENU_ITEMS = '.manager-recipe-ingredient-menu [role="menuitem"]';
+
+/** The open menu's item hooks, in order. */
+const menuHooks = (items = OR_MENU_ITEMS) =>
+  [...document.querySelectorAll(items)].map((item) => item.getAttribute('data-recipe-add'));
+
+// Press `trigger`, a node or a selector on `root`, as a pointer does: its mousedown dismisses any
+// other open menu, and its click opens this one. Awaits the render.
+async function openKindMenu(root, trigger) {
+  const node = typeof trigger === 'string' ? root.querySelector(trigger) : trigger;
+  node.dispatchEvent(new globalThis.window.MouseEvent('mousedown', { bubbles: true }));
+  node.click();
   await flushRender();
 }
 
-// Choose the add-affordance carrying the given data-recipe-add token.
-async function pickOrOption(target, groupId, addToken) {
-  const group = target.querySelector(`[data-recipe-group-id="${groupId}"]`);
-  const trigger = group.querySelector('.manager-recipe-or-trigger');
-  if (trigger) {
-    trigger.click();
-    await flushRender();
-    document.querySelector(`[data-recipe-add="${addToken}"]`).click();
-  } else {
-    group.querySelector(`.manager-recipe-requirement-adds [data-recipe-add="${addToken}"]`).click();
-  }
+// Open a kind menu from `trigger`, await its render, and choose the item hooked `itemHook`.
+async function pickKind(root, trigger, itemHook) {
+  await openKindMenu(root, trigger);
+  document.querySelector(`.fabricate-action-menu-panel [data-recipe-add="${itemHook}"]`).click();
   await flushRender();
+}
+
+// A requirement's alternatives trigger: the bare row's `or…`, else the box's `Alternative` adder.
+function alternativeTrigger(target, groupId) {
+  const group = target.querySelector(`[data-recipe-group-id="${groupId}"]`);
+  return (
+    group.querySelector('.manager-recipe-or-trigger') ??
+    group.querySelector('[data-recipe-add="alternative"]')
+  );
+}
+
+// Open a BARE row's single "or..." menu.
+async function openOrMenu(target, groupId) {
+  await openKindMenu(target, `[data-recipe-group-id="${groupId}"] .manager-recipe-or-trigger`);
+}
+
+// Choose `alternative-<tone>` from the requirement's alternatives trigger.
+async function pickOrOption(target, groupId, itemHook) {
+  await pickKind(target, alternativeTrigger(target, groupId), itemHook);
+}
+
+// Choose `ingredient-<tone>` from a set's `Ingredient` adder.
+async function addRequirement(target, tone, scope = '[data-recipe-set-id="set-1"]') {
+  await pickKind(target, `${scope} [data-recipe-add="ingredient"]`, `ingredient-${tone}`);
 }
 
 // The four converted Overview cells and the ingredient row's kind picker, each by its own hook on
@@ -1618,8 +1655,7 @@ describe('RecipeEditView (mounted)', () => {
     await flushRender();
 
     // Author the (id-less placeholder) first set with any requirement.
-    target.querySelector('[data-recipe-add="tag-requirement"]').click();
-    await flushRender();
+    await pickKind(target, '[data-recipe-add="ingredient"]', 'ingredient-tag');
 
     const patch = patches.at(-1);
     assert.ok(patch.ingredientSets, 'the first edit materializes the ingredient sets');
@@ -3706,14 +3742,166 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('draws one Ingredient adder whose menu, headed "Add an ingredient", offers the row’s kinds', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const foot = target.querySelector(
+      '[data-recipe-set-id="set-1"] .manager-recipe-ingredient-set-add'
+    );
+    const buttons = [...foot.querySelectorAll('button')];
+    assert.deepEqual(
+      buttons.map((button) => button.getAttribute('data-recipe-add')),
+      ['ingredient'],
+      'one adder'
+    );
+    const [adder] = buttons;
+    assert.equal(adder.textContent.trim(), 'Ingredient');
+    assert.equal(adder.getAttribute('aria-label'), 'Add an ingredient');
+    assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+
+    await openKindMenu(target, adder);
+    assert.equal(
+      document
+        .querySelector('.manager-recipe-ingredient-menu .manager-action-menu-heading')
+        ?.textContent.trim(),
+      'Add an ingredient'
+    );
+    const fromSet = menuHooks(INGREDIENT_MENU_ITEMS);
+    await openOrMenu(target, 'grp-1');
+    assert.deepEqual(
+      fromSet,
+      ['ingredient-component', 'ingredient-tag', 'ingredient-essence', 'ingredient-currency'],
+      'the set adder offers the subset in the kind order'
+    );
+    assert.deepEqual(
+      fromSet.map((hook) => hook.replace('ingredient-', '')),
+      menuHooks().map((hook) => hook.replace('alternative-', '')),
+      'the subset the row’s "or..." offers'
+    );
+    editHarness.remount();
+  });
+
+  it('choosing a kind from the set adder appends it and focuses its name field', async () => {
+    const NAME_FIELD = {
+      component: '[data-recipe-option-search]',
+      tag: '[data-recipe-add-tag]',
+      essence: '[data-recipe-option-search]',
+      currency: '[data-recipe-option-search]',
+    };
+    for (const [tone, field] of Object.entries(NAME_FIELD)) {
+      const { target, patches } = await mountSingleGroup(
+        [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+        {
+          props: {
+            componentOptions: COMPONENT_OPTIONS,
+            itemTags: ITEM_TAGS,
+            currencyUnits: CURRENCY_UNITS,
+            essenceOptions: ESSENCE_OPTIONS,
+          },
+          controlled: true,
+        }
+      );
+      try {
+        await addRequirement(target, tone);
+        await tick();
+        await settle();
+        assert.equal(patches.length, 1, `${tone}: one write`);
+        const groups = patches[0].ingredientSets[0].ingredientGroups;
+        assert.equal(groups.length, 2, `${tone}: a requirement is appended`);
+        assert.equal(groups[1].options.length, 1, `${tone}: holding one option`);
+        const type = tone === 'tag' ? 'tags' : tone;
+        assert.equal(groups[1].options[0].match.type, type, `${tone}: of the chosen kind`);
+        const added = target.querySelectorAll(
+          '[data-recipe-set-id="set-1"] [data-recipe-group]'
+        )[1];
+        const expected = added?.querySelector(field);
+        assert.ok(Boolean(expected), `${tone}: the new row draws ${field}`);
+        assert.ok(document.activeElement === expected, `${tone}: focus lands on its name field`);
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('an empty set adds a tag requirement from its Ingredient adder, focusing its + Tag', async () => {
+    const { target, patches } = await mountIngredientGroups([], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+      controlled: true,
+    });
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.equal(patches.length, 0, 'opening the menu writes nothing');
+    document
+      .querySelector('.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]')
+      .click();
+    await tick();
+    await settle();
+    assert.equal(patches.length, 1, 'exactly one write');
+    const groups = patches[0].ingredientSets[0].ingredientGroups;
+    assert.equal(groups.length, 1, 'carrying one requirement');
+    assert.deepEqual(groups[0].options, [
+      { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } },
+    ]);
+    const addTag = target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add-tag]');
+    assert.ok(Boolean(addTag), 'the new row draws its + Tag');
+    assert.ok(document.activeElement === addTag, 'and focus lands on it');
+    editHarness.remount();
+  });
+
+  it('a refused Ingredient write never moves focus onto a requirement added later', async () => {
+    const herb = {
+      id: 'grp-1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+    };
+    const { target, patches } = await mountIngredientGroups([herb], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+    });
+    await addRequirement(target, 'tag');
+    await tick();
+    await settle();
+    assert.equal(patches.length, 1, 'the adder asks once, and the parent refuses');
+    const resting = document.activeElement;
+    const tagged = { quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } };
+    await editHarness.setProps({
+      recipe: {
+        ...RECIPE,
+        ingredientSets: [
+          {
+            id: 'set-1',
+            name: 'Primary',
+            ingredientGroups: [herb, { id: 'grp-2', options: [tagged] }],
+          },
+        ],
+      },
+    });
+    await tick();
+    await settle();
+    const later = target.querySelector(
+      ':scope [data-recipe-group-id="grp-2"] [data-recipe-add-tag]'
+    );
+    assert.ok(Boolean(later), 'an unrelated update grows the set by a tag requirement');
+    assert.ok(document.activeElement === resting, 'and focus stays where the refusal left it');
+    editHarness.remount();
+  });
+
   // REWRITTEN at issue 1373's maintainer round 5.
   it('appends a requirement carrying an eager id and a quantity of 1', async () => {
     const { target, patches } = await mountIngredientGroups([], {
       set: { name: 'Primary' },
       props: { componentOptions: COMPONENT_OPTIONS },
     });
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
-    await flushRender();
+    await addRequirement(target, 'component');
     assert.equal(patches.length, 1, 'the adder patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
@@ -3722,14 +3910,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a tag requirement (empty tags option, id-less) via Add tag requirement', async () => {
+  it('appends a tag requirement (empty tags option, id-less) via the Ingredient adder', async () => {
     const { target, patches } = await mountIngredientGroups([], {
       set: { name: 'Primary' },
       props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
     });
-    target
-      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="tag-requirement"]')
-      .click();
+    await addRequirement(target, 'tag');
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a tag requirement is appended');
@@ -3766,8 +3952,7 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
       { set: { name: 'Primary' }, props: { componentOptions: COMPONENT_OPTIONS } }
     );
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
-    await flushRender();
+    await addRequirement(target, 'component');
     assert.equal(patches.length, 1, 'the adder patches the recipe');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 2, 'a second, empty requirement is appended');
@@ -4003,11 +4188,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders the multi-alternative box footer as four explicit dashed add-buttons', async () => {
-    // A box (2+ alternatives) drops the compact "or..." popover the bare rows keep and
-    // renders four explicit dashed add-buttons instead (issue 643), each preserving its
-    // data-recipe-add marker. Cost shows only with configured currency, essence only
-    // while the set can still take one.
+  it('draws the box footer as one dashed Alternative adder over the kind menu', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4025,110 +4206,175 @@ describe('RecipeEditView (mounted)', () => {
     const adds = target.querySelector(
       '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
     );
-    assert.ok(adds, 'the box carries an add-button footer');
-    assert.equal(
-      adds.querySelector('.manager-recipe-or-trigger'),
-      null,
-      'the box has no compact "or..." popover'
+    assert.ok(adds, 'the box carries an add footer');
+    assert.ok(
+      !adds.querySelector('.manager-recipe-or-trigger'),
+      'the box draws no "or..." of its own'
     );
-    const buttons = [...adds.querySelectorAll('button[data-recipe-add]')];
-    // COMPONENT, TAG, ESSENCE, CURRENCY.
+    const buttons = [...adds.querySelectorAll('button')];
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('data-recipe-add')),
-      ['alternative-component', 'alternative-tag', 'alternative-essence', 'alternative-cost'],
-      'four dashed add-buttons in order, each keeping its marker'
+      ['alternative'],
+      'exactly one adder'
     );
-    // `alt component` rather than `Add component` (`proto:4692`): inside an `ANY ONE OF` group
-    // every one of these appends an ALTERNATIVE, and `Add component` beside `Add cost` reads as
-    // two different verbs for one act.
-    assert.deepEqual(
-      buttons.map((button) => button.textContent.trim()),
-      ['alt component', 'alt tag', 'alt essence', 'alt currency'],
-      'and each is worded as the alternative it appends'
-    );
-    for (const button of buttons) {
-      assert.ok(button.classList.contains('is-dashed'), 'each add-button is dashed');
-      // …and none of them spans. This is a WRAPPING flex row.
-      assert.ok(
-        !button.classList.contains('is-full-width'),
-        `a wrapping-row add must not span: ${button.className}`
-      );
-    }
+    const [adder] = buttons;
+    assert.equal(adder.textContent.trim(), 'Alternative');
+    assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
+    assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(!adder.classList.contains('is-full-width'), 'and does not span its wrapping row');
+    assert.doesNotMatch(target.textContent, /\balt (component|tag|essence|currency)\b/);
     editHarness.remount();
   });
 
-  it('the "or..." menu and the box adders offer the same kinds in the same order', async () => {
-    // design-system: the convert control and the group's adder state one subset in one order.
-    // `ui-entity-editors` keeps the box's four `alt <kind>` adders, so the adders are the second
-    // trigger; currency keeps its `cost` hook on the adder, so both read back as kinds.
-    const KIND_OF = {
-      'alternative-component': 'component',
-      'alternative-tag': 'tags',
-      'alternative-essence': 'essence',
-      'alternative-currency': 'currency',
-      'alternative-cost': 'currency',
-    };
+  it('the "or..." menu and the box adder open one menu: heading, hooks, labels and order', async () => {
     const base = { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS };
     const allDisabled = ESSENCE_OPTIONS.map((essence) => ({ ...essence, enabled: false }));
     const cases = [
       [
         { ...base, currencyUnits: CURRENCY_UNITS, essenceOptions: ESSENCE_OPTIONS },
-        ['component', 'tags', 'essence', 'currency'],
+        ['component', 'tag', 'essence', 'currency'],
       ],
-      [base, ['component', 'tags']],
-      [{ ...base, currencyUnits: CURRENCY_UNITS, currencyEnabled: false }, ['component', 'tags']],
-      [{ ...base, essenceOptions: allDisabled }, ['component', 'tags', 'essence']],
+      [base, ['component', 'tag']],
+      [{ ...base, currencyUnits: CURRENCY_UNITS, currencyEnabled: false }, ['component', 'tag']],
+      [{ ...base, essenceOptions: allDisabled }, ['component', 'tag', 'essence']],
     ];
-    const kindsOf = (nodes) => nodes.map((node) => KIND_OF[node.getAttribute('data-recipe-add')]);
 
     // Each mount is torn down even when an assertion fails, so a stale menu never reaches the next.
-    async function readMounted(options, props, read) {
+    async function readMenu(options, props) {
       const { target } = await mountSingleGroup(options, { props });
       try {
-        return await read(target);
+        await openKindMenu(target, alternativeTrigger(target, 'grp-1'));
+        const group = target.querySelector('[data-recipe-group-id="grp-1"]');
+        return {
+          heading: document
+            .querySelector('.manager-recipe-or-menu .manager-action-menu-heading')
+            ?.textContent.trim(),
+          items: [...document.querySelectorAll(OR_MENU_ITEMS)].map((item) => [
+            item.getAttribute('data-recipe-add'),
+            item.textContent.trim(),
+          ]),
+          converting: [...group.querySelectorAll('[data-recipe-option]')].filter((row) =>
+            row.querySelector('.manager-recipe-or-trigger')
+          ).length,
+        };
       } finally {
         editHarness.remount();
       }
     }
 
-    for (const [props, expected] of cases) {
+    for (const [props, tones] of cases) {
       const named = JSON.stringify(Object.keys(props));
-      const fromMenu = await readMounted(
+      const fromRow = await readMenu(
         [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
-        props,
-        async (target) => {
-          await openOrMenu(target, 'grp-1');
-          return kindsOf([
-            ...document.querySelectorAll('.manager-recipe-or-menu [role="menuitem"]'),
-          ]);
-        }
+        props
       );
-      const box = await readMounted(
+      const fromBox = await readMenu(
         [
           { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
           { quantity: 1, match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } },
         ],
-        props,
-        (target) => {
-          const group = target.querySelector('[data-recipe-group-id="grp-1"]');
-          const members = [...group.querySelectorAll('[data-recipe-option]')];
-          return {
-            fromAdders: kindsOf([
-              ...group.querySelectorAll('.manager-recipe-requirement-adds [data-recipe-add]'),
-            ]),
-            members: members.length,
-            converting: members.filter((row) =>
-              row.querySelector('.manager-recipe-or-trigger, .fabricate-action-menu')
-            ).length,
-          };
-        }
+        props
       );
-      assert.deepEqual(fromMenu, expected, `the menu's kinds for ${named}`);
-      assert.deepEqual(box.fromAdders, fromMenu, `both triggers offer one list for ${named}`);
-      // No member row converts: the box's adders are its only way to add an alternative.
-      assert.equal(box.members, 2);
-      assert.equal(box.converting, 0, 'no member row renders the convert control');
+      assert.deepEqual(
+        fromRow.items.map(([hook]) => hook),
+        tones.map((tone) => `alternative-${tone}`),
+        `the "or..." menu's kinds for ${named}`
+      );
+      assert.equal(fromRow.heading, 'Accept instead');
+      assert.deepEqual(fromBox, { ...fromRow, converting: 0 }, `one menu from both for ${named}`);
     }
+  });
+
+  it('choosing a kind from the box adder appends it and focuses its name field, not the adder', async () => {
+    const NAME_FIELD = { component: '[data-recipe-option-search]', tag: '[data-recipe-add-tag]' };
+    const EMPTY = {
+      component: { type: 'component', componentId: null },
+      tag: { type: 'tags', tags: [], tagMatch: 'any' },
+    };
+    for (const [tone, field] of Object.entries(NAME_FIELD)) {
+      const { target, patches } = await mountSingleGroup(
+        [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+        ],
+        { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS }, controlled: true }
+      );
+      try {
+        const adder = alternativeTrigger(target, 'grp-1');
+        await pickKind(target, adder, `alternative-${tone}`);
+        await tick();
+        await settle();
+        assert.equal(patches.length, 1, `${tone}: one write`);
+        const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
+        assert.deepEqual(options[2], { quantity: 1, match: EMPTY[tone] }, `${tone}: born empty`);
+        const rows = target.querySelectorAll('[data-recipe-group-id="grp-1"] [data-recipe-option]');
+        assert.equal(rows.length, 3, `${tone}: the box draws the new alternative`);
+        const expected = rows[2].querySelector(field);
+        assert.ok(Boolean(expected), `${tone}: the new row draws ${field}`);
+        assert.ok(document.activeElement === expected, `${tone}: focus lands on its name field`);
+        assert.ok(document.activeElement !== adder, `${tone}: and not on the adder`);
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('a refused Alternative write never moves focus onto an alternative added later', async () => {
+    const options = [
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+    ];
+    const { target, patches } = await mountSingleGroup(options, {
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+    });
+    await pickKind(target, alternativeTrigger(target, 'grp-1'), 'alternative-component');
+    await tick();
+    await settle();
+    assert.equal(patches.length, 1, 'the adder asks once, and the parent refuses');
+    const resting = document.activeElement;
+    const tagged = { quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } };
+    await editHarness.setProps({
+      recipe: {
+        ...RECIPE,
+        ingredientSets: [
+          { id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [...options, tagged] }] },
+        ],
+      },
+    });
+    await tick();
+    await settle();
+    const rows = target.querySelectorAll(
+      ':scope [data-recipe-group-id="grp-1"] [data-recipe-option]'
+    );
+    assert.equal(rows.length, 3, 'an unrelated update grows the box by a tag alternative');
+    assert.ok(document.activeElement === resting, 'and focus stays where the refusal left it');
+    editHarness.remount();
+  });
+
+  it('Escape closes the box adder’s menu and returns focus to the adder', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+    );
+    const adder = alternativeTrigger(target, 'grp-1');
+    await openKindMenu(target, adder);
+    await tick();
+    await settle();
+    const item = document.querySelector(OR_MENU_ITEMS);
+    assert.ok(document.activeElement === item, 'opening focuses the first item');
+    item.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    );
+    await tick();
+    await settle();
+    assert.ok(!document.querySelector(OR_MENU_ITEMS), 'the menu closes');
+    assert.ok(document.activeElement === adder, 'focus returns to the adder');
+    assert.equal(patches.length, 0, 'and nothing is written');
+    editHarness.remount();
   });
 
   it('choosing a kind moves focus to the new alternative’s name field', async () => {
@@ -4158,27 +4404,6 @@ describe('RecipeEditView (mounted)', () => {
         editHarness.remount();
       }
     }
-  });
-
-  it('drops the cost and essence box buttons when the system configures neither', async () => {
-    const { target } = await mountSingleGroup(
-      [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
-      ],
-      { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
-    );
-    const adds = target.querySelector(
-      '[data-recipe-group-id="grp-1"] .manager-recipe-requirement-adds'
-    );
-    assert.deepEqual(
-      [...adds.querySelectorAll('button[data-recipe-add]')].map((button) =>
-        button.getAttribute('data-recipe-add')
-      ),
-      ['alternative-component', 'alternative-tag'],
-      'only component and tag buttons without currency units or system essences'
-    );
-    editHarness.remount();
   });
 
   it('offers FOUR kinds in the "or..." menu, each keeping its data-recipe-add token', async () => {
@@ -4336,9 +4561,10 @@ describe('RecipeEditView (mounted)', () => {
     await openOrMenu(target, 'grp-1');
 
     // No option-group headings (flat list) and no essence choice at all.
-    assert.ok(!target.querySelector('[data-popover-group]'), 'the menu is a flat list');
-    assert.ok(
-      !target.querySelector('[data-recipe-add="alternative-essence"]'),
+    assert.ok(!document.querySelector('[data-popover-group]'), 'the menu is a flat list');
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
       'no essence alternative without system essences'
     );
     editHarness.remount();
@@ -4350,17 +4576,10 @@ describe('RecipeEditView (mounted)', () => {
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
     await openOrMenu(target, 'grp-1');
-    assert.ok(document.querySelector('[data-recipe-add="alternative-component"]'));
-    assert.ok(document.querySelector('[data-recipe-add="alternative-tag"]'));
-    assert.equal(
-      document.querySelector('[data-recipe-add="alternative-currency"]'),
-      null,
-      'no currency choice without configured currency units'
-    );
-    assert.equal(
-      document.querySelector('[data-recipe-add="alternative-essence"]'),
-      null,
-      'no essence choice without system essences'
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
+      'no currency choice without units, and no essence choice without essences'
     );
     editHarness.remount();
   });
@@ -4409,14 +4628,13 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    // A 2-option group renders the box footer of dashed add-buttons.
-    assert.ok(
-      target.querySelector(
-        '[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]'
-      ),
+    await openKindMenu(target, alternativeTrigger(target, 'grp-1'));
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag', 'alternative-essence'],
       'the essence alternative stays available even with an essence already present'
     );
-    assert.equal(patches.length, 0, 'rendering authors nothing');
+    assert.equal(patches.length, 0, 'opening the menu authors nothing');
     editHarness.remount();
   });
 
@@ -4618,12 +4836,12 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('appends a currency requirement (one currency option, id-less) via set-level Add cost', async () => {
+  it('appends a currency requirement (one currency option, id-less) via the Ingredient adder', async () => {
     const { target, patches } = await mountIngredientGroups([], {
       set: { name: 'Primary' },
       props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: CURRENCY_UNITS },
     });
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="cost"]').click();
+    await addRequirement(target, 'currency');
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a currency requirement is appended');
@@ -4712,26 +4930,28 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('hides every Add cost control when the system defines no currency units', async () => {
+  it('offers no Currency from any trigger when the system defines no currency units', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, currencyUnits: [] } }
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="cost"]'),
-      null,
-      'no set-level Add cost button'
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.deepEqual(
+      menuHooks(INGREDIENT_MENU_ITEMS),
+      ['ingredient-component', 'ingredient-tag'],
+      'the set adder offers no Currency'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="alternative-cost"]'),
-      null,
-      'no row-level Add cost button'
+    await openOrMenu(target, 'grp-1');
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
+      'nor does the row'
     );
     editHarness.remount();
   });
 
   // The normalizer seeds preset units even when currency is DISABLED.
-  it('hides every Add cost control when currency is disabled despite seeded units', async () => {
+  it('offers no Currency from any trigger when currency is disabled despite seeded units', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4745,15 +4965,17 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="cost"]'),
-      null,
-      'no set-level Add cost button'
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.deepEqual(
+      menuHooks(INGREDIENT_MENU_ITEMS),
+      ['ingredient-component', 'ingredient-tag'],
+      'the set adder offers no Currency'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-add="alternative-cost"]'),
-      null,
-      'no requirement-level Add cost button'
+    await openKindMenu(target, alternativeTrigger(target, 'grp-1'));
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
+      'nor does the box adder'
     );
     editHarness.remount();
   });
@@ -4770,15 +4992,15 @@ describe('RecipeEditView (mounted)', () => {
       }
     );
     await openOrMenu(target, 'grp-1');
-    assert.equal(
-      document.querySelector('[data-recipe-add="alternative-currency"]'),
-      null,
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag'],
       'the "or..." Accept-instead menu offers no Currency choice'
     );
     editHarness.remount();
   });
 
-  it('shows the Add cost controls when currency is enabled with units', async () => {
+  it('offers Currency from the set and box adders when currency is enabled with units', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4792,13 +5014,17 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    assert.ok(
-      target.querySelector('[data-recipe-add="cost"]'),
-      'the set-level Add cost button renders'
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.deepEqual(
+      menuHooks(INGREDIENT_MENU_ITEMS),
+      ['ingredient-component', 'ingredient-tag', 'ingredient-currency'],
+      'the set adder offers Currency'
     );
-    assert.ok(
-      target.querySelector('[data-recipe-add="alternative-cost"]'),
-      'the requirement-level Add cost button renders'
+    await openKindMenu(target, alternativeTrigger(target, 'grp-1'));
+    assert.deepEqual(
+      menuHooks(),
+      ['alternative-component', 'alternative-tag', 'alternative-currency'],
+      'and so does the box adder'
     );
     editHarness.remount();
   });
@@ -4844,9 +5070,8 @@ describe('RecipeEditView (mounted)', () => {
       set: { name: 'Primary' },
       props: { componentOptions: COMPONENT_OPTIONS },
     });
-    target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="component"]').click();
-    await flushRender();
-    assert.equal(patches.length, 1, 'the adder patches the recipe directly, with no popover');
+    await addRequirement(target, 'component');
+    assert.equal(patches.length, 1, 'choosing a kind patches the recipe once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
     assert.deepEqual(
@@ -5327,10 +5552,7 @@ describe('RecipeEditView (mounted)', () => {
       { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
 
-    target
-      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
-      .click();
-    await flushRender();
+    await pickOrOption(target, 'grp-1', 'alternative-essence');
     const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
     assert.equal(options.at(-1).match.essenceId, '', 'the alternative names no essence at all');
 
@@ -5367,10 +5589,7 @@ describe('RecipeEditView (mounted)', () => {
     const { target, patches } = await mountIngredientGroups([], {
       props: { essenceOptions: MIXED_ESSENCE_OPTIONS },
     });
-    target
-      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
-      .click();
-    await flushRender();
+    await addRequirement(target, 'essence');
     assert.equal(
       patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.essenceId,
       '',
@@ -5439,14 +5658,14 @@ describe('RecipeEditView (mounted)', () => {
     ];
     const { target } = await mountIngredientGroups([], { props: { essenceOptions: allDisabled } });
 
-    // `hasEssences` reads the UNFILTERED prop deliberately. Gating it on the offer would
+    // The essence gate reads the UNFILTERED prop deliberately. Gating it on the offer would
     // remove essence requirements entirely from such a system — including the ability to
     // see and clear the ones it already has.
-    assert.ok(
-      Boolean(
-        target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
-      ),
-      'the set-level essence add still renders'
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.deepEqual(
+      menuHooks(INGREDIENT_MENU_ITEMS),
+      ['ingredient-component', 'ingredient-tag', 'ingredient-essence'],
+      'the set adder still offers Essence'
     );
     editHarness.remount();
   });
@@ -5456,10 +5675,7 @@ describe('RecipeEditView (mounted)', () => {
     const { target, patches } = await mountIngredientGroups([], {
       props: { essenceOptions: ESSENCE_OPTIONS },
     });
-    target
-      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
-      .click();
-    await flushRender();
+    await addRequirement(target, 'essence');
     assert.equal(patches.length, 1, 'the adder patches the recipe');
     const set = patches[0].ingredientSets[0];
     assert.equal(set.essences, undefined, 'no per-set essences map is written');
@@ -5474,13 +5690,13 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('omits the set-level "Add essence requirement" control when the system has no essences', async () => {
+  it('omits Essence from the set adder when the system has no essences', async () => {
     const { target } = await mountIngredientGroups([], { props: { essenceOptions: [] } });
-    assert.ok(target.querySelector('[data-recipe-set-id="set-1"]'), 'the set still renders');
-    assert.equal(
-      target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]'),
-      null,
-      'no set-level essence add without essences'
+    await openKindMenu(target, '[data-recipe-set-id="set-1"] [data-recipe-add="ingredient"]');
+    assert.deepEqual(
+      menuHooks(INGREDIENT_MENU_ITEMS),
+      ['ingredient-component', 'ingredient-tag'],
+      'no Essence entry without essences'
     );
     editHarness.remount();
   });
@@ -5508,11 +5724,11 @@ describe('RecipeEditView (mounted)', () => {
     await flushRender();
     target.querySelector('[data-sortable-disclosure="sa"]').click();
     await flushRender();
-    target
-      .querySelector(
-        '[data-recipe-section="step-sa-ingredients"] [data-recipe-set-id="set-1"] [data-recipe-add="tag-requirement"]'
-      )
-      .click();
+    await addRequirement(
+      target,
+      'tag',
+      '[data-recipe-section="step-sa-ingredients"] [data-recipe-set-id="set-1"]'
+    );
     assert.equal(updates.length, 1, 'onUpdateStep invoked once');
     assert.equal(updates[0][0], 'sa', 'patches the right step');
     assert.equal(

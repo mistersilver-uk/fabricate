@@ -72,12 +72,12 @@ export function kindMeta(matchType) {
 
 /**
  * The kind menu's `ActionMenu` items: the offered `kinds` in table order, each carrying its glyph,
- * its tone and the `data-recipe-add="<hook>-<tone>"` hook. The convert menu, a choice group's
- * adders and a result set's adder all read this list, so they state one subset in one order.
+ * its tone and the `data-recipe-add="<hook>-<tone>"` hook. Every trigger of the kind menu reads
+ * this list, so the convert control and each adder state one subset in one order.
  *
  * @param {ReadonlyArray<string>} kinds the surface's offered match types or result kinds
  * @param {(key: string, fallback: string) => string} [translate] the caller's localizer
- * @param {string} [hook] the hook's prefix: `alternative`, or `result` on a result set's adder
+ * @param {string} [hook] the hook's prefix: `alternative`, `ingredient` or `result`
  */
 export function kindMenuItems(
   kinds,
@@ -89,6 +89,24 @@ export function kindMenuItems(
     const data = { 'data-recipe-add': `${hook}-${tone}` };
     return { id: kind, label: translate(labelKey, label), icon, tone, data };
   });
+}
+
+/**
+ * The match types an ingredient surface offers: component and tag always, essence while the
+ * system has any essence, and currency while its feature is enabled AND units exist, because
+ * preset units are seeded even for a disabled system.
+ */
+export function offeredIngredientKinds({
+  essenceOptions = [],
+  currencyUnits = [],
+  currencyEnabled = true,
+} = {}) {
+  return [
+    'component',
+    'tags',
+    ...((essenceOptions || []).length > 0 ? ['essence'] : []),
+    ...(currencyEnabled && (currencyUnits || []).length > 0 ? ['currency'] : []),
+  ];
 }
 
 const AMOUNT_ON_MATCH = new Set(['essence', 'currency']);
@@ -185,6 +203,9 @@ function retyped(entry, kind) {
       : { type: 'component', componentId: null };
   return { ...entry, quantity: shownAmount(entry?.quantity), match };
 }
+
+/** A new ingredient option of `kind` carrying no value, for the row's own field to name. */
+export const emptyIngredientOption = (kind) => retyped({}, kind);
 
 function ingredientFrom(entry, before, value) {
   const { kind } = before;

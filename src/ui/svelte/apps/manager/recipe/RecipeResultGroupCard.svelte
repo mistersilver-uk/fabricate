@@ -4,7 +4,7 @@
   a fixed or rolled amount, drawn through the result-side `ChoiceGroup`, which also draws a choice
   group's box; or on a progressive stage a component with a DC and an Edit link in its `trailing`.
   Emitted as a shallow-updated copy through `onChange(nextGroup)`. On a recipe every item it
-  creates carries an id and its kind's empty subject (`RecipeResultAdder`), and focus moves to its
+  creates carries an id and its kind's empty subject (`KindAdder`), and focus moves to its
   name field; on a gathering task it names the picked component. An empty group or an unnamed item
   is gated at the save path (`Recipe.validate`), not here, and on a non-terminal step an empty group
   is a finished state rather than a draft (issue 1907).
@@ -22,7 +22,7 @@
   import { emptyResult, fromValue, toValue } from './pickerRowKinds.js';
   import { newDraftId as newId } from './resultGroupEdits.js';
   import { componentCatalogue, withAddedResult } from './resultRows.js';
-  import RecipeResultAdder from './RecipeResultAdder.svelte';
+  import KindAdder from './KindAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -181,6 +181,13 @@
     pendingFocus = { at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL };
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
+
+  const addAResult = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Recipe.AddAResult', 'Add a result')
+  );
+  const stageLabel = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+  );
 
   // Always appends, the row naming its own subject: a recipe set never bumps a quantity, and a
   // progressive award loop ignores `quantity`, so repeating a component asks for more of it.
@@ -444,11 +451,16 @@
 
 {#snippet resultAdder()}
   {#if recipeSurface}
-    <RecipeResultAdder
+    <KindAdder
       {kinds}
-      label={progressive
-        ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-        : ''}
+      word={progressive
+        ? stageLabel
+        : localizeOr('FABRICATE.Admin.Manager.Recipe.ResultAdder', 'Result')}
+      name={progressive ? stageLabel : addAResult}
+      heading={addAResult}
+      hook="result"
+      triggerHook="result-item"
+      menuClass="manager-recipe-or-menu manager-recipe-result-menu"
       onAdd={addItem}
     />
   {:else}

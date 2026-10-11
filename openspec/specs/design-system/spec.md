@@ -1559,7 +1559,7 @@ When a value is picked the search is replaced by the subject cell at its fixed w
 The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
 That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.
 
-The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adders MUST all state the same subset.
+The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adder MUST all state the same subset.
 A downtime activity awards what a patron can hand over, so it offers `component`, `currency` and `knowledge` — teaching a recipe is a reward a patron can give.
 A gathering task offers `component`, and `currency` once gathering currency ships; until then it offers `component` alone.
 It hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
@@ -1621,6 +1621,12 @@ Naming the adders after the kinds would state the menu's own list twice.
 - **THEN** its kind select offers component alone, gathering currency being NOT SHIPPED here
 - **AND** its convert menu and the set's adder offer that same subset
 
+#### Scenario: Both triggers open one kind menu
+
+- **WHEN** a GM opens the kind menu from a standalone row's convert control and from a choice group's `Alternative` adder
+- **THEN** both menus carry the same heading and the same kinds in the same order, the heading being "Accept instead" on the ingredient side and "Add an alternative" on the result side
+- **AND** choosing a kind from either appends an empty row of that kind and moves focus to its name field
+
 ### Requirement: Simple and alchemy carry a reserved failure set
 
 `simple` and alchemy-simple do not route: one ingredient set, one success result set, and nothing to assign.
@@ -1658,7 +1664,7 @@ A set MUST be renameable in the surface that shows it, because every other surfa
 A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
-It ships as `ChoiceGroup` in both forms, the result-side form adding the award header; its alternative adders follow `ui-entity-editors` rather than the specimen, recorded `divergent` (issue 1516).
+It ships as `ChoiceGroup` in both forms, the result-side form adding the award header, and its one `Alternative` adder opens the kind menu a standalone row's convert control opens.
 On the ingredient side it is exactly that OR: the crafter spends one alternative and the rest are untouched.
 On the RESULT side the bundle is not always exclusive — its award strategy states how many of its alternatives are handed over — so the name is retained for the shape the two sides share, which is a set of alternatives authored as one thing, rather than for the cardinality, which differs by side.
 Where the two documents are read together, they name one thing.
@@ -2176,6 +2182,10 @@ Its shipped composition is `apps/PlayerDetailHeader.svelte`, which renders the p
 A pane with no identity row of its own — the alchemy Workbench, the inventory bulk panel — still carries at most one primary, beside the flow it commits.
 The player window carries NO premium signal in any state.
 A player never authors a choice group, and MAY pick from a result-side choice group whose chooser is the player, at award time, through the requirement chooser's award face.
+Where a player browse column closes with a pagination bar, the bar MUST be that column's footer: its outer box MUST meet the app rail, the window's bottom edge and the border of the pane beside it with no gutter, and the panes beside the browse column MUST be square pane sections divided from it by one rule, not floating cards (this governs the pane containers, not the rows or cards inside them).
+In the stacked layout (below the 960px container breakpoint) the bar MUST span the window and the next pane's top rule MUST sit directly beneath it.
+Where the browse column shows no bar, its own padding applies.
+A compact pager (`density="compact"`) is not a column footer and is not governed by this rule.
 
 #### Scenario: A new GM browse surface is built
 
@@ -2194,6 +2204,13 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 - **WHEN** a player pane's commit verb is unavailable
 - **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
 - **AND** no second-choice verb takes its place
+
+#### Scenario: A browse column closes with a pager
+
+- **WHEN** a player browse column closes with a pagination bar
+- **THEN** the bar meets the app rail, the window's bottom edge and the adjacent pane's border with no gutter
+- **AND** the adjacent pane is a square pane section divided by one rule
+- **AND** in the stacked layout the bar spans the window
 
 ### Requirement: The application shell renders through the shell primitives
 
