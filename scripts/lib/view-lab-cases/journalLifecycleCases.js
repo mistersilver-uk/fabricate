@@ -5,6 +5,22 @@
 import { JOURNAL_SOURCES } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
+/** Issue 2257 D22: the run kickers in `Kicker`'s muted scale, the switch's well, and the heading they set. */
+const RUN_KICKER = 'font-size: 8.5px; letter-spacing: 0.935px; color: var(--fab-text-muted)';
+const RUN_KICKER_CLAIMS = Object.freeze({
+  'waiting-auto-eligible': [
+    { selector: '[data-run-completion] > :first-child', styles: RUN_KICKER },
+    { selector: '[data-run-completion-switch]', styles: 'box-sizing: border-box; height: 36px' },
+  ],
+  'past-stage': [
+    { selector: '[data-journal-detail] .fab-run-progress-heading .fab-kicker', styles: RUN_KICKER },
+    {
+      selector: '[data-journal-detail] .fab-run-progress-heading',
+      styles: 'box-sizing: border-box; height: 11.046875px',
+    },
+  ],
+});
+
 /** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
 export function journalLifecycleCases() {
   const states = [
@@ -736,6 +752,7 @@ export function journalLifecycleCases() {
       ...(state === 'current-choice-closed' && {
         expectCenterHit: '[data-slot-row] button.fab-slot-tile',
       }),
+      ...(RUN_KICKER_CLAIMS[state] && { expectLayout: { controls: RUN_KICKER_CLAIMS[state] } }),
       ...(['narrow', 'wide'].includes(state) && {
         expectLayout: {
           containerSelector: '.journal-view-container',

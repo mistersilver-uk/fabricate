@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+
 import { chromium } from 'playwright';
 import { createRawSnippet } from 'svelte';
 
-import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -26,6 +28,7 @@ const runActionHarness = createHarness(
   [
     component('Button'),
     component('IconButton'),
+    component('Kicker'),
     'src/ui/svelte/components/SegmentedControl.svelte',
   ],
   [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES]
@@ -48,7 +51,7 @@ const essenceHarness = createHarness('EssencePool', [
 ]);
 const progressHarness = createHarness(
   'RunProgress',
-  [component('FillBar'), component('StageBars')],
+  [component('FillBar'), component('Kicker'), component('StageBars')],
   [...FOUNDRY_BRIDGE_RAW_MODULES]
 );
 const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
@@ -216,6 +219,13 @@ describe('run primitives mounted behavior', () => {
       ),
       ['cancel-arm', 'pause', 'completion', 'primary'],
       'the four action families keep their fixed order'
+    );
+    const completionRow = target.querySelector('[data-run-completion]');
+    assert.equal(completionRow.querySelector(':scope > .fab-kicker').textContent, 'Complete');
+    assert.equal(
+      completionRow.querySelectorAll(':scope > :not(.fab-kicker):not([data-run-completion-switch])').length,
+      0,
+      'the completion holds only the shared kicker and the switch'
     );
     const completion = target.querySelector('input[value="worldTime"]');
     completion.click();
@@ -828,7 +838,7 @@ describe('run primitives mounted behavior', () => {
     try {
       const page = await browser.newPage();
       await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
-        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${readStylesheet()}</style>
         <style>${styles.join('\n')}</style></head>
         <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
         <div data-rail style="width:200px">${target.innerHTML}</div>
@@ -1018,10 +1028,20 @@ describe('run primitives mounted behavior', () => {
     assert.equal(progress.querySelectorAll('[data-stage-bars-stage]').length, 8);
     assert.equal(progress.querySelector('[data-run-progress-blocker]').textContent, 'Materials needed');
     const group = progress.querySelector('[role="group"]');
+    const label = progress.querySelector(`[id="${group.getAttribute('aria-labelledby')}"]`);
+    assert.ok(label?.parentElement?.classList.contains('fab-run-progress-heading'), 'the group is named by the heading');
+    assert.deepEqual(
+      [...label.children].map((child) => child.classList[0]),
+      ['fab-kicker'],
+      'the id wrapper holds only the shared kicker'
+    );
+    assert.equal(label.textContent, 'Progress');
     assert.equal(
-      group.getAttribute('aria-labelledby'),
-      progress.querySelector('.fab-run-progress-kicker').id,
-      'the drawn kicker names the stage group'
+      [...label.parentElement.querySelectorAll(':scope > :not(.fab-kicker):not([data-run-progress-blocker])')].filter(
+        (child) => child !== label
+      ).length,
+      0,
+      'the heading holds only the kicker wrapper and the blocker'
     );
     assert.ok(!group.hasAttribute('aria-label'), 'exactly one naming route');
     assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the run heading draws no captions');

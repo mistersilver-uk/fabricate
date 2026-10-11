@@ -6,16 +6,19 @@
  * content difference to explain it. A previous round answered "the cards are equal height"
  * by looking at that same image, which is how the defect survived a review.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test from 'node:test';
+
 import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',

@@ -11,6 +11,7 @@ import {
   NOT_A_PRIMITIVE,
   RULED_OUT,
 } from '../scripts/lib/designSystemPrimitives.js';
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
 import { readDeclaration } from './helpers/apiConvention.js';
@@ -996,7 +997,7 @@ const STYLESHEET = 'styles/fabricate.css';
 
 /** Its rules, as selector lists. */
 const STYLESHEET_SELECTORS = selectorListsIn(
-  styleTextFor(STYLESHEET, readFileSync(path.join(REPO_ROOT, STYLESHEET), 'utf8'))
+  styleTextFor(STYLESHEET, readStylesheet())
 );
 
 /**

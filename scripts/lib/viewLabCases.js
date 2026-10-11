@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { logicalStylesheetPath } from './stylesheetSource.js';
 import {
   BROAD_SIGNAL_CASE_OVERRIDES,
   BROAD_SIGNAL_PATTERN,
@@ -127,6 +128,14 @@ export function normalizePath(filePath) {
     .replace(/^\.\//, '');
 }
 
+/**
+ * A changed set in normalized form, each module-sheet partial standing as `styles/fabricate.css`
+ * by pattern (so a deleted or renamed one still maps), without repeats (issue 1711).
+ */
+function logicalPaths(files) {
+  return [...new Set(files.map((file) => logicalStylesheetPath(normalizePath(file))))];
+}
+
 /** Whether one path can change what a window looks like. */
 export function isUiFile(filePath) {
   return UI_PATH_PATTERN.test(normalizePath(filePath));
@@ -137,7 +146,7 @@ export function isUiFile(filePath) {
  * `lang/` change alongside a render file does, which is why this tests the whole set.
  */
 export function hasUiChanges(files = []) {
-  const normalized = files.map((file) => normalizePath(file));
+  const normalized = logicalPaths(files);
   if (normalized.some((file) => isUiFile(file) || file === LAYOUT_ASSERTION_PATH)) {
     return true;
   }
@@ -896,7 +905,7 @@ function isLabInput(file) {
  */
 export function rendersCapture(files = []) {
   if (hasUiChanges(files)) return true;
-  const productFiles = files.map((file) => normalizePath(file)).filter((file) => !isLabInput(file));
+  const productFiles = logicalPaths(files).filter((file) => !isLabInput(file));
   return mapChangedFilesToCases(productFiles).length > 0;
 }
 
@@ -913,7 +922,7 @@ function selectRenderAndLabCases(renderFiles, labInputs, patches) {
 
 /** Map a changed-file set onto the cases that should be captured. */
 export function mapChangedFilesToCases(files = [], { patches } = {}) {
-  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+  const normalized = logicalPaths(files).filter(Boolean);
   const labInputs = normalized.filter(isLabInput);
   // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
   // is both a lab input and a `.css` file, and it is the lab input rule that governs it.

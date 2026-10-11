@@ -5,12 +5,11 @@
  * `interactable-config-view.test.js` and `interactable-config-actions.test.js`.
  */
 
-import { describe, it, afterEach, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
-import { resolve } from 'node:path';
+import { describe, it, afterEach, before } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
 import {
   planSetEnabled,
@@ -24,13 +23,8 @@ import {
   CONFIG_PANEL_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
-import { componentAstOf } from '../helpers/parsedSource.js';
 import { identifierNames, walkNodes } from '../helpers/moduleAst.js';
-import {
-  attributeExpression,
-  carriesSpread,
-  declaresAttribute,
-} from '../helpers/svelteStructureContract.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import {
   claimsForComponent,
   constantLiteral,
@@ -39,7 +33,11 @@ import {
   structureOf,
   templateNodes,
 } from '../helpers/structureContract.js';
-import { repoRoot } from '../helpers/sourceScan.js';
+import {
+  attributeExpression,
+  carriesSpread,
+  declaresAttribute,
+} from '../helpers/svelteStructureContract.js';
 
 const APP = 'src/ui/InteractableConfigApp.svelte.js';
 const ROOT = 'src/ui/svelte/apps/InteractableConfigRoot.svelte';
@@ -50,7 +48,7 @@ const SELECT = 'src/ui/svelte/components/Select.svelte';
 const POPOVER_LAYOUT = 'src/ui/svelte/util/iconPickerPopover.js';
 
 /** `styles/fabricate.css` is the shipped global sheet, not `src/` text: it stays a text read. */
-const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheetSource = readStylesheet();
 
 /** One mutating seam of the services bag, addressed by name so a claim cannot slide onto another. */
 const seam = (property) => ({ file: APP, member: '_buildServices', property });

@@ -34,6 +34,7 @@
         value={item.severity}
         groupName={item.id}
         ariaLabel={severityLabel}
+        density="field"
       />
       <ToggleCard icon="" title={shownLabel} sub={shownHint} on={item.shown} />
     </Well>

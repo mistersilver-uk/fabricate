@@ -11,6 +11,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
@@ -77,7 +78,7 @@ async function markupOf(componentPath, propsList) {
 const page = ({ rows, routes }) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${SCOPED.map((path) => scopedComponentCss(resolve(repoRoot, path)).css).join('\n')}</style>
 <style>:root{--font-primary:Arial,sans-serif}</style>
 </head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">

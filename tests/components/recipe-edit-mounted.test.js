@@ -1,23 +1,11 @@
-import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it, before, after, beforeEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import {
-  CHOICE_GROUP_RAW_MODULES,
-  CHOICE_GROUP_COMPILED_MODULES,
-  createMountedComponentHarness,
-  KIND_MENU_COMPILED_MODULES,
-  KIND_MENU_RAW_MODULES,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  TYPEAHEAD_RUNE_MODULES,
-} from '../helpers/svelte-component-harness.js';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { Recipe } from '../../src/models/Recipe.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
-import {
-  TOOL_DISPLAY_PRECEDENCE_CASES,
-  flattenToolForRecipeLibrary,
-} from '../helpers/toolDisplayPrecedenceCases.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -33,6 +21,19 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
+  createMountedComponentHarness,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+} from '../helpers/svelte-component-harness.js';
+import {
+  TOOL_DISPLAY_PRECEDENCE_CASES,
+  flattenToolForRecipeLibrary,
+} from '../helpers/toolDisplayPrecedenceCases.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -3237,7 +3238,7 @@ describe('RecipeEditView (mounted)', () => {
   it('1286: the stage row clips itself and puts its padding on its line, so a band reaches the edges', () => {
     // Stated in the sheet, not measurable from the mounted markup. The two `:has()` rules this read
     // are retired: the shared list's row is already a column that clips itself (issue 1512).
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const rowStart = sheet.indexOf('.fabricate-sortable-list-row {');
     assert.notEqual(rowStart, -1, 'the ordered row is still declared');
     const row = sheet.slice(rowStart, sheet.indexOf('}', rowStart));

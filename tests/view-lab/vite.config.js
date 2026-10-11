@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
+import { openServedFile } from './servedFile.js';
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -66,7 +67,7 @@ function staticMount(prefix, root, label) {
         response.setHeader('Content-Type', mimeTypeFor(target));
         // Never cache: a re-harvest must be visible to the very next capture.
         response.setHeader('Cache-Control', 'no-store');
-        createReadStream(target).pipe(response);
+        openServedFile(target).pipe(response);
       });
     },
   };

@@ -4,7 +4,7 @@
  * alone, won by specificity and then by sheet order. A rule this model cannot evaluate that could
  * reach the chip's ground throws, so the model fails closed rather than reading a looser cascade.
  */
-import { readFileSync } from 'node:fs';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 /** The properties that decide whether a chip's ground is opaque. */
 const GROUND_PROPERTIES = new Set(['background', 'background-color', 'opacity']);
@@ -22,9 +22,7 @@ export function injectedCss() {
 }
 
 /** The global sheet, whose descendant chip overrides reach a mounted chip as well. */
-const GLOBAL_SHEET = withoutComments(
-  readFileSync(new URL('../../styles/fabricate.css', import.meta.url), 'utf8')
-);
+const GLOBAL_SHEET = withoutComments(readStylesheet());
 let globalRules = null;
 
 /**

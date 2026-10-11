@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   activeDescendant,
   announceAcross,
@@ -18,7 +20,6 @@ import {
   typeQuery,
 } from '../helpers/listboxKeyboardDriver.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SOURCE_SELECTOR = 'src/ui/svelte/components/EssenceSourceSelector.svelte';
@@ -63,7 +64,7 @@ const chosen = [];
 
 /** The column count the SHEET draws this panel at, read rather than restated. */
 function sheetGridColumns() {
-  const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+  const sheet = readStylesheet();
   const rungs = [
     ...sheet.matchAll(
       /\.fabricate-picker-popover \.manager-travel-popover-options\[data-picker-columns='(\d+)'\] \{([^}]*)\}/g
@@ -549,7 +550,7 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
     // THE MIRROR. The pitch the callback reads is only right while the sheet still draws these
     // tiles at a fixed floor and this gap; a sheet that re-tiled the grid and a callback that
     // kept measuring one tile would disagree silently.
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const tile = sheet.match(
       /\.fabricate-source-picker-popover\.essence-source-picker-popover \.essence-source-picker-option \{([^}]*)\}/
     );

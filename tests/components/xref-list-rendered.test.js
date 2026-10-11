@@ -10,6 +10,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -60,7 +61,7 @@ const CASES = Object.freeze({
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer reset{*,*::before,*::after{box-sizing:border-box}}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 ${['Medallion', 'Kicker', 'XrefList']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}

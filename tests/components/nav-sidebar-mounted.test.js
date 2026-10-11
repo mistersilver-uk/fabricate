@@ -1,10 +1,10 @@
 /** Issue 1777 — `<NavSidebar>`'s two variants, the ARIA each owes, and the group box (issue 2257). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { tick } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { renderWithCascade } from '../helpers/layout-harness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -613,7 +613,7 @@ describe('NavSidebar, labelled variant, the expanded group box in Chromium', () 
     const view = await renderWithCascade(
       `<div class="fabricate fabricate-manager"><div class="manager-body${bodyClass}">` +
         `<aside class="manager-rail">${root.innerHTML}</aside></div></div>`,
-      [readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')],
+      [readStylesheet()],
       { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }
     );
     try {

@@ -15,12 +15,12 @@
  * - the injected `random` mint, so no `Math.random()` literal enters new code (S2245).
  */
 
-import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
@@ -37,6 +37,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const TRIGGER_PICKER = '[data-complication-trigger]';
 const COMPARATOR = '[data-complication-roll-condition-cmp]';
@@ -508,7 +509,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /\.fab-complications-add\s*\{|class="[^"]*\bfab-complications-add\b/,
       'the retired class is gone from CSS and markup'
     );
-    const globalCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const globalCss = readStylesheet();
     // Both selectors moved in issue 1502.
     for (const selector of [
       '.fabricate-button.fabricate-button.fab-manager-button.is-dashed',
