@@ -202,53 +202,41 @@
     "cap": "filter bar — inline form, with sort",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/FilterBar.svelte",
-    "partial": "search and count only",
-    "note": "The search and the count, in the shipped recipe toolbar’s classes and the drawing’s words. The status chips, the scope switch and the sort stay drawn: each is a component, Chip, SegmentedControl or Select, whose styles are its own, which a node array cannot stand up.",
+    "fixture": "FilterBarRecipes",
+    "partial": "no toggles",
+    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so Enabled only and Craftable stay drawn. The sort button carries the caller’s direction word, Asc, where the drawing draws a glyph: a fixture renders no raw element, so it cannot author the `<i>`, and the row’s one `content` is the count.",
     "undrawn": {
-      "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name"
+      "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "all": "an option’s value, not its words",
+      "mine": "an option’s value, not its words",
+      "shared": "an option’s value, not its words",
+      "name": "an option’s value, not its words",
+      "Recipe scope": "the scope switch’s accessible name; the drawing draws no name",
+      "toolbar": "the sort select’s size rung, a value rather than a word",
+      "Sort recipes": "the sort select’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "Toggle sort direction": "the sort button’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "Asc": "the sort button’s direction word, the shipped recipe browser’s; the drawing draws a glyph a fixture cannot author"
     },
-    "props": {
-      "ariaLabel": "Recipe filters"
+    "props": { "ariaLabel": "Recipe filters", "class": "manager-recipe-toolbar" },
+    "data": {
+      "searchLabel": "Search recipes",
+      "scopes": [
+        { "value": "all", "fallback": "All" },
+        { "value": "mine", "fallback": "Mine" },
+        { "value": "shared", "fallback": "Shared" }
+      ],
+      "scope": "all",
+      "scopeLabel": "Recipe scope",
+      "sorts": [{ "value": "name", "label": "Name" }],
+      "sort": "name",
+      "sortSize": "toolbar",
+      "sortLabelKey": "FABRICATE.Admin.Manager.Recipe.SortLabel",
+      "directionKey": "FABRICATE.Admin.Manager.Recipe.SortAscending",
+      "directionLabelKey": "FABRICATE.Admin.Manager.Recipe.ToggleSortDirection",
+      "class": "manager-recipe-sort-direction"
     },
     "content": [
-      {
-        "tag": "div",
-        "attrs": {
-          "class": "manager-recipe-filter-row"
-        },
-        "children": [
-          {
-            "tag": "label",
-            "attrs": {
-              "class": "fabricate-search"
-            },
-            "children": [
-              {
-                "tag": "i",
-                "attrs": {
-                  "class": "fas fa-search",
-                  "aria-hidden": "true"
-                }
-              },
-              {
-                "tag": "input",
-                "attrs": {
-                  "type": "search",
-                  "placeholder": "Search recipes",
-                  "aria-label": "Search recipes"
-                }
-              }
-            ]
-          },
-          {
-            "tag": "span",
-            "attrs": {
-              "class": "manager-recipe-count"
-            },
-            "text": "18 of 412"
-          }
-        ]
-      }
+      { "tag": "span", "attrs": { "class": "manager-recipe-count" }, "text": "18 of 412" }
     ]
   },
   {
