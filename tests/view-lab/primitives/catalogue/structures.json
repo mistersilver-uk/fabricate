@@ -204,7 +204,7 @@
     "path": "src/ui/svelte/components/FilterBar.svelte",
     "fixture": "FilterBarRecipes",
     "partial": "no toggles",
-    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so Enabled only and Craftable stay drawn. The sort button carries the caller’s direction word, Asc, where the drawing draws a glyph: a fixture renders no raw element, so it cannot author the `<i>`, and the row’s one `content` is the count.",
+    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so Enabled only and Craftable stay drawn. The sort button draws only the caller’s direction word, Asc: the shipped button draws its arrow glyph beside that word and the drawing draws the glyph alone, but no shared button takes a glyph as a prop and a fixture may not author an `<i>`, so neither glyph stands live.",
     "undrawn": {
       "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name",
       "all": "an option’s value, not its words",
@@ -215,7 +215,7 @@
       "toolbar": "the sort select’s size rung, a value rather than a word",
       "Sort recipes": "the sort select’s accessible name, the shipped recipe browser’s; the drawing draws no name",
       "Toggle sort direction": "the sort button’s accessible name, the shipped recipe browser’s; the drawing draws no name",
-      "Asc": "the sort button’s direction word, the shipped recipe browser’s; the drawing draws a glyph a fixture cannot author"
+      "Asc": "the sort button’s direction word, as the shipped recipe browser draws it beside its arrow glyph; the drawing draws the glyph alone, and a fixture cannot author either glyph"
     },
     "props": { "ariaLabel": "Recipe filters", "class": "manager-recipe-toolbar" },
     "data": {
