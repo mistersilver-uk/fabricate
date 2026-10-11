@@ -8,6 +8,7 @@ import {
   CRAFTING_SHARED,
   PLAYER_DETAIL_HEADER,
   PLAYER_VIEW_STATE,
+  PROGRESSIVE_STAGE_PARTS,
 } from './caseConstants.js';
 import {
   CARD,
@@ -312,6 +313,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
+      PROGRESSIVE_STAGE_PARTS,
       /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
@@ -325,6 +327,30 @@ export const CASES = Object.freeze([
       ':not(:has([data-progressive-stage-complication="hb-comp-dust-spoiled"]))' +
       ' [data-progressive-stage="hb-salv-alembic-r1"]' +
       ':not(:has([data-progressive-stage-complications]))',
+  }),
+  playerCase({
+    id: 'player-salvage-narrow',
+    label: 'Player app — Salvage narrow',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    // The progressive salvage stage list at the narrowest two-column width, where the inspector is about 370px.
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Cracked Alembic' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-herbalism:hb-cracked-alembic"] .inventory-card-button',
+      },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
+    ],
+    position: { width: 1064, height: 860 },
+    kinds: ['player', 'inventory', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      PROGRESSIVE_STAGE_PARTS,
+    ],
+    expectSelector: '[data-inventory-salvage-panel="progressive"] [data-progressive-stage]',
   }),
   playerCase({
     id: 'player-salvage-no-check',
@@ -813,6 +839,7 @@ export const CASES = Object.freeze([
       { selector: '[data-progressive-stage-move-down]' },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
     ],
+    sourceMatches: [...BULK_DEFAULTS.sourceMatches, PROGRESSIVE_STAGE_PARTS],
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-complication-group="lab-herbalism:hb-cracked-alembic"] ' +
