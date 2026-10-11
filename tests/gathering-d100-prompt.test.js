@@ -85,32 +85,42 @@ const d100Answer = (roll, situationalBonus) => ({
 });
 
 /**
- * A `Roll` double: `1d100` rolls the next face, any other formula `bonusTotal`; `validate` refuses
- * a formula naming `bad`. Every evaluation and post is recorded on `dice`.
+ * A `Roll` double: `1d100` rolls the next face, `@key` reads its roll data, any other formula
+ * `bonusTotal`; `validate` refuses a formula naming `bad`. Every evaluation, with the roll data it
+ * was built with and its options, and every post is recorded on `dice`.
  */
 function stubDice({ faces = [50], bonusTotal = 0, throwsOn = null } = {}) {
-  const dice = { evaluated: [], posts: [], created: [] };
+  const dice = { evaluated: [], evaluations: [], posts: [], created: [] };
   const queue = [...faces];
+  const totalOf = (formula, data) => {
+    if (formula === '1d100') return queue.shift() ?? 1;
+    const reference = /^@(\w+)$/u.exec(formula);
+    return reference ? Number(data?.[reference[1]]) : bonusTotal;
+  };
   class FakeRoll {
     formula;
+    data;
     total;
 
+    // Builds through `this`, so a detached call fails as it does on Foundry's `Roll`.
     static validate(formula) {
-      return !String(formula).includes('bad');
+      return !String(new this(formula).formula).includes('bad');
     }
 
     static fromData(data) {
       return Object.assign(new FakeRoll(data.formula), { total: data.total });
     }
 
-    constructor(formula) {
+    constructor(formula, data = {}) {
       this.formula = formula;
+      this.data = data;
     }
 
-    async evaluate() {
+    async evaluate(options) {
       if (throwsOn?.test(this.formula)) throw new Error('dice offline');
-      this.total = this.formula === '1d100' ? (queue.shift() ?? 1) : bonusTotal;
+      this.total = totalOf(this.formula, this.data);
       dice.evaluated.push(this.formula);
+      dice.evaluations.push({ formula: this.formula, data: this.data, options });
       return this;
     }
 
@@ -470,21 +480,6 @@ test('the d100 descriptor is the same on every read, so an answer stands for a r
   assert.deepEqual(second, first);
 });
 
-test('the d100 check flavour names a visible task and an unrevealed blind task generically', async () => {
-  const visible = await describeStartedRun(
-    engineWorld({ fixture: herbFixture({ taskName: 'Forage Herbs' }) })
-  );
-  assert.equal(visible.privateEvaluation.flavor, 'Forage Herbs — Gathering check');
-
-  const blind = await describeStartedRun(
-    engineWorld({ fixture: { ...herbFixture({ selectionMode: 'blind' }), taskId: null } })
-  );
-  assert.equal(
-    blind.privateEvaluation.flavor,
-    'FABRICATE.Gathering.BlindTaskLabel — Gathering check'
-  );
-});
-
 // The stage resolves with the answer.
 
 test('the answered face and bonus decide the item row, and the record keeps the face', async () => {
@@ -533,6 +528,25 @@ test('every event roll receives the answered bonus', async () => {
   assert.deepEqual(flat.record.checkResult.events, [], 'without the bonus it does not');
 });
 
+test('an event never takes the answered face as its roll', async () => {
+  const fixture = herbFixture({ dropRate: 0 });
+  fixture.environment.events = [{ id: 'ev-storm', name: 'Storm', dropRate: 45, enabled: true }];
+  const attempt = await runRealGatheringAttempt({
+    ...fixture,
+    sources: SOURCES,
+    versioned: true,
+    resolvedCheckResult: d100Answer(5, 10),
+    rolls: [50],
+  });
+  assert.equal(attempt.error, null, JSON.stringify(attempt.error));
+  assert.equal(attempt.record.checkResult.roll, 5);
+  assert.deepEqual(
+    attempt.record.checkResult.events.map((event) => event.id),
+    ['ev-storm'],
+    "the event rolls its own 50 plus 10, never the face's 5 plus 10"
+  );
+});
+
 test('a face outside 1 to 100 falls back to the d100 seam, and the bonus still applies', async () => {
   for (const face of [null, 0, 101, 50.5]) {
     const attempt = await runRealGatheringAttempt({
@@ -569,6 +583,7 @@ test('a routed task handed a d100 answer resolves as misconfigured and awards no
     ['TASK_MISCONFIGURED'],
     JSON.stringify(attempt.response)
   );
+  assert.equal(attempt.response.blockedReasons[0].data.code, 'CHECK_MODE_MISMATCH');
 });
 
 // The GM evaluator.
@@ -619,9 +634,15 @@ test('a dice bonus is rolled once, rides with the 1d100, and clears or misses by
     [10, 1],
     [2, 0],
   ]) {
-    stubDice({ faces: [50], bonusTotal });
+    const dice = stubDice({ faces: [50], bonusTotal });
     const result = await evaluateAnswer({ bonus: '1d4 + 1' });
     assert.equal(result.data.d100.situationalBonus, bonusTotal);
+    assert.deepEqual(dice.evaluated, ['1d4 + 1', '1d100']);
+    assert.deepEqual(
+      dice.evaluations.map(({ options }) => options),
+      [{ allowInteractive: false }, { allowInteractive: false }],
+      'neither roll may open an interactive dice prompt'
+    );
     assert.deepEqual(
       result.rollHandoff.serializedPreRolls.map((roll) => roll.formula),
       ['1d4 + 1']
@@ -649,6 +670,18 @@ test('a malformed or throwing bonus counts as 0 and rolls no pre-roll', async ()
   assert.equal(thrown.data.d100.situationalBonus, 0);
   assert.equal(thrown.data.d100.roll, 50);
   assert.equal(thrown.rollHandoff.serializedPreRolls, undefined);
+});
+
+test('a dice bonus is rolled against the actor roll data', async () => {
+  const dice = stubDice();
+  const { rollSituationalBonus } = await loadD100Check();
+  const bonus = await rollSituationalBonus('@prof', { getRollData: () => ({ prof: 3 }) });
+
+  assert.equal(bonus.total, 3);
+  assert.deepEqual(
+    dice.evaluations.map(({ formula, data }) => ({ formula, data })),
+    [{ formula: '@prof', data: { prof: 3 } }]
+  );
 });
 
 test('the bonus is dropped when the bound policy does not allow it', async () => {
@@ -731,11 +764,16 @@ test('an interactive d100 gather prompts once and resolves only with the answer'
   const [handoff] = world.seen.handoffs;
   assert.deepEqual(handoff, JSON.parse(JSON.stringify(handoff)));
   assert.equal(handoff.serializedRoll.formula, '1d100');
+  assert.equal(
+    handoff.serializedRoll.total,
+    world.runManager.getRunHistory(world.actor)[0].checkResult.roll,
+    'the posted roll is the face the stage resolved with'
+  );
   assert.deepEqual(dice.posts, [], 'the GM posts nothing for a visible roll');
 });
 
 test('a dismissed d100 prompt releases its token, executes nothing and prompts again later', async () => {
-  stubDice({ faces: [50] });
+  const dice = stubDice({ faces: [50] });
   const world = commandWorld({
     answer: async (_descriptor, { prompt }) =>
       prompt === 1 ? { confirmed: false } : { confirmed: true },
@@ -752,6 +790,8 @@ test('a dismissed d100 prompt releases its token, executes nothing and prompts a
   assert.deepEqual(world.runManager.getRunHistory(world.actor), []);
   assert.equal(world.actor.items.length, 0);
   assert.deepEqual(world.tokenStatuses(), ['released']);
+  assert.equal(world.seen.evaluations, 0, 'the GM never evaluates a dismissed check');
+  assert.deepEqual(dice.evaluated, [], 'and no dice are rolled');
 
   const collected = await world.execute(run);
   assert.equal(world.seen.prompts.length, 2, 'the ready action prompts again');
@@ -818,7 +858,7 @@ test('an expired token settles under a fresh one with exactly one prompt', async
   assert.equal(world.actor.items.length, 1);
 });
 
-test('two prompts on one run settle once', async () => {
+test('two prompts on one run settle once', { timeout: 5000 }, async () => {
   stubDice({ faces: [50, 50] });
   let release;
   const bothOpen = new Promise((resolve) => (release = resolve));
@@ -845,11 +885,12 @@ test('two prompts on one run settle once', async () => {
   assert.equal(world.runManager.getRunHistory(world.actor).length, 1);
 });
 
-test('an answer settles once when the elected GM changes during the prompt', async () => {
+/** A gather whose answer changes the elected GM while the prompt is open. */
+async function electionRace(requester) {
   stubDice({ faces: [50] });
   let election = 0;
   const world = commandWorld({
-    requester: GM,
+    requester,
     electedGM: () => ({ id: `gm-${election}`, isGM: true }),
     answer: async () => {
       election += 1;
@@ -862,7 +903,14 @@ test('an answer settles once when the elected GM changes during the prompt', asy
   assert.equal(world.seen.prompts.length, 1, 'the unchanged check is not asked again');
   assert.equal(world.seen.evaluations, 1);
   assert.equal(world.actor.items.length, 1);
-});
+  assert.deepEqual(world.tokenStatuses(), ['active', 'consumed']);
+}
+
+test('an answer settles once when the elected GM changes during the prompt', () =>
+  electionRace(GM));
+
+test("an answer settles once when the elected GM changes during a player's prompt", () =>
+  electionRace(PLAYER));
 
 test('a stale revision at answer time executes nothing', async () => {
   stubDice({ faces: [50] });
@@ -895,7 +943,13 @@ test('a timed d100 run cleared of its time requirement mid-wait completes at wor
   await world.gather({ completionMode: 'worldTime' });
   const waiting = world.activeRun();
   assert.ok(waiting?.timeGate, 'the run waits on its time gate');
+  // The stage reads the persisted run's task snapshot, so clear it there as well as live.
   world.environment.tasks[0].timeRequirement = null;
+  const persisted = world.actor.getFlag('fabricate', 'gatheringRuns').active[waiting.id];
+  const snapshotTask = persisted.economyEvidence.runtimeSnapshot.task;
+  assert.ok(snapshotTask.timeRequirement, 'the snapshot carried the time requirement');
+  snapshotTask.timeRequirement = null;
+  world.runManager.invalidateCache(world.actor.uuid);
   world.clock.worldTime += 120;
 
   const result = await world.execute(waiting, { trigger: 'worldTime' });

@@ -1,16 +1,13 @@
-import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
+import { describe, it, before, after, beforeEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
 import { flushSync } from 'svelte';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import {
-  ROLL_PROMPT_COMPILED_MODULES,
-  ROLL_PROMPT_PATH as PROMPT,
-  ROLL_PROMPT_RAW_MODULES,
-} from '../helpers/rollPromptHarnessModules.js';
-import { stubI18n } from '../helpers/rollPromptDialogStub.js';
+
+import { promptJournalStageCheck } from '../../src/bootstrap/journalOperations.js';
 import { intersectAdvantageOffers, resolveAdvantageOffer } from '../../src/systems/checkAdvantage.js';
+import { describeD100Check } from '../../src/systems/gatheringD100Check.js';
 import {
   buildBulkPromptData,
   buildSinglePromptData,
@@ -21,6 +18,13 @@ import {
   waitForPrompt,
 } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
+import { stubI18n } from '../helpers/rollPromptDialogStub.js';
+import {
+  ROLL_PROMPT_COMPILED_MODULES,
+  ROLL_PROMPT_PATH as PROMPT,
+  ROLL_PROMPT_RAW_MODULES,
+} from '../helpers/rollPromptHarnessModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const harness = createMountedComponentHarness({
@@ -594,17 +598,38 @@ describe('mounted roll prompt', () => {
     }
   });
 
-  it('shows a d100 gather its 1d100, no target chip and the bonus field (issue 2398)', async () => {
-    const view = buildSinglePromptData({
-      formula: '1d100', resolvedFormula: '1d100', displayFormula: '1d100',
-      name: 'Gather Meadow Herbs', actorName: 'Brenna', activity: 'Gathering', offerSituationalBonus: true,
-    });
-    const { dialog, pending } = await openThroughHost(view, false, noChoice);
-    assert.equal(dialog.querySelector('.formula').textContent, '1d100');
-    assert.ok(!dialog.querySelector(':scope .formula-content .manager-chip'), 'every row grades itself: no target');
-    assert.ok(dialog.querySelector('input[name="situationalBonus"]'), 'the bonus is offered');
-    dialog.querySelector('[data-manager-modal-close]').click();
-    await pending;
+  it('shows a d100 gather its 1d100, a blind one no formula, neither a target, both the bonus (issue 2398)', async () => {
+    const publicPrompt = (taskId) =>
+      describeD100Check({
+        actor: { name: 'Brenna' },
+        run: { taskId },
+        task: { name: 'Gather Meadow Herbs' },
+        localize: (key) => key,
+      }).publicPrompt;
+    for (const [taskId, formula] of [
+      ['meadow-herbs', '1d100'],
+      ['blind:meadow', ''],
+    ]) {
+      document.body.replaceChildren();
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptJournalStageCheck(publicPrompt(taskId))
+      );
+      assert.equal(dialog.querySelector(':scope .formula')?.textContent ?? '', formula, taskId);
+      assert.ok(
+        !dialog.querySelector(':scope .formula-content .manager-chip'),
+        `${taskId}: every row grades itself`
+      );
+      assert.ok(
+        !dialog.querySelector(':scope .formula-content .target-row'),
+        `${taskId}: no target row`
+      );
+      assert.ok(
+        dialog.querySelector('input[name="situationalBonus"]'),
+        `${taskId}: the bonus is offered`
+      );
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
   });
 
   it('hides a bulk bonus only when every row with a check declines the offer (Q6)', async () => {

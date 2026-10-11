@@ -662,28 +662,55 @@ describe('GatheringView ↔ actor bar wiring', () => {
         warns.push(msg);
       },
     };
-    Object.defineProperty(globalThis, 'ui', { value: { notifications }, configurable: true, writable: true });
+    Object.defineProperty(globalThis, 'ui', {
+      value: { notifications },
+      configurable: true,
+      writable: true,
+    });
     try {
       let listings = 0;
+      const waiting = environment({
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Extract Ore',
+            attemptable: false,
+            blockedReasons: [{ code: 'DUPLICATE_ACTIVE_RUN', data: { taskId: 'task-1' } }],
+          },
+        ],
+      });
       const services = {
         listGatheringForActor: () => {
           listings += 1;
-          return Promise.resolve(listing([attemptableEnv()], 'a1'));
+          return Promise.resolve(listing([listings === 1 ? attemptableEnv() : waiting], 'a1'));
         },
         startGatheringAttempt: () =>
-          Promise.resolve({ accepted: true, success: false, cancelled: true })
+          Promise.resolve({ accepted: true, success: false, cancelled: true }),
       };
-      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+      const store = makeStore({
+        actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }],
+        seededId: 'a1',
+      });
       store.loadSelectableActors();
       flushSync();
       services.actorBar = store;
       await mountView(services);
       assert.equal(listings, 1, 'the mount fetched once');
+      const attempt = () =>
+        target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]');
+      assert.equal(attempt().dataset.gatheringAttemptBlocked, 'false');
 
-      target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
+      attempt().click();
       await settle();
 
       assert.equal(listings, 2, 'the dismissal refreshed task and run state');
+      assert.equal(
+        attempt().dataset.gatheringAttemptBlocked,
+        'true',
+        'the waiting run now blocks a second attempt'
+      );
+      assert.equal(attempt().disabled, true);
+      assert.ok(target.querySelector(':scope [data-gathering-attempt-reason]'), 'and says why');
       assert.deepEqual(warns, [], 'a dismissal is not a refusal');
     } finally {
       delete globalThis.ui;

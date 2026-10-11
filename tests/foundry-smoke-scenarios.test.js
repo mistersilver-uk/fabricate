@@ -324,6 +324,10 @@ function spineGatheringTasks() {
     const id = valueOf(node, 'id');
     if (id?.type !== 'Literal' || !valueOf(node, 'dropRows')) continue;
     const time = valueOf(node, 'timeRequirement');
+    for (const property of time?.properties ?? []) {
+      // A computed duration would read as untimed here, so the spine authors only literals.
+      assert.equal(property.value?.type, 'Literal', `${id.value}: timeRequirement is literal`);
+    }
     tasks.set(id.value, {
       resolutionMode: valueOf(node, 'resolutionMode')?.value,
       timed: (time?.properties ?? []).some((property) => Number(property.value?.value) > 0),
