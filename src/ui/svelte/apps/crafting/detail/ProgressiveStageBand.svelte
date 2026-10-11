@@ -35,6 +35,7 @@
 
   let { stage = null, tense = 'forecast' } = $props();
 
+  // ratchet-exempt(text-helper): moved verbatim from the deleted ProgressiveStageList; the architecture doc cites it as the text(key, fallback) example
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;

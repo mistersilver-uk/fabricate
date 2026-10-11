@@ -77,14 +77,15 @@
 {/snippet}
 
 <div class="progressive-stage" class:is-stacked={stacked}>
-  <Medallion art={stage?.img || ''} alt="" size={stacked ? 30 : 22} />
   {#if stacked}
+    <Medallion art={stage?.img || ''} alt="" size={30} />
     <span class="progressive-stage-identity">
       <span class="progressive-stage-name">{stage?.name}</span>
       <span class="progressive-stage-numbers">{@render numbers()}</span>
       {#if stateChip}{@render stateChip(stage)}{/if}
     </span>
   {:else}
+    <Medallion art={stage?.img || ''} alt="" size={22} />
     <span class="progressive-stage-name" title={stage?.name || undefined}>{stage?.name}</span>
     <span class="progressive-stage-numbers">
       {@render numbers()}
