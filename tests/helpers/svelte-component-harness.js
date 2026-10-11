@@ -616,8 +616,10 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
-  // ProgressiveBody's stage list (issue 651).
-  'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  // ProgressiveBody's stage list (issue 651): the shared list and the row and band it composes.
+  'src/ui/svelte/components/SortableList.svelte',
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
   // The per-stage complication band (issue 1286).
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',

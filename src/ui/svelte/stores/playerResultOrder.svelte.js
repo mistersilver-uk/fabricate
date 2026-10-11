@@ -31,9 +31,9 @@ import { progressiveStageThresholds } from '../../../utils/progressiveStageThres
 // Under `scope: 'user'` every commit is a replicated document write (`#setWorld` broadcasts
 // createSetting/updateSetting to every client), so a burst of moves must not become a burst of
 // writes. The burst comes from the keyboard path — a player walking a stage up several places emits
-// one move per chevron click. Drag emits only one move, on drop (`ProgressiveStageList` fires
-// `onReorder` from `ondrop`, never from `ondragover`), so it settles immediately and the drop-path
-// flush commits it without waiting.
+// one move per chevron click or grip arrow key. Drag emits only one move, on drop (`SortableList`
+// fires `onReorder` from `ondrop`, never from `ondragover`, then `onReorderSettled`), so it settles
+// immediately and the drop-path flush commits it without waiting.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
 
 /**
@@ -124,7 +124,7 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
     }
   }
 
-  /** Apply `ids` under `writeKey` optimistically, announce `text`, and arm the debounce. */
+  /** Apply `ids` under `writeKey` optimistically, stage `text` as the announcement, arm the debounce. */
   function stage(writeKey, ids, text) {
     if (commitTimer) {
       clearTimeout(commitTimer);
@@ -216,10 +216,10 @@ export function createPlayerResultOrder({
   }
 
   /**
-   * Move a stage from `index` to `target`, optimistically and debounced. `text` is pre-formatted
-   * live-region copy: the component owns the i18n and reads the moved stage's name before the move.
+   * Move a stage from `index` to `target`, optimistically and debounced. The list speaks its own
+   * move, so this stages `''`: clearing a prior revert is what lets a repeated revert be spoken.
    */
-  function reorder(index, target, text = '') {
+  function reorder(index, target) {
     const writeKey = key;
     if (!writeKey || !current?.allowReorder) return;
 
@@ -233,7 +233,7 @@ export function createPlayerResultOrder({
     writer.stage(
       writeKey,
       next.map((entry) => entry.id),
-      text
+      ''
     );
   }
 

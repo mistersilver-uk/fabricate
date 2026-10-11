@@ -20758,8 +20758,22 @@
    editing body of every other caller, which is a body the caller always fills. */
 .fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
 .fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
-  .fabricate-sortable-list-body {
+  .fabricate-sortable-list-body,
+.fabricate-sortable-list-row.progressive-stage-row:not(.has-band) .fabricate-sortable-list-body {
   display: none;
+}
+
+/* The player stage band is full-bleed: it carries the line's inset itself, so its top rule meets
+   the row's border and its text starts on the grip's x (issue 2381). */
+.fabricate-sortable-list-row.progressive-stage-row.has-band .fabricate-sortable-list-body {
+  padding: 0;
+}
+
+/* Why a player's progressive stage list is fixed, rendered by each body after its list. */
+.fabricate-app .progressive-stage-fixed-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fab-text-muted);
 }
 
 /* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */

@@ -44,9 +44,6 @@ const PARENTS = Object.freeze({
   bulkRow: scopedComponentCss(
     resolve(repoRoot, 'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte')
   ),
-  stages: scopedComponentCss(
-    resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte')
-  ),
 });
 
 /** Adds a component's scope hash to every classed element of a fixture drawn from its markup. */
@@ -91,11 +88,6 @@ const BULK_ROW = (row, panel) => `<ul style="list-style:none;margin:0;padding:0"
   <span class="bulk-row-text ${row}"><span>A long component name</span></span>
   <span class="bulk-row-trailing ${row}"><span style="display:inline-block;width:60px;height:20px"></span><button type="button" class="bulk-remove fab-hit-area ${panel}" aria-label="Remove">${GLYPH}</button></span>
   </li></ul>`;
-
-const STAGE_MOVE = `<span class="crafting-stage-move is-stacked">
-  <button type="button" class="crafting-stage-move-button fab-hit-area" aria-label="Move up">${GLYPH}</button>
-  <button type="button" class="crafting-stage-move-button fab-hit-area" aria-label="Move down">${GLYPH}</button>
-  </span>`;
 
 /** The mounted primitives, each by the harness that compiles it. */
 const MOUNTS = Object.freeze({
@@ -237,7 +229,6 @@ ${Object.values(PARENTS)
   <div data-case="staged" style="width:300px;margin:12px">${scoped(STAGED, PARENTS.panel)}</div>
   <div data-case="benchChip" style="width:300px;margin:12px">${scoped(BENCH_CHIP, PARENTS.workbench)}</div>
   <div data-case="bulkRow" style="width:300px;margin:12px">${BULK_ROW(PARENTS.bulkRow.hashClass, PARENTS.bulkPanel.hashClass)}</div>
-  <div data-case="stageMove" style="margin:12px">${scoped(STAGE_MOVE, PARENTS.stages)}</div>
   ${SHEET_CONTROLS.map(
     ([cls, wrapper, width, height]) =>
       `<div data-case="${cls}" class="row ${wrapper}" style="--gap:${reachOf(width)}px"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
@@ -673,52 +664,6 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     }
   });
 
-  // The stacked pair paints 22px each, 2px apart, and each target reaches 1px into that gap. Swept a
-  // pixel row at a time, each owns at least 24 rows, contiguous, and neither takes a painted row
-  // of the other.
-  it('gives the stacked stage move pair 24px targets that split the 2px gap between them', async () => {
-    const pair = await tab.evaluate(() => {
-      const [up, down] = document.querySelectorAll('[data-case="stageMove"] button');
-      const a = up.getBoundingClientRect();
-      const b = down.getBoundingClientRect();
-      const owner = (y) => {
-        const hit = document.elementFromPoint(a.left + a.width / 2, y);
-        if (hit === up || up.contains(hit)) return 'up';
-        return hit === down || down.contains(hit) ? 'down' : 'gap';
-      };
-      const rows = [];
-      for (let y = Math.floor(a.top) - 3; y <= Math.ceil(b.bottom) + 3; y += 1) {
-        rows.push(owner(y + 0.5));
-      }
-      return {
-        boxes: [a, b].map(({ width, height }) => [width, height]),
-        gap: b.top - a.bottom,
-        rows: {
-          up: rows.filter((r) => r === 'up').length,
-          down: rows.filter((r) => r === 'down').length,
-        },
-        runs: rows.filter((r, i) => i === 0 || r !== rows[i - 1]).join(' '),
-        painted: [owner(a.bottom - 0.5), owner(b.top + 0.5)],
-      };
-    });
-    assert.deepEqual(
-      pair.boxes,
-      [
-        [24, 22],
-        [24, 22],
-      ],
-      'the painted pair'
-    );
-    assert.equal(pair.gap, 2);
-    assert.ok(pair.rows.up >= 24 && pair.rows.down >= 24, JSON.stringify(pair.rows));
-    assert.equal(
-      pair.runs,
-      'gap up down gap',
-      'each target is one run, and the two meet in the gap'
-    );
-    assert.deepEqual(pair.painted, ['up', 'down'], 'neither takes a painted row of the other');
-  });
-
   it('puts the shared hit-area class on the buttons its components own', () => {
     for (const [path, token, count] of [
       [component('Chip'), 'manager-chip-remove fab-hit-area', 1],
@@ -744,11 +689,6 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
         'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
         'bulk-remove fab-hit-area',
         1,
-      ],
-      [
-        'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
-        'crafting-stage-move-button fab-hit-area',
-        2,
       ],
     ]) {
       assert.equal(read(path).split(`class="${token}"`).length - 1, count, `${path}: ${token}`);

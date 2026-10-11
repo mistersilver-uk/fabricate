@@ -6,8 +6,9 @@
   on the right surfaces an in-flight run). Shared composition lives in
   RecipeBodyShell.
 
-  It opts the stage list into the per-stage COMPLICATION BAND (issue 1286) in the
-  `forecast` tense, and only that tense. Crafting is FORECAST-ONLY, and that is a property
+  Its stage list is the shared `SortableList` (issue 2381), each row a `ProgressiveStageRow`
+  with the per-stage COMPLICATION BAND (issue 1286) mounted as its body in the `forecast`
+  tense, and only that tense. Crafting is FORECAST-ONLY, and that is a property
   of crafting rather than an omission: the fired record is defined on the salvage RUN
   record and the immediate crafting path writes none, so there is nothing to mark and no
   crafting stage ever claims a complication fired. `CraftingListingBuilder`'s own
@@ -16,9 +17,16 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
+  import SortableList from '../../../components/SortableList.svelte';
   import RecipeBodyShell from './RecipeBodyShell.svelte';
   import IoTable from './IoTable.svelte';
-  import ProgressiveStageList from './ProgressiveStageList.svelte';
+  import ProgressiveStageBand from './ProgressiveStageBand.svelte';
+  import ProgressiveStageRow, {
+    stageLabel,
+    stageRowClass,
+    stageRowData,
+  } from './ProgressiveStageRow.svelte';
 
   let {
     recipe = null,
@@ -57,14 +65,30 @@
            fallback only when a recipe has no stages (an unconfigured progressive
            recipe), so the inputs half of the body still renders something. -->
       {#if stages.length > 0}
-        <ProgressiveStageList
-          {stages}
-          canReorder={canReorderStages}
-          announcement={stageAnnouncement}
-          onReorder={(index, target, announcement) => onReorderStage?.(index, target, announcement)}
-          onReorderSettled={() => onReorderStageSettled?.()}
-          complications="forecast"
-        />
+        <!-- Keyed on the recipe, so a list never speaks the previous recipe's pending sentence. -->
+        {#key recipe?.id}
+          <SortableList
+            items={stages}
+            itemLabel={stageLabel}
+            numbered
+            reorderable={canReorderStages}
+            alwaysOpen
+            rowClass={stageRowClass}
+            rowData={(stage) => stageRowData(stage, canReorderStages)}
+            announcement={stageAnnouncement}
+            onReorder={(index, target) => onReorderStage?.(index, target)}
+            onReorderSettled={() => onReorderStageSettled?.()}
+            data-recipe-section="progressive-stages"
+          >
+            {#snippet row(stage)}<ProgressiveStageRow {stage} />{/snippet}
+            {#snippet body(stage)}<ProgressiveStageBand {stage} tense="forecast" />{/snippet}
+          </SortableList>
+        {/key}
+        {#if !canReorderStages}
+          <p class="progressive-stage-fixed-note" data-progressive-stage-fixed-note>
+            {localizeOr('FABRICATE.App.Crafting.Detail.StageOrderFixed', 'Order set by the GM')}
+          </p>
+        {/if}
       {:else}
         <IoTable {craftability} result={recipe?.result} {onChooseOption} {...rail} />
       {/if}

@@ -66,7 +66,7 @@ const harness = createMountedComponentHarness({
     // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
     'src/systems/salvageMessages.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
-    // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
+    // here. The stage row and band import neither; the
     // real importer is `inventoryStore.svelte.js`, which this suite mocks with a POJO.
   ],
   compiledModules: [
@@ -89,7 +89,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The salvage tree, plus the shared stage list it reuses.
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -1446,6 +1448,16 @@ describe('InventoryView (mounted) — recipe-item books', () => {
 
 // --- Player salvage surface (issue 675) ---------------------------------------
 
+const STAGE = '[data-progressive-stage]';
+const MOVE_DOWN = `${STAGE} [data-sortable-move="down"]`;
+const regionAfterList = (target) =>
+  [target.querySelector('[data-recipe-section="progressive-stages"]')?.nextElementSibling].find(
+    (node) => node?.matches('[data-sortable-list-status]')
+  ) ?? null;
+/** The mock store with one getter replaced, so a new `services` re-renders the view over it. */
+const withAnnouncement = (store, text) =>
+  Object.assign(Object.create(store), { salvageOrderAnnouncement: text });
+
 function salvageItem(salvage = {}, overrides = {}) {
   return {
     ...makeItem(),
@@ -2244,16 +2256,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         threshold: 7,
       },
     ];
-    const { services, calls } = salvageServices(
-      salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' }),
-      // AC6's live-region half. `salvageOrderAnnouncement` threads FIVE wrapper hops
-      // (InventoryView → InventoryDetail → InventoryComponentDetail →
-      // InventorySalvagePanel → SalvageProgressiveBody → ProgressiveStageList). Drop the
-      // prop at ANY hop and it silently defaults to '': the revert announcement never
-      // reaches the player, a keyboard reorder announces nothing, and an
-      // existence-only assertion stays green. So the fixture carries a REAL string and
-      // the assertion below reads it back out of the DOM, through the real chain.
-      { salvageOrderAnnouncement: 'Iron Shard moved to position 2 of 2' }
+    const { services, calls, store } = salvageServices(
+      salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' })
     );
     const target = await openSalvage(services);
 
@@ -2268,14 +2272,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-salvage-reorder-note]'),
       'the reorderable state explains the affordance'
     );
-    const liveRegion = target.querySelector('[data-progressive-stage-status]');
-    assert.ok(liveRegion, 'the live region is present');
+    const liveRegion = regionAfterList(target);
+    assert.ok(liveRegion, 'the live region follows the list');
     assert.equal(liveRegion.getAttribute('aria-live'), 'polite');
-    assert.equal(
-      liveRegion.textContent.trim(),
-      'Iron Shard moved to position 2 of 2',
-      'the announcement REACHES the live region across all five wrapper hops (AC6)'
-    );
+    assert.equal(liveRegion.textContent.trim(), '', 'the sentence it mounts with is not spoken');
     // The opt-in extension the salvage body passes.
     assert.ok(target.querySelector('[data-progressive-stage-state]'), 'renders a state chip');
     // And the one it must NOT: the fixture's authored `quantity: 2` renders nowhere.
@@ -2289,11 +2289,26 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('input[type="checkbox"]'), null, 'no exclude checkbox');
 
     // Keyboard reorder routes through the store.
-    target.querySelectorAll('[data-progressive-stage-move-down]')[0].click();
+    target.querySelectorAll(MOVE_DOWN)[0].click();
     await settle();
-    assert.equal(calls.reorder.length, 1);
-    assert.equal(calls.reorder[0][0], 0, 'from index 0');
-    assert.equal(calls.reorder[0][1], 1, 'to index 1');
+    assert.deepEqual(
+      calls.reorder.map(([index, target, sentence]) => [index, target, sentence ?? '']),
+      [[0, 1, '']],
+      'from index 0 to index 1, and no sentence: the list speaks its own move'
+    );
+
+    // AC6's live-region half. `salvageOrderAnnouncement` threads five wrapper hops (InventoryView →
+    // InventoryDetail → InventoryComponentDetail → InventorySalvagePanel → SalvageProgressiveBody)
+    // into `SortableList`; a prop dropped at any hop defaults to '', so a REAL string is read back.
+    await harness.setProps({
+      services: { ...services, inventory: withAnnouncement(store, 'Your order was restored.') },
+    });
+    await settle();
+    assert.equal(
+      regionAfterList(target).textContent.trim(),
+      'Your order was restored.',
+      'the announcement REACHES the live region across every wrapper hop (AC6)'
+    );
   });
 
   // AC8. `canReorder: false` DETACHES the handlers rather than leaving inert rows.
@@ -2331,12 +2346,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.equal(target.querySelectorAll('[data-progressive-stage-reorderable]').length, 0);
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 2);
-    assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
-    assert.equal(
-      target.querySelector('[data-progressive-stage-status]'),
-      null,
-      'nothing to announce'
-    );
+    assert.ok(!target.querySelector(`${STAGE} [data-sortable-grip]`), 'no grip');
+    assert.ok(!target.querySelector(`${STAGE} [data-sortable-move]`), 'no rocker');
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1, 'one region');
+    assert.equal(regionAfterList(target).textContent.trim(), '', 'with nothing to announce');
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
       'Order set by the GM',
@@ -2379,63 +2392,49 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   }
 
-  it('stacks the row identity so the name has a column of its own to wrap in', async () => {
+  it('stacks the row identity: the name wraps in its own column, the state chip beneath it', async () => {
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
     const row = target.querySelector('[data-progressive-stage="s1"]');
-    const identity = row.querySelector('.crafting-stage-identity');
+    const identity = row.querySelector('.progressive-stage-identity');
     assert.ok(identity, 'the stacked row wraps its identity in a column');
-    assert.ok(
-      identity.querySelector('.crafting-stage-name'),
-      'the name lives INSIDE that column, not as a row-level flex child'
+    const parts = [...identity.children].map((child) =>
+      child.matches('.progressive-stage-name')
+        ? 'name'
+        : child.querySelector('[data-progressive-stage-state]') || child.dataset.progressiveStageState
+          ? 'chip'
+          : 'numbers'
     );
-    assert.equal(
-      identity.textContent.includes('×'),
-      false,
-      'and nothing prints a count beside it: an awarded stage grants exactly one item'
-    );
+    assert.deepEqual(parts, ['name', 'numbers', 'chip'], 'the chip sits beneath the name');
+    assert.equal(identity.textContent.includes('×'), false, 'and nothing prints a count');
+    const tile = row.querySelector('.fab-medallion');
+    assert.match(tile.getAttribute('style'), /width:\s*30px;\s*height:\s*30px/u, 'art at 30');
+    assert.equal(tile.getAttribute('data-medallion'), 'glyph', 'the glyph stands in for no art');
   });
 
-  it('ends the row with the reorder controls, after the state chip', async () => {
+  it('leads with the grip and the ordinal and trails with the rocker', async () => {
     const { services } = shapeServices();
     const target = await openSalvage(services);
 
-    const row = target.querySelector('[data-progressive-stage="s1"]');
-    const parts = [
-      ...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]'),
-    ];
-    assert.equal(parts.length, 2);
-    assert.ok(
-      parts[0].hasAttribute('data-progressive-stage-ordinal'),
-      'the ordinal leads, as the row identity'
+    const line = target
+      .querySelector('[data-progressive-stage="s1"]')
+      .querySelector('.fabricate-sortable-list-line');
+    const parts = [...line.children].map(
+      (child) =>
+        ['data-sortable-grip', 'data-sortable-ordinal'].find((name) => child.hasAttribute(name)) ??
+        [...child.classList].find((name) => /content|rocker/u.test(name))
     );
-    assert.ok(
-      parts[1].hasAttribute('data-progressive-stage-move'),
-      'the chevrons come LAST — the same edge they sit on in the GM salvage editor and on the crafting tab'
-    );
-    // Read off the stage's own LINE rather than off the row. Since issue 1286 the row is a
-    // wrapper that MAY carry a full-bleed complication band beneath its line, so `row`'s
-    // last element child is the line (or the band), never the chevrons. The claim under
-    // test is unchanged: the chevrons end the line the stage reads on.
+    assert.deepEqual(parts, [
+      'data-sortable-grip',
+      'data-sortable-ordinal',
+      'fabricate-sortable-list-content',
+      'fabricate-sortable-list-rocker',
+    ]);
     assert.equal(
-      row
-        .querySelector('.crafting-stage-line')
-        .lastElementChild.hasAttribute('data-progressive-stage-move'),
-      true,
-      'far right: after the state chip, not merely after the identity column'
-    );
-
-    const handle = row.querySelector('.crafting-stage-handle');
-    assert.equal(
-      handle.contains(parts[1]),
-      false,
-      'the chevrons are no longer inside the grip cluster'
-    );
-    assert.equal(
-      handle.getAttribute('aria-hidden'),
-      'true',
-      'so the cluster is decorative again — the keyboard reorder control lives outside it'
+      line.querySelector('[data-sortable-move="up"]').getAttribute('aria-label'),
+      'FABRICATE.Common.SortableList.MoveUp:{"name":"Iron Shard"}',
+      'the rocker names the stage it moves'
     );
   });
 
@@ -2692,7 +2691,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       0,
       'a committed order is a record, not a choice'
     );
-    assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
+    assert.ok(!target.querySelector(`${STAGE} [data-sortable-move]`), 'no rocker');
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 3);
 
     // The note must give the REASON THAT APPLIES. `canReorder: false` has two causes and

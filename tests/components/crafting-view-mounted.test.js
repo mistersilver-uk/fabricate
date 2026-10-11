@@ -393,35 +393,7 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
     return new RegExp(String.raw`import\s+${component}\s+from`, 'u').test(code(file));
   }
 
-  const STAGE_LIST = 'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte';
   const BROWSER = 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte';
-
-  it('leaves both progressive stage tiles raw, because the primitive cannot say `draggable`', () => {
-    const stages = code(STAGE_LIST);
-    assert.ok(!imports(STAGE_LIST, 'Medallion'), 'the stage list draws no shared tile');
-    // Counted over the `<img>` TAGS that carry the tile's class, not over the file.
-    const stageImages = [...stages.matchAll(/<img\b[^>]*crafting-stage-img[^>]*>/gu)].map(
-      ([tag]) => tag
-    );
-    assert.equal(stageImages.length, 2, 'the reorderable tile and the fixed one');
-    assert.equal(
-      stageImages.filter((tag) => tag.includes('draggable="false"')).length,
-      2,
-      'both stage images carry it, in the reorderable state and in the fixed one. It is REQUIRED ' +
-        'rather than decorative — an `<img>` is natively draggable, so a drag started on the ' +
-        'artwork becomes an image drag with the wrong ghost and dropping it outside the app can ' +
-        'navigate away — and `progressive-body-mounted.test.js` asserts it in both states. ' +
-        '`Medallion.svelte:146` renders its `<img>` with no `draggable` and no rest spread, so a ' +
-        'change that builds no primitive cannot add the prop'
-    );
-    assert.match(
-      stages,
-      /\.crafting-stage-row\.is-stacked \.crafting-stage-img \{[\s\S]*?border-radius: 7px;/u,
-      'and the SECOND blocker, independent of the first: the stacked row re-sizes the tile from ' +
-        '22px at 6px to 30px at 7px, the corner band of each size, which a single `size` cannot ' +
-        'express'
-    );
-  });
 
   it('leaves the browser empty line hand-rolled, because the note variant cannot centre', () => {
     const browser = code(BROWSER);

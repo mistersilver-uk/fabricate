@@ -155,11 +155,17 @@ function memoizedBySource(compute) {
   };
 }
 
+/**
+ * Deleted files a pattern still names (issue 2381), so the deleting change maps to the frames the
+ * file drew. An entry leaves once no pattern names it, which the last test below enforces.
+ */
+const RETIRED_FILES = ['src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte'];
+
 /** What one pattern strands: itself when it matches no tracked file, then each stranded path. */
 const strandedIn = memoizedBySource((pattern) => [
   ...(tracked.some((file) => pattern.test(file)) ? [] : ['']),
   ...alternativesOf(pattern)
-    .filter((regex) => tracked.every((file) => !regex.test(file)))
+    .filter((regex) => [...tracked, ...RETIRED_FILES].every((file) => !regex.test(file)))
     .map((regex) => ` (expansion ${regex})`),
 ]);
 
@@ -311,4 +317,16 @@ test('no file the app View Lab is built from loads anything of the Primitive Lab
     )
   );
   assert.deepEqual(reaching, [], 'these app lab inputs load the Primitive Lab');
+});
+
+test('a retired file stays untracked and leaves the allowance once no pattern names it', () => {
+  // Otherwise a stale entry would excuse a later pattern that strands on the same path.
+  const patterns = VIEW_LAB_CASES.flatMap(({ sourceMatches }) => sourceMatches);
+  assert.deepEqual(
+    RETIRED_FILES.filter(
+      (file) => tracked.includes(file) || patterns.every((pattern) => !pattern.test(file))
+    ),
+    [],
+    'delete these from RETIRED_FILES: each is tracked again or no pattern names it'
+  );
 });
