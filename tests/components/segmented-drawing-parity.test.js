@@ -31,9 +31,20 @@ const FORMS = Object.freeze({
   tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
   inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 30 },
   field: { props: { density: 'field' }, drawn: '.k-seg.field:not(.tag)', uses: 1 },
-  // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet.
-  tagInline: { props: { tone: 'tag', density: 'inline' }, drawn: '.k-seg.tag.inline', uses: 1 },
-  tagField: { props: { tone: 'tag', density: 'field' }, drawn: '.k-seg.tag.field', uses: 1 },
+  // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet, so its geometry is
+  // read too: the track's height and corner and the segments' type size.
+  tagInline: {
+    props: { tone: 'tag', density: 'inline' },
+    drawn: '.k-seg.tag.inline',
+    uses: 1,
+    geometry: true,
+  },
+  tagField: {
+    props: { tone: 'tag', density: 'field' },
+    drawn: '.k-seg.tag.field',
+    uses: 1,
+    geometry: true,
+  },
 });
 
 /** D1: the shipped idle ink measures under 4.5:1 at these sizes, so the drawing passes (#2368). */
@@ -55,7 +66,7 @@ let browser;
 let paints;
 
 /** Reads a well's paint and its idle and chosen segments' paint, in the browser. */
-function readPaint({ wells, segment, chosen, tokenNames }) {
+function readPaint({ wells, segment, chosen, tokenNames, geometry }) {
   const name = (value) => {
     const index = value.match(/^rgb\(251, (\d+), (\d+)\)$/);
     if (index) return tokenNames[(Number(index[1]) - 1) * 250 + Number(index[2]) - 1];
@@ -65,9 +76,19 @@ function readPaint({ wells, segment, chosen, tokenNames }) {
     style.borderTopStyle === 'none' || style.borderTopWidth === '0px'
       ? 'none'
       : name(style.borderTopColor);
+  const shape = (element, style, withInk) => {
+    if (!geometry) return {};
+    if (withInk) return { 'font-size': style.fontSize };
+    const height = `${element.getBoundingClientRect().height}px`;
+    return { height, 'border-radius': style.borderTopLeftRadius };
+  };
   const paint = (element, withInk) => {
     const style = getComputedStyle(element);
-    const read = { background: name(style.backgroundColor), 'border-color': edge(style) };
+    const read = {
+      background: name(style.backgroundColor),
+      'border-color': edge(style),
+      ...shape(element, style, withInk),
+    };
     return withInk ? { ...read, color: name(style.color), 'font-weight': style.fontWeight } : read;
   };
   return [...document.querySelectorAll(wells)].map((well) => {
@@ -113,24 +134,26 @@ before(async () => {
   await tab.route(/^https?:/, (route) => route.abort());
   await tab.setContent(library.replace('</head>', `${SENTINEL_STYLE}</head>`));
   const drawn = {};
-  for (const [form, { drawn: wells }] of Object.entries(FORMS)) {
+  for (const [form, { drawn: wells, geometry }] of Object.entries(FORMS)) {
     drawn[form] = await tab.evaluate(readPaint, {
       wells,
       segment: ':scope > button',
       chosen: '.sel',
       tokenNames: tokens,
+      geometry,
     });
   }
   await tab.setContent(
     `<!doctype html><html><head><style>${shipped.css}</style>${SENTINEL_STYLE}</head><body>${Object.values(markup).join('')}</body></html>`
   );
   const live = {};
-  for (const form of Object.keys(FORMS)) {
+  for (const [form, { geometry }] of Object.entries(FORMS)) {
     live[form] = await tab.evaluate(readPaint, {
       wells: `[data-form="${form}"] > .manager-segmented`,
       segment: ':scope > .manager-segment',
       chosen: '.is-active',
       tokenNames: tokens,
+      geometry,
     });
   }
   paints = { drawn, live };
