@@ -31,7 +31,9 @@
 
   /** The row's hooks: its stage id, and which of the two states it renders in. */
   export function stageRowData(stage, reorderable) {
-    const state = reorderable ? 'data-progressive-stage-reorderable' : 'data-progressive-stage-fixed';
+    const state = reorderable
+      ? 'data-progressive-stage-reorderable'
+      : 'data-progressive-stage-fixed';
     return { 'data-progressive-stage': stage?.id ?? '', [state]: '' };
   }
 </script>
@@ -83,7 +85,7 @@
       {#if stateChip}{@render stateChip(stage)}{/if}
     </span>
   {:else}
-    <span class="progressive-stage-name">{stage?.name}</span>
+    <span class="progressive-stage-name" title={stage?.name || undefined}>{stage?.name}</span>
     <span class="progressive-stage-numbers">
       {@render numbers()}
       {#if stateChip}{@render stateChip(stage)}{/if}

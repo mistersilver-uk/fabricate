@@ -79,7 +79,7 @@
   );
 </script>
 
-{#if lead}
+{#if stageHasBand(stage) && lead}
   <div
     class="crafting-stage-complications"
     class:is-fired={bandTense === 'fired'}

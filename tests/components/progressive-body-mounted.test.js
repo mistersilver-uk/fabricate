@@ -181,6 +181,14 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     );
   });
 
+  it('the inline name carries its full text as a title, since a long one ellipses', async () => {
+    const target = await mountBody();
+    assert.deepEqual(
+      inRows(target, '.progressive-stage-name').map((name) => name.getAttribute('title')),
+      STAGES.map((stage) => stage.name)
+    );
+  });
+
   it('a null threshold is OMITTED rather than rendered as zero', async () => {
     // An award-loop-skipped stage is reached at NO budget, so any number would be a lie.
     const target = await mountBody({
