@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): ProgressiveStageBand composes ComplicationSummaryRow inside SortableList and draws no control of its own; its manifest row lands with its Primitive Lab specimen (issue 2381) -->
+<!-- ratchet-exempt(design-system): ProgressiveStageBand is a new shared member at target, because the crafting and salvage progressive bodies both render it as SortableList's body (issue 2381) -->
 <!--
   The per-stage complication strip (issue 1286), drawn as the full-bleed band in `SortableList`'s
   `body` beneath a player progressive stage row. Both progressive bodies mount it.
