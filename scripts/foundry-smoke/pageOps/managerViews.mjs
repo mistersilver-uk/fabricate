@@ -659,11 +659,12 @@ export async function assertRecipeRowsHittable(page, label) {
 /**
  * Assert the player's progressive stage list is sound — the checks no unit test can make (issue
  * 651), read off `SortableList`'s rocker and the one live region following the list (issue 2381).
+ * `expectRocker` requires an up and a down control on every row; a fixed list passes false.
  */
 export async function assertProgressiveStageListSound(
   page,
   label,
-  { expectAnnouncement = false } = {}
+  { expectAnnouncement = false, expectRocker = true } = {}
 ) {
   const report = await withDeadline(
     page.evaluate(() => {
@@ -679,19 +680,19 @@ export async function assertProgressiveStageListSound(
       );
 
       // Each rocker control's hit area: its own box, joined with a `::before` that extends it.
-      const rocker = [...document.querySelectorAll('[data-progressive-stage] [data-sortable-move]')].map(
-        (button) => {
-          const box = button.getBoundingClientRect();
-          const pseudo = getComputedStyle(button, '::before');
-          const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
-          return {
-            width: Math.max(box.width, Number.parseFloat(pseudo.width) || 0),
-            height: Math.max(box.height, Number.parseFloat(pseudo.height) || 0),
-            glyphContained: glyph ? contains(box, glyph) : false,
-            hasGlyph: Boolean(glyph),
-          };
-        }
-      );
+      const rocker = [
+        ...document.querySelectorAll('[data-progressive-stage] [data-sortable-move]'),
+      ].map((button) => {
+        const box = button.getBoundingClientRect();
+        const pseudo = getComputedStyle(button, '::before');
+        const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
+        return {
+          width: Math.max(box.width, Number.parseFloat(pseudo.width) || 0),
+          height: Math.max(box.height, Number.parseFloat(pseudo.height) || 0),
+          glyphContained: glyph ? contains(box, glyph) : false,
+          hasGlyph: Boolean(glyph),
+        };
+      });
 
       // Per row: the down control sits directly below the up control, on its left edge.
       const pairs = rows
@@ -732,6 +733,12 @@ export async function assertProgressiveStageListSound(
     throw new Error(`${label}: expected >= 3 progressive stages, saw ${report.rowCount}`);
   }
 
+  if (expectRocker && report.rocker.length !== 2 * report.rowCount) {
+    throw new Error(
+      `${label}: expected an up and a down control on each of ${report.rowCount} rows, saw ${report.rocker.length}`
+    );
+  }
+
   const cropped = report.rocker.filter(
     (c) => !c.hasGlyph || !c.glyphContained || c.width < 24 || c.height < 24
   );
@@ -741,9 +748,7 @@ export async function assertProgressiveStageListSound(
     );
   }
 
-  const unstacked = report.pairs.filter(
-    ({ gap, drift }) => gap < 0 || gap > 4 || drift > 1
-  );
+  const unstacked = report.pairs.filter(({ gap, drift }) => gap < 0 || gap > 4 || drift > 1);
   if (unstacked.length > 0) {
     throw new Error(
       `${label}: rocker not a stacked pair (down 0-4px below up, same left edge): ${JSON.stringify(unstacked)}`
