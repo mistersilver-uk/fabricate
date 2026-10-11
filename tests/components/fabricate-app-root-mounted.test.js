@@ -200,7 +200,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     // The shared complication summary row and the two leaves it renders (issue 1286).
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.

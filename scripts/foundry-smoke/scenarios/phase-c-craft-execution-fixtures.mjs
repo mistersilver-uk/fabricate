@@ -978,7 +978,7 @@ export async function seedSmokeCraftExecutionFixtures(page, craftingSetup, craft
 
       // Flag-OFF sibling (issue 651): the same three stages with the GM's reorder permission
       // withheld, so the player stage list renders its fixed state (no grips, no move buttons,
-      // ordinals + difficulty retained, "Order set by the GM" line).
+      // ordinals + difficulty retained, "Order set by your GM." line).
       await rm.createRecipe({
         name: 'Smoke Kiln Firing',
         description: 'progressive: stage order fixed by the GM (allowPlayerResultReorder: false).',

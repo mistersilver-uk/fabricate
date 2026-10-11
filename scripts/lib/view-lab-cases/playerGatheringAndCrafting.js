@@ -1684,7 +1684,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
-      { selector: '[data-progressive-stage-move-down]' },
+      { selector: '[data-progressive-stage] [data-sortable-move="down"]' },
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [

@@ -77,7 +77,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -171,7 +173,7 @@ function salvageRow() {
  * renders the Reset affordance and the reorder live region, and no View Lab case reaches either
  * state, so the two tests at the end of this file are their only pins.
  */
-function progressiveSalvageRow() {
+function progressiveSalvageRow(stageIds = ['s1', 's2']) {
   const base = salvageRow();
   return {
     ...base,
@@ -182,8 +184,8 @@ function progressiveSalvageRow() {
       results: [],
       awardMode: 'equal',
       stages: [
-        { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 2, threshold: 2 },
-        { id: 's2', componentId: 'c3', name: 'Slag', img: null, difficulty: 3, threshold: 5 },
+        { id: stageIds[0], componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 2, threshold: 2 },
+        { id: stageIds[1], componentId: 'c3', name: 'Slag', img: null, difficulty: 3, threshold: 5 },
       ],
     },
   };
@@ -454,6 +456,13 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
   // list, but not the Reset control's enablement or the live region a rejected write writes into,
   // so each is pinned here by name instead.
 
+  const MOVE_DOWN = '[data-progressive-stage] [data-sortable-move="down"]';
+  const REVERT = 'Could not save your order. Restored the last saved order.';
+  const regionAfterList = (target) =>
+    [target.querySelector('[data-recipe-section="progressive-stages"]')?.nextElementSibling].find(
+      (node) => node?.matches('[data-sortable-list-status]')
+    ) ?? null;
+
   /** Mount over a real store holding the PROGRESSIVE row, with its Salvage tab open. */
   async function mountWithProgressiveSalvage(services) {
     services.inventory = createInventoryStore({ services });
@@ -474,7 +483,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     assert.ok(Boolean(reset), 'the reorderable stage list offers Reset');
     assert.equal(reset.disabled, true, 'disabled — not hidden — while the order is still the GM’s');
 
-    target.querySelector('[data-progressive-stage-move-down]').click();
+    target.querySelector(MOVE_DOWN).click();
     await settle();
 
     assert.equal(services.inventory.salvageOrderIsCustom, true, 'the store sees a custom order');
@@ -492,21 +501,22 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
         setProgressiveResultOrder: async () => {
           throw new Error('setting rejected');
         },
-        progressiveOrderRevertMessage: () => 'Could not save your order. Restored the last saved order.',
+        progressiveOrderRevertMessage: () => REVERT,
       },
     });
     const target = await mountWithProgressiveSalvage(services);
 
-    target.querySelector('[data-progressive-stage-move-down]').click();
+    target.querySelector(MOVE_DOWN).click();
     await settle();
     await services.inventory.flushSalvageOrder();
     await settle();
 
     assert.equal(
-      target.querySelector('[data-progressive-stage-status]').textContent.trim(),
-      'Could not save your order. Restored the last saved order.',
+      regionAfterList(target).textContent.trim(),
+      REVERT,
       'a keyboard user reordering by chevron never looks at a toast, so the revert lands here'
     );
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1, 'one region');
     assert.deepEqual(
       [...target.querySelectorAll('[data-progressive-stage]')].map((row) =>
         row.getAttribute('data-progressive-stage')
@@ -514,6 +524,108 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
       ['s1', 's2'],
       'and the rows are back in the GM’s authored order'
     );
+  });
+
+  it('a reset to the GM’s order is announced through the same region', async () => {
+    const services = makeServices({ rows: [progressiveSalvageRow(), otherRow()] });
+    const target = await mountWithProgressiveSalvage(services);
+
+    target.querySelector(MOVE_DOWN).click();
+    await settle();
+    target.querySelector('[data-inventory-salvage-reorder-reset]').click();
+    await settle();
+
+    assert.equal(
+      regionAfterList(target).textContent.trim(),
+      'FABRICATE.App.Inventory.Salvage.StageOrderResetAnnouncement',
+      'the rows change under a keyboard user with no other signal'
+    );
+  });
+
+  /** The progressive row over a real store whose order writes are recorded, Salvage tab open. */
+  async function mountRecordingWrites() {
+    const writes = [];
+    const services = makeServices({
+      rows: [progressiveSalvageRow(), otherRow()],
+      services: {
+        setProgressiveResultOrder: async (key, ids) => {
+          writes.push(ids);
+        },
+      },
+    });
+    const target = await mountWithProgressiveSalvage(services);
+    return { target, services, writes };
+  }
+
+  const firstGrip = (target) =>
+    target.querySelector('[data-progressive-stage]').querySelector('[data-sortable-grip]');
+  const stageOrder = (target) =>
+    [...target.querySelectorAll('[data-progressive-stage]')].map((row) =>
+      row.getAttribute('data-progressive-stage')
+    );
+
+  it('ArrowDown on a stage grip reorders, keeps focus on that grip and speaks the move', async () => {
+    const { target, services, writes } = await mountRecordingWrites();
+
+    fire(firstGrip(target), 'keydown', { key: 'ArrowDown' });
+    await settle();
+
+    assert.deepEqual(stageOrder(target), ['s2', 's1'], 'the reorder lands');
+    assert.equal(
+      target.ownerDocument.activeElement?.getAttribute('data-sortable-grip'),
+      's1',
+      'focus follows the moved stage’s grip'
+    );
+    assert.equal(
+      regionAfterList(target).textContent.trim(),
+      'FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement:' +
+        '{"name":"Iron Shard","position":"2","total":"2"}',
+      'the region after the list carries the shared sentence'
+    );
+    assert.deepEqual(writes, [], 'a key move is the burst the debounce coalesces');
+    await services.inventory.flushSalvageOrder();
+  });
+
+  it('a drop from the grip writes the order at once, without waiting out the debounce', async () => {
+    const { target, writes } = await mountRecordingWrites();
+
+    fire(firstGrip(target), 'dragstart');
+    fire(target.querySelectorAll('[data-progressive-stage]')[1], 'drop');
+    await settle();
+
+    assert.deepEqual(writes, [['s2', 's1']], 'the drop settled the write through the flush');
+  });
+
+  it('a pending revert is not re-spoken by the next participation’s stage list', async () => {
+    // The tab survives a participation switch, so this list changes subject without unmounting.
+    const row = progressiveSalvageRow();
+    const second = progressiveSalvageRow(['s5', 's6']).salvage;
+    row.systems = [
+      { systemId: 'sys', systemName: 'One', componentId: 'c1', salvage: row.salvage, ownedQuantity: 1 },
+      { systemId: 'sys2', systemName: 'Two', componentId: 'c1', salvage: second, ownedQuantity: 1 },
+    ];
+    const services = makeServices({
+      rows: [row, otherRow()],
+      services: {
+        setProgressiveResultOrder: () => Promise.reject(new Error('setting rejected')),
+        progressiveOrderRevertMessage: () => REVERT,
+      },
+    });
+    const target = await mountWithProgressiveSalvage(services);
+    target.querySelector(MOVE_DOWN).click();
+    await settle();
+    await services.inventory.flushSalvageOrder();
+    await settle();
+    assert.equal(regionAfterList(target).textContent.trim(), REVERT, 'precondition: spoken');
+
+    services.inventory.selectSystem('sys2');
+    await settle();
+    assert.equal(
+      target.querySelector('[data-progressive-stage]').getAttribute('data-progressive-stage'),
+      's5',
+      'precondition: the other participation’s stages render on the same tab'
+    );
+    assert.equal(regionAfterList(target).textContent.trim(), '', 'its list starts silent');
   });
 
   it('InventoryDetail imports NOTHING from the bulk tree — the router bypass', async () => {

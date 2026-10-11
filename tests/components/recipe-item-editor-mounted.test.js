@@ -85,7 +85,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The preview NEVER renders the salvage tree (a book is never salvageable).
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',

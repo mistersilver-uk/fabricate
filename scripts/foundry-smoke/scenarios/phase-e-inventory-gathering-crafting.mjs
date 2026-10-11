@@ -9,8 +9,20 @@ import {
 } from '../pageOps/pageLifecycle.mjs';
 import { ensureSlotOpen } from '../pageOps/toolStudio.mjs';
 
+/**
+ * The gathering attempts phase E clicks, with whether each opens the interactive roll prompt. Only
+ * a routed or progressive task does (the engine's versioned check descriptor); a d100 or timed
+ * gather resolves without one. A Node test pins every row against the engine.
+ */
+export const GATHERING_ATTEMPT_PROMPTS = [
+  { taskId: 'smoke-meadow-herbs', resolutionMode: undefined, prompts: false },
+  { taskId: 'smoke-slow-bloom', resolutionMode: undefined, prompts: false },
+];
+
 export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
   const { page, results, screenshot } = ctx;
+  const attemptPrompts = (taskId) =>
+    GATHERING_ATTEMPT_PROMPTS.find((entry) => entry.taskId === taskId).prompts;
   const { executionFixtures } = ctx.shared;
   const { RUN_SCREENSHOT_PHASES, RUN_FULL_ONLY_GATHERING_STATES } = ctx.profile;
   // The "Craft Item" and "Gathering" sidebar actions both open one shared window
@@ -377,8 +389,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  // `prompts` is by construction: an immediate (d100) gather opens the interactive roll prompt,
-  // and a timed one only starts its waiting run.
+  // `prompts` comes from GATHERING_ATTEMPT_PROMPTS: only a routed or progressive task opens the
+  // roll prompt (the engine's versioned check descriptor); a d100 or timed gather resolves
+  // without one.
   async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
@@ -424,7 +437,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt({ prompts: true });
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-meadow-herbs') });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -442,7 +455,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt({ prompts: false });
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-slow-bloom') });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
@@ -1075,15 +1088,17 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             .waitFor({ state: 'visible', timeout: 10_000 });
         };
 
-        // (1) Flag ON — the default. Settles the chevron box: the buttons render
-        // whether or not anything has moved, so the reset is checkable at rest.
+        // (1) Flag ON — the default. Settles the rocker box: it renders whether or not
+        // anything has moved, so its geometry is checkable at rest.
         await selectRecipeByName('Smoke Mold Brick');
         await assertProgressiveStageListSound(page, 'player-crafting-progressive');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-crafting-progressive');
 
         // (2) Reordered.
-        const moveDown = appShell.locator('[data-progressive-stage-move-down]').first();
+        const moveDown = appShell
+          .locator('[data-progressive-stage] [data-sortable-move="down"]')
+          .first();
         await moveDown.click({ timeout: 5000 });
         await page.waitForTimeout(250);
         const reordered = await assertProgressiveStageListSound(
@@ -1100,36 +1115,49 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           announcement: reordered.region?.text ?? '',
         });
 
-        // (3) Flag OFF (D13): no grips, no move buttons, ordinals + difficulty kept,
-        // and the muted "Order set by the GM" line. Default-true means an explicit
-        // false has to be authored to reach this state at all.
+        // (3) Flag OFF (D13): no grips, no rocker, ordinals + difficulty kept, the muted
+        // "Order set by your GM." line, and the one live region kept mounted and empty.
+        // Default-true means an explicit false has to be authored to reach this state.
         await selectRecipeByName('Smoke Kiln Firing');
-        const fixedReport = await page.evaluate(() => ({
-          rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
-          grips: document.querySelectorAll('.crafting-stage-handle').length,
-          moves: document.querySelectorAll('[data-progressive-stage-move]').length,
-          ordinals: document.querySelectorAll('[data-progressive-stage-ordinal]').length,
-          difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
-          note:
-            document.querySelector('[data-progressive-stage-fixed-note]')?.textContent?.trim() ??
-            '',
-          liveRegions: document.querySelectorAll('[data-progressive-stage-status]').length,
-        }));
+        const fixedReport = await page.evaluate(() => {
+          const regions = [...document.querySelectorAll('[data-sortable-list-status]')].filter(
+            (region) =>
+              region.previousElementSibling?.matches('[data-recipe-section="progressive-stages"]')
+          );
+          return {
+            rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
+            grips: document.querySelectorAll('[data-progressive-stage] [data-sortable-grip]')
+              .length,
+            moves: document.querySelectorAll('[data-progressive-stage] [data-sortable-move]')
+              .length,
+            ordinals: document.querySelectorAll('[data-progressive-stage] [data-sortable-ordinal]')
+              .length,
+            difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
+            note:
+              document.querySelector('[data-progressive-stage-fixed-note]')?.textContent?.trim() ??
+              '',
+            liveRegions: regions.length,
+            regionText: regions.map((region) => region.textContent?.trim() ?? '').join(''),
+          };
+        });
         if (fixedReport.rows < 3) throw new Error(`fixed state rendered ${fixedReport.rows} rows`);
         if (fixedReport.grips > 0 || fixedReport.moves > 0) {
           throw new Error(
             `fixed state still offers reorder affordances: ${JSON.stringify(fixedReport)}`
           );
         }
-        if (fixedReport.ordinals < 3 || fixedReport.difficulties < 3) {
+        if (fixedReport.ordinals !== fixedReport.rows || fixedReport.difficulties < 3) {
           throw new Error(
             `fixed state dropped ordinals/difficulty: ${JSON.stringify(fixedReport)}`
           );
         }
         if (fixedReport.note.length === 0)
-          throw new Error('fixed state shows no "order set by the GM" line');
-        if (fixedReport.liveRegions > 0)
-          throw new Error('fixed state renders a live region for an order that cannot change');
+          throw new Error('fixed state shows no "Order set by your GM." line');
+        if (fixedReport.liveRegions !== 1 || fixedReport.regionText.length > 0) {
+          throw new Error(
+            `fixed state needs exactly one empty live region after the list: ${JSON.stringify(fixedReport)}`
+          );
+        }
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-crafting-progressive-fixed');
         results.steps.push({
@@ -1139,7 +1167,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         });
 
         // (4) Narrow: the long component name must ellipse while the difficulty and
-        // "Reached at >=N" chips survive and the chevrons stay on-row.
+        // "Reached at >=N" chips survive and the rocker stays on-row.
         await selectRecipeByName('Smoke Mold Brick');
         const progressiveStackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
@@ -1167,14 +1195,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll(selector)].filter(
               (node) => node.getBoundingClientRect().width > 1
             ).length;
-          const names = [...document.querySelectorAll('.crafting-stage-name')];
+          const names = [
+            ...document.querySelectorAll('[data-progressive-stage] .progressive-stage-name'),
+          ];
           return {
             difficulties: visible('[data-progressive-stage-difficulty]'),
             thresholds: visible('[data-progressive-stage-threshold]'),
             ellipsed: names.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
-            rowOverflow: [...document.querySelectorAll('.crafting-stage-row')].filter(
-              (row) => row.scrollWidth > row.clientWidth + 2
-            ).length,
+            rowOverflow: [
+              ...document.querySelectorAll('.fabricate-sortable-list-row.progressive-stage-row'),
+            ].filter((row) => row.scrollWidth > row.clientWidth + 2).length,
           };
         });
         if (narrowChips.difficulties < 3 || narrowChips.thresholds < 3) {
@@ -1182,7 +1212,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         }
         if (narrowChips.rowOverflow > 0) {
           throw new Error(
-            `narrow layout overflows the row (chevrons pushed off): ${JSON.stringify(narrowChips)}`
+            `narrow layout overflows the row (rocker pushed off): ${JSON.stringify(narrowChips)}`
           );
         }
         await assertNoScreenshotOverlays(page);

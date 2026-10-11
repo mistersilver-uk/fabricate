@@ -125,6 +125,16 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte': 1 },
   ],
   [
+    'ProgressiveStageRow composes Medallion inside SortableList and draws no control of its ' +
+      'own; its manifest row lands with its Primitive Lab specimen (issue 2381)',
+    { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte': 1 },
+  ],
+  [
+    'ProgressiveStageBand composes ComplicationSummaryRow inside SortableList and draws no ' +
+      'control of its own; its manifest row lands with its Primitive Lab specimen (issue 2381)',
+    { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte': 1 },
+  ],
+  [
     "the gathering task editor's own card, the chrome and header snippet its view carried at " +
       "base, shared by that editor's tabs and cards rather than offered as a vocabulary member",
     { 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte': 1 },

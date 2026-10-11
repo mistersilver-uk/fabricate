@@ -1022,14 +1022,14 @@ describe('craftingStore', () => {
     );
   });
 
-  it('reorderProgressiveStage moves a stage optimistically and announces it', async () => {
+  it('reorderProgressiveStage moves a stage optimistically and leaves the sentence to the list', async () => {
     const { services } = makeOrderServices();
     const store = createCraftingStore({ services });
     await store.load();
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    store.reorderProgressiveStage(2, 0);
     flushSync();
 
     assert.deepEqual(
@@ -1037,7 +1037,7 @@ describe('craftingStore', () => {
       ['s3', 's1', 's2'],
       'the row moves immediately, before the write resolves'
     );
-    assert.equal(store.orderAnnouncement, 'Master moved to position 1 of 3');
+    assert.equal(store.orderAnnouncement, '', 'the list speaks its own move');
     assert.deepEqual(store.progressiveOrders['recipe:r1'], ['s3', 's1', 's2'], 'stored as IDS');
     await store.flushProgressiveOrder();
   });
@@ -1050,7 +1050,7 @@ describe('craftingStore', () => {
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'nope');
+    store.reorderProgressiveStage(2, 0);
     flushSync();
     await store.flushProgressiveOrder();
 
@@ -1070,9 +1070,9 @@ describe('craftingStore', () => {
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 1, 'a');
-    store.reorderProgressiveStage(1, 0, 'b');
-    store.reorderProgressiveStage(0, 1, 'c');
+    store.reorderProgressiveStage(2, 1);
+    store.reorderProgressiveStage(1, 0);
+    store.reorderProgressiveStage(0, 1);
     flushSync();
     assert.equal(writes.length, 0, 'nothing is written mid-drag');
 
@@ -1088,7 +1088,7 @@ describe('craftingStore', () => {
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'a');
+    store.reorderProgressiveStage(2, 0);
     await store.flushProgressiveOrder();
 
     assert.equal(writes.length, 1);
@@ -1111,7 +1111,7 @@ describe('craftingStore', () => {
     store.select('ordered-a');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    store.reorderProgressiveStage(2, 0);
     flushSync();
     store.select('ordered-b');
     flushSync();
@@ -1142,7 +1142,7 @@ describe('craftingStore', () => {
       ['s2', 's1', 's3']
     );
 
-    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    store.reorderProgressiveStage(2, 0);
     flushSync();
     assert.deepEqual(
       store.orderedProgressiveStages.map((stage) => stage.id),
@@ -1165,6 +1165,27 @@ describe('craftingStore', () => {
     );
   });
 
+  it('D7a: a move between two rejected writes clears the revert, so the second is spoken', async () => {
+    const { services } = makeOrderServices({
+      setImpl: () => Promise.reject(new Error('setting rejected')),
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('r1');
+    flushSync();
+    const revert = 'Could not save your order. Restored the last saved order.';
+
+    store.reorderProgressiveStage(2, 0);
+    await store.flushProgressiveOrder();
+    assert.equal(store.orderAnnouncement, revert, 'the first rejection announces the revert');
+
+    store.reorderProgressiveStage(2, 0);
+    assert.equal(store.orderAnnouncement, '', 'the next move clears it');
+
+    await store.flushProgressiveOrder();
+    assert.equal(store.orderAnnouncement, revert, 'so the second rejection is a new sentence');
+  });
+
   it('D7a: a rejected FIRST-EVER write drops the key rather than stranding it', async () => {
     const { services } = makeOrderServices({
       setImpl: () => {
@@ -1176,7 +1197,7 @@ describe('craftingStore', () => {
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'moved');
+    store.reorderProgressiveStage(2, 0);
     await store.flushProgressiveOrder();
     flushSync();
 
@@ -1200,7 +1221,7 @@ describe('craftingStore', () => {
     store.select('r1');
     flushSync();
 
-    store.reorderProgressiveStage(2, 0, 'first');
+    store.reorderProgressiveStage(2, 0);
     await store.flushProgressiveOrder();
     flushSync();
     assert.deepEqual(
@@ -1209,7 +1230,7 @@ describe('craftingStore', () => {
     );
 
     fail = true;
-    store.reorderProgressiveStage(2, 0, 'second');
+    store.reorderProgressiveStage(2, 0);
     await store.flushProgressiveOrder();
     flushSync();
     assert.deepEqual(
@@ -1255,7 +1276,7 @@ describe('craftingStore', () => {
 
   for (const awardMode of ['equal', 'exceed', 'partial']) {
     it(`COMPOSED (${awardMode}): thresholds are recomputed for the PLAYER'S order, not the authored one`, async () => {
-      // The store's stages are rendered verbatim (ProgressiveStageList emits
+      // The store's stages are rendered verbatim (ProgressiveStageRow emits
       // `data-progressive-stage-threshold={stage.threshold}` with no arithmetic of its
       // own), so a correct store here is a correct badge there.
       const store = thresholdStore([5, 3, 4], awardMode, ['s2', 's3', 's1']);
@@ -1399,7 +1420,7 @@ describe('craftingStore', () => {
     );
 
     // Move the LAST stage (difficulty 4) to the top.
-    store.reorderProgressiveStage(2, 0, 'moved');
+    store.reorderProgressiveStage(2, 0);
     flushSync();
 
     const ordered = store.orderedProgressiveStages;

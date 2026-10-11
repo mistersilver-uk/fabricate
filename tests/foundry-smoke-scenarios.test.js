@@ -10,7 +10,9 @@ import { resolve } from 'node:path';
 
 import { runScenarios } from '../scripts/foundry-smoke/runScenarios.mjs';
 import { SMOKE_SCENARIOS, SMOKE_SCENARIO_IDS } from '../scripts/foundry-smoke/registry.mjs';
+import { GATHERING_ATTEMPT_PROMPTS } from '../scripts/foundry-smoke/scenarios/phase-e-inventory-gathering-crafting.mjs';
 import { D0_SKIPPABLE_SECTIONS, SCREENSHOT_CAPTURE_ORDER } from '../scripts/lib/screenshotCaptureMap.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { parseModule } from './helpers/moduleAst.js';
 import { physicalLines } from './helpers/unitSizes.js';
 import {
@@ -309,4 +311,18 @@ test('the label-emission parse over every module covers the whole capture order'
   }
   const missing = SCREENSHOT_CAPTURE_ORDER.filter((label) => !emitted.has(label));
   assert.deepEqual(missing, []);
+});
+
+test('phase E expects a gather roll prompt exactly when the engine requires a check', () => {
+  const engine = new GatheringEngine({});
+  for (const { taskId, resolutionMode, prompts } of GATHERING_ATTEMPT_PROMPTS) {
+    const { required } = engine._versionedCheckDescriptor({
+      actor: { name: 'A' },
+      run: { taskId },
+      system: {},
+      environment: {},
+      task: { id: taskId, resolutionMode },
+    });
+    assert.equal(prompts, required, taskId);
+  }
 });
