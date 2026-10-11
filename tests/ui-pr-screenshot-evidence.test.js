@@ -2645,11 +2645,13 @@ describe('UI PR screenshot evidence', () => {
 describe('a Primitive Lab file is not a render file (issue 2382)', () => {
   const PAGE_CSS = 'tests/view-lab/primitives/page.css';
   const RENDER_FILE = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
-  const primitiveLab = spawnSync(
+  const listed = spawnSync(
     'git',
     ['ls-files', '--', 'tests/view-lab/primitives/', 'tests/view-lab/primitives.html'],
-    { encoding: 'utf8' },
-  ).stdout.split(/\r?\n/).filter(Boolean);
+    { cwd: new URL('..', import.meta.url), encoding: 'utf8' },
+  );
+  assert.equal(listed.status, 0, listed.stderr);
+  const primitiveLab = listed.stdout.split(/\r?\n/).filter(Boolean);
   const viewIds = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
   const armedBy = files => [
     hasUiChanges(files) && 'hasUiChanges',
@@ -2689,6 +2691,7 @@ describe('a Primitive Lab file is not a render file (issue 2382)', () => {
       'tests/view-lab/primitives-extra/a.css',
     ]) {
       assert.equal(hasUiChanges([file]), true, file);
+      assert.deepEqual(viewIds([file]), ['theme-or-global-ui'], file);
     }
     assert.equal(hasUiChanges(['tests/view-lab/cascade.css']), true);
     assert.deepEqual(viewIds(['tests/view-lab/cascade.css']), ['theme-or-global-ui']);

@@ -293,6 +293,9 @@ test('a Primitive Lab file beside a real render file leaves the gate armed by th
   assert.equal(hasUiChanges(mixed), true);
   assert.equal(rendersCapture(mixed), true);
   assert.deepEqual(selectedIds(mixed), selectedIds([RENDER_FILE]));
+});
+
+test('a Primitive Lab file beside only lang/ or a lab input adds nothing', () => {
   assert.deepEqual(reachedBy([PAGE_CSS, 'lang/en.json']), []);
   assert.deepEqual(selectedIds([PAGE_CSS, 'tests/view-lab/world/labContent.js']), [
     ...LAB_SURFACE_CASE_IDS,
