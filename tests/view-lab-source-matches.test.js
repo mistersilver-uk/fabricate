@@ -6,14 +6,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, posix, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
   FALLBACK_CASE_ID,
+  LAB_SURFACE_CASE_IDS,
   VIEW_LAB_CASES,
   hasUiChanges,
+  isLabInput,
   isUiFile,
   mapChangedFilesToCases,
   normalizePath,
@@ -209,4 +211,104 @@ test('every sourceMatches pattern, and each of its alternatives, names a tracked
     [],
     'point each at the current path of its file, or remove it'
   );
+});
+
+/** The Primitive Lab's page and directory, which `npm run lab:check` verifies (issue 2377). */
+const PRIMITIVE_LAB_PAGE = 'tests/view-lab/primitives.html';
+const isPrimitiveLabPath = (file) =>
+  file === PRIMITIVE_LAB_PAGE || file.startsWith('tests/view-lab/primitives/');
+
+test('a Primitive Lab file selects no app frame, and only the fallback when it arms the gate', () => {
+  const primitiveLab = tracked.filter(isPrimitiveLabPath);
+  const renderFiles = primitiveLab.filter(isUiFile);
+  const nonRender = primitiveLab.filter((file) => !isUiFile(file));
+  assert.ok(
+    primitiveLab.length >= 10,
+    `only ${primitiveLab.length} Primitive Lab paths are tracked`
+  );
+  assert.ok(renderFiles.length > 0, 'no Primitive Lab .svelte or .css file is tracked');
+  assert.ok(nonRender.length > 0, 'no Primitive Lab non-render file is tracked');
+
+  // A non-render file selects and renders nothing; a render file arms the gate, so it selects the
+  // fallback frame alone.
+  const framed = nonRender
+    .filter((file) => selectedIds([file]).length > 0 || rendersCapture([file]))
+    .map((file) => `${file} → ${selectedIds([file]).length} case(s)`);
+  const beyondFallback = renderFiles
+    .filter((file) => JSON.stringify(selectedIds([file])) !== JSON.stringify([FALLBACK_CASE_ID]))
+    .map((file) => `${file} → ${selectedIds([file]).length} case(s)`);
+  assert.deepEqual({ framed, beyondFallback }, { framed: [], beyondFallback: [] });
+});
+
+test('a Primitive Lab file leaves a real lab input its coverage, and a near miss keeps it', () => {
+  const catalogue = 'tests/view-lab/primitives/catalogue/controls.json';
+  assert.ok(tracked.includes(catalogue), `${catalogue} is not tracked, so this probe is inert`);
+  assert.deepEqual(selectedIds([catalogue, 'tests/view-lab/world/labContent.js']), [
+    ...LAB_SURFACE_CASE_IDS,
+  ]);
+  assert.deepEqual(selectedIds(['tests/view-lab/primitivesNobodyMadeYet.js']), [
+    ...LAB_SURFACE_CASE_IDS,
+  ]);
+});
+
+/** The lab server's mount prefixes, as `tests/view-lab/vite.config.js` serves them. */
+const LAB_MOUNTS = [
+  ['/@view-lab/', 'tests/view-lab/'],
+  ['/@fabricate-styles/', 'styles/'],
+  ['/@design-library/', 'openspec/specs/design-system/'],
+];
+
+/** An import, dynamic import, re-export, `src=` or `href=` specifier, quoted. */
+const SPECIFIER =
+  /\b(?<keyword>from|import|src|href)\s*(?:=|\()?\s*(["'`])(?<specifier>[^"'`]+)\2/g;
+
+/**
+ * The repository paths one specifier in `file` can name. A bare attribute value is relative to
+ * the page or, under a `<base href="/">`, to the root, so it is resolved both ways.
+ */
+function specifierTargets(file, keyword, specifier) {
+  const bare = specifier.split(/[?#]/, 1)[0];
+  const mount = LAB_MOUNTS.find(([prefix]) => bare.startsWith(prefix));
+  if (mount) return [posix.join(mount[1], bare.slice(mount[0].length))];
+  if (bare.startsWith('/')) return [posix.normalize(bare.slice(1))];
+  if (bare.startsWith('.')) return [posix.join(posix.dirname(file), bare)];
+  const isAttribute = keyword === 'src' || keyword === 'href';
+  return isAttribute && !/^[a-z][\w+.-]*:/i.test(bare)
+    ? [posix.join(posix.dirname(file), bare), posix.normalize(bare)]
+    : [];
+}
+
+/** The specifiers in one file's text that reach the Primitive Lab. */
+const primitiveLabSpecifiers = (file, text) =>
+  [...text.matchAll(SPECIFIER)]
+    .map((match) => match.groups)
+    .filter(({ keyword, specifier }) =>
+      specifierTargets(file, keyword, specifier).some(isPrimitiveLabPath)
+    )
+    .map(({ specifier }) => specifier);
+
+test('the Primitive Lab specifier scan sees every form, and not a bare path string', () => {
+  const probe = [
+    "import { readLibrary } from './primitives/library.js';",
+    "await import('/@view-lab/primitives/mount.js');",
+    '<script type="module" src="/tests/view-lab/primitives/mount.js"></script>',
+    '<link rel="stylesheet" href="primitives/page.css" />',
+    "<a href='./primitives.html'>lab</a>",
+    "export { CATALOGUE } from '../view-lab/primitives/catalogue.js';",
+  ].join('\n');
+  assert.equal(primitiveLabSpecifiers('tests/view-lab/probe.js', probe).length, 6);
+  const entries = "optimizeDeps: { entries: ['tests/view-lab/primitives/mount.js'] },";
+  assert.deepEqual(primitiveLabSpecifiers('tests/view-lab/vite.config.js', entries), []);
+});
+
+test('no file the app View Lab is built from loads anything of the Primitive Lab', () => {
+  // The premise that lets a Primitive Lab file select no app frame: no app frame can render it.
+  const appLabInputs = tracked.filter((file) => isLabInput(file) && !isPrimitiveLabPath(file));
+  assert.ok(appLabInputs.length >= 50, `only ${appLabInputs.length} app lab inputs are tracked`);
+  const reaching = appLabInputs.flatMap((file) =>
+    primitiveLabSpecifiers(file, readFileSync(resolve(ROOT, file), 'utf8')).map(
+      (specifier) => `${file} → ${specifier}`
+    )
+  );
+  assert.deepEqual(reaching, [], 'these app lab inputs load the Primitive Lab');
 });

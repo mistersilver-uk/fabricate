@@ -58,10 +58,14 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
  * the Foundry shim it renders against, its capture, layout and census helpers and the radius
- * ladder the census reads, this index and the case files it reads.
+ * ladder the census reads, this index and the case files it reads — but not the Primitive Lab
+ * below, which no app frame renders.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
   /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/(?:foundryChromeSpec|radiusLadder)\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
+
+/** The Primitive Lab's page and directory, which `npm run lab:check` verifies (issue 2377). */
+const PRIMITIVE_LAB_PATTERN = /^tests\/view-lab\/primitives(?:\/|\.html$)/;
 
 /** The helper that enforces the opt-in responsive layout contract. */
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
@@ -865,7 +869,7 @@ function selectLabInputCases(file, patchByPath) {
   // The default, and the fail-safe: an input nobody has attributed — a new file under
   // `tests/view-lab/`, the fixture assembler, the Foundry shim, this index, a shared seam under
   // `view-lab-cases/` — reaches further than this registry can say, and resolves to surface
-  // coverage.
+  // coverage. The Primitive Lab never reaches here: it is not a lab input.
   if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.attributesByCase) {
     return casesFromCaseFilePatch(patchByPath.get(file), attribution);
@@ -894,8 +898,8 @@ function normalizePatches(patches) {
 }
 
 /** Whether one path is an input of the lab itself rather than of the product it renders. */
-function isLabInput(file) {
-  return LAB_INFRASTRUCTURE_PATTERN.test(file);
+export function isLabInput(file) {
+  return LAB_INFRASTRUCTURE_PATTERN.test(file) && !PRIMITIVE_LAB_PATTERN.test(file);
 }
 
 /**

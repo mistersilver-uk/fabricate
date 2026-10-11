@@ -485,6 +485,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'fabricate-journal-lifecycle-waiting-auto-eligible',
       'the one frame that draws the completion switch and its kicker',
     ],
+    [
+      'src/ui/svelte/components/ActionMenu.svelte',
+      'manager-recipe-edit-ingredients-adder-menu',
+      'the ingredient set`s adder menu, the results adder`s sibling',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
     assert.ok(
