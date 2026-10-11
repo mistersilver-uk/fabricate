@@ -118,14 +118,6 @@
     // by default, so a frame that says nothing opens on the resting inspector it always did and
     // the essence and tool catalogues are byte-identical.
     autoSelectFirst = false,
-    // ── THE LIST COLUMN RUNS EDGE TO EDGE (issue 1371 r16-cat, maintainer ruling M21) ────────
-    // "the entire world component catalogue browser has unnecessary padding/whitespace around its
-    // central rail body and does not occupy all of the space available to it." The column below
-    // carries the pane's `--fab-space-4` inset on every side, so the toolbar, the rows scroller
-    // and the pager all stopped 16px short of the pane's edges while the system Component Rules
-    // list beside it — `ComponentsBrowserView`'s `.manager-main`, which carries no inset — runs
-    // its toolbar and footer edge to edge.
-    flushColumn = false,
     // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
     // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
     // from being full-width." The inspector column below pads `--fab-space-4` and the bulk panel
@@ -525,7 +517,7 @@
   <div class="manager-scoped-list-layout" class:has-inspector={Boolean(inspectorBody) && available}>
     <!-- THE COLUMN IS THE MIDDLE TRACK IN BOTH STATES, and the lead is above the branch rather
          than inside its available half (issue 1373, maintainer feedback round 2). -->
-    <div class="manager-scoped-list-column" class:is-flush={flushColumn}>
+    <div class="manager-scoped-list-column">
       {#if columnLead}
         <div class="manager-scoped-list-column-lead">{@render columnLead()}</div>
       {/if}
@@ -1003,19 +995,32 @@
     column-gap: 0;
   }
 
-  /* THE CONTENT CARRIES THE PANE'S INSET, BECAUSE THE SIDEBAR MUST NOT (issue 1373, round 4). */
+  /* No inset, so the toolbar, rows and pager reach the pane's edges (M21, issue 2373). */
   .manager-scoped-list-column {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-4);
   }
 
-  /* AND THE ONE CATALOGUE THAT DROPS IT (M21; see `flushColumn`). */
-  .manager-scoped-list-column.is-flush {
-    padding: 0;
+  /* Boxed children keep the gutter `FilterBar` and `Pagination` pad inside themselves: inline,
+     above the first, and below a pagerless scroller. */
+  .manager-scoped-list-column-lead,
+  .manager-scoped-list-unavailable,
+  .manager-scoped-list-bulk,
+  .manager-scoped-list-rows {
+    min-width: 0;
+    padding-inline: var(--fab-space-3);
+  }
+
+  .manager-scoped-list-column
+    > :first-child:is(.manager-scoped-list-column-lead, .manager-scoped-list-unavailable) {
+    padding-block-start: var(--fab-space-3);
+  }
+
+  .manager-scoped-list-rows:last-child {
+    padding-block-end: var(--fab-space-3);
   }
 
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
@@ -1030,7 +1035,6 @@
   .manager-scoped-list-column-lead {
     display: grid;
     flex: 0 0 auto;
-    min-width: 0;
   }
 
   .manager-scoped-list-bulk {
@@ -1189,7 +1193,6 @@
   /* THE SCROLLER RESTS ON A ROW BOUNDARY, NEVER THROUGH ONE (issue 1373). */
   .manager-scoped-list-rows {
     flex: 1 1 auto;
-    min-width: 0;
     min-height: 0;
     overflow-y: auto;
     scroll-padding-block-start: var(--fab-space-1);
@@ -1339,10 +1342,6 @@
   .manager-scoped-list-inspector:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  .manager-scoped-list-unavailable {
-    min-width: 0;
   }
 
   /* The source badge's hook wrapper. */

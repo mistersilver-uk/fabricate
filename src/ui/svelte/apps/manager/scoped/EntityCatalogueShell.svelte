@@ -53,8 +53,6 @@
     onSelect = () => {},
     // WHETHER THE FIRST SHOWN ROW IS INSPECTED ON OPEN (M14). Opt-in.
     autoSelectFirst = false,
-    // WHETHER THE LIST COLUMN RUNS EDGE TO EDGE IN ITS PANE (M21). Opt-in.
-    flushColumn = false,
     // WHETHER THE BULK DOCK REACHES THE INSPECTOR COLUMN'S EDGES (M24). Opt-in.
     flushBulkDock = false,
     onOpenEntry = () => {},
@@ -170,7 +168,6 @@
     bind:selectedId
     {onSelect}
     {autoSelectFirst}
-    {flushColumn}
     {flushBulkDock}
     bind:armedToken
     inspectorBody={catalogueInspector}
