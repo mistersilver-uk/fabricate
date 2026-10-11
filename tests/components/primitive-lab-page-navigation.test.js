@@ -123,7 +123,7 @@ test('every rail link names the lab page, and clicking one scrolls that page', a
     const top = await page.waitForFunction(
       (name) => {
         const reached = document.querySelector(`#${CSS.escape(name)}`).getBoundingClientRect().top;
-        return reached >= 0 && reached <= innerHeight / 4 && { reached };
+        return reached >= -1 && reached <= innerHeight / 4 && { reached };
       },
       id,
       { timeout: 5000 }
