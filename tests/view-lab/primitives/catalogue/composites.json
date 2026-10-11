@@ -1874,8 +1874,7 @@
     "path": "src/ui/svelte/components/EssencePool.svelte",
     "fixture": "EssencePoolReadings",
     "props": {
-      "label": "Essence pool",
-      "hint": "one spend feeds every pool",
+      "label": "Shared essence allocation",
       "thresholds": [
         {
           "essence": "Radiant",
@@ -1925,14 +1924,10 @@
       }
     },
     "data": {
-      "names": {
-        "Radiant": "Radiant channelled",
-        "Shadow": "Shadow channelled"
-      },
       "readings": {
-        "sunmote": "+2 Radiant each · 3 held · 2 spare",
-        "duskglass": "+1 Radiant · +2 Shadow each · 2 held",
-        "shade-ink": "+3 Shadow each · 1 held"
+        "sunmote": "+2 Radiant · 3 held · 2 unallocated",
+        "duskglass": "+1 Radiant · +2 Shadow · 2 held · 0 unallocated",
+        "shade-ink": "+3 Shadow · 1 held · 1 unallocated"
       },
       "yields": {
         "sunmote": {
@@ -1957,7 +1952,7 @@
       "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
       "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
     },
-    "note": "Wired as `StepDetails` wires the open stage's pool. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author, and the steppers' names are the Journal's own copy. The overshoot line uses the Journal's copy, the carrier readings follow the drawing where `StepDetails` prints \"· N unallocated\", and the kicker sits inside the well."
+    "note": "Wired as `StepDetails` wires the open stage's pool, in the Journal's copy: its kicker, each bar named by its essence, the steppers' names and the overshoot. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The kicker and the overshoot ship in `--fab-text-subtle` (3.54 to 3.98:1 on `--fab-bg-1` in six themes) and the readings likewise (3.34 to 3.78:1 on `--fab-bg-2`); the drawing draws them in `--fab-text-muted`: debt owned by #2368."
   },
   {
     "spec": "<EssencePool>",
@@ -1966,8 +1961,7 @@
     "path": "src/ui/svelte/components/EssencePool.svelte",
     "fixture": "EssencePoolReadings",
     "props": {
-      "label": "Channel 5 Clarity",
-      "hint": "combine what you hold",
+      "label": "Shared essence allocation",
       "thresholds": [
         {
           "essence": "Clarity",
@@ -1986,30 +1980,19 @@
               "label": "Moonpetal",
               "icon": "fas fa-leaf",
               "tint": "lavender"
-            },
-            {
-              "id": "spring-water",
-              "label": "Spring Water",
-              "icon": "fas fa-droplet",
-              "tint": "mist"
             }
           ]
         }
       ],
       "allocation": {
         "dewglass": 1,
-        "moonpetal": 0,
-        "spring-water": 0
+        "moonpetal": 0
       }
     },
     "data": {
-      "names": {
-        "Clarity": "Clarity channelled"
-      },
       "readings": {
-        "dewglass": "+2 Clarity each · 4 held · 3 spare",
-        "moonpetal": "+3 Clarity each · 1 held",
-        "spring-water": "no essence · 2 held"
+        "dewglass": "+2 Clarity · 4 held · 3 unallocated",
+        "moonpetal": "+3 Clarity · 1 held · 1 unallocated"
       },
       "yields": {
         "dewglass": {
@@ -2021,8 +2004,7 @@
       },
       "held": {
         "dewglass": 4,
-        "moonpetal": 1,
-        "spring-water": 2
+        "moonpetal": 1
       },
       "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
       "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
@@ -2030,6 +2012,6 @@
       "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
       "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
     },
-    "note": "Wired as the pool above. The overshoot line uses the Journal's copy, the carrier readings follow the drawing where `StepDetails` prints \"· N unallocated\", and the kicker sits inside the well."
+    "note": "Wired as the pool above, short of its one threshold, so no overshoot is stated. `StepDetails` lists only a carrier that gives an essence the stage needs. The kicker and readings carry the debt named above, owned by #2368."
   }
 ]
