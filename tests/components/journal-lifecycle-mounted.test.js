@@ -2252,6 +2252,15 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(target.querySelector('[data-slot-id="metal"]').textContent, /copper stock/);
   });
 
+  it('draws a slot whose pick went stale as the empty ring, never the solid disc', async () => {
+    const { target } = await mountState('stale-choice');
+    const glyph = target.querySelector(
+      ':scope [data-slot-row] [data-slot-state="open"] .fab-slot-tile .fab-medallion i'
+    );
+    assert.ok(glyph, 'the stale slot keeps the open face');
+    assert.ok(glyph.matches('.fa-regular.fa-circle') && !glyph.matches('.fas'), glyph.className);
+  });
+
   it('marks the effective initial selection and the fallback after its actual removal', async () => {
     const mounted = await mountState('filter-paused');
     const selectedId = mounted.store.selectedRun.id;

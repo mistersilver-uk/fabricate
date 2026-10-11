@@ -97,7 +97,7 @@
           label={selected?.label || requirement.label}
           ariaLabel={slotLabel(requirement)}
           art={selected?.art || requirement.art || ''}
-          icon={selected?.icon || requirement.icon || 'fas fa-circle'}
+          icon={selected?.icon || requirement.icon || ''}
           tint={selected?.tint || requirement.tint || ''}
           state={tileState(requirement)}
           pip={tilePip(requirement)}

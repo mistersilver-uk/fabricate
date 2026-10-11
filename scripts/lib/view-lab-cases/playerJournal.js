@@ -584,6 +584,22 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/journal\/runDetailPresentation\.js$/,
     ],
   }),
+  // Issue 2366: a pick that went stale leaves its slot on the open face, drawn as the empty ring.
+  playerCase({
+    id: 'fabricate-journal-lifecycle-stale-choice',
+    label: 'Player Journal — stale choice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'stale-choice' },
+    steps: [{ selector: '[data-run-id="lab-v1-stale-choice"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail][data-run-key*="lab-v1-stale-choice"]' +
+      ' [data-slot-row] [data-slot-state="open"] .fab-slot-tile' +
+      ' i.fa-regular.fa-circle:not(.fas):not(.fa-solid)',
+    kinds: ['player', 'journal'],
+    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),
