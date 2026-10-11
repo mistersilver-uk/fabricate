@@ -394,6 +394,7 @@ The primitive also takes an OPT-IN per-control icon-only variant (issue 1036) fo
 It renders the same DOM as the labelled variant and differs only in CSS: the segment becomes a compact square tile and its label is CLIPPED out of view, never dropped and never removed from the accessibility tree, because the `<label>` IS the radio's accessible name and an icon-only track whose segments are anonymous to a screen reader is not an acceptable rendering.
 The variant additionally titles each tile with that same label, which is the pointer equivalent of the name the clipped text already gives assistive technology; the labelled variant adds no such tooltip, since it would only repeat words already on screen.
 Because the markup is unchanged, a per-option test or capture hook still resolves to the enclosing `<label>` in both variants — the click target a screenshot step depends on.
+A list/grid presentation toggle takes that form through `ViewToggle` (`design-system/spec.md`) and never passes `iconOnly` itself.
 
 #### Icon vocabulary
 
