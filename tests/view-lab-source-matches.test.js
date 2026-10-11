@@ -157,7 +157,7 @@ function memoizedBySource(compute) {
 
 /**
  * Deleted files a pattern still names (issue 2381), so the deleting change maps to the frames the
- * file drew. An entry leaves once no pattern names it, which the last test below enforces.
+ * file drew. An entry leaves once no expansion strands without it, which the last test enforces.
  */
 const RETIRED_FILES = ['src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte'];
 
@@ -319,14 +319,16 @@ test('no file the app View Lab is built from loads anything of the Primitive Lab
   assert.deepEqual(reaching, [], 'these app lab inputs load the Primitive Lab');
 });
 
-test('a retired file stays untracked and leaves the allowance once no pattern names it', () => {
+test('a retired file stays untracked and leaves the allowance once no expansion needs it', () => {
   // Otherwise a stale entry would excuse a later pattern that strands on the same path.
-  const patterns = VIEW_LAB_CASES.flatMap(({ sourceMatches }) => sourceMatches);
+  const expansions = VIEW_LAB_CASES.flatMap(({ sourceMatches }) => sourceMatches).flatMap(
+    (pattern) => alternativesOf(pattern)
+  );
+  const needed = (file) =>
+    expansions.some((regex) => regex.test(file) && tracked.every((t) => !regex.test(t)));
   assert.deepEqual(
-    RETIRED_FILES.filter(
-      (file) => tracked.includes(file) || patterns.every((pattern) => !pattern.test(file))
-    ),
+    RETIRED_FILES.filter((file) => tracked.includes(file) || !needed(file)),
     [],
-    'delete these from RETIRED_FILES: each is tracked again or no pattern names it'
+    'delete these from RETIRED_FILES: each is tracked again or no expansion strands without it'
   );
 });
