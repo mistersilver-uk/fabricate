@@ -794,7 +794,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
    A broken bridge answers `false` everywhere, which on a component is indistinguishable from a correct answer.
 8. **`enabled` is ABSENT on a component row, not `false`.**
    `'enabled' in row` is the only correct read: a consumer branching on truthiness is satisfied by an absent key today and by a persisted `false` tomorrow, and those are different states.
-9. **A composed primitive that renders its own root class needs a host-sheet rule**, and the shells pass that class and every hook attribute explicitly rather than inheriting another studio's defaults, which would retune six scoped screens whenever that studio changes.
+9. **A composed primitive that renders its own root class needs a host-sheet rule**, and the shells pass that class and every hook attribute explicitly rather than inheriting another studio's defaults, which would retune the three world catalogues whenever that studio changes.
 10. **`available: false` suspends the whole authoring surface.**
     Search, filter, sort, the selection toolbar and every add, remove and copy affordance are suppressed, and the panel is its own treatment rather than the no-state hero with different copy.
     The projection reports every seeded flag false in this state precisely so a screen cannot offer a destructive action against a corpus nobody could read.
@@ -867,8 +867,9 @@ The world catalogues and the system-scope rules lists share ONE list composition
     M21's flush list column is not a switch: requirement 25 makes it the composition's own geometry, because a geometry every mounted caller needs is stated once as the composition's own and is not given a default.
 
 25. **THE LIST COLUMN CARRIES NO INSET: ITS BANDS RUN TO THE PANE'S EDGES AND ITS CONTENT KEEPS A GUTTER** (maintainer ruling M21, revision 16 of issue 1371; every world catalogue since issue 2373).
-    The toolbar, the rows scroller and the foot pager share the pane's own left, right and bottom edges, and the toolbar its top, on the Component, Essence and Tools catalogues alike, because a footer that stops short of the pane it closes reads as a misplaced divider.
-    The column itself carries no padding, so no child bleeds out of an inset; the toolbar and the pager keep their own internal padding, and every boxed child the column holds — the column lead, the unavailable warning, and the rows scroller with the list lead, the empty states and the rows — keeps a `--fab-space-3` inline gutter, so the filter line, a scope-wide card and every row start and end together.
+    The toolbar, the rows scroller and the foot pager share the pane's own left, right and bottom edges, and, where no column lead stands above it, the toolbar its top, on the Component, Essence and Tools catalogues alike, because a footer that stops short of the pane it closes reads as a misplaced divider (on Tools the scope band leads the column).
+    The column itself carries no padding, so no child bleeds out of an inset; the toolbar and the pager keep their own internal padding, and every boxed child the column holds — the column lead, the unavailable warning, the bulk face, and the rows scroller with the list lead, the empty states and the rows — keeps a `--fab-space-3` inline gutter, so the filter line, a scope-wide card and every row start and end together.
+    The column's first boxed child also keeps that gutter above it, and a rows scroller with no pager below it keeps it at its foot.
     It is the composition's own geometry rather than an opt-in, because a switch every mounted caller turns on is the in-place edit wearing a prop's name (requirement 24).
     Each route's surface ladder still decides the bands' fills: the Component catalogue's pager keeps its wash, and the Essence and Tools toolbars and pagers stay transparent.
 
