@@ -25,6 +25,8 @@
       },
       "SortableList": {
         "Reorder": "Reorder {name} — use the up and down arrow keys",
+        "MoveUp": "Move {name} up",
+        "MoveDown": "Move {name} down",
         "Remove": "Remove {name}"
       },
       "Disclosure": {

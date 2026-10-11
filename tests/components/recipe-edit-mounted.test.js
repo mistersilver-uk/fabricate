@@ -2803,8 +2803,8 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
     const rows = target.querySelectorAll('[data-recipe-result-row]');
-    // Drag row 0 (the whole card is the source) and drop it onto row 1.
-    fireDrag(rows[0], 'dragstart');
+    // Drag row 0 by its grip, the only drag source, and drop it onto row 1.
+    fireDrag(rows[0].querySelector('[data-sortable-grip]'), 'dragstart');
     fireDrag(rows[1], 'drop');
     await flushRender();
     assert.equal(patches.length, 1, 'the reorder emits exactly one recipe patch');
@@ -2909,12 +2909,16 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(lastUp.disabled, false, 'the last row can move up');
     assert.equal(lastDown.disabled, true, 'the last row cannot move down');
 
-    // The GRIP is what names the row now: the rocker reuses the product's own Move up / Move down
-    // strings verbatim, so it adds no key and states the direction rather than the record.
+    // The grip and both rocker controls name the record they move (issue 2381).
     assert.match(
       rows[0].querySelector('[data-sortable-grip]').getAttribute('aria-label'),
       /Mountain Herb/u,
       'the grip names the result it moves'
+    );
+    assert.match(
+      firstDown.getAttribute('aria-label'),
+      /SortableList\.MoveDown.*Mountain Herb/u,
+      'and so does the rocker'
     );
 
     // The grip leads and the trailing cluster is `content · rocker · delete`, the specimen's order:
@@ -5773,10 +5777,6 @@ describe('RecipeEditView (mounted)', () => {
         !row.querySelector('[data-sortable-move]'),
         `${tab} tab step row draws no rocker either`
       );
-      row.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
-      target
-        .querySelector('[data-recipe-step-id="sb"]')
-        .dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
     }
     assert.deepEqual(moves, [], 'no reorder fires from the requirement tabs');
     editHarness.remount();
