@@ -21,7 +21,8 @@ const read = (file) => readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
 /**
  * The amended published set, in the order the component destructures it. `handles` is retired
- * because `reorderable` subsumes it, and the library's API block is amended in the same commit.
+ * because `reorderable` subsumes it; `announcement` and `onReorderSettled` are issue 2381's. The
+ * library's API block is amended in the same commit as each change.
  */
 const DECLARED_PROPS = Object.freeze([
   'items',
@@ -42,6 +43,8 @@ const DECLARED_PROPS = Object.freeze([
   'rowData',
   'removeData',
   'ariaLabel',
+  'announcement',
+  'onReorderSettled',
 ]);
 
 /** The component's `$props()` destructuring, comments stripped, in source order. */
@@ -192,7 +195,7 @@ test('focus lands before the live region is written, in the one place that can h
   const source = read(PRIMITIVE);
   const effect = source.slice(source.indexOf('$effect(() => {'));
   const focusAt = effect.indexOf('focusTarget?.focus?.();');
-  const announceAt = effect.indexOf('announcement = sentence;');
+  const announceAt = effect.indexOf('spoken = sentence;');
   assert.ok(focusAt !== -1 && announceAt !== -1, 'the effect still focuses and still announces');
   assert.ok(
     focusAt < announceAt,
@@ -207,7 +210,8 @@ test('the moved name is read BEFORE the caller round-trips the array', () => {
   // `items` does not change until the caller sets it. On a real surface the caller round-trips
   // through its store, so `items[index]` afterwards is a different record.
   const source = read(PRIMITIVE);
-  const move = source.slice(source.indexOf('function moveFrom('), source.indexOf('/** The keyboard'));
+  const start = source.indexOf('function moveFrom(');
+  const move = source.slice(start, source.indexOf('function moveAndFollow(', start));
   const nameAt = move.indexOf('reorderAnnouncementText(nameOf(list[index])');
   const emitAt = move.indexOf('onReorder(index, target);');
   assert.ok(nameAt !== -1 && emitAt !== -1, 'the move still names the record and still emits');
