@@ -395,8 +395,7 @@
     "spec": "<PageHeader> <TabBar>",
     "draws": ".stage.b0.col > div > div:nth-child(1)",
     "path": "src/ui/svelte/components/PageHeader.svelte",
-    "partial": "badge and hint stay drawn",
-    "note": "The header block above the tab bar, its two actions passed as the `actions` snippet. The Progression badge and the \"used by 2 settlements\" hint beside the title stay drawn: the header has no slot beside its title, only an `identity` snippet that replaces the title and subtitle.",
+    "note": "The header block above the tab bar, its two actions passed as the `actions` snippet.",
     "props": {
       "breadcrumbs": [
         {
@@ -628,7 +627,7 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowRunCard",
-    "partial": "no bolt or countdown",
+    "partial": "no countdown",
     "undrawn": {
       "Progress": "the stage bars' accessible name, the Journal's own copy; the drawing names no group"
     },
@@ -649,15 +648,32 @@
         {
           "tag": "span",
           "text": "Stage 2 of 2"
-        },
-        {
-          "tag": "span",
-          "text": "Day 214"
         }
       ]
     },
+    "content": [
+      {
+        "tag": "span",
+        "attrs": {
+          "role": "img",
+          "aria-label": "Finishes this stage as time passes",
+          "data-tooltip": "Finishes this stage as time passes",
+          "style": "flex:0 0 auto;color:var(--fab-accent);font-size:10px;line-height:1"
+        },
+        "children": [
+          {
+            "tag": "i",
+            "attrs": {
+              "class": "fas fa-bolt",
+              "aria-hidden": "true"
+            }
+          }
+        ]
+      }
+    ],
     "data": {
       "statusKey": "FABRICATE.App.Journal.Status.inProgress",
+      "statusIcon": "fas fa-gear",
       "tone": "info",
       "stages": [
         {
@@ -669,7 +685,7 @@
       "progress": 40,
       "progressKey": "FABRICATE.App.Journal.Progress.Label"
     },
-    "note": "Wired as `RunCard` wires it: the status chip as a badge, the meta as spans, and the stage bars as the aside beneath the one button. The bolt and the countdown are `RunCard`'s own scoped markup. `RunCard` puts the stage bars in the full-width aside, where the drawing puts them in the name column, and its status chip carries a glyph the drawing and this fixture omit."
+    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars as the aside beneath the one button. The bolt arrives as the row's `content`, its paint restated from `RunCard`'s scoped `.journal-run-card-bolt`. The countdown stays drawn: it shares the aside with the bars inside `RunCard`'s own timing block, which a row's one `content` cannot reach."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -699,6 +715,7 @@
     },
     "data": {
       "statusKey": "FABRICATE.App.Journal.Status.paused",
+      "statusIcon": "fas fa-pause",
       "tone": "neutral"
     }
   },

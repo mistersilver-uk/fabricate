@@ -11,12 +11,8 @@ import { parsedTemplates, walkElements } from './helpers/svelteTemplateScan.js';
 
 const RAW_DROP_ATTRIBUTES = new Set(['ondrop', 'ondragover']);
 
-// The two list reorders: `SortableList` is the shared primitive, and the player stage list is a
-// hand-rolled reorder awaiting convergence on it.
-const ALLOWED = new Set([
-  'src/ui/svelte/components/SortableList.svelte',
-  'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
-]);
+// The one list reorder: `SortableList` is the shared primitive, and every ordered list renders it.
+const ALLOWED = new Set(['src/ui/svelte/components/SortableList.svelte']);
 
 /** Every `{file, name, line}` raw drop attribute the scanned templates carry. */
 function rawDropAttributes(templates) {
@@ -45,7 +41,7 @@ describe('drop targets (issue 1675)', () => {
     assert.ok(templates.length > 100, `only ${templates.length} templates were scanned`);
   });
 
-  it('carries no raw ondrop or ondragover outside the two list reorders', () => {
+  it('carries no raw ondrop or ondragover outside the list reorder', () => {
     const stray = found.filter(({ file }) => !ALLOWED.has(file));
     assert.deepEqual(
       stray.map(({ file, name, line }) => `${file}:${line} ${name}`),

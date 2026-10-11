@@ -29,7 +29,7 @@ const CONVERTED_ROWS = new Set(['IconFactRow', 'ComplicationEffectRow', 'Complic
  */
 const SITES = Object.freeze([
   [
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     'ComplicationSummaryRow',
     'data-progressive-stage-complication',
     'lead.id || true',

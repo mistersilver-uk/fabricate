@@ -284,7 +284,7 @@ It is a **standing preference** applying to every craft of that recipe until cha
 It is **never exported**: both halves ride on state `import-export` §Authoring-versus-runtime boundary already excludes (a salvage run's captured order is "active timed runs"; the settings map is user-scoped runtime state), so the split between this and **Result Order Permission** lands exactly on the spec's existing authoring/runtime boundary with no new rule invented.
 Reconciliation against the authored list is one shared pure rule: never drops a result, tail-appends the unranked in authored order (so an unranked stage can never displace a ranked one), never reorders an id-less result, and first-match-wins on duplicate ids.
 
-Canonical mapping: `progressiveResultOrder.js` (`progressiveOrderKey`/`applyPlayerResultOrder`); `SETTING_KEYS.PROGRESSIVE_RESULT_ORDER`; `craftingStore.svelte.js`; `inventoryStore.svelte.js` (the `salvage:` writer, which must FLUSH its debounced write before a salvage run starts, or the run captures a stale order); `ProgressiveStageList.svelte`
+Canonical mapping: `progressiveResultOrder.js` (`progressiveOrderKey`/`applyPlayerResultOrder`); `SETTING_KEYS.PROGRESSIVE_RESULT_ORDER`; `craftingStore.svelte.js`; `inventoryStore.svelte.js` (the `salvage:` writer, which must FLUSH its debounced write before a salvage run starts, or the run captures a stale order); `ProgressiveBody.svelte` and `SalvageProgressiveBody.svelte`, which render the order through `SortableList` with `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/import-export/spec.md, openspec/specs/ui-crafting-app/spec.md
 

@@ -1052,7 +1052,7 @@ test('(e) the register gate reads the import graph and the manifest on each side
   ]);
 });
 
-test('(e) exactly two shared member rows live outside the primitive directory', () => {
+test('(e) exactly four shared member rows live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
@@ -1060,6 +1060,8 @@ test('(e) exactly two shared member rows live outside the primitive directory', 
     [
       'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
       'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+      'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+      'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +
       `${PRIMITIVE_DIRECTORY} must update that sentence with it`
