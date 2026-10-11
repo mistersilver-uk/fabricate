@@ -117,12 +117,12 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>` — 10 booked here now.
-      // 4 -> 1 at issue 1516: the choice group's four `alt <kind>` adders render from one
-      // `{#each}` over the kind menu's own list, so the four sites are one.
+      // 14 sites across the recipe editor tree, all `<button>` — 9 booked here now.
+      // Issue 2367 merged the choice group's adder and the ingredient set's four adders into
+      // KindAdder's two Button sites.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-        sites: 1,
+        file: 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+        sites: 2,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -130,10 +130,6 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
-        sites: 2,
-      }),
-      Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
         sites: 2,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
@@ -1118,19 +1114,20 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    118,
-    // 120 until issue 1522 moved the System blocker's link into its `Notice`'s own action, and
-    // 119 until issue 1521 retired the explainer card's docs link.
-    'the conversion is 118 sites, whether or not a given one has been converted yet'
+    117,
+    // 120 until issue 1522 moved the System blocker's link into its `Notice`'s own action, 119
+    // until issue 1521 retired the explainer card's docs link, and 118 until issue 2367 merged
+    // the choice group's and the ingredient set's adders into KindAdder.
+    'the conversion is 117 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    49,
+    48,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), one for the
     // salvage DC card's move into `CheckOverrideField` (issue 2005), and one each for the salvage
     // adds' and the gathering task adds' splits across two files (issue 1522); the site total above
-    // is unchanged by those.
-    'across 49 components'
+    // is unchanged by those. Issue 2367's two files into KindAdder took one away.
+    'across 48 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

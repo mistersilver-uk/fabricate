@@ -6,10 +6,10 @@
   bare `PickerRow allowAny`. It emits a shallow-updated copy via `onChange(nextGroup)` and is
   dropped entirely via `onRemove()`.
 
-  The bare row's `or…` menu and the box's `alt <kind>` adders both read `kindMenuItems(kinds)`,
-  so they offer one subset in one order, and both append an OR alternative for the row's own field
+  The bare row's `or…` and the box's one `Alternative` adder open the same kind menu, one heading
+  per side over one subset in one order, and both append an OR alternative for the row's own field
   to name. Their wording is `openspec/specs/ui-entity-editors/spec.md` → "Adding a requirement, and
-  adding an alternative"; the `data-recipe-add` token family is preserved on both.
+  adding an alternative".
 
   `side="result"` draws the result-side form (issue 1773): `group` is one result entry and `offer`
   its set's `{ kinds, readonlyKinds, catalogue }`. A flat result is a bare row, whose `or…` converts
@@ -22,8 +22,14 @@
   import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
   import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
-  import Button from '../../../components/Button.svelte';
-  import { fromValue, kindMenuItems, subjectName, toValue } from './pickerRowKinds.js';
+  import KindAdder from './KindAdder.svelte';
+  import {
+    emptyIngredientOption,
+    fromValue,
+    offeredIngredientKinds,
+    subjectName,
+    toValue,
+  } from './pickerRowKinds.js';
   import { isChoiceGroup, rangeProblems } from '../../../../../utils/choiceGroupShape.js';
   import { localizeOr } from '../../../util/localizeOr.js';
   import ChoiceGroupAwardHeader from './ChoiceGroupAwardHeader.svelte';
@@ -75,18 +81,12 @@
 
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
-  const hasEssences = $derived((essenceOptions || []).length > 0);
-  // A currency alternative is authorable only when the feature is enabled AND units exist.
-  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
-  // What every row of this requirement may offer and name: the kinds the adders offer, the
+  // What every row of this requirement may offer and name: the kinds the kind menu offers, the
   // currency read-only face once its feature is off, and one catalogue per kind.
-  const kinds = $derived([
-    'component',
-    'tags',
-    ...(hasEssences ? ['essence'] : []),
-    ...(canAddCost ? ['currency'] : []),
-  ]);
+  const kinds = $derived(
+    offeredIngredientKinds({ essenceOptions, currencyUnits, currencyEnabled })
+  );
   const readonlyKinds = $derived(currencyEnabled ? [] : ['currency']);
   const catalogue = $derived.by(() => {
     const offered = new Set(visibleEssenceOptions(essenceOptions).map((essence) => essence.id));
@@ -112,30 +112,11 @@
     };
   });
 
-  // The box's adders: the kind menu's own list, worded `alt <kind>`. The currency adder's hook
-  // says `cost`, as the set's own currency adder does.
-  const ADDERS = {
-    component: [
-      'alternative-component',
-      'FABRICATE.Admin.Manager.Recipe.AltComponent',
-      'alt component',
-    ],
-    tags: ['alternative-tag', 'FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag'],
-    essence: ['alternative-essence', 'FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence'],
-    currency: ['alternative-cost', 'FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency'],
-    knowledge: [
-      'alternative-knowledge',
-      'FABRICATE.Admin.Manager.Recipe.AltKnowledge',
-      'alt knowledge',
-    ],
-  };
-  // A result group's adders offer its set's kinds, a reward's currency hooked by its own tone.
-  const adders = $derived(
-    kindMenuItems(side === 'result' ? offer.kinds : kinds).map(({ id, icon, tone }) => {
-      const [marker, key, fallback] = ADDERS[id];
-      const hook = side === 'result' ? `alternative-${tone}` : marker;
-      return { id, icon, marker: hook, label: localizeOr(key, fallback) };
-    })
+  // The kind menu's one heading per side, shared by the bare row's `or…` and the box's adder.
+  const menuHeading = $derived(
+    side === 'result'
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddAnAlternative', 'Add an alternative')
+      : localizeOr('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
   );
 
   function updateOption(index, nextOption) {
@@ -154,47 +135,9 @@
     onChange({ ...group, options: options.filter((_, i) => i !== index) });
   }
 
-  /**
-   * A NEW ALTERNATIVE IS A KIND AND NOTHING ELSE. Seeding a currency alternative with the first
-   * configured unit authors a choice the GM did not make, and the same one every time, which is
-   * how a set ends up requiring gold pieces nobody asked for.
-   *
-   * @param {'component'|'tags'|'essence'|'currency'} type
-   */
-  function appendAlternative(type) {
-    if (type === 'essence') {
-      onChange({
-        ...group,
-        options: [
-          ...options,
-          { quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } },
-        ],
-      });
-      return;
-    }
-    if (type === 'tags') {
-      onChange({
-        ...group,
-        options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
-      });
-      return;
-    }
-    if (type === 'currency') {
-      onChange({
-        ...group,
-        options: [...options, { quantity: 1, match: { type: 'currency', unit: '', amount: 1 } }],
-      });
-      return;
-    }
-    onChange({
-      ...group,
-      options: [...options, { quantity: 1, match: { type: 'component', componentId: null } }],
-    });
-  }
-
-  // Choosing a kind turns the bare row into the box, unmounting the `or…` trigger focus would
-  // return to, so focus moves to the new alternative's name field once the caller hands it back;
-  // a removed member's moves to the member taking its place, else the one before.
+  // Choosing a kind appends an alternative carrying its kind and no value, and focus moves to its
+  // name field once the caller hands it back; a removed member's moves to the member taking its
+  // place, else the one before.
   let root = $state(null);
   let pendingFocus = null;
   const NAME_FIELD = '[data-recipe-option-search], [data-recipe-add-tag]';
@@ -203,18 +146,22 @@
 
   function selectKind(type) {
     focusNameAt(options.length);
-    appendAlternative(type);
+    onChange({ ...group, options: [...options, emptyIngredientOption(type)] });
   }
 
   const members = $derived(isChoiceGroup(group) ? group.alternatives : []);
 
-  // The entry count is read first, so the effect tracks it even while no focus is pending.
+  // The entry count is read first, so the effect tracks it even while no focus is pending. The
+  // focus is a task, so it lands after `ActionMenu` hands focus back to the adder that stays.
   $effect(() => {
     const count = side === 'result' ? members.length : options.length;
     if (!root || !pendingFocus || count <= pendingFocus.at) return;
-    const row = root.querySelectorAll('[data-recipe-option]')[pendingFocus.at];
-    row?.querySelector(pendingFocus.selector)?.focus();
-    pendingFocus = null;
+    setTimeout(() => {
+      const pending = pendingFocus;
+      pendingFocus = null;
+      const row = pending && root?.querySelectorAll('[data-recipe-option]')[pending.at];
+      row?.querySelector(pending.selector)?.focus();
+    }, 0);
   });
 
   const rolled = $derived(chooserOf(group) === 'rolled');
@@ -302,10 +249,7 @@
     class={reward ? 'is-result is-reward' : 'is-result'}
     {...member ? { 'data-recipe-result-member': '' } : { 'data-recipe-result-item': '' }}
     allowAny={reward && !member}
-    menuHeading={localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.AddAnAlternative',
-      'Add an alternative'
-    )}
+    {menuHeading}
     menuHint={localizeOr(
       'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.ConvertHint',
       'Offer another reward in place of this one.'
@@ -320,14 +264,19 @@
   />
 {/snippet}
 
-{#snippet alternativeAdders(onAdd)}
+<!-- The box's one adder, over the kind menu the bare row's `or…` opens. -->
+{#snippet alternativeAdder(adderKinds, onAdd)}
   <div class="manager-recipe-requirement-adds">
-    {#each adders as adder (adder.id)}
-      <Button role="dashed" data-recipe-add={adder.marker} onclick={() => onAdd(adder.id)}>
-        <i class={adder.icon} aria-hidden="true"></i>
-        <span>{adder.label}</span>
-      </Button>
-    {/each}
+    <KindAdder
+      kinds={adderKinds}
+      word={localizeOr('FABRICATE.Admin.Manager.Recipe.AlternativeAdder', 'Alternative')}
+      name={localizeOr('FABRICATE.Admin.Manager.Recipe.AddAnAlternative', 'Add an alternative')}
+      heading={menuHeading}
+      hook="alternative"
+      triggerHook="alternative"
+      menuClass="manager-recipe-or-menu"
+      {onAdd}
+    />
   </div>
 {/snippet}
 
@@ -350,7 +299,7 @@
         {@render resultRow(entry, index)}
       {/each}
     </div>
-    {@render alternativeAdders(addMember)}
+    {@render alternativeAdder(offer.kinds, addMember)}
   </div>
 {:else}
   <div
@@ -395,8 +344,7 @@
           />
         {/each}
       </div>
-      <!-- Inside an `Any one of` box every adder appends an alternative, hence `alt <kind>`. -->
-      {@render alternativeAdders(appendAlternative)}
+      {@render alternativeAdder(kinds, selectKind)}
     {:else}
       <!-- Bare requirement: a single row with the "or…" menu inline at its right end. -->
       <div class="manager-recipe-ingredient-requirement-options">
@@ -407,6 +355,7 @@
             {catalogue}
             {readonlyKinds}
             allowAny
+            {menuHeading}
             onSelect={selectKind}
             onChange={(value) => updateOption(index, fromValue(option, value))}
             onRemove={() => removeOption(index)}

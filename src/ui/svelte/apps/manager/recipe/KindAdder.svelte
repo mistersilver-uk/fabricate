@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): the composition licence of "The primitive set is a closed, versioned vocabulary" — this is the kind menu's adder, wholly the members `ActionMenu` and `Button`, so its callers owe it no manifest row -->
 <!--
   One dashed adder over the shared kind menu: a `Button role="dashed"` trigger over `ActionMenu`,
   headed by the caller and listing the offered kinds from the button's start edge, or appending

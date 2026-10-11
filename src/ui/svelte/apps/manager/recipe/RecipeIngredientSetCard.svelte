@@ -1,13 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One ingredient set. A recipe is satisfied by ANY one set; a set requires EVERY requirement plus
-  its per-set essence amounts. This renders the set name, its requirements, the four dashed
-  adders, the per-set essence editor and a remove-set button.
+  its per-set essence amounts. This renders the set name, its requirements, the one dashed
+  `Ingredient` adder over the kind menu, the per-set essence editor and a remove-set button.
 
-  THE FOUR ADDERS EACH CREATE A KIND AND NOTHING ELSE, appending a row that carries its kind and
-  an empty ref for the ROW's own field to name, clear and re-name. It emits a shallow-updated
-  copy via `onChange(nextSet)`; new requirements are appended with an eager id, their single
-  option id-less for the store to normalize.
+  THE ADDER CREATES A KIND AND NOTHING ELSE, appending a row that carries its kind and an empty
+  ref for the ROW's own field to name, clear and re-name, and focus moves to that field. It emits
+  a shallow-updated copy via `onChange(nextSet)`; new requirements are appended with an eager id,
+  their single option id-less for the store to normalize.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -15,8 +15,10 @@
   // applies the offer to the row's catalogue. The adder gates on the unfiltered roster, because a
   // system whose essences are all disabled must keep the match type.
   import ChoiceGroup from './ChoiceGroup.svelte';
-  import Button from '../../../components/Button.svelte';
+  import KindAdder from './KindAdder.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import { localizeOr } from '../../../util/localizeOr.js';
+  import { emptyIngredientOption, offeredIngredientKinds } from './pickerRowKinds.js';
 
   let {
     set = {},
@@ -55,25 +57,44 @@
 
   const groups = $derived(Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []);
 
-  // Cost is authorable only when the currency feature is enabled AND the system has units.
-  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
-  // And an essence requirement only when the system has essences at all, on the UNFILTERED
-  // roster — see the import note above.
-  const canAddEssence = $derived((essenceOptions || []).length > 0);
+  // The kind select's own subset, essence gated on the UNFILTERED roster (see the import note).
+  const kinds = $derived(
+    offeredIngredientKinds({ essenceOptions, currencyUnits, currencyEnabled })
+  );
+
+  // The index of the requirement whose name field takes focus once the caller hands it back;
+  // rooted at the card because the groups container does not exist while the set is empty.
+  let root = $state(null);
+  let pendingFocus = null;
 
   /**
-   * Append a requirement of one kind, holding no value. Every adder lands here, so the four
-   * cannot drift into four shapes. The requirement carries an eager id because the set keys its
-   * children by it; the OPTION stays id-less for the store to normalize.
-   *
-   * @param {object} match the empty match for the kind being added
+   * Append a requirement of one kind, holding no value. The requirement carries an eager id
+   * because the set keys its children by it; the OPTION stays id-less for the store to normalize.
    */
-  function addRequirement(match) {
+  function addRequirement(kind) {
+    pendingFocus = groups.length;
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match }] }],
+      ingredientGroups: [...groups, { id: newId(), options: [emptyIngredientOption(kind)] }],
     });
   }
+
+  // A task, so the focus lands after `ActionMenu` hands focus back to the adder.
+  $effect(() => {
+    const count = groups.length;
+    if (!root || pendingFocus === null || count <= pendingFocus) return;
+    setTimeout(() => {
+      const at = pendingFocus;
+      pendingFocus = null;
+      if (at === null) return;
+      const group = root?.querySelectorAll('[data-recipe-group]')[at];
+      group?.querySelector('[data-recipe-option-search], [data-recipe-add-tag]')?.focus();
+    }, 0);
+  });
+
+  const addAnIngredient = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Recipe.AddAnIngredient', 'Add an ingredient')
+  );
 
   function setName(name) {
     onChange({ ...set, name });
@@ -96,6 +117,7 @@
 </script>
 
 <div
+  bind:this={root}
   class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`}
   data-recipe-set
   data-recipe-set-id={set?.id || ''}
@@ -162,47 +184,16 @@
     </div>
   {/if}
 
-  <!-- The four adders, in the kind order the row's own select offers. The `data-recipe-add`
-       token family is PRESERVED across roughly twenty-five call sites, so `cost` and
-       `essence-requirement` still name the currency and essence adders. -->
   <div class="manager-recipe-ingredient-set-add">
-    <Button
-      role="dashed"
-      data-recipe-add="component"
-      onclick={() => addRequirement({ type: 'component', componentId: null })}
-    >
-      <i class="fas fa-cube" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
-    </Button>
-    <Button
-      role="dashed"
-      data-recipe-add="tag-requirement"
-      onclick={() => addRequirement({ type: 'tags', tags: [], tagMatch: 'any' })}
-    >
-      <i class="fas fa-tags" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagShort', 'Add tag')}</span>
-    </Button>
-    {#if canAddEssence}
-      <!-- The set-level essence add appends a single-option essence GROUP, an AND-required
-           requirement, and an essence may repeat across groups. -->
-      <Button
-        role="dashed"
-        data-recipe-add="essence-requirement"
-        onclick={() => addRequirement({ type: 'essence', essenceId: '', amount: 1 })}
-      >
-        <i class="fas fa-flask-vial" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssenceShort', 'Add essence')}</span>
-      </Button>
-    {/if}
-    {#if canAddCost}
-      <Button
-        role="dashed"
-        data-recipe-add="cost"
-        onclick={() => addRequirement({ type: 'currency', unit: '', amount: 1 })}
-      >
-        <i class="fa-solid fa-coins" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddCurrency', 'Add currency')}</span>
-      </Button>
-    {/if}
+    <KindAdder
+      {kinds}
+      word={localizeOr('FABRICATE.Admin.Manager.Recipe.IngredientAdder', 'Ingredient')}
+      name={addAnIngredient}
+      heading={addAnIngredient}
+      hook="ingredient"
+      triggerHook="ingredient"
+      menuClass="manager-recipe-or-menu manager-recipe-ingredient-menu"
+      onAdd={addRequirement}
+    />
   </div>
 </div>

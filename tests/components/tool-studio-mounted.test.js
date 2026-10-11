@@ -1333,6 +1333,62 @@ describe('Tool Studio editor (mounted)', () => {
     });
   });
 
+  it('adds a repair requirement from the set’s one Ingredient adder, focusing its name field', async () => {
+    const patches = [];
+    let current = tool({
+      onBreak: { mode: 'flagBroken' },
+      repairRequirements: [
+        {
+          id: 'g1',
+          options: [{ quantity: 1, match: { type: 'component', componentId: 'scrap' } }],
+        },
+      ],
+    });
+    const root = await harness.mount(
+      props({
+        activeTab: 'breakage',
+        tool: current,
+        onPatch: (patch) => {
+          patches.push(patch);
+          current = { ...current, ...patch };
+          harness.setProps({ tool: current });
+        },
+      })
+    );
+    const adder = root.querySelector(
+      ':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]'
+    );
+    assert.equal(adder.textContent.trim(), 'Ingredient');
+    assert.equal(adder.getAttribute('aria-label'), 'Add an ingredient');
+    adder.click();
+    await tick();
+    assert.equal(
+      document
+        .querySelector(':scope .manager-recipe-ingredient-menu .manager-action-menu-heading')
+        ?.textContent.trim(),
+      'Add an ingredient'
+    );
+    assert.equal(patches.length, 0, 'opening the menu writes nothing');
+    document
+      .querySelector(
+        ':scope .manager-recipe-ingredient-menu [data-recipe-add="ingredient-component"]'
+      )
+      .click();
+    await tick();
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(patches.length, 1, 'one write');
+    const groups = patches[0].repairRequirements;
+    assert.equal(groups.length, 2, 'a requirement is appended');
+    assert.deepEqual(groups[1].options, [
+      { quantity: 1, match: { type: 'component', componentId: null } },
+    ]);
+    const field = root
+      .querySelectorAll(':scope [data-tool-repair-requirements] [data-recipe-group]')[1]
+      ?.querySelector('[data-recipe-option-search]');
+    assert.ok(Boolean(field), 'the new row draws its name field');
+    assert.ok(document.activeElement === field, 'and focus lands on it');
+  });
+
   it('gates repair essence and currency authoring on the matching system features', async () => {
     const root = await harness.mount(
       props({
@@ -1351,11 +1407,31 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    assert.equal(root.querySelector('[data-tool-repair-add-group="essence"]'), null);
-    assert.equal(root.querySelector('[data-tool-repair-add-group="currency"]'), null);
-    root.querySelector('.manager-recipe-or-trigger').click();
-    assert.equal(document.querySelector('[data-recipe-add="alternative-essence"]'), null);
-    assert.equal(document.querySelector('[data-recipe-add="alternative-currency"]'), null);
+    // A pointer's mousedown dismisses the other open menu before its click opens this one.
+    const openedHooks = async (trigger, items) => {
+      trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      trigger.click();
+      await tick();
+      return [...document.querySelectorAll(items)].map((item) =>
+        item.getAttribute('data-recipe-add')
+      );
+    };
+    assert.deepEqual(
+      await openedHooks(
+        root.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]'),
+        ':scope .manager-recipe-ingredient-menu [role="menuitem"]'
+      ),
+      ['ingredient-component', 'ingredient-tag'],
+      'the set adder offers neither essence nor currency'
+    );
+    assert.deepEqual(
+      await openedHooks(
+        root.querySelector('.manager-recipe-or-trigger'),
+        ':scope .manager-recipe-or-menu [role="menuitem"]'
+      ),
+      ['alternative-component', 'alternative-tag'],
+      'nor does the row’s "or..."'
+    );
     assert.deepEqual(
       selectOptionValues(root, '.fabricate-select-trigger[data-recipe-option-kind]'),
       ['component', 'tags'],
