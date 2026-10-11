@@ -218,24 +218,30 @@
 
   /* TAG tone on a taller rung: `density` lifts the track to the height of its row's siblings and
      nothing else, so the well, the gap and the equal-width segments the density would bring stay
-     out. The track is the segment plus the 1px border either side: 28 + 2 = 30, 32 + 2 = 34. */
+     out. The track owns the rung and the segments stretch to fill it inside its border. */
+  .manager-segmented.is-tag.is-inline {
+    box-sizing: border-box;
+    height: 30px;
+  }
+
+  .manager-segmented.is-tag.is-field {
+    box-sizing: border-box;
+    height: 34px;
+    border-radius: 9px;
+  }
+
   .manager-segmented.is-tag.is-inline .manager-segment,
   .manager-segmented.is-tag.is-field .manager-segment {
     flex: 0 1 auto;
+    align-self: stretch;
     padding: 0 var(--fab-space-2);
   }
 
   .manager-segmented.is-tag.is-inline .manager-segment {
-    height: 28px;
     font-size: 10px;
   }
 
-  .manager-segmented.is-tag.is-field {
-    border-radius: 9px;
-  }
-
   .manager-segmented.is-tag.is-field .manager-segment {
-    height: calc(34px - 2px);
     font-size: 10.5px;
   }
 
