@@ -638,7 +638,7 @@ describe('run primitives mounted behavior', () => {
     try {
       const page = await browser.newPage();
       await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
-        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${readStylesheet()}</style>
         <style>${styles.join('\n')}</style></head>
         <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
         ${target.innerHTML}
