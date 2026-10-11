@@ -145,7 +145,9 @@ A run on the older lifecycle refuses to award one.
 There is no button that creates an empty group.
 A reward row becomes one, in place, when you select its **or…** control (**Add an alternative**).
 The row stays where it is and gains a second, empty alternative beside it.
-Each result kind has its own **alt** adder (for example **alt component** or **alt currency**), so an alternative can be an item, a currency amount or a recipe the character learns.
+A group has one dashed **Alternative** adder.
+It opens a menu headed **Add an alternative** that offers the result kinds, so an alternative can be an item, a currency amount or a recipe the character learns.
+Choosing a kind adds the row and moves focus to its name field.
 Remove alternatives until only one is left and the group turns back into a plain row.
 A line under the group's header says in plain words what the group does.
 
@@ -226,6 +228,9 @@ The recipe is craftable if the player has materials to satisfy all groups in at 
 ### Ingredient Matching
 
 Each ingredient option decides how it is matched against the items a player is carrying.
+An ingredient set adds a requirement through one dashed **Ingredient** adder, which opens a menu headed **Add an ingredient** offering Component, Tag, Essence and Currency.
+The menu leaves out essence and currency while the system has them turned off.
+On a requirement's bare row, **or…** opens the same kinds in a menu headed **Accept instead**; once a requirement holds alternatives, its box has one dashed **Alternative** adder that opens that same menu.
 
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.

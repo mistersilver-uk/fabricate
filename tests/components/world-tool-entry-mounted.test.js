@@ -9,6 +9,7 @@ import { tick } from 'svelte';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
@@ -1676,8 +1677,13 @@ describe('the world Tool entry (issue 1373)', () => {
         { mode: 'flagBroken' },
         {
           actions: {
-            setWorldRepairRequirements: (id, groups) => {
+            // Fed back as the world default the store holds once its `save` resolves.
+            setWorldRepairRequirements: async (id, groups) => {
               repairWrites.push([id, groups]);
+              await Promise.resolve();
+              harness.setProps({
+                scope: scopeFor({ onBreak: { mode: 'flagBroken' }, repairRequirements: groups }),
+              });
               return true;
             },
             updateWorldDefaultSection: (id, section, value) => {
@@ -1688,18 +1694,32 @@ describe('the world Tool entry (issue 1373)', () => {
         }
       );
       target
-        .querySelector('[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]')
+        .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]')
         .click();
       await tick();
+      assert.equal(repairWrites.length, 0, 'opening the Ingredient menu writes nothing');
+      target.ownerDocument
+        .querySelector(':scope .manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]')
+        .click();
+      await tick();
+      await settle();
 
-      assert.equal(repairWrites.length, 1, 'the seed action fires on change');
+      assert.equal(repairWrites.length, 1, 'the seed action fires once on change');
       assert.equal(repairWrites[0][0], 'pick');
       assert.equal(repairWrites[0][1].length, 1, 'and carries the new group');
+      assert.deepEqual(repairWrites[0][1][0].options, [
+        { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } },
+      ]);
       assert.deepEqual(
         sectionWrites,
         [],
         'the seed must not travel through the section write path, which would refuse its name'
       );
+      const addTag = target.querySelector(
+        ':scope [data-tool-repair-requirements] [data-recipe-add-tag]'
+      );
+      assert.ok(Boolean(addTag), 'the new tag row draws its + Tag');
+      assert.ok(target.ownerDocument.activeElement === addTag, 'and focus lands on it');
     });
 
     it('writes each edit to a seeded repair row: a name, an amount, then its removal', async () => {
@@ -1769,10 +1789,18 @@ describe('the world Tool entry (issue 1373)', () => {
         { mode: 'flagBroken' },
         { currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }] }
       );
-      const editor = target.querySelector('[data-tool-repair-requirements]');
-      assert.ok(
-        Boolean(editor.querySelector('[data-recipe-add="cost"]')),
-        'the world repair set offers a cost, because the ladder it would spend is world scope'
+      target
+        .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]')
+        .click();
+      await tick();
+      assert.deepEqual(
+        [
+          ...target.ownerDocument.querySelectorAll(
+            ':scope .manager-recipe-ingredient-menu [role="menuitem"]'
+          ),
+        ].map((item) => item.getAttribute('data-recipe-add')),
+        ['ingredient-component', 'ingredient-tag', 'ingredient-currency'],
+        'the world repair set offers currency, because the ladder it would spend is world scope'
       );
     });
 

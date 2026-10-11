@@ -29,7 +29,7 @@
     // preserved and restored on re-enable.
     collapsed = false,
     currencyUnits = [],
-    // Gates the "Add cost" affordances (and read-only rendering of existing currency
+    // Gates the kind menu's Currency entry (and read-only rendering of existing currency
     // requirements) on the system's currency feature being enabled, not merely on unit
     // presence. Forwarded to every section, or it silently drops to its default.
     currencyEnabled = true,
