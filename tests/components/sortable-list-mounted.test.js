@@ -12,10 +12,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import {
-  createRawSnippet,
-  flushSync,
-} from '../../node_modules/svelte/src/index-client.js';
+import { createRawSnippet, flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -25,10 +22,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-sortable-list-',
-  rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/util/listReorderAnnouncement.js',
-  ],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, 'src/ui/svelte/util/listReorderAnnouncement.js'],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -112,7 +106,10 @@ describe('SortableList — the row is the shape the specimen draws', () => {
       'and the rocker follows it'
     );
 
-    assert.ok(Boolean(target.querySelector('[data-list-footer]')), 'the adder is the list`s footer');
+    assert.ok(
+      Boolean(target.querySelector('[data-list-footer]')),
+      'the adder is the list`s footer'
+    );
   });
 
   it('renders both affordances in EVERY mode, disabled at the ends rather than hidden', async () => {
@@ -132,7 +129,10 @@ describe('SortableList — the row is the shape the specimen draws', () => {
       const up = rows.map((row) => row.querySelector('[data-sortable-move="up"]'));
       const down = rows.map((row) => row.querySelector('[data-sortable-move="down"]'));
 
-      assert.ok(rows.every((row) => Boolean(gripOf(row))), `${mode.label}: every row grips`);
+      assert.ok(
+        rows.every((row) => Boolean(gripOf(row))),
+        `${mode.label}: every row grips`
+      );
       assert.ok(up.every(Boolean) && down.every(Boolean), `${mode.label}: every row rockers`);
       assert.ok(up[0].disabled, `${mode.label}: the first row cannot move up`);
       assert.ok(down[2].disabled, `${mode.label}: the last row cannot move down`);
@@ -346,7 +346,9 @@ describe('SortableList — reorder answers both inputs', () => {
 
     assert.deepEqual(moves, [[2, 1]], 'ArrowUp moves the row one position');
     assert.deepEqual(
-      rowsOf(target).map((row) => row.querySelector('[data-sortable-grip]').getAttribute('data-sortable-grip')),
+      rowsOf(target).map((row) =>
+        row.querySelector('[data-sortable-grip]').getAttribute('data-sortable-grip')
+      ),
       ['a', 'c', 'b'],
       'and the caller`s round-tripped array is what the list renders'
     );
@@ -415,7 +417,11 @@ describe('SortableList — reorder answers both inputs', () => {
     press(gripOf(rowsOf(target)[0]), 'ArrowUp');
     press(gripOf(rowsOf(target)[2]), 'ArrowDown');
     press(gripOf(rowsOf(target)[1]), 'Enter');
-    assert.deepEqual(moves, [], 'a move that changes nothing, and a key that is not a move, write nothing');
+    assert.deepEqual(
+      moves,
+      [],
+      'a move that changes nothing, and a key that is not a move, write nothing'
+    );
   });
 
   it('writes the travelling state on the row being dragged', async () => {
@@ -435,10 +441,7 @@ describe('SortableList — reorder answers both inputs', () => {
       rowsOf(target)[2].classList.contains('is-dragging'),
       'the row being dragged paints itself as travelling'
     );
-    assert.ok(
-      !rowsOf(target)[0].classList.contains('is-dragging'),
-      'and no other row does'
-    );
+    assert.ok(!rowsOf(target)[0].classList.contains('is-dragging'), 'and no other row does');
 
     rows[0].dispatchEvent(new globalThis.Event('drop', { bubbles: true, cancelable: true }));
     flushSync();
@@ -671,6 +674,65 @@ describe('SortableList — the caller speaks through the list, and only the grip
     assert.equal(spokenIn(target), 'Order reset.', 'an empty value never clears the region');
   });
 
+  it('re-arms a repeated sentence after an empty one, even with a list move between', async () => {
+    let items = [...ITEMS];
+    const target = await harness.mount({
+      items,
+      itemLabel,
+      row: rowSnippet,
+      announcement: '',
+      onReorder: (from, to) => {
+        const next = [...items];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        items = next;
+      },
+    });
+    await harness.setProps({ announcement: 'R' });
+    assert.equal(spokenIn(target), 'R');
+
+    press(gripOf(rowsOf(target)[0]), 'ArrowDown');
+    await harness.setProps({ items });
+    flushSync();
+    assert.match(
+      spokenIn(target),
+      /ReorderedAnnouncement/u,
+      'the region now holds the move sentence'
+    );
+
+    await harness.setProps({ announcement: '' });
+    await harness.setProps({ announcement: 'R' });
+    assert.equal(spokenIn(target), 'R', 'the repeated sentence is spoken again');
+  });
+
+  it('arms no drag from a grip nested in a body, and drops nothing', async () => {
+    const moves = [];
+    const nested = createRawSnippet(() => ({
+      render: () => '<div><button type="button" data-sortable-grip="x">inner</button></div>',
+    }));
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      body: nested,
+      expandable: true,
+      expandedId: 'a',
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+    });
+    const rows = rowsOf(target);
+    const inner = bodyOf(rows[0]).querySelector('[data-sortable-grip="x"]');
+    assert.ok(Boolean(inner), 'the nested grip rendered');
+    fire(inner, 'dragstart');
+    assert.ok(
+      !rowsOf(target)[0].classList.contains('is-dragging'),
+      'the outer row does not travel'
+    );
+    fire(rows[1], 'drop');
+    assert.deepEqual(moves, [], 'and nothing moved');
+  });
+
   it('settles once for a drop that moves a row, and never for a no-op drop, a key or a rocker', async () => {
     const moves = [];
     let settled = 0;
@@ -705,7 +767,7 @@ describe('SortableList — the caller speaks through the list, and only the grip
     assert.equal(settled, 1, 'and settled exactly once');
   });
 
-  it('arms no drag from the row`s art or its bare text', async () => {
+  it('arms no drag from the art or bare text in a row', async () => {
     const moves = [];
     const target = await harness.mount({
       items: ITEMS,

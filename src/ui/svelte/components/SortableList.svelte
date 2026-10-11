@@ -22,6 +22,8 @@
     itself at an end) and only then writes the live region, which is not announced otherwise.
   - The live region is never gated on `reorderable`; it speaks the caller's `announcement` on each
     new non-empty value after mount, never the mount value, and never clears for an empty one.
+    It re-speaks a value only when it differs from what the region shows, which a list move
+    between two reverts guarantees.
   - Only the grip arms a drag; any other origin in the row, art or bare text, arms nothing.
   - The family is rooted at `fabricate-sortable-list` in `styles/fabricate.css`, never in a scoped
     block.
@@ -182,9 +184,14 @@
 
   /** Arm a drag only when it began on this row's own grip; a Text node origin reads its parent. */
   function armDrag(event, index) {
-    const origin = event.target instanceof Element ? event.target : event.target?.parentElement;
+    // `nodeType`, not `instanceof Element`: a node from another window is not this realm's Element.
+    const target = event.target;
+    const origin = target?.nodeType === 1 ? target : target?.parentElement;
     const grip = origin?.closest(GRIP_SELECTOR);
-    if (grip?.closest('.fabricate-sortable-list-row') === event.currentTarget) dragIndex = index;
+    // The grip must sit in this row's own line: a grip a body or nested list carries is not ours.
+    const owned =
+      grip?.closest('.fabricate-sortable-list-line')?.parentElement === event.currentTarget;
+    dragIndex = owned ? index : -1;
   }
 
   /** The pointer path: the drop lands where the pointer is, so focus is left where it is. */

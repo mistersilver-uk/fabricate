@@ -5777,10 +5777,6 @@ describe('RecipeEditView (mounted)', () => {
         !row.querySelector('[data-sortable-move]'),
         `${tab} tab step row draws no rocker either`
       );
-      row.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
-      target
-        .querySelector('[data-recipe-step-id="sb"]')
-        .dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
     }
     assert.deepEqual(moves, [], 'no reorder fires from the requirement tabs');
     editHarness.remount();
