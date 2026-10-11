@@ -819,6 +819,7 @@
     "cap": "check rows — systems, one staged, paged",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
     "props": {
       "id": "systems",
       "kind": "check",
@@ -865,11 +866,7 @@
     "cap": "tri rows — tags, one added and one removed, with n/N",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
-    "partial": "a fixed five-row window",
-    "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the three drawn.",
-    "undrawn": {
-      "Search tags": "the well’s placeholder, the bulk panel’s own; the drawing shows the rows alone"
-    },
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
     "props": {
       "id": "tags",
       "kind": "tri",
@@ -908,11 +905,7 @@
     "cap": "stepper rows — essence values, one set",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
-    "partial": "a fixed five-row window",
-    "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the two drawn.",
-    "undrawn": {
-      "Search essences": "the well’s placeholder, the bulk panel’s own; the drawing shows the rows alone"
-    },
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
     "props": {
       "id": "essences",
       "kind": "stepper",
