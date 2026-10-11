@@ -13200,9 +13200,11 @@
   gap: var(--fab-space-chip);
 }
 
+/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in over half a second; a highlight appears in the frame the state changes, in the popover and the inline strip alike, which both draw these cells. */
 .fabricate-color-picker-popover .manager-color-preset {
   aspect-ratio: 1;
   border: 1px solid var(--fab-border);
+  transition: none;
 }
 
 /* A selected swatch is an inset ring at 3:1 on its fill, apart from the outset focus ring (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
@@ -16030,7 +16032,7 @@
   box-sizing: border-box;
   border: 1px solid var(--fab-border);
   border-radius: 11px;
-  background: var(--fab-bg-3);
+  background: var(--fab-bg-0);
   box-shadow: var(--fab-shadow-md);
 }
 

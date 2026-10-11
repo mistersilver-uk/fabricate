@@ -67,6 +67,7 @@ export function anchoredPopover(node, params = {}) {
   let options = params ?? {};
   let portalHandle = null;
   let listening = false;
+  let destroyed = false;
 
   function validate() {
     if (!options.component) {
@@ -217,6 +218,16 @@ export function anchoredPopover(node, params = {}) {
     else portalHandle = portal(node, host);
   }
 
+  // The first pass measures the panel in whatever face the page has loaded so far, and a fallback face
+  // is wider than the real one, so a panel that sizes to its content is placed by a width it then
+  // loses: an end-aligned or start-aligned edge lands off its trigger by the difference. Fonts still
+  // loading settle the width, so one more pass follows them; with none loading it is a no-op repeat.
+  function remeasureWhenFontsLoad() {
+    document.fonts?.ready?.then?.(() => {
+      if (!destroyed) measure();
+    });
+  }
+
   function sync() {
     validate();
     if (!isOpen()) {
@@ -227,6 +238,7 @@ export function anchoredPopover(node, params = {}) {
     portalToHost();
     measure();
     attach();
+    remeasureWhenFontsLoad();
   }
 
   sync();
@@ -238,6 +250,7 @@ export function anchoredPopover(node, params = {}) {
     },
 
     destroy() {
+      destroyed = true;
       detach();
       portalHandle?.destroy();
       portalHandle = null;
