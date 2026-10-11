@@ -649,6 +649,11 @@ test('XrefList, which issue 2321 built, reads shipped in the library', () => {
   assert.equal(PER_NAME_STATUS.get('XrefList'), 'shipped');
 });
 
+test('ViewToggle, which issue 2412 built, reads shipped in the library', () => {
+  // A non-member row, pinned here for the reason XrefList's is.
+  assert.equal(PER_NAME_STATUS.get('ViewToggle'), 'shipped');
+});
+
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
     assert.equal(
