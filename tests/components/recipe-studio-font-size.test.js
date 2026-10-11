@@ -48,7 +48,7 @@ const FIXTURE = `
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed
                size. -->
-          <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
+          <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Ingredient</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
         <!-- A flat result row names its component in the requirement row's pill (issue 1516),

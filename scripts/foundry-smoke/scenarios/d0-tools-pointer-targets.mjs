@@ -846,13 +846,24 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   );
   const repairGroups = editor.locator('[data-tool-repair-requirements] [data-recipe-group]');
   const initialRepairGroupCount = await repairGroups.count();
-  const addRepairGroup = editor.locator(
-    '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]'
+  // The set's Ingredient adder opens the kind menu, which writes nothing; its item mutates once.
+  const repairIngredientAdder = editor.locator(
+    '[data-tool-repair-requirements] [data-recipe-add="ingredient"]'
+  );
+  await assertPointerTarget(
+    page,
+    repairIngredientAdder,
+    '[data-recipe-add="ingredient"]',
+    'Tool repair Ingredient adder'
+  );
+  await repairIngredientAdder.click();
+  const addRepairGroup = page.locator(
+    '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
   );
   await assertPointerTarget(
     page,
     addRepairGroup,
-    '[data-recipe-add="tag-requirement"]',
+    '[data-recipe-add="ingredient-tag"]',
     'Tool repair AND control'
   );
   await withSingleToolStoreMutation(
@@ -886,8 +897,17 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   );
   const firstRepairGroup = repairGroups.first();
   const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
-  const addRepairAlternative = firstRepairGroup.locator(
-    '[data-recipe-add="alternative-component"]'
+  // The box's Alternative adder opens the kind menu, which writes nothing; its item mutates once.
+  const repairAlternativeAdder = firstRepairGroup.locator('[data-recipe-add="alternative"]');
+  await assertPointerTarget(
+    page,
+    repairAlternativeAdder,
+    '[data-recipe-add="alternative"]',
+    'Tool repair Alternative adder'
+  );
+  await repairAlternativeAdder.click();
+  const addRepairAlternative = page.locator(
+    '.manager-recipe-or-menu [data-recipe-add="alternative-component"]'
   );
   await assertPointerTarget(
     page,
@@ -937,7 +957,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   await scrollToolEditorPanelToReveal(
     page,
     editor,
-    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative-component"]',
+    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative"]',
     'Populated repair'
   );
   await captureToolStudioProduct(ctx, 'manager-tool-stress-repair', wideGeometry);

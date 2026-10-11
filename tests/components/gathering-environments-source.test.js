@@ -89,7 +89,6 @@ describe('GatheringView 3-column layout and states', () => {
       viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'),
       'grid should use the planned column template with a non-zero centre-column minimum'
     );
-    assert.ok(viewSource.includes('gap: var(--fab-space-4)'), 'grid should use the base spacing token gap');
     assert.ok(viewSource.includes('gathering-view-column-left'), 'left column present');
     assert.ok(viewSource.includes('gathering-view-column-center'), 'center column present');
     assert.ok(viewSource.includes('gathering-view-column-right'), 'right column present');

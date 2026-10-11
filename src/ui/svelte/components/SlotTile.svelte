@@ -6,7 +6,7 @@
     label = '',
     ariaLabel = '',
     art = '',
-    icon = 'fas fa-circle',
+    icon = '',
     tint = '',
     state = 'met',
     pip = '',
@@ -20,6 +20,9 @@
 
   const states = new Set(['met', 'partial', 'short', 'open']);
   const resolvedState = $derived(states.has(state) ? state : 'met');
+  // An open face with no caller glyph or art draws the empty ring (design-system spec, run detail).
+  const unpicked = $derived(resolvedState === 'open' && !icon && !art);
+  const glyphClass = $derived(icon || (unpicked ? 'fa-regular fa-circle' : 'fas fa-circle'));
   const host = $derived(interactive ? 'button' : 'div');
   const attributes = $derived(
     interactive
@@ -39,11 +42,12 @@
     this={host}
     class="fab-slot-tile is-{resolvedState}"
     class:is-selected={pressed}
+    class:is-unpicked={unpicked}
     onclick={interactive && !disabled ? onActivate : undefined}
     {...attributes}
   >
     <!-- ratchet-exempt(design-system): the specimen's own 56px tap target, not a record tile -->
-    <Medallion {art} {icon} {tint} alt="" size={56} glyph={19} />
+    <Medallion {art} icon={glyphClass} {tint} alt="" size={56} glyph={unpicked ? 15 : 19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}
@@ -100,6 +104,10 @@
 
   .fab-slot-tile.is-open {
     border: 1px dashed var(--fab-accent-border);
+  }
+
+  .fab-slot-tile.is-unpicked {
+    --fab-medallion-tint: var(--fab-accent-text);
   }
 
   .fab-slot-tile.is-selected {

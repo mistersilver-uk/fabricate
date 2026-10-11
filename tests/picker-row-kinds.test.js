@@ -9,10 +9,12 @@ import {
   KIND_META,
   KIND_ORDER,
   RESULT_ROW_KINDS,
+  emptyIngredientOption,
   emptyResult,
   fromValue,
   isKnownKind,
   kindMenuItems,
+  offeredIngredientKinds,
   shownAmount,
   toValue,
 } from '../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
@@ -408,5 +410,57 @@ test('the kind menu lists the offered kinds in table order, toned and hooked fro
     kindMenuItems(['unknown']),
     [],
     'a kind the table does not name is never offered'
+  );
+});
+
+test('an ingredient surface offers component and tag, essence on a roster, currency when enabled with units', () => {
+  const units = [{ id: 'gp' }];
+  const essences = [{ id: 'e-fire' }];
+  assert.deepEqual(offeredIngredientKinds({}), ['component', 'tags']);
+  assert.deepEqual(
+    offeredIngredientKinds({
+      essenceOptions: essences,
+      currencyUnits: units,
+      currencyEnabled: true,
+    }),
+    ['component', 'tags', 'essence', 'currency']
+  );
+  assert.deepEqual(
+    offeredIngredientKinds({ currencyUnits: units, currencyEnabled: false }),
+    ['component', 'tags'],
+    'seeded units on a disabled feature offer no currency'
+  );
+  assert.deepEqual(
+    offeredIngredientKinds({ currencyUnits: [], currencyEnabled: true }),
+    ['component', 'tags'],
+    'an enabled feature with no units offers no currency'
+  );
+  assert.deepEqual(offeredIngredientKinds({ essenceOptions: null, currencyUnits: null }), [
+    'component',
+    'tags',
+  ]);
+});
+
+test('a new ingredient option carries its kind and no value', () => {
+  assert.deepEqual(emptyIngredientOption('component'), {
+    quantity: 1,
+    match: { type: 'component', componentId: null },
+  });
+  assert.deepEqual(emptyIngredientOption('tags'), {
+    quantity: 1,
+    match: { type: 'tags', tags: [], tagMatch: 'any' },
+  });
+  assert.deepEqual(emptyIngredientOption('essence'), {
+    quantity: 1,
+    match: { type: 'essence', essenceId: '', amount: 1 },
+  });
+  assert.deepEqual(emptyIngredientOption('currency'), {
+    quantity: 1,
+    match: { type: 'currency', unit: '', amount: 1 },
+  });
+  assert.notEqual(
+    emptyIngredientOption('tags').match.tags,
+    emptyIngredientOption('tags').match.tags,
+    'each option owns its tag list'
   );
 });

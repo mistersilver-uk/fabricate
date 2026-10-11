@@ -853,6 +853,17 @@ const NON_VERB_CONTROLS = Object.freeze({
     OR_MENU,
     `${OR_MENU} [data-recipe-add="alternative-tag"]`
   ),
+  'manager-recipe-edit-ingredients-adder-menu': menuCorners(
+    '.manager-recipe-ingredient-menu',
+    '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
+  ),
+  // A choice group's one adder: the dashed `Button`'s pinned 34px (issue 2367).
+  'manager-recipe-edit-ingredients-choice-group': [
+    {
+      selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
+      styles: 'height: 34px; border-top-style: dashed',
+    },
+  ],
   'manager-environment-edit-automatic-force-add': menuCorners(
     '.fabricate-action-menu-panel',
     '.fabricate-action-menu-panel [data-action="force-include"]'
@@ -1289,7 +1300,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    75
+    76
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
@@ -1331,8 +1342,8 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  // 75 since issue 1644 added the run-type panel open over two ticked kinds and the auto-completing waiting run.
-  assert.equal(cases.length, 75);
+  // 76 since issue 2366 added the stale choice, registered in playerJournal.js.
+  assert.equal(cases.length, 76);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -3021,6 +3032,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
   'manager-recipe-edit-choice-group-menu',
+  'manager-recipe-edit-ingredients-adder-menu',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',

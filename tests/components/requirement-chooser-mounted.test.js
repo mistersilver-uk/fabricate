@@ -151,6 +151,24 @@ describe('RequirementChooser mounted behavior', () => {
     );
   });
 
+  it("keeps a caller's glyph and tint on an open tile, and rings one with neither", async () => {
+    const target = await harness.mount({
+      slots: [
+        { ...CHOICE, tint: 'sage' },
+        { ...CHOICE, key: 'g-bare', slotId: 'g-bare', icon: '' },
+      ],
+    });
+    const [tinted, bare] = slotsIn(target).map((slot) => slot.querySelector('.fab-slot-tile'));
+    const medallion = tinted.querySelector(':scope .fab-medallion');
+    assert.ok(medallion.querySelector(':scope i').matches('.fas.fa-leaf'));
+    assert.match(medallion.getAttribute('style'), /--fab-medallion-tint:\s*var\(--fab-tag-sage\)/u);
+    assert.ok(!tinted.classList.contains('is-unpicked'));
+    assert.ok(
+      bare.querySelector(':scope .fab-medallion i').matches('.fa-regular.fa-circle:not(.fas)')
+    );
+    assert.ok(bare.classList.contains('is-unpicked'));
+  });
+
   it('paints a chosen short choice short and a partly delivered essence partial', async () => {
     const target = await harness.mount({
       slots: [

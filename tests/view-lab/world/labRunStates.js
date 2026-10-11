@@ -47,6 +47,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
   'waiting-auto-completes': 'lab-v1-waiting-auto-completes',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
+  'stale-choice': 'lab-v1-stale-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
   'stage-paid': 'lab-v1-stage-paid',
   'awaiting-choice': 'lab-v1-awaiting-choice',
@@ -574,6 +575,18 @@ function journalCaseFactories(context) {
     'waiting-auto-eligible': () => active(waiting('lab-v1-waiting-auto-eligible')),
     'waiting-open-choice': () =>
       active(unbegun('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
+    // Issue 2366: each group's pick points past its options, so its slot shows the open face.
+    'stale-choice': () => {
+      const run = unbegun('lab-v1-stale-choice', choice(), { completionMode: 'manual' });
+      const [stage] = run.steps;
+      stage.selectionPlan.ingredientOptionOverrides = Object.fromEntries(
+        stage.selectedRequirementSnapshot.ingredientGroups.map((group) => [
+          group.id,
+          { optionIndex: group.options.length },
+        ])
+      );
+      return active(run);
+    },
     'material-shortage': () =>
       active(
         unbegun('lab-v1-material-shortage', shortage(), {

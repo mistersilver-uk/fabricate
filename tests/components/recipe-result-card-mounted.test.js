@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { tick } from 'svelte';
+
 import { recipeResultKinds } from '../../src/ui/svelte/apps/manager/recipe/resultRows.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 import { seededRollClass, withRoll } from '../helpers/seededRoll.js';
@@ -890,24 +892,63 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.deepEqual(groups.at(-1).results, []);
   });
 
-  it('draws one `alt <kind>` adder per offered kind, appending an empty member that takes focus', async () => {
-    const { target, groups } = await mountGroup(PLAYER_GROUP);
-    const adders = [...target.querySelectorAll('[data-recipe-add^="alternative-"]')];
-    assert.deepEqual(
-      adders.map((adder) => [adder.getAttribute('data-recipe-add'), adder.textContent.trim()]),
-      [
-        ['alternative-component', 'alt component'],
-        ['alternative-currency', 'alt currency'],
-        ['alternative-knowledge', 'alt knowledge'],
-      ]
+  it('draws one Alternative adder over the convert menu, appending an empty member that takes focus', async () => {
+    const readMenu = async (target, trigger) => {
+      trigger.click();
+      await settle();
+      const menu = target.ownerDocument.querySelector(':scope .manager-recipe-or-menu');
+      return {
+        heading: menu.querySelector('.manager-action-menu-heading').textContent.trim(),
+        items: [...menu.querySelectorAll('[role="menuitem"]')].map((entry) => [
+          entry.getAttribute('data-recipe-add'),
+          entry.textContent.trim(),
+        ]),
+      };
+    };
+    const bare = await mountGroup({ id: 'r1', componentId: 'cmp-herb', quantity: 2 });
+    const fromRow = await readMenu(
+      bare.target,
+      rows(bare.target)[0].querySelector('.manager-recipe-or-trigger')
     );
-    adders[2].click();
+    harness.remount();
+
+    const { target, groups } = await mountGroup(PLAYER_GROUP);
+    const adders = [
+      ...target.querySelectorAll(
+        ':scope [data-recipe-result-group] .manager-recipe-requirement-adds button'
+      ),
+    ];
+    assert.deepEqual(
+      adders.map((adder) => adder.getAttribute('data-recipe-add')),
+      ['alternative']
+    );
+    const [adder] = adders;
+    assert.equal(adder.textContent.trim(), 'Alternative');
+    assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
+    assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    const fromBox = await readMenu(target, adder);
+    assert.deepEqual(fromBox, {
+      heading: 'Add an alternative',
+      items: [
+        ['alternative-component', 'Component'],
+        ['alternative-currency', 'Currency'],
+        ['alternative-knowledge', 'Recipe knowledge'],
+      ],
+    });
+    assert.deepEqual(fromBox, fromRow, 'the convert menu’s heading, entries and order');
+
+    target.ownerDocument
+      .querySelector(':scope .manager-recipe-or-menu [data-recipe-add="alternative-knowledge"]')
+      .click();
+    await tick();
     await settle();
     const added = groups.at(-1).results[0].alternatives[2];
     assert.deepEqual(
       { ...added, id: 'x' },
       { id: 'x', kind: 'knowledge', recipeId: '', quantity: 1 }
     );
-    assert.ok(target.ownerDocument.activeElement === nameField(members(target)[2]));
+    const field = nameField(members(target)[2]);
+    assert.ok(Boolean(field), 'the new member draws its name field');
+    assert.ok(target.ownerDocument.activeElement === field, 'focus lands on it, not the adder');
   });
 });
