@@ -928,7 +928,7 @@
       ],
       "shownHint": "They see the complication when it fires."
     },
-    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The open row's ordinal takes the accent. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
+    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The open row's ordinal takes the accent. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
   },
   {
     "spec": "<SortableList>",

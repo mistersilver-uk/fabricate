@@ -96,7 +96,7 @@
       "value": "unchanged",
       "groupName": "essence-bulk-status"
     },
-    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it; the chosen segment is `SegmentedControl`’s raised dark tile (`--fab-surface-active` on a `--fab-border-strong` edge, `--fab-text` ink) where the drawing fills it with the accent, and the track is 34px where the drawing’s is 36."
+    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it, and the track is 34px where the drawing’s is 36."
   },
   {
     "spec": "<Modal>",
@@ -194,7 +194,8 @@
       "pageSize": 25,
       "pageIndex": 0,
       "pageSizeOptions": [10, 25, 50]
-    }
+    },
+    "note": "The per-page choice ships as a `Select`, so the drawn segments are not a `SegmentedControl` and keep the kit's default paint."
   },
   {
     "spec": "<Pagination> <FilterBar>",

@@ -376,7 +376,7 @@
         }
       }
     ],
-    "note": "The live glyph is a 14px `fa-xmark`, where the drawing draws a text × of about 10px; the shipped `HistoryList` caller also adds `is-ghost`."
+    "note": "The shipped `HistoryList` caller also adds `is-ghost`."
   },
   {
     "spec": "<Button> <IconButton>",
@@ -657,7 +657,8 @@
       ],
       "value": "any",
       "groupName": "pl-match",
-      "ariaLabel": "Tag match"
+      "ariaLabel": "Tag match",
+      "tone": "tag"
     }
   },
   {

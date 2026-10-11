@@ -724,9 +724,8 @@ function unsectionedManifestRows({ library, manifestRows }) {
  */
 const AWAITING_SPECIMEN = Object.freeze({
   pickers: [
-    // The library draws the panel only in its grid form, six columns of icon-only tiles, which
-    // does not ship: the sheet lays out two columns and no icon-only tile ships (phase 2 of issue
-    // 2339). The list-form `SearchablePopover` specimen mounts the panel through its one caller.
+    // The parent's portaled panel, drawn as the grid form `EssenceSourceSelector` composes. The
+    // list-form `SearchablePopover` specimen mounts the panel through its one real caller.
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ],
 });

@@ -384,9 +384,7 @@
       "removeLabel": "Remove Athletics",
       "disabled": true
     },
-    "content": ["Athletics"],
-    "partial": "the disabled chip fades only its remove control",
-    "note": "A disabled chip keeps its label at full strength and fades only its remove control, where the drawing fades the whole token."
+    "content": ["Athletics"]
   },
   {
     "spec": "<Kicker> <IconChip> <StatBox>",
@@ -597,28 +595,6 @@
       "segments": [
         {
           "tone": "accent"
-        }
-      ]
-    }
-  },
-  {
-    "spec": "<Meter> <BandedBar> <StageBars>",
-    "cap": "meter — two segments, granted vs paid",
-    "draws": ".k-track",
-    "path": "src/ui/svelte/components/Meter.svelte",
-    "partial": "first segment only",
-    "note": "Passes both segments the drawing shows. The shipped meter draws only the first, which is what its API states.",
-    "props": {
-      "value": 1,
-      "max": 3,
-      "valueText": "Max 3",
-      "label": "Free 1",
-      "segments": [
-        {
-          "tone": "accent"
-        },
-        {
-          "color": "var(--fab-accent-soft)"
         }
       ]
     }
