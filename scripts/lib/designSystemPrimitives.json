@@ -523,10 +523,10 @@
     {
       "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
       "library": "<ChoiceGroup>",
-      "status": "divergent",
+      "status": "shipped",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Issue 1773 gives the choice group its second independent importer. `src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte` draws its ingredient-side form, a requirement whose alternatives sit in the `Any one of` box, and `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte` draws its result-side form, a reward row that its `or…` converts into a box under `ChoiceGroupAwardHeader.svelte`, each rolled member carrying `PickerRowRangeCell.svelte`. Divergent by the decision of issue 1516: inside the box it draws one `alt <kind>` adder per offered kind, as `ui-entity-editors` specifies, where the specimen draws a single Alternative adder over the kind menu. It is manager-only because every row it draws is `PickerRow`, whose amount slot and class family are rooted in the manager. Targeted: every recipe editor case claims the directory by `sourceMatches`, and `manager-recipe-edit-ingredients-choice-group`, `manager-recipe-edit-choice-group-menu` and the `manager-recipe-edit-results-group-*` cases draw the box."
+      "why": "Issue 1773 gives the choice group its second independent importer. `src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte` draws its ingredient-side form, a requirement whose alternatives sit in the `Any one of` box, and `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte` draws its result-side form, a reward row that its `or…` converts into a box under `ChoiceGroupAwardHeader.svelte`, each rolled member carrying `PickerRowRangeCell.svelte`. It is manager-only because every row it draws is `PickerRow`, whose amount slot and class family are rooted in the manager. Targeted: every recipe editor case claims the directory by `sourceMatches`, and `manager-recipe-edit-ingredients-choice-group`, `manager-recipe-edit-choice-group-menu` and the `manager-recipe-edit-results-group-*` cases draw the box."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte",

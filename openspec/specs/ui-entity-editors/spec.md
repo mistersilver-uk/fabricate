@@ -310,7 +310,7 @@ The plate, the named pill's mark and each suggestion's take one colour per kind 
 The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
-- **The kind is the shared select,** rendered through `components/Select.svelte` at its `inline` rung and never a native `<select>` (issue 1510), carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
+- **The kind is the shared select,** rendered through `components/Select.svelte` at its `inline` rung and never a native `<select>` (issue 1510), carrying the kinds the kind menu offers plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
@@ -349,16 +349,17 @@ What must hold there is that the tag ARM stays whole: the policy word, the chips
 Every adder creates a row carrying its KIND and no value; the row's own field names it.
 No adder chooses a subject, so none can dedupe against a requirement the set already holds — a GM who names one component twice is told so by the Validation tab, which is where a check the adder cannot make belongs.
 
-A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" menu** per bare requirement, replacing the loose per-row and footer add-buttons.
-It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
-A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
-The menu and the adders are drawn from one list, so they offer the same kinds in the same order, and no row inside the box draws the `or…` control.
-A result-side box draws one `alt <kind>` adder per offered kind, `alt component`, `alt currency` and `alt knowledge`, from the same list its set's `Result` adder offers.
-Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through ONE kind menu with two triggers.
+A bare requirement carries the **"or…"** control; a requirement holding two or more alternatives carries one dashed **`Alternative`** adder at the foot of its box instead, named "Add an alternative", and no row inside the box draws the `or…` control.
+Both triggers open the SAME menu — a single flat **"Accept instead"** list of the ingredient match types the system can honour, Component, Tag, Essence and Currency in that order — and choosing one appends a new OR alternative of that kind for the row's own field to name.
+The adder's menu opens from the button's start edge.
+A result-side box carries the same one `Alternative` adder, its menu headed **"Add an alternative"** as a standalone result row's convert menu is, offering its set's kinds, and appending directly where the set offers one kind.
+An ingredient set adds through one dashed **`Ingredient`** adder over the same kinds, named and headed **"Add an ingredient"**, appending a requirement of the chosen kind and no value.
+Choosing a kind from any trigger moves focus to the new row's name field, a tag row's being its `+ Tag`, rather than to the trigger or the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
 The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase eyebrow, over entries that read from their own left edge.
-The eyebrow is the caller's: **"Accept instead"** on ingredients, and **"Add an alternative"** or **"Add a result"** on results.
+The eyebrow is the caller's: **"Accept instead"** on a requirement's alternatives, **"Add an ingredient"** on an ingredient set's adder, and **"Add an alternative"** or **"Add a result"** on results.
 The header is what lets each entry be the kind's own label alone.
 The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency`, or on a result `Recipe knowledge` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
 It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
@@ -372,15 +373,15 @@ They are drawn at their own two scales: `or…` is a control among controls, lev
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
-Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" menu's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
+Currency affordances — the kind menu's Currency entry, from every trigger — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
 Unit presence alone is not authorisation, and since issue 1278 it is emphatically not: the ladder is WORLD scope, so a world with a fully authored ladder still has systems that do not charge for anything, and the participation toggle is the only thing that says which do.
 Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
 The per-option `tagMatch` (any / all) control is retained on every tag alternative, and renders through the shared segmented-control primitive rather than a hand-rolled toggle-button pair.
-The set-level **"Add essence"** control is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
+The `Ingredient` adder's Essence entry is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 The add-new essence OFFER — withholding a DISABLED essence, while keeping an already-authored one reachable — is applied where an essence is actually CHOSEN, which is the row's own field.
-An adder that names nothing cannot leak a disabled essence, so the adders gate on the system HAVING essences and the field narrows the list.
+An adder that names nothing cannot leak a disabled essence, so the kind menu gates on the system HAVING essences and the field narrows the list.
 
 #### A result choice group
 
@@ -541,7 +542,7 @@ Ingredient set editor supports:
   - Add/remove groups
   - Add/remove OR options within a group
   - Item placeholder options that match one or more configured system tags
-- Essence options authored as OR alternatives within a group (when the system enables essences); the set-level add appends a single-option essence group
+- Essence options authored as OR alternatives within a group (when the system enables essences); the set's `Ingredient` adder appends a single-option essence group
 
 Required tools are **not** authored in the Ingredients tab.
 _Catalyst_ is a retired concept — Tools replaced it, and Tool references are authored on the editor's **Tools** tab at recipe and step scope.

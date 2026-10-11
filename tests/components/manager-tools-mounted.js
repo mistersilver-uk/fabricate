@@ -1401,13 +1401,32 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    assert.ok(target.querySelector('[data-recipe-add="essence-requirement"]'));
-    assert.ok(target.querySelector('[data-recipe-add="cost"]'));
-    target.querySelector('.manager-recipe-or-trigger').click();
-    await tick();
-    flushSync();
-    assert.ok(document.querySelector('[data-recipe-add="alternative-essence"]'));
-    assert.ok(document.querySelector('[data-recipe-add="alternative-currency"]'));
+    // A pointer's mousedown dismisses the other open menu before its click opens this one.
+    const openedHooks = async (trigger, items) => {
+      trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      trigger.click();
+      await tick();
+      flushSync();
+      return [...document.querySelectorAll(items)].map((item) =>
+        item.getAttribute('data-recipe-add')
+      );
+    };
+    assert.deepEqual(
+      await openedHooks(
+        target.querySelector(
+          ':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]'
+        ),
+        ':scope .manager-recipe-ingredient-menu [role="menuitem"]'
+      ),
+      ['ingredient-component', 'ingredient-tag', 'ingredient-essence', 'ingredient-currency']
+    );
+    assert.deepEqual(
+      await openedHooks(
+        target.querySelector('.manager-recipe-or-trigger'),
+        ':scope .manager-recipe-or-menu [role="menuitem"]'
+      ),
+      ['alternative-component', 'alternative-tag', 'alternative-essence', 'alternative-currency']
+    );
   });
 
   it('offers NO Tool creation on the system Tool Rules route, on any drop target', async () => {

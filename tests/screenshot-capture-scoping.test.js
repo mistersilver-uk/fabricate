@@ -1808,7 +1808,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(HARNESS, /stopImmediatePropagation|stopPropagation/);
   assert.match(
     toolStudioWalk,
-    /scrollToolEditorPanelToReveal\([\s\S]*?alternative-component[\s\S]*?manager-tool-stress-repair/,
+    /scrollToolEditorPanelToReveal\([\s\S]*?\[data-recipe-add="alternative"\][\s\S]*?manager-tool-stress-repair/,
     'repair stress evidence must reveal the populated OR group in the editor pane',
   );
   assert.match(
@@ -1818,11 +1818,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /const addRepairAlternative = firstRepairGroup\.locator\(\s*'\[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    /await repairAlternativeAdder\.click\(\);\s*const addRepairAlternative = page\.locator\(\s*'\.manager-recipe-or-menu \[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    'the Alternative adder opens its menu outside the mutation, and its item mutates once',
   );
   assert.match(
     HARNESS,
-    /const addRepairGroup = editor\.locator\(\s*'\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    /await repairIngredientAdder\.click\(\);\s*const addRepairGroup = page\.locator\(\s*'\.manager-recipe-ingredient-menu \[data-recipe-add="ingredient-tag"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
     'the repair group control must choose one strict-safe pointer target and mutate once',
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);

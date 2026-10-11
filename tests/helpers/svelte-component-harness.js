@@ -266,9 +266,9 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-  // Issue 1773: a recipe result set's one adder.
+  // Issue 1773: a recipe result set's one adder, the shared kind adder since issue 2367.
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
+  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
   // …and its choice group, with the award header, the range cell and the progressive statement.
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
@@ -295,6 +295,7 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
 
 export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
