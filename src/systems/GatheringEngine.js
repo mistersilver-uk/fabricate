@@ -3915,7 +3915,15 @@ export class GatheringEngine {
     return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
-  async _resolveD100Outcome({ viewer, actor, system, environment, task, ...answer }) {
+  async _resolveD100Outcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    attemptRoll = null,
+    extraModifier = 0,
+  }) {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
@@ -3937,8 +3945,8 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
-      attemptRoll: answer.attemptRoll ?? null,
-      extraModifier: answer.extraModifier ?? 0,
+      attemptRoll,
+      extraModifier,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({

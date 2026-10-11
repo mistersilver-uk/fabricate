@@ -56,13 +56,13 @@ export function describeD100Check({ actor, run, system, environment, task, local
  * other entry rolled against the actor's roll data, and a malformed or throwing entry `0`.
  */
 export async function rollSituationalBonus(bonus, actor = null) {
-  const text = typeof bonus === 'string' ? bonus.trim() : bonus;
-  if ([null, undefined, ''].includes(text)) return NO_BONUS;
-  const direct = Number(text);
+  const entry = typeof bonus === 'string' ? bonus.trim() : bonus;
+  if ([null, undefined, ''].includes(entry)) return NO_BONUS;
+  const direct = Number(entry);
   if (Number.isFinite(direct)) return { total: direct, roll: null };
   const RollClass = globalThis.Roll;
   if (typeof RollClass !== 'function') return NO_BONUS;
-  const formula = String(text);
+  const formula = String(entry);
   // Called as a method, not detached, as in `evaluateCheckRoll`.
   if (typeof RollClass.validate === 'function' && RollClass.validate(formula) === false) {
     console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
