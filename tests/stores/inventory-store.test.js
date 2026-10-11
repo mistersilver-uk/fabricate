@@ -767,13 +767,13 @@ describe('inventoryStore', () => {
       const { store } = await loadedProgressiveStore();
       assert.equal(store.salvageOrderIsCustom, false, 'nothing has moved yet');
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       assert.equal(store.salvageOrderIsCustom, true);
 
       // Moved back. A stored order still EXISTS under this key, so a presence check
       // would say "custom" and offer a Reset that does nothing when pressed.
-      store.reorderSalvageStage(1, 0, '');
+      store.reorderSalvageStage(1, 0);
       flushSync();
       assert.equal(
         store.salvageOrderIsCustom,
@@ -784,7 +784,7 @@ describe('inventoryStore', () => {
 
     it("resets by persisting NO preference, not by pinning today's authored ids", async () => {
       const { store, log } = await loadedProgressiveStore();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       await store.flushSalvageOrder();
       flushSync();
@@ -813,7 +813,7 @@ describe('inventoryStore', () => {
 
     it('restores the thresholds the authored order carries', async () => {
       const { store } = await loadedProgressiveStore();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       assert.deepEqual(
         store.orderedSalvageStages.map((s) => [s.id, s.threshold]),
@@ -859,7 +859,7 @@ describe('inventoryStore', () => {
     it('reorders under the salvage: key, storing IDS (not indices) so a GM edit survives', async () => {
       const { store, log } = await loadedProgressiveStore();
 
-      store.reorderSalvageStage(0, 1, 'Shard moved to position 2 of 2');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       assert.deepEqual(
@@ -867,7 +867,7 @@ describe('inventoryStore', () => {
         ['s2', 's1'],
         'the move is optimistic - it shows immediately'
       );
-      assert.equal(store.salvageOrderAnnouncement, 'Shard moved to position 2 of 2');
+      assert.equal(store.salvageOrderAnnouncement, '', 'the list speaks its own move');
       assert.deepEqual(log, [], 'the write is debounced, not issued per gesture');
 
       const flush = await store.flushSalvageOrder();
@@ -888,7 +888,7 @@ describe('inventoryStore', () => {
         'authored order: 5 then 5+3'
       );
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       assert.deepEqual(
@@ -913,7 +913,7 @@ describe('inventoryStore', () => {
       flushSync();
       store.select('sys:c1');
 
-      store.reorderSalvageStage(0, 1, 'nope');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       assert.deepEqual(
@@ -932,7 +932,7 @@ describe('inventoryStore', () => {
       const deferred = new Promise((resolve) => (releaseWrite = resolve));
       const { store, log } = await loadedProgressiveStore({ setOrder: () => deferred });
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       // Press Salvage INSIDE the debounce window: without the flush, the engine would
@@ -964,7 +964,7 @@ describe('inventoryStore', () => {
         setOrder: () => Promise.reject(new Error('user setting write failed')),
       });
 
-      store.reorderSalvageStage(0, 1, 'Shard moved to position 2 of 2');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       const result = await store.salvage('sys', 'c1');
@@ -988,6 +988,23 @@ describe('inventoryStore', () => {
       );
     });
 
+    it('AC6: a move between two rejected writes clears the revert, so the second is spoken', async () => {
+      const { store } = await loadedProgressiveStore({
+        setOrder: () => Promise.reject(new Error('user setting write failed')),
+      });
+      const revert = 'Your order could not be saved and was restored.';
+
+      store.reorderSalvageStage(0, 1);
+      await store.flushSalvageOrder();
+      assert.equal(store.salvageOrderAnnouncement, revert, 'the first rejection announces it');
+
+      store.reorderSalvageStage(0, 1);
+      assert.equal(store.salvageOrderAnnouncement, '', 'the next move clears it');
+
+      await store.flushSalvageOrder();
+      assert.equal(store.salvageOrderAnnouncement, revert, 'so the second is a new sentence');
+    });
+
     // The whole reason the failure is a RETURN STATUS and not a rethrow: this flush is
     // wired into `SvelteFabricateApp._flushPendingOrderWrite`, whose `void` + sync-only
     // try/catch would turn a rejection into an unhandled rejection at window teardown.
@@ -995,7 +1012,7 @@ describe('inventoryStore', () => {
       const { store } = await loadedProgressiveStore({
         setOrder: () => Promise.reject(new Error('user setting write failed')),
       });
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       const flush = await store.flushSalvageOrder();
@@ -1007,7 +1024,7 @@ describe('inventoryStore', () => {
       assert.deepEqual(await store.flushSalvageOrder(), { ok: true });
       assert.deepEqual(log, []);
 
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       await store.flushSalvageOrder();
       await store.flushSalvageOrder();
@@ -1082,14 +1099,14 @@ describe('inventoryStore', () => {
       // System A (the primary): reorder a stage and flush; observe the commit key.
       store.select(`${SYS_A}:shared`);
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       await store.flushSalvageOrder();
 
       // System B (same component id): reorder and flush again.
       store.selectSystem(SYS_B);
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       await store.flushSalvageOrder();
 
@@ -1772,7 +1789,7 @@ describe('inventoryStore', () => {
       const { store, log } = await loadedBulkStore([progressiveBulkRow('c1', 'Iron')]);
       store.select('sys:c1');
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       store.toggleBulkSelection('sys:c1');
       flushSync();
@@ -1797,7 +1814,7 @@ describe('inventoryStore', () => {
       });
       store.select('sys:c1');
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
       store.toggleBulkSelection('sys:c1');
       flushSync();
@@ -2234,7 +2251,7 @@ describe('inventoryStore', () => {
       ]);
       store.select('sys:cA');
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       store.select('sys:cB');
@@ -2251,7 +2268,7 @@ describe('inventoryStore', () => {
       const { store, log } = await loadedBulkStore([progressiveBulkRow('cA', 'Alpha')]);
       store.select('sys:cA');
       flushSync();
-      store.reorderSalvageStage(0, 1, '');
+      store.reorderSalvageStage(0, 1);
       flushSync();
 
       assert.deepEqual(await store.flushSalvageOrder(), { ok: true });

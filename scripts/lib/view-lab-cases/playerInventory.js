@@ -836,7 +836,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       { selector: '[data-inventory-detail-tab="salvage"]' },
-      { selector: '[data-progressive-stage-move-down]' },
+      { selector: '[data-progressive-stage] [data-sortable-move="down"]' },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
     ],
     sourceMatches: [...BULK_DEFAULTS.sourceMatches, PROGRESSIVE_STAGE_PARTS],

@@ -1,9 +1,10 @@
-/** Issue 651 — the player's progressive stage list (mounted). */
+/** Issue 651 — the player's progressive stage list (mounted), drawn by `SortableList` (issue 2381). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
@@ -22,8 +23,22 @@ const harness = createMountedComponentHarness({
 });
 
 const STAGES = [
-  { id: 's1', componentId: 'c1', name: 'Rough Blade', img: 'icons/rough.webp', difficulty: 2, threshold: 2 },
-  { id: 's2', componentId: 'c2', name: 'Fine Blade', img: 'icons/fine.webp', difficulty: 3, threshold: 5 },
+  {
+    id: 's1',
+    componentId: 'c1',
+    name: 'Rough Blade',
+    img: 'icons/rough.webp',
+    difficulty: 2,
+    threshold: 2,
+  },
+  {
+    id: 's2',
+    componentId: 'c2',
+    name: 'Fine Blade',
+    img: 'icons/fine.webp',
+    difficulty: 3,
+    threshold: 5,
+  },
   { id: 's3', componentId: 'c3', name: 'Master Blade', img: null, difficulty: 4, threshold: 9 },
 ];
 
@@ -31,18 +46,66 @@ function progressiveRecipe(overrides = {}) {
   return recipe({ modeToken: 'progressive', ...overrides });
 }
 
-function mountBody({ stages = STAGES, canReorder = true, onReorderStage = () => {}, recipeOverrides = {} } = {}) {
+function mountBody({
+  stages = STAGES,
+  canReorder = true,
+  onReorderStage = () => {},
+  onReorderStageSettled = () => {},
+  stageAnnouncement = '',
+  recipeOverrides = {},
+} = {}) {
   return harness.mount({
     recipe: progressiveRecipe(recipeOverrides),
     craftability: craftability(),
     progressiveStages: stages,
     canReorderStages: canReorder,
-    stageAnnouncement: '',
+    stageAnnouncement,
     onReorderStage,
+    onReorderStageSettled,
   });
 }
 
+const LIST = '[data-recipe-section="progressive-stages"]';
 const rows = (target) => [...target.querySelectorAll('[data-progressive-stage]')];
+const inRows = (target, selector) => [
+  ...target.querySelectorAll(`[data-progressive-stage] ${selector}`),
+];
+const rocker = (target, direction) => inRows(target, `[data-sortable-move="${direction}"]`);
+const grips = (target) => inRows(target, '[data-sortable-grip]');
+const regionAfterList = (target) =>
+  [target.querySelector(LIST)?.nextElementSibling].find((node) =>
+    node?.matches('[data-sortable-list-status]')
+  ) ?? null;
+const fire = (node, type) =>
+  node.dispatchEvent(new globalThis.window.Event(type, { bubbles: true, cancelable: true }));
+const keydown = (node, key) =>
+  node.dispatchEvent(
+    new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+  );
+
+/** The shared sentence, as the harness's `format` stub echoes it: the key and its data. */
+const MOVED_MASTER_TO_2 =
+  'FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement:' +
+  '{"name":"Master Blade","position":"2","total":"3"}';
+
+/** A callback that records each call's arguments, and the list it records them in. */
+function recorder() {
+  const calls = [];
+  return [
+    calls,
+    (...args) => {
+      calls.push(args);
+    },
+  ];
+}
+
+/** The store's round trip: the move's result arrives as the next `progressiveStages`. */
+const moved = (stages, index, target) => {
+  const next = [...stages];
+  const [stage] = next.splice(index, 1);
+  next.splice(target, 0, stage);
+  return next;
+};
 
 describe('ProgressiveBody — the player stage list (issue 651)', () => {
   before(() => harness.setup());
@@ -51,9 +114,9 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   // ── F1 ───────────────────────────────────────────────────────────────────
 
-  it('F1: renders a POPULATED stage list where the output table was always empty', async () => {
+  it('F1: renders the stage list through the shared SortableList', async () => {
     const target = await mountBody();
-    assert.ok(target.querySelector('[data-recipe-section="progressive-stages"]'), 'the list renders');
+    assert.ok(target.querySelector(`${LIST}.fabricate-sortable-list`), 'the list is the primitive');
     assert.equal(rows(target).length, 3, 'every authored stage, not the zero-budget award');
   });
 
@@ -69,27 +132,36 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
   it('F1: a stage list REPLACES the generic IO output table', async () => {
     const target = await mountBody();
     assert.ok(target.querySelector('[data-progressive-stage]'));
-    assert.equal(
-      target.querySelector('[data-io-table-result]'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-io-table-result]'),
       'a progressive output is an ordered list, not a flat set'
     );
   });
 
   it('a recipe with no stages still falls back to the IO table', async () => {
     const target = await mountBody({ stages: [] });
-    assert.equal(target.querySelector('[data-recipe-section="progressive-stages"]'), null);
+    assert.ok(!target.querySelector(LIST));
   });
 
-  // ── Row content: ordinal, difficulty, cumulative threshold ───────────────
+  // ── Row content: ordinal, art, difficulty, cumulative threshold ──────────
 
   it('rows carry ordinals in rendered position order', async () => {
     const target = await mountBody({ stages: [STAGES[2], STAGES[0], STAGES[1]] });
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) => n.textContent.trim()),
+      inRows(target, '[data-sortable-ordinal]').map((n) => n.textContent.trim()),
       ['1', '2', '3'],
       'the ordinal is the POSITION, not the stage identity'
     );
+  });
+
+  it('rows draw their art as a 22px Medallion, and the glyph when a stage has none', async () => {
+    const target = await mountBody();
+    const tiles = rows(target).map((row) => row.querySelector('.fab-medallion'));
+    assert.deepEqual(
+      tiles.map((tile) => tile.getAttribute('data-medallion')),
+      ['image', 'image', 'glyph']
+    );
+    assert.match(tiles[0].getAttribute('style'), /width:\s*22px;\s*height:\s*22px/u);
   });
 
   it('rows carry the read-only difficulty and the CUMULATIVE threshold', async () => {
@@ -109,64 +181,95 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     );
   });
 
+  it('the inline name carries its full text as a title, since a long one ellipses', async () => {
+    const target = await mountBody();
+    assert.deepEqual(
+      inRows(target, '.progressive-stage-name').map((name) => name.getAttribute('title')),
+      STAGES.map((stage) => stage.name)
+    );
+  });
+
   it('a null threshold is OMITTED rather than rendered as zero', async () => {
     // An award-loop-skipped stage is reached at NO budget, so any number would be a lie.
     const target = await mountBody({
       stages: [{ id: 's1', name: 'Broken', img: null, difficulty: null, threshold: null }],
     });
-    assert.equal(target.querySelector('[data-progressive-stage-threshold]'), null);
-    assert.equal(target.querySelector('[data-progressive-stage-difficulty]'), null);
+    assert.ok(!target.querySelector('[data-progressive-stage-threshold]'));
+    assert.ok(!target.querySelector('[data-progressive-stage-difficulty]'));
     assert.equal(rows(target).length, 1, 'the row itself still renders');
   });
 
   // ── Reorder affordances + a11y triad ─────────────────────────────────────
 
-  it('reorderable rows expose move buttons, disabled at the ends', async () => {
+  it('reorderable rows expose the rocker, disabled at the ends', async () => {
     const target = await mountBody();
-    const ups = [...target.querySelectorAll('[data-progressive-stage-move-up]')];
-    const downs = [...target.querySelectorAll('[data-progressive-stage-move-down]')];
+    const ups = rocker(target, 'up');
+    const downs = rocker(target, 'down');
     assert.equal(ups.length, 3);
     assert.equal(ups[0].disabled, true, 'the first row cannot move up');
     assert.equal(ups[1].disabled, false);
     assert.equal(downs[2].disabled, true, 'the last row cannot move down');
   });
 
-  it('a keyboard move reports the index, target AND a pre-formatted announcement', async () => {
-    const moves = [];
-    const target = await mountBody({ onReorderStage: (...args) => moves.push(args) });
-    [...target.querySelectorAll('[data-progressive-stage-move-up]')][2].click();
+  it('a rocker click reports the move, announces the shared sentence and keeps focus', async () => {
+    const [moves, onReorderStage] = recorder();
+    const target = await mountBody({ onReorderStage });
+    const up = rocker(target, 'up')[2];
+    up.click();
     flushSync();
+    assert.deepEqual(moves, [[2, 1]], 'the index and the target, and nothing else');
 
-    assert.equal(moves.length, 1);
-    const [index, targetIndex, announcement] = moves[0];
-    assert.equal(index, 2);
-    assert.equal(targetIndex, 1);
-    // The name is read BEFORE the move — after it, stages[2] is the row that swapped in.
-    assert.match(announcement, /Master Blade/, 'names the stage that MOVED');
-    assert.match(announcement, /2/, 'and its new position');
+    await harness.setProps({ progressiveStages: moved(STAGES, 2, 1) });
+    assert.equal(
+      regionAfterList(target).textContent.trim(),
+      MOVED_MASTER_TO_2,
+      'the shared sentence names the stage that MOVED, read before the move'
+    );
+    assert.equal(globalThis.document.activeElement, up, 'focus stays on the pressed chevron');
   });
 
-  it('the live region is present, polite, and visually hidden', async () => {
-    const target = await harness.mount({
-      recipe: progressiveRecipe(),
-      craftability: craftability(),
-      progressiveStages: STAGES,
-      canReorderStages: true,
-      stageAnnouncement: 'Fine Blade moved to position 1 of 3',
-      onReorderStage: () => {},
-    });
-    const status = target.querySelector('[data-progressive-stage-status]');
-    assert.ok(status, 'the region renders');
+  it('a grip arrow key moves the stage, keeps focus on the grip and announces', async () => {
+    const [moves, onReorderStage] = recorder();
+    const target = await mountBody({ onReorderStage });
+    keydown(grips(target)[2], 'ArrowUp');
+    flushSync();
+    assert.deepEqual(moves, [[2, 1]]);
+
+    await harness.setProps({ progressiveStages: moved(STAGES, 2, 1) });
+    assert.equal(
+      globalThis.document.activeElement?.getAttribute('data-sortable-grip'),
+      's3',
+      'the moved stage’s grip keeps focus'
+    );
+    assert.equal(regionAfterList(target).textContent.trim(), MOVED_MASTER_TO_2);
+  });
+
+  it('speaks a caller sentence through the one region that follows the list', async () => {
+    const target = await mountBody({ stageAnnouncement: '' });
+    const status = regionAfterList(target);
+    assert.ok(status, 'the region follows the list');
     assert.equal(status.getAttribute('aria-live'), 'polite');
-    // `.sr-only` was retired in issue 1501.
     assert.ok(status.classList.contains('visually-hidden'), 'and is visually hidden');
-    assert.equal(status.textContent.trim(), 'Fine Blade moved to position 1 of 3');
+
+    await harness.setProps({ stageAnnouncement: 'Could not save your order.' });
+    assert.equal(regionAfterList(target).textContent.trim(), 'Could not save your order.');
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
   });
 
-  it('move buttons carry the stage name in their accessible label', async () => {
+  it('a recipe switch remounts the list, so a pending sentence is never re-spoken', async () => {
+    const target = await mountBody({ stageAnnouncement: '' });
+    await harness.setProps({ stageAnnouncement: 'Could not save your order.' });
+    assert.equal(regionAfterList(target).textContent.trim(), 'Could not save your order.');
+
+    await harness.setProps({ recipe: progressiveRecipe({ id: 'another-recipe' }) });
+    assert.equal(regionAfterList(target).textContent.trim(), '', 'the next recipe starts silent');
+  });
+
+  it('the rocker names carry the stage', async () => {
     const target = await mountBody();
-    const up = [...target.querySelectorAll('[data-progressive-stage-move-up]')][1];
-    assert.match(up.getAttribute('aria-label'), /Fine Blade/);
+    const name = (direction) => rocker(target, direction)[1].getAttribute('aria-label');
+    assert.equal(name('up'), 'FABRICATE.Common.SortableList.MoveUp:{"name":"Fine Blade"}');
+    assert.equal(name('down'), 'FABRICATE.Common.SortableList.MoveDown:{"name":"Fine Blade"}');
   });
 
   // ── D13: the fixed state ─────────────────────────────────────────────────
@@ -175,194 +278,108 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const target = await mountBody({ canReorder: false });
     assert.equal(rows(target).length, 3, 'the order is still information');
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) => n.textContent.trim()),
+      inRows(target, '[data-sortable-ordinal]').map((n) => n.textContent.trim()),
       ['1', '2', '3']
     );
     assert.equal(target.querySelectorAll('[data-progressive-stage-difficulty]').length, 3);
   });
 
-  it('D13: fixed rows attach NO drag handlers and are not draggable', async () => {
-    // "Not attached, not merely inert".
-    const moves = [];
-    const target = await mountBody({ canReorder: false, onReorderStage: (...a) => moves.push(a) });
-    const row = rows(target)[0];
+  it('D13: fixed rows drop the grip and the rocker and reorder nothing', async () => {
+    const [moves, onReorderStage] = recorder();
+    const target = await mountBody({ canReorder: false, onReorderStage });
+    assert.equal(grips(target).length, 0, 'the grip IS the affordance signal');
+    assert.equal(inRows(target, '[data-sortable-move]').length, 0, 'and there is no rocker');
+    assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 3);
+    assert.ok(!target.querySelector('[data-progressive-stage-reorderable]'));
 
-    assert.equal(row.getAttribute('draggable'), null, 'no draggable attribute');
-    assert.equal(
-      target.querySelector('[data-progressive-stage-reorderable]'),
-      null,
-      'the reorderable branch — which is where every drag handler lives — did not render'
-    );
-
-    const lastRow = rows(target)[2];
     for (const type of ['dragstart', 'dragover', 'drop']) {
-      row.dispatchEvent(new globalThis.window.Event(type, { bubbles: true, cancelable: true }));
-      lastRow.dispatchEvent(new globalThis.window.Event(type, { bubbles: true, cancelable: true }));
+      fire(rows(target)[0], type);
+      fire(rows(target)[2], type);
     }
     flushSync();
     assert.deepEqual(moves, [], 'a full drag lifecycle reorders nothing');
   });
 
-  it('D13: fixed rows drop the grip glyph and the move buttons', async () => {
-    const target = await mountBody({ canReorder: false });
-    assert.equal(
-      target.querySelector('.crafting-stage-handle'),
-      null,
-      'the grip IS the affordance signal, so it must not be shown'
-    );
-    assert.equal(target.querySelector('[data-progressive-stage-move]'), null);
-  });
-
-  it('D13: fixed rows explain themselves and carry NO live region', async () => {
+  it('D13: fixed rows explain themselves, and the one region stays mounted and empty', async () => {
     const target = await mountBody({ canReorder: false });
     const note = target.querySelector('[data-progressive-stage-fixed-note]');
     assert.ok(note, 'one muted line says why there is nothing to grab');
-    assert.match(note.textContent, /Order set by the GM/);
-    assert.equal(
-      target.querySelector('[data-progressive-stage-status]'),
-      null,
-      'nothing can change, so nothing is announced'
-    );
-  });
-
-  it('stage artwork is NOT natively draggable, in either state', async () => {
-    // An <img> is draggable by default.
-    for (const canReorder of [true, false]) {
-      const target = await mountBody({ canReorder });
-      const images = [...target.querySelectorAll('.crafting-stage-img')];
-      assert.ok(images.length > 0, `precondition: artwork renders (canReorder=${canReorder})`);
-      for (const image of images) {
-        assert.equal(
-          image.getAttribute('draggable'),
-          'false',
-          `artwork is not draggable (canReorder=${canReorder})`
-        );
-      }
-      harness.remount();
-    }
+    assert.match(note.textContent, /Order set by your GM\./);
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
+    assert.equal(regionAfterList(target).textContent.trim(), '', 'nothing is announced');
+    assert.ok(!target.querySelector('[data-progressive-stage-status]'), 'and no second region');
   });
 
   it('a drop commits the pending order write immediately (no debounce wait)', async () => {
     // A drag has already settled by the time it drops, so there is nothing to coalesce.
-    const settled = [];
-    const target = await harness.mount({
-      recipe: progressiveRecipe(),
-      craftability: craftability(),
-      progressiveStages: STAGES,
-      canReorderStages: true,
-      stageAnnouncement: '',
-      onReorderStage: () => {},
-      onReorderStageSettled: () => settled.push(true),
-    });
-
-    rows(target)[0].dispatchEvent(
-      new globalThis.window.Event('dragstart', { bubbles: true, cancelable: true })
-    );
-    rows(target)[2].dispatchEvent(
-      new globalThis.window.Event('drop', { bubbles: true, cancelable: true })
-    );
+    const [settled, onReorderStageSettled] = recorder();
+    const target = await mountBody({ onReorderStageSettled });
+    fire(grips(target)[0], 'dragstart');
+    fire(rows(target)[2], 'drop');
     flushSync();
-
     assert.equal(settled.length, 1, 'the drop settles the write');
   });
 
-  it('a KEYBOARD move does not settle — it is the burst the debounce exists for', async () => {
-    const settled = [];
-    const target = await harness.mount({
-      recipe: progressiveRecipe(),
-      craftability: craftability(),
-      progressiveStages: STAGES,
-      canReorderStages: true,
-      stageAnnouncement: '',
-      onReorderStage: () => {},
-      onReorderStageSettled: () => settled.push(true),
-    });
-
-    [...target.querySelectorAll('[data-progressive-stage-move-up]')][2].click();
+  it('a rocker or grip-key move does not settle — it is the burst the debounce exists for', async () => {
+    const [settled, onReorderStageSettled] = recorder();
+    const target = await mountBody({ onReorderStageSettled });
+    rocker(target, 'up')[2].click();
+    keydown(grips(target)[1], 'ArrowDown');
     flushSync();
-
-    assert.deepEqual(settled, [], 'chevron clicks coalesce; only the drop settles');
+    assert.deepEqual(settled, [], 'only the drop settles');
   });
 
-  it('D13: reorderable rows DO attach the drag handlers (the converse)', async () => {
-    // Without this, the absence assertions above could pass for the wrong reason.
-    const moves = [];
-    const target = await mountBody({ canReorder: true, onReorderStage: (...a) => moves.push(a) });
-    const row = rows(target)[0];
-    assert.equal(row.getAttribute('draggable'), 'true');
+  it('D13: reorderable rows DO reorder by a drag from the grip (the converse)', async () => {
+    const [moves, onReorderStage] = recorder();
+    const target = await mountBody({ onReorderStage });
     assert.ok(target.querySelector('[data-progressive-stage-reorderable]'));
-    assert.equal(target.querySelector('[data-progressive-stage-fixed-note]'), null);
+    assert.ok(!target.querySelector('[data-progressive-stage-fixed-note]'));
 
-    // The same lifecycle that reorders nothing above DOES reorder here.
-    row.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true, cancelable: true }));
-    rows(target)[2].dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
+    fire(grips(target)[0], 'dragstart');
+    fire(rows(target)[2], 'drop');
     flushSync();
-    assert.equal(moves.length, 1, 'a drag from row 1 onto row 3 reorders');
-    assert.deepEqual([moves[0][0], moves[0][1]], [0, 2]);
+    assert.deepEqual(moves, [[0, 2]], 'a drag from row 1 onto row 3 reorders');
   });
 
   // ── Issue 675: the salvage extensions are OPT-IN ─────────────────────────
 
-  it('675: the crafting rendering is unchanged when the new props are omitted', async () => {
+  it('675: the crafting row carries no state chip and every number', async () => {
     const target = await mountBody();
-    assert.equal(
-      target.querySelector('[data-progressive-stage-state]'),
-      null,
-      'no state chip'
-    );
-    // The rest of the row is untouched: ordinal, difficulty, threshold, move buttons.
+    assert.ok(!target.querySelector('[data-progressive-stage-state]'), 'no state chip');
     const first = rows(target)[0];
-    assert.ok(first.querySelector('[data-progressive-stage-ordinal]'));
+    assert.ok(first.querySelector('[data-sortable-ordinal]'));
     assert.ok(first.querySelector('[data-progressive-stage-difficulty]'));
     assert.ok(first.querySelector('[data-progressive-stage-threshold]'));
-    assert.ok(first.querySelector('[data-progressive-stage-move]'));
+    assert.ok(first.querySelector('[data-sortable-move]'));
   });
 
   it('675: a stage carrying a quantity renders NONE — progressive is quantity-less', async () => {
-    // There is no opt-in left to pass: `showQuantity` was deleted, not defaulted off.
     const target = await mountBody({
       stages: [{ ...STAGES[0], quantity: 3 }, STAGES[1], STAGES[2]],
     });
-    assert.equal(
-      target.querySelector('[data-progressive-stage-quantity]'),
-      null,
-      'the stored count is inert in this mode and nothing renders it'
-    );
-    assert.equal(
-      rows(target)[0].textContent.includes('×'),
-      false,
-      'and no ×N reaches the row by any other route'
-    );
+    assert.ok(!target.querySelector('[data-progressive-stage-quantity]'));
+    assert.equal(rows(target)[0].textContent.includes('×'), false, 'no ×N by any other route');
   });
 
-  it('675: the reorder chevrons END the row', async () => {
-    // One arrow position across both surfaces (crafting here, salvage via the same
-    // component), matching the GM's component salvage editor. A divergence prop was
-    // deliberately not added.
+  it('the grip leads, then the ordinal and the content, and the rocker trails', async () => {
     const target = await mountBody();
-    const row = rows(target)[0];
-    const parts = [
-      ...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]'),
-    ];
-    assert.equal(parts.length, 2);
-    assert.ok(parts[0].hasAttribute('data-progressive-stage-ordinal'), 'the ordinal leads');
-    assert.ok(parts[1].hasAttribute('data-progressive-stage-move'), 'the chevrons trail');
-    // Read off the stage's own LINE rather than off the row. Since issue 1286 the row is a
-    // wrapper that MAY carry a full-bleed complication band beneath its line, so `row`'s
-    // last element child is the line (or the band), never the chevrons. The claim under
-    // test is unchanged: the chevrons end the line the stage reads on.
-    assert.equal(
-      row.querySelector('.crafting-stage-line').lastElementChild.hasAttribute(
-        'data-progressive-stage-move'
-      ),
-      true,
-      'and they are the last thing on the line'
+    const line = rows(target)[0].querySelector('.fabricate-sortable-list-line');
+    const parts = [...line.children].map(
+      (child) =>
+        ['data-sortable-grip', 'data-sortable-ordinal'].find((name) => child.hasAttribute(name)) ??
+        [...child.classList].find((name) => /content|rocker/u.test(name))
     );
+    assert.deepEqual(parts, [
+      'data-sortable-grip',
+      'data-sortable-ordinal',
+      'fabricate-sortable-list-content',
+      'fabricate-sortable-list-rocker',
+    ]);
   });
 
   // ── 1286: the crafting body opts into the complication band, FORECAST-only ───────
 
-  it('1286: forwards the forecast tense, so a crafting stage draws its band', async () => {
+  it('1286: mounts the forecast band only on the stage that carries complications', async () => {
     const stages = [
       { ...STAGES[0] },
       {
@@ -385,12 +402,23 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const band = target.querySelector(
       '[data-progressive-stage="s2"] [data-progressive-stage-complications]'
     );
-    assert.ok(band, 'the crafting body passes the extension, so the band renders');
+    assert.ok(band, 'the crafting body mounts the band');
     assert.equal(band.getAttribute('data-progressive-stage-complication-tense'), 'forecast');
     assert.match(band.textContent, /This can go wrong/);
-    assert.ok(
-      !target.querySelector('[data-progressive-stage="s1"] [data-progressive-stage-complications]'),
-      'and a stage carrying nothing is untouched'
+    const [plain, banded] = rows(target);
+    assert.ok(banded.classList.contains('has-band'));
+    assert.ok(!plain.classList.contains('has-band'), 'a stage carrying nothing is the plain row');
+    assert.equal(
+      plain.querySelector('.fabricate-sortable-list-body').children.length,
+      0,
+      'and its body is empty'
+    );
+  });
+
+  it('the stylesheet hides the empty body of a stage row without a band', () => {
+    assert.match(
+      readStylesheet(),
+      /\.fabricate-sortable-list-row\.progressive-stage-row:not\(\.has-band\)\s+\.fabricate-sortable-list-body[^{]*\{[^}]*display:\s*none/u
     );
   });
 });

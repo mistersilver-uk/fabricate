@@ -99,7 +99,7 @@
       : 'FABRICATE.App.Inventory.Salvage.StageOrderSpent'
   );
   const fixedNoteFallback = $derived(
-    gmPinned ? 'Order set by the GM' : 'Order spent — your roll ran down this list.'
+    gmPinned ? 'Order set by your GM.' : 'Order spent — your roll ran down this list.'
   );
 
   // The banner reads the SAME pair the body dispatch does — `(mode, checkUsable)` — not

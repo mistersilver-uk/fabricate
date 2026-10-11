@@ -4,10 +4,10 @@
   ordered list, each stage consuming its difficulty before the next is produced — so
   the order decides what the player actually recovers.
 
-  It wraps the shared `ProgressiveStageList` (the crafting tab's), passing its two
-  opt-in extensions: the `stacked` row shape and a `stateChip` snippet. Reuse rather
-  than a twin is what keeps salvage's a11y triad — drag, keyboard, live region —
-  identical to crafting's, and what keeps `canReorder: false` DETACHING the handlers
+  Its stage list is the shared `SortableList` (issue 2381) with the crafting tab's
+  `ProgressiveStageRow` in its `stacked` layout plus a `stateChip` snippet. One list is
+  what keeps salvage's a11y triad — grip drag and keys, rocker, live region — identical
+  to crafting's, and what keeps `canReorder: false` DROPPING the grip and the rocker
   instead of leaving inert rows a player can grab to no effect.
 
   It passes NO quantity, because there is no quantity to pass: progressive results are a
@@ -47,7 +47,14 @@
   import { localize } from '../../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../../util/statusChipTone.js';
   import Chip from '../../../../components/Chip.svelte';
-  import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
+  import { localizeOr } from '../../../../util/localizeOr.js';
+  import SortableList from '../../../../components/SortableList.svelte';
+  import ProgressiveStageBand from '../../../crafting/detail/ProgressiveStageBand.svelte';
+  import ProgressiveStageRow, {
+    stageLabel,
+    stageRowClass,
+    stageRowData,
+  } from '../../../crafting/detail/ProgressiveStageRow.svelte';
   import Callout from '../../../../components/Callout.svelte';
   import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
@@ -61,12 +68,9 @@
     onReorderSettled = () => {},
     result = null,
     // WHY the rows are fixed, decided by the panel (which is the only thing that knows):
-    // the GM pinned the order, or this player's roll has already been spent down the
-    // list. Declared AND forwarded — a prop that stops at a wrapper silently falls back
-    // to its default, which here is the crafting tab's "Order set by the GM": the exact
-    // falsehood this prop exists to prevent.
-    fixedNoteKey = undefined,
-    fixedNoteFallback = undefined,
+    // the GM pinned the order, or this player's roll has already been spent down the list.
+    fixedNoteKey = 'FABRICATE.App.Crafting.Detail.StageOrderFixed',
+    fixedNoteFallback = 'Order set by your GM.',
     // Restore the GM's authored order. `canResetOrder` is the panel's read of whether
     // the player's order actually differs from it — resetting to the order you are
     // already in is a no-op the control should not offer.
@@ -86,6 +90,14 @@
   // "5 of 4".
   const recoveredCount = $derived(
     stages.filter((stage) => awardedIds.has(stage.componentId)).length
+  );
+  // The salvaged component's identity, since no subject id reaches this body: the list remounts
+  // per component, so it never speaks the previous component's pending sentence.
+  const stageSetKey = $derived(
+    stages
+      .map((stage) => String(stage?.id ?? ''))
+      .sort((a, b) => a.localeCompare(b))
+      .join('|')
   );
 
   /**
@@ -191,29 +203,39 @@
   {#if stages.length === 0}
     <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoResults')} />
   {:else}
-    <ProgressiveStageList
-      {stages}
-      {canReorder}
-      {announcement}
-      {onReorder}
-      {onReorderSettled}
-      stacked
-      {stateChip}
-      {fixedNoteKey}
-      {fixedNoteFallback}
-      complications={resolved ? 'resolved' : 'forecast'}
-    />
-    <!-- The stage list explains itself only when the rows are FIXED. Silence in the
-         other state leaves the affordance to be discovered: the grip is a small glyph,
-         and reordering is the whole of this feature. Said here rather than in the shared
-         list so the crafting tab stays byte-unchanged.
-
-         Reset is part of the same note, not a separate control: an order the player can
-         rearrange is an order they can get LOST in, and the GM's authored order is the
-         only one they cannot reconstruct from what is on screen. It is disabled — not
-         hidden — while the order is already the GM's, so the note's shape does not
-         change under the player as they drag. -->
-    {#if canReorder}
+    {#key stageSetKey}
+      <SortableList
+        items={stages}
+        itemLabel={stageLabel}
+        numbered
+        reorderable={canReorder}
+        alwaysOpen
+        rowClass={stageRowClass}
+        rowData={(stage) => stageRowData(stage, canReorder)}
+        {announcement}
+        {onReorder}
+        {onReorderSettled}
+        ariaLabel={localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}
+        data-recipe-section="progressive-stages"
+      >
+        {#snippet row(stage)}<ProgressiveStageRow {stage} layout="stacked" {stateChip} />{/snippet}
+        {#snippet body(stage)}<ProgressiveStageBand
+            {stage}
+            tense={resolved ? 'resolved' : 'forecast'}
+          />{/snippet}
+      </SortableList>
+    {/key}
+    <!-- The list explains itself in both states. Fixed, one muted line says why. Reorderable,
+         the note names the affordance — the grip is a small glyph, and reordering is the whole
+         of this feature — and carries Reset: an order the player can rearrange is an order they
+         can get LOST in, and the GM's authored order is the only one they cannot reconstruct
+         from what is on screen. Reset is disabled, not hidden, while the order is already the
+         GM's, so the note's shape does not change under the player as they drag. -->
+    {#if !canReorder}
+      <p class="progressive-stage-fixed-note" data-progressive-stage-fixed-note>
+        {localizeOr(fixedNoteKey, fixedNoteFallback)}
+      </p>
+    {:else}
       <Callout
         tone="neutral"
         icon="fas fa-hand-pointer"

@@ -307,14 +307,14 @@ See [Tools]({% link tools.md %}#on-break-actions).
 A component set up for progressive salvage carries an **Allow player result re-ordering** setting on its salvage setup, and it is on by default.
 It decides whether a player's own preferred stage order is used when that component is salvaged, or whether your authored order always is.
 
-When it is on, the player can drag a stage on the **Salvage** tab, or move it with the move up and move down controls on each stage.
+When it is on, the player can reorder the stages on the **Salvage** tab: drag a stage by its grip, or use its grip arrow keys or move up and move down buttons.
 Each move is announced for screen readers, and the reach values update to match the new order.
 A chosen order is a standing preference rather than a one-off choice, remembered per player and per component, in this world only.
 
 The player can also **Reset** the list back to your authored order.
 Reset clears that player's preference rather than pinning your current order, so if you later re-author the stages, that player follows the new order.
 
-When it is off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
+When it is off, the stage list is shown in your authored order, marked **Order set by your GM**, and players cannot rearrange it.
 
 A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
 Once a salvage has resolved, the list locks and a note explains that the roll has already run down it.
