@@ -457,12 +457,7 @@
 </PlayerViewState>
 
 <style>
-  /* The grid's wrapper is the size container so the columns reflow against the
-     Fabricate window width (not the viewport): the app can be resized and docked
-     at any width, so a viewport media query would be wrong here. A container
-     cannot query its own size, so the container lives on the wrapper and the
-     grid (a descendant) responds to it — the same parent-container pattern the
-     manager view uses with `container-type: inline-size`. */
+  /* A container cannot query its own size, so the columns reflow against this wrapper's width. */
   .gathering-view-container {
     container-type: inline-size;
     container-name: fabricate-gathering;
@@ -470,30 +465,43 @@
     min-height: 0;
   }
 
+  /* No padding or gap: the left column carries the padding and the others are square panes, so the
+     environment pager is the browse column's footer (design-system, player screens). */
   .gathering-view-grid {
     display: grid;
-    /* The centre column carries a non-zero minimum (matching the side columns)
-       so it no longer collapses to 0 ahead of the 280px-floored side columns:
-       all three columns now scale down together proportionally instead of the
-       centre dying first. Below the stacking breakpoint they reflow to a single
-       column (see the @container rule). */
     grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr);
-    gap: var(--fab-space-4);
     height: 100%;
     min-height: 0;
-    padding: var(--fab-space-4);
     box-sizing: border-box;
     background: var(--fab-surface);
     color: var(--fab-text);
   }
 
-  /* At the supported 1024px window floor this container's content box is roughly
-     938px wide, so the shared 960px boundary is deliberately reachable.
-     Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
-     reflow into a single vertical stack so the view stays usable on a narrow
-     window instead of overflowing or clipping the side columns. The grid scrolls
-     vertically in this mode; each column gets a sensible minimum height so its
-     content is not crushed. */
+  .gathering-view-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gathering-view-column-left {
+    padding: var(--fab-space-4);
+  }
+
+  /* With no bar rendered, the column's padding stands. */
+  .gathering-view-column-left :global(.gathering-env-pagination:has(> .fabricate-pagination)) {
+    margin: 0 calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
+  }
+
+  .gathering-view-column-center,
+  .gathering-view-column-right {
+    border-left: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+    overflow: hidden;
+  }
+
+  /* The 1024px window floor gives roughly 938px, so the shared 960px boundary is reachable.
+     Stacked, each rule turns to the top; the grid scrolls and columns keep 220px minimums. */
   @container fabricate-gathering (max-width: 960px) {
     .gathering-view-grid {
       grid-template-columns: 1fr;
@@ -506,19 +514,11 @@
     .gathering-view-column {
       min-height: 220px;
     }
-  }
 
-  .gathering-view-column {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .gathering-view-column-center,
-  .gathering-view-column-right {
-    border: 1px solid var(--fab-border);
-    border-radius: 11px;
-    background: var(--fab-surface-soft);
+    .gathering-view-column-center,
+    .gathering-view-column-right {
+      border-top: 1px solid var(--fab-border);
+      border-left: 0;
+    }
   }
 </style>
