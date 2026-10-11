@@ -1,6 +1,6 @@
 <!--
   A list's arrangement switch: SegmentedControl's icon-only form over the closed list and grid
-  pair. A list glyph and a grid glyph ARE the two layouts, so each label is clipped, never removed.
+  pair. A list glyph and a grid glyph are the two layouts, so each label is clipped, never removed.
 
   Props:
   | prop | values | default | contract |
@@ -13,7 +13,8 @@
   - `onChange(view)` — the chosen arrangement; it never fires for the one already checked.
 
   Rest spread:
-  - `{...rest}` lands on the SegmentedControl root, written after `class`.
+  - `{...rest}` lands on the SegmentedControl root, written after `class`; the track props follow it, so
+    a caller cannot override them.
 -->
 <script>
   import SegmentedControl from './SegmentedControl.svelte';
@@ -38,6 +39,8 @@
 
 <!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
 <SegmentedControl
+  class={extraClass}
+  {...rest}
   {options}
   value={view === 'grid' ? 'grid' : 'list'}
   iconOnly
@@ -45,6 +48,8 @@
   {ariaLabel}
   {optionDataAttr}
   {onChange}
-  class={extraClass}
-  {...rest}
+  fill={false}
+  density="default"
+  tone=""
+  shape=""
 />
