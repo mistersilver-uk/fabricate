@@ -122,9 +122,19 @@ An absent receipt does not mean zero items, while an explicitly recorded empty o
 **This run** retains compact world-time facts, followed by guidance about the closed record.
 Blind history keeps protected details hidden and uses a generic pouch image, while entitled GM previews can show the task's own image.
 
+An untimed d100 gather opens the roll prompt when you start it, with a situational bonus and the roll mode, and no target.
+Each item row and event is graded against its own chance, so the prompt has no single target to show.
+The bonus also applies to every event roll, so a positive bonus makes hazards likelier as well as finds.
+The result applies only after you answer the prompt.
+A timed d100 gather does not prompt.
+Dismissing the prompt leaves the run ready in the Journal under **Roll a d100**, with its start-time costs spent, and the Gathering tab refreshes.
+Today a timed d100 run shows the same **Roll a d100** label once it is ready, but it completes without a prompt.
+
 A required player check opens an interactive dialog when you execute the ready run.
 Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.
 For non-secret checks you are entitled to see, the evaluated roll can post from your client so a module like Dice So Nice can animate it.
+A d100 roll posts after the result card, with any bonus dice in the same message.
+An opaque blind attempt's d100 roll posts GM-private when it is evaluated.
 Secret checks use a generic prompt and GM private posting without sending secret roll details back to the player.
 Foundry's private presentation does not guarantee confidentiality.
 See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the check controls.
