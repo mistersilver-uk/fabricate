@@ -185,7 +185,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
+  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',

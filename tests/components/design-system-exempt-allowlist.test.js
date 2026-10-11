@@ -163,7 +163,7 @@ const ALLOWLIST = Object.freeze([
   [
     "the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), " +
       "never a caller's name",
-    { 'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte': 1 },
+    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
   ],
   [
     "the spread is the popover's own trigger contract (type, ARIA state, handlers, element " +
