@@ -316,7 +316,7 @@
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
-    "cap": "a component reward, and one still searching — plus one adder per offered kind",
+    "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
     "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: they are the result set's, not the row's.",
@@ -344,7 +344,7 @@
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
-    "cap": "a component reward, and one still searching — plus one adder per offered kind",
+    "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
     "props": {

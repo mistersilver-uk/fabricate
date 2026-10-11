@@ -28,7 +28,7 @@
     itemTags = [],
     currencyUnits = [],
     // Whether the system's currency feature is enabled. Preset units are seeded even for a
-    // disabled system, so the "Add cost" affordance gates on this flag and not on unit presence.
+    // disabled system, so the Currency kind gates on this flag and not on unit presence.
     currencyEnabled = true,
     // Routed check-mode recipes route by the check outcome, so the set name is hidden there.
     showSetName = true,
