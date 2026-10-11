@@ -145,7 +145,7 @@
             label={alternative.name}
             ariaLabel={alternative.label}
             art={alternative.art || ''}
-            icon={alternative.icon || 'fas fa-circle'}
+            icon={alternative.icon || ''}
             tint={alternative.tint || ''}
             state={!award && alternative.short ? 'short' : 'met'}
             pip={alternative.pip || ''}
@@ -186,7 +186,7 @@
     label={slot.name}
     ariaLabel={slot.label}
     art={slot.art || ''}
-    icon={slot.icon || 'fas fa-circle'}
+    icon={slot.icon || ''}
     tint={slot.tint || ''}
     state={tileState(slot)}
     pip={slot.pip || ''}

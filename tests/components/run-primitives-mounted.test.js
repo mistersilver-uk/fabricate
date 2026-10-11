@@ -566,6 +566,64 @@ describe('run primitives mounted behavior', () => {
     }
   });
 
+  const OPEN_FACE_SLOTS = [
+    { id: 'unchosen', kind: 'choice', label: 'Any binder', needed: 1, candidates: [{ id: 'resin', label: 'Pine Resin' }] },
+    { id: 'iconic', kind: 'choice', label: 'Any herb', needed: 1, icon: 'fas fa-leaf', candidates: [] },
+    { id: 'fixed', kind: 'fixed', componentId: 'charcoal', label: 'Charcoal', needed: 1 },
+  ];
+  const mountOpenFaces = () =>
+    slotRowHarness.mount({ requirements: OPEN_FACE_SLOTS, held: () => 1, slotLabel: (slot) => slot.label });
+  const slotTile = (target, id) => target.querySelector(`:scope [data-slot-id="${id}"] .fab-slot-tile`);
+
+  it('draws an unchosen slot with no glyph as the empty ring, and keeps every supplied glyph', async () => {
+    const target = await mountOpenFaces();
+    const open = slotTile(target, 'unchosen');
+    const ring = open.querySelector(':scope .fab-medallion i');
+    assert.ok(ring.matches('.fa-regular.fa-circle') && !ring.matches('.fas'), ring.className);
+    assert.ok(open.classList.contains('is-unpicked'));
+    assert.match(open.querySelector(':scope .fab-medallion').getAttribute('style'), /--fab-medallion-glyph:\s*13px/u);
+
+    const iconic = slotTile(target, 'iconic');
+    assert.equal(iconic.closest('[data-slot-state]').dataset.slotState, 'open');
+    assert.ok(iconic.querySelector(':scope .fab-medallion i').matches('.fas.fa-leaf'));
+    assert.ok(!iconic.classList.contains('is-unpicked'), "the caller's own glyph keeps its ink and size");
+
+    const fixed = slotTile(target, 'fixed');
+    assert.ok(fixed.querySelector(':scope .fab-medallion i').matches('.fas.fa-circle'), 'only the open face draws the ring');
+    assert.ok(!fixed.classList.contains('is-unpicked'));
+    slotRowHarness.remount();
+  });
+
+  it('inks the empty ring --fab-accent-text and a met default glyph --fab-accent', async () => {
+    const target = await mountOpenFaces();
+    const styles = [...globalThis.document.head.querySelectorAll('style')].map((node) => node.textContent);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${styles.join('\n')}</style></head>
+        <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">${target.innerHTML}
+        <span data-probe="accent-text" style="color:var(--fab-accent-text)"></span>
+        <span data-probe="accent" style="color:var(--fab-accent)"></span></div></body></html>`);
+      const ink = await page.evaluate(() => {
+        const color = (selector) => getComputedStyle(document.querySelector(selector)).color;
+        return {
+          ring: color('[data-slot-id="unchosen"] .fab-medallion i'),
+          met: color('[data-slot-id="fixed"] .fab-medallion i'),
+          accentText: color('[data-probe="accent-text"]'),
+          accent: color('[data-probe="accent"]'),
+        };
+      });
+      assert.equal(ink.ring, ink.accentText);
+      assert.equal(ink.met, ink.accent);
+      assert.notEqual(ink.accentText, ink.accent, 'the probes tell the two inks apart');
+    } finally {
+      await browser.close();
+      slotRowHarness.remount();
+    }
+  });
+
   // The library's candidate list (library.html §SlotRow): held stylus, chalk; Duskglass held but
   // claimed elsewhere by the stage; ash held short of the need.
   const binderStock = { stylus: 2, chalk: 5, dusk: 2, ash: 0 };

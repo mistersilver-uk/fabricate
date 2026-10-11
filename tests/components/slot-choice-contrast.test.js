@@ -44,3 +44,20 @@ test("a short candidate's reading clears 4.5:1 on its own ground and once chosen
   const chosen = declared(LIST, '.fab-choice-option.is-selected', 'background');
   assert.deepEqual(shortfalls(ink, [chosen, ground]), []);
 });
+
+test("an open tile's empty ring is inked --fab-accent-text and clears 3:1 on the tile in every theme", () => {
+  const ink = declared(TILE, '.fab-slot-tile.is-unpicked', '--fab-medallion-tint');
+  assert.equal(ink, '--fab-accent-text');
+  const ground = [declared(TILE, '.fab-slot-tile', 'background')];
+  assert.deepEqual(inkShortfalls(themes, ink, ground, 3), []);
+  assert.deepEqual(
+    inkShortfalls(themes, ink, ground, 4.16),
+    [`hearth-herb: ${ink} on ${ground[0]} 4.15:1`],
+    'the minimum'
+  );
+  assert.deepEqual(
+    inkShortfalls(themes, '--fab-accent', ground, 3).map((line) => line.split(':', 1)[0]),
+    ['ironblood-forge', 'hearth-herb'],
+    'why the ring does not take the met glyph ink'
+  );
+});

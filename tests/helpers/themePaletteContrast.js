@@ -70,14 +70,19 @@ export function declaredToken(rules, selector, property, label = selector) {
   return name;
 }
 
-/** Each of the seven `themes` where `ink` reads under 4.5:1 on `stack`, its grounds top first. */
-export function shortfalls(themes, ink, stack) {
+/**
+ * Each of the seven `themes` where `ink` reads under `floor` on `stack`, its grounds top first;
+ * the floor is 4.5:1 for text and 3:1 for a non-text glyph.
+ */
+export function shortfalls(themes, ink, stack, floor = 4.5) {
   assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
   return [...themes].flatMap(([theme, tokens]) => {
     const ground = stack
       .slice(0, -1)
       .reduceRight((base, layer) => flatten(tokens.get(layer), base), tokens.get(stack.at(-1)));
     const ratio = contrast(tokens.get(ink), ground);
-    return ratio < 4.5 ? [`${theme}: ${ink} on ${stack.join(' over ')} ${ratio.toFixed(2)}:1`] : [];
+    return ratio < floor
+      ? [`${theme}: ${ink} on ${stack.join(' over ')} ${ratio.toFixed(2)}:1`]
+      : [];
   });
 }
