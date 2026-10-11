@@ -1,4 +1,4 @@
-<!-- The Journal's Active run, as `RunCard` wires its row: the status chip, and the stage bars beneath. -->
+<!-- The Journal's Active run, as `RunCard` wires its row: the bolt and the status chip, and the stage bars beneath. -->
 <script>
   import Chip from '../../../../src/ui/svelte/components/Chip.svelte';
   import RunProgress from '../../../../src/ui/svelte/components/RunProgress.svelte';
@@ -8,7 +8,9 @@
     component: Specimen,
     props = {},
     meta,
+    children,
     statusKey,
+    statusIcon = '',
     tone,
     stages = null,
     current = 0,
@@ -20,7 +22,8 @@
 </script>
 
 {#snippet heading()}
-  <Chip density="list" {tone}>{localize(statusKey)}</Chip>
+  {@render children?.()}
+  <Chip density="list" {tone} icon={statusIcon}>{localize(statusKey)}</Chip>
 {/snippet}
 
 {#snippet timing()}

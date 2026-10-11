@@ -202,6 +202,7 @@ export async function checksRollEdges(page, tiersWrapperClass) {
     const lastOption = options[options.length - 1].getBoundingClientRect();
     const row = document.querySelector('[data-tier-row]').getBoundingClientRect();
     const addTier = document.querySelector('[data-add-tier]').getBoundingClientRect();
+    const disabledMove = getComputedStyle(document.querySelector('[data-sortable-move="up"]'));
     return {
       radioLeft: round(firstOption.left),
       radioRight: round(lastOption.right),
@@ -213,6 +214,11 @@ export async function checksRollEdges(page, tiersWrapperClass) {
         .paddingRight,
       addTierLeft: round(addTier.left),
       addTierRight: round(addTier.right),
+      disabledMove: {
+        backgroundColor: disabledMove.backgroundColor,
+        borderTopColor: disabledMove.borderTopColor,
+        opacity: disabledMove.opacity,
+      },
     };
   });
 }
