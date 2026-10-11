@@ -640,3 +640,155 @@ describe('SortableList — the list names itself and its drag source is the grip
     assert.equal(gripOf(first).getAttribute('draggable'), 'true', 'the grip is');
   });
 });
+
+describe('SortableList — the caller speaks through the list, and only the grip drags (issue 2381)', () => {
+  const regionOf = (target) => target.querySelector('[data-sortable-list-status]');
+  const spokenIn = (target) => regionOf(target).textContent.trim();
+
+  /** Row copy carrying art and bare text, the two drag origins a row's content offers. */
+  const artSnippet = createRawSnippet(() => ({
+    render: () => '<span data-row-copy><img data-row-art alt="" />copy</span>',
+  }));
+
+  function fire(node, type) {
+    node.dispatchEvent(new globalThis.Event(type, { bubbles: true, cancelable: true }));
+    flushSync();
+  }
+
+  it('never speaks the sentence it mounts with, speaks the next, and keeps it through an empty one', async () => {
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      announcement: 'Order reverted.',
+    });
+    assert.equal(spokenIn(target), '', 'the mount value counts as already heard');
+
+    await harness.setProps({ announcement: 'Order reset.' });
+    assert.equal(spokenIn(target), 'Order reset.', 'a new value after mount is spoken');
+
+    await harness.setProps({ announcement: '' });
+    assert.equal(spokenIn(target), 'Order reset.', 'an empty value never clears the region');
+  });
+
+  it('settles once for a drop that moves a row, and never for a no-op drop, a key or a rocker', async () => {
+    const moves = [];
+    let settled = 0;
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+      onReorderSettled: () => {
+        settled += 1;
+      },
+    });
+    const rows = rowsOf(target);
+
+    fire(gripOf(rows[1]), 'dragstart');
+    fire(rows[1], 'drop');
+    press(gripOf(rows[1]), 'ArrowUp');
+    rows[0].querySelector('[data-sortable-move="down"]').click();
+    flushSync();
+    const keyThenRocker = [
+      [1, 0],
+      [0, 1],
+    ];
+    assert.deepEqual(moves, keyThenRocker, 'the key and rocker moved; the own-row drop did not');
+    assert.equal(settled, 0, 'and none of the three settled');
+
+    fire(gripOf(rows[2]), 'dragstart');
+    fire(rows[0], 'drop');
+    assert.deepEqual(moves.at(-1), [2, 0], 'the drop moved its row');
+    assert.equal(settled, 1, 'and settled exactly once');
+  });
+
+  it('arms no drag from the row`s art or its bare text', async () => {
+    const moves = [];
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: artSnippet,
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+    });
+    const rows = rowsOf(target);
+    const copy = rows[2].querySelector('[data-row-copy]');
+    // happy-dom swallows a throwing listener and reports it here, so a guard that calls
+    // `closest` on a Text node would otherwise pass by throwing.
+    const thrown = [];
+    const view = target.ownerDocument.defaultView;
+    const onError = (event) => {
+      thrown.push(event.message);
+    };
+    view.addEventListener('error', onError);
+
+    for (const origin of [copy.querySelector('[data-row-art]'), copy.lastChild]) {
+      fire(origin, 'dragstart');
+      assert.ok(!rowsOf(target)[2].classList.contains('is-dragging'), 'the row does not travel');
+      fire(rows[0], 'drop');
+    }
+    view.removeEventListener('error', onError);
+    assert.equal(copy.lastChild.nodeType, globalThis.Node.TEXT_NODE, 'the second origin was text');
+    assert.deepEqual(moves, [], 'and neither drop moved anything');
+    assert.deepEqual(thrown, [], 'and the guard read the Text node without throwing');
+  });
+
+  it('names each rocker control for its direction and for the record it moves', async () => {
+    const target = await harness.mount({ items: ITEMS, itemLabel, row: rowSnippet });
+    const row = rowsOf(target)[1];
+    const up = row.querySelector('[data-sortable-move="up"]').getAttribute('aria-label');
+    const down = row.querySelector('[data-sortable-move="down"]').getAttribute('aria-label');
+    assert.match(up, /^FABRICATE\.Common\.SortableList\.MoveUp:.*Fold and quench/u);
+    assert.match(down, /^FABRICATE\.Common\.SortableList\.MoveDown:.*Fold and quench/u);
+  });
+
+  it('falls back to a rocker name that still carries the record', async () => {
+    const { format } = globalThis.game.i18n;
+    globalThis.game.i18n.format = (key) => key;
+    try {
+      const target = await harness.mount({ items: ITEMS, itemLabel, row: rowSnippet });
+      const row = rowsOf(target)[1];
+      assert.equal(
+        row.querySelector('[data-sortable-move="up"]').getAttribute('aria-label'),
+        'Move Fold and quench up'
+      );
+      assert.equal(
+        row.querySelector('[data-sortable-move="down"]').getAttribute('aria-label'),
+        'Move Fold and quench down'
+      );
+    } finally {
+      globalThis.game.i18n.format = format;
+    }
+  });
+
+  it('keeps one present, empty region on a list that does not order', async () => {
+    // Characterization pin: already true before issue 2381.
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      reorderable: false,
+      row: rowSnippet,
+    });
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
+    assert.equal(spokenIn(target), '');
+  });
+
+  it('still speaks a caller sentence there, and toggling reorder never clears it', async () => {
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      reorderable: false,
+      row: rowSnippet,
+    });
+    await harness.setProps({ announcement: 'Order reset.' });
+    assert.equal(spokenIn(target), 'Order reset.', 'the fixed list speaks its caller');
+
+    await harness.setProps({ reorderable: true });
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
+    assert.equal(spokenIn(target), 'Order reset.', 'and the toggle neither remounts nor clears it');
+  });
+});
