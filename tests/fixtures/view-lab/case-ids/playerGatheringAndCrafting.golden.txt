@@ -81,6 +81,7 @@ player-crafting-progressive
 player-crafting-progressive-reordered
 player-crafting-progressive-fixed
 player-crafting-progressive-stacked
+player-crafting-progressive-narrow
 player-crafting-stacked
 player-crafting-roll-result-count-pass
 player-crafting-roll-result-count-pass-narrow
