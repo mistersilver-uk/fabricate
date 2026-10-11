@@ -125,13 +125,13 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte': 1 },
   ],
   [
-    'ProgressiveStageRow composes Medallion inside SortableList and draws no control of its ' +
-      'own; its manifest row lands with its Primitive Lab specimen (issue 2381)',
+    'ProgressiveStageRow is a new shared member at target, because the crafting and salvage ' +
+      "progressive bodies both render it as SortableList's row (issue 2381)",
     { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte': 1 },
   ],
   [
-    'ProgressiveStageBand composes ComplicationSummaryRow inside SortableList and draws no ' +
-      'control of its own; its manifest row lands with its Primitive Lab specimen (issue 2381)',
+    'ProgressiveStageBand is a new shared member at target, because the crafting and salvage ' +
+      "progressive bodies both render it as SortableList's body (issue 2381)",
     { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte': 1 },
   ],
   [
