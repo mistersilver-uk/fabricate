@@ -89,13 +89,6 @@ describe('GatheringView 3-column layout and states', () => {
       viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'),
       'grid should use the planned column template with a non-zero centre-column minimum'
     );
-    // The browse column carries the view's padding so its pager can be the column's footer.
-    assert.doesNotMatch(viewSource, /\.gathering-view-grid \{[^}]*\bgap:/, 'the grid has no gutter');
-    assert.match(
-      viewSource,
-      /\.gathering-view-column-left \{\s*padding: var\(--fab-space-4\);\s*\}/,
-      'the left column carries the base spacing token padding'
-    );
     assert.ok(viewSource.includes('gathering-view-column-left'), 'left column present');
     assert.ok(viewSource.includes('gathering-view-column-center'), 'center column present');
     assert.ok(viewSource.includes('gathering-view-column-right'), 'right column present');

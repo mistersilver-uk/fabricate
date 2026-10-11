@@ -4,18 +4,12 @@
  * border widths, its corner radius and the vertical centres of its direct children, which a
  * wrapping `align-items: center` row such as the pagination bar's shares one per row.
  */
-import assert from 'node:assert/strict';
-
-/** Assert two edges coincide to within half a pixel. */
-export const near = (actual, expected, label) =>
-  assert.ok(Math.abs(actual - expected) < 0.5, `${label}: ${actual}, expected ${expected}`);
-
 /**
  * @param {object} fixtureServer A started `createViteFixtureServer`.
  * @param {{url: string, readySelector: string, selectors: Record<string, string>}} view The fixture
  *   page (given `?width=`), the selector that marks it mounted, and the boxes to measure by name.
  * @param {number} width The host's width; the viewport is 40px wider and 900px tall.
- * @returns {Promise<Record<string, object> & {near: Function}>}
+ * @returns {Promise<Record<string, object>>}
  */
 export async function railFooterGeometry(fixtureServer, { url, readySelector, selectors }, width) {
   const page = await fixtureServer.newPage({ viewport: { width: width + 40, height: 900 } });
@@ -48,7 +42,7 @@ export async function railFooterGeometry(fixtureServer, { url, readySelector, se
         Object.entries(named).map(([name, selector]) => [name, measure(selector)])
       );
     }, selectors);
-    return { ...boxes, near };
+    return boxes;
   } finally {
     await page.close();
   }

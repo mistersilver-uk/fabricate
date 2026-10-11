@@ -6,7 +6,8 @@
  */
 import { after, before, describe, it } from 'node:test';
 
-import { near, railFooterGeometry } from '../helpers/railFooterGeometry.js';
+import { near } from '../helpers/railFooterAssertions.js';
+import { railFooterGeometry } from '../helpers/railFooterGeometry.js';
 import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@inventory-view-styles/' });

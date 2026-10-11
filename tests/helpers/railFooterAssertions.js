@@ -5,7 +5,9 @@
  */
 import assert from 'node:assert/strict';
 
-import { near } from './railFooterGeometry.js';
+/** Assert two edges coincide to within half a pixel. */
+export const near = (actual, expected, label) =>
+  assert.ok(Math.abs(actual - expected) < 0.5, `${label}: ${actual}, expected ${expected}`);
 
 /** Side by side: the pager meets the nav rail, the window bottom and the centre pane's rule. */
 export function assertFooterSideBySide({ host, pager, centre, right }) {
@@ -23,13 +25,19 @@ export function assertFooterSideBySide({ host, pager, centre, right }) {
   near(right.right, host.right, 'the right pane at the right edge');
 }
 
-/** Stacked: the pager spans the window on one row, with the centre pane's rule beneath it. */
+/**
+ * Stacked: the pager spans the window on one row, with the centre pane's rule beneath it and its
+ * left rule gone. The harness's headless Chromium hides scrollbars, so "spans the window" is
+ * measured against the grid's box.
+ */
 export function assertFooterStacked({ host, pager, centre }) {
   near(pager.left, host.left, 'the pager left edge against the nav rail');
   near(pager.right, host.right, 'the pager right edge against the window');
   near(centre.top, pager.bottom, 'the centre pane directly beneath the pager');
   assert.equal(centre.borderTop, '1px', 'the centre pane takes the top rule stacked');
+  assert.equal(centre.borderLeft, '0px', 'the centre pane drops its left rule stacked');
   const middles = pager.childMiddles;
+  assert.ok(middles.length >= 3, `the pager has at least three parts, found ${middles.length}`);
   assert.ok(
     Math.max(...middles) - Math.min(...middles) < 1,
     `the pager is one row stacked, its parts centred at ${middles.join(', ')}`

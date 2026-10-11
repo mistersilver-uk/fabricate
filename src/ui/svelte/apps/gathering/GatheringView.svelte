@@ -500,8 +500,8 @@
     overflow: hidden;
   }
 
-  /* At the supported 1024px window floor this container's content box is roughly 938px wide, so
-     the shared 960px boundary is reachable. Stacked, each pane's rule turns to the top. */
+  /* The 1024px window floor gives roughly 938px, so the shared 960px boundary is reachable.
+     Stacked, each rule turns to the top; the grid scrolls and columns keep 220px minimums. */
   @container fabricate-gathering (max-width: 960px) {
     .gathering-view-grid {
       grid-template-columns: 1fr;
