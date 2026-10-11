@@ -16,7 +16,7 @@
     "fixture": "PickerRowSearchOpen",
     "slot": { "width": 620, "height": 163 },
     "data": { "typed": "ingot" },
-    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window: 620 by 163 holds the row on one line with the search as wide as the list's 220px floor, and the list opens 4px beneath the search at its left edge, unclamped and unflipped.",
+    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window. Measured: at 620 by 163 the row holds one line, the search is 221px wide and the list opens 4px beneath it at its left edge, 221 by 104, unclamped and unflipped; 163 is the least height that holds the whole list (162 clips it to 103), and below 619 the search falls under the list's 220px floor, so the list outgrows the field.",
     "props": {
       "value": {
         "kind": "component",
@@ -1030,7 +1030,7 @@
     "cap": "a tag requirement — several items satisfy it",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RequirementChooser.svelte",
-    "note": "The chooser's root: the #Hardwood slot open in the tile row, and its alternatives in the well beneath, Oak Haft chosen and Bog Oak short with no reading. The shipped chooser dims a short alternative to .6 as a whole, which puts its danger pip at 2.43 to 3.42:1 in every theme and its danger caption at 4.11 to 4.38:1 on `--fab-bg-1` in four, so the drawing draws Bog Oak undimmed: debt owned by #2368.",
+    "note": "The chooser's root: the #Hardwood slot open in the tile row, and its alternatives in the well beneath, Oak Haft chosen and Bog Oak short with no reading. The shipped chooser dims a short alternative to .6 as a whole, which puts its danger pip at 2.43 to 3.42:1 in every theme and its danger caption at 4.11 to 4.38:1 on `--fab-bg-1` in four, so the drawing draws Bog Oak undimmed: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
     "props": {
       "ariaLabel": "Requirements",
       "alternativesLabel": "Alternatives",
@@ -1091,7 +1091,7 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RequirementChooser.svelte",
     "fixture": "RequirementChooserEssence",
-    "note": "The chooser's root: the Vitality slot open, and beneath it the stage's pool as the chooser's `panel`, wired as crafting's `EssencePoolPanel` wires its pool, the only shipped caller that puts a pool in a chooser: its title, hint, `capAtHeld`, stepper names and overshoot. Steel Ingot ×2 and Ash Haft ×1 deliver 6 of 4. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The pool's 9px kicker, its hint and overshoot (`--fab-text-subtle`, 3.54 to 3.98:1 on `--fab-bg-1` in six themes) and its readings (3.34 to 3.78:1 on `--fab-bg-2` in six) are drawn in `--fab-text-muted`: debt owned by #2368.",
+    "note": "The chooser's root: the Vitality slot open, and beneath it the stage's pool as the chooser's `panel`, wired as crafting's `EssencePoolPanel` wires its pool, the only shipped caller that puts a pool in a chooser: its title, hint, `capAtHeld`, stepper names and overshoot. Steel Ingot ×2 and Ash Haft ×1 deliver 6 of 4. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The pool's 9px kicker, its hint and overshoot (`--fab-text-subtle`, 3.54 to 3.98:1 on `--fab-bg-1` in six themes) and its readings (3.34 to 3.78:1 on `--fab-bg-2` in six) are drawn in `--fab-text-muted`: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
     "props": {
       "ariaLabel": "Requirements",
       "openSlotId": "vitality",
@@ -1146,7 +1146,7 @@
     "cap": "requirement chooser — the player side",
     "draws": ":scope > div:nth-of-type(1)",
     "path": "src/ui/svelte/components/RequirementChooser.svelte",
-    "note": "The chooser's root, the tile row with the haft slot open on the pressed fill and Moonsilver short. The \"This craft will use\" panel below is crafting's `ConsumptionPlanPanel`, an app surface beside the chooser rather than a primitive, so it stays drawn; its 10px \"You own\" line ships in `--fab-text-subtle`, 3.36 to 3.88:1 on `--fab-surface-soft` over `--fab-bg-1` in six themes, and is drawn in `--fab-text-muted`: debt owned by #2368.",
+    "note": "The chooser's root, the tile row with the haft slot open on the pressed fill and Moonsilver short. The \"This craft will use\" panel below is crafting's `ConsumptionPlanPanel`, an app surface beside the chooser rather than a primitive, so it stays drawn; its 10px \"You own\" line ships in `--fab-text-subtle`, 3.36 to 3.88:1 on `--fab-surface-soft` over `--fab-bg-1` in six themes, and is drawn in `--fab-text-muted`: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
     "props": {
       "ariaLabel": "Requirements",
       "openSlotId": "haft",
@@ -1947,7 +1947,7 @@
       "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
       "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
     },
-    "note": "Wired as `StepDetails` wires the open stage's pool, in the Journal's copy: its kicker, each bar named by its essence, the steppers' names and the overshoot. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The kicker and the overshoot ship in `--fab-text-subtle` (3.54 to 3.98:1 on `--fab-bg-1` in six themes) and the readings likewise (3.34 to 3.78:1 on `--fab-bg-2`); the drawing draws them in `--fab-text-muted`: debt owned by #2368."
+    "note": "Wired as `StepDetails` wires the open stage's pool, in the Journal's copy: its kicker, each bar named by its essence, the steppers' names and the overshoot. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The kicker and the overshoot ship in `--fab-text-subtle` (3.54 to 3.98:1 on `--fab-bg-1` in six themes) and the readings likewise (3.34 to 3.78:1 on `--fab-bg-2`); the drawing draws them in `--fab-text-muted`: debt owned by #2368. The Shadow and Shade Ink chips ship and are drawn in `--fab-tag-mauve`, 2.74:1 on `--fab-bg-3` in foundry-native against the 3:1 glyph floor: debt owned by #2368."
   },
   {
     "spec": "<EssencePool>",
