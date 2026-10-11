@@ -621,6 +621,61 @@
     }
   },
   {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "the kind menu — one menu, two triggers",
+    "draws": ":scope > div > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "fixture": "KindMenuOpen",
+    "partial": "first item unfocused",
+    "slot": { "width": 515, "height": 197 },
+    "undrawn": {
+      "Oak Haft": "the row’s named component; the drawing draws the trigger without its row"
+    },
+    "props": {
+      "value": { "kind": "component", "id": "oak-haft", "quantity": 1 },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "component": [{ "id": "oak-haft", "label": "Oak Haft", "icon": "fas fa-cube" }]
+      },
+      "allowAny": true
+    },
+    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 515 by 197 holds the row on one line with its named pill whole, and the menu opens beneath its trigger, unclamped and unflipped; below 507 the pill is squeezed under the stepper. The shipped menu is headed “Accept instead” at the Kind menu panel row’s 150px, where the drawing heads it “Add an alternative” at 210px, and lists the four kinds this side offers: the drawing’s fifth item, Completed activity, does not ship. The menu moves real focus to its first item, which paints `--fab-surface-raised` and an accent ring only while it holds focus, never the drawing’s `--fab-surface-active`, and the page takes that focus away."
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "the kind menu — one menu, two triggers",
+    "draws": ":scope > div > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "fixture": "KindMenuOpen",
+    "partial": "first item unfocused",
+    "slot": { "width": 630, "height": 375 },
+    "undrawn": {
+      "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
+      "#Hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
+      "Vitality": "the system’s essence, whose presence offers Essence; the drawing draws no essence catalogue",
+      "Gold": "the currency unit’s name, whose presence offers Currency; the drawing draws no currency catalogue",
+      "gp": "the currency unit’s abbreviation; the drawing draws no currency catalogue"
+    },
+    "props": {
+      "group": {
+        "id": "haft",
+        "options": [
+          { "quantity": 1, "match": { "type": "component", "componentId": "oak-haft" } },
+          {
+            "quantity": 1,
+            "match": { "type": "tags", "tags": ["#Hardwood"], "tagMatch": "any" }
+          }
+        ]
+      },
+      "componentOptions": [{ "id": "oak-haft", "name": "Oak Haft" }],
+      "itemTags": ["#Hardwood"],
+      "essenceOptions": [{ "id": "vitality", "name": "Vitality" }],
+      "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
+      "currencyEnabled": true
+    },
+    "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. The heading, the 150px width, the missing fifth item and the first item’s focus diverge as the bare row’s do."
+  },
+  {
     "spec": "<SetPicker>",
     "cap": "membership — one record’s set",
     "draws": ".k-lbl",
