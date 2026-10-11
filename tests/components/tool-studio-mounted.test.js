@@ -9,6 +9,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
@@ -1375,7 +1376,7 @@ describe('Tool Studio editor (mounted)', () => {
       )
       .click();
     await tick();
-    await new Promise((done) => setTimeout(done, 0));
+    await settle();
     assert.equal(patches.length, 1, 'one write');
     const groups = patches[0].repairRequirements;
     assert.equal(groups.length, 2, 'a requirement is appended');

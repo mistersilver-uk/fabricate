@@ -9,6 +9,7 @@ import { tick } from 'svelte';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
@@ -1676,9 +1677,10 @@ describe('the world Tool entry (issue 1373)', () => {
         { mode: 'flagBroken' },
         {
           actions: {
-            // Fed back as the world default the store now holds, as the store does.
-            setWorldRepairRequirements: (id, groups) => {
+            // Fed back as the world default the store holds once its `save` resolves.
+            setWorldRepairRequirements: async (id, groups) => {
               repairWrites.push([id, groups]);
+              await Promise.resolve();
               harness.setProps({
                 scope: scopeFor({ onBreak: { mode: 'flagBroken' }, repairRequirements: groups }),
               });
@@ -1700,7 +1702,7 @@ describe('the world Tool entry (issue 1373)', () => {
         .querySelector(':scope .manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]')
         .click();
       await tick();
-      await new Promise((done) => setTimeout(done, 0));
+      await settle();
 
       assert.equal(repairWrites.length, 1, 'the seed action fires once on change');
       assert.equal(repairWrites[0][0], 'pick');
