@@ -661,6 +661,14 @@ const SUPERSEDED_POLICY_COUNT = 60;
  * #1761).
  */
 const RENAMED = [
+  // Issue #2381 deleted ProgressiveStageList; InteractableBrowserRoot is now the text(key, fallback) example.
+  {
+    before:
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.',
+    after:
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `InteractableBrowserRoot.svelte`) quietly renders its **hardcoded English fallback**.',
+    identifiers: [['InteractableBrowserRoot.svelte', 'ProgressiveStageList.svelte']],
+  },
   {
     before:
       "Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.",
@@ -926,7 +934,7 @@ const RENAMED = [
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 34;
+const RENAMED_COUNT = 35;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

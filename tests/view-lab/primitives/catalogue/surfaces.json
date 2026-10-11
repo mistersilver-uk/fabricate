@@ -87,15 +87,11 @@
       "title": "No businesses yet",
       "hint": "Businesses produce and consume goods. Add one and it becomes available to every settlement on this template."
     },
-    "content": [
-      {
-        "tag": "button",
-        "attrs": {
-          "type": "button"
-        },
-        "text": "New business"
-      }
-    ]
+    "fixture": "EmptyStateAction",
+    "data": {
+      "role": "primary"
+    },
+    "content": ["New business"]
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
@@ -106,15 +102,8 @@
       "filtered": true,
       "hint": "No recipes match “ingot” in this system."
     },
-    "content": [
-      {
-        "tag": "button",
-        "attrs": {
-          "type": "button"
-        },
-        "text": "Clear filters"
-      }
-    ]
+    "fixture": "EmptyStateAction",
+    "content": ["Clear filters"]
   },
   {
     "spec": "<Card> <Well> <RowDisclosure>",

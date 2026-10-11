@@ -663,6 +663,62 @@
   },
   {
     "spec": "<Segmented>",
+    "cap": "bare · no well · 30",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "any": "an option’s value, not its words",
+      "all": "an option’s value, not its words",
+      "Tag match": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "options": [
+        {
+          "value": "any",
+          "fallback": "Any of"
+        },
+        {
+          "value": "all",
+          "fallback": "All of"
+        }
+      ],
+      "value": "any",
+      "groupName": "pl-match-30",
+      "ariaLabel": "Tag match",
+      "tone": "tag",
+      "density": "inline"
+    }
+  },
+  {
+    "spec": "<Segmented>",
+    "cap": "bare · no well · 34",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "any": "an option’s value, not its words",
+      "all": "an option’s value, not its words",
+      "Tag match": "the group’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "options": [
+        {
+          "value": "any",
+          "fallback": "Any of"
+        },
+        {
+          "value": "all",
+          "fallback": "All of"
+        }
+      ],
+      "value": "any",
+      "groupName": "pl-match-34",
+      "ariaLabel": "Tag match",
+      "tone": "tag",
+      "density": "field"
+    }
+  },
+  {
+    "spec": "<Segmented>",
     "cap": "fill",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",
@@ -868,16 +924,17 @@
     "path": "src/ui/svelte/components/Typeahead.svelte",
     "fixture": "TypeaheadOpen",
     "slot": {
-      "width": 300,
+      "width": 332,
       "height": 158
     },
-    "partial": "no focus ring, no pointer hover, list inset by the lab box",
+    "partial": "no focus ring, no pointer hover, field inset by the lab box",
     "undrawn": {
       "Search recipes": "the field’s accessible name; the drawing draws the field without its label"
     },
     "props": {
       "query": "brew",
-      "ariaLabel": "Search recipes"
+      "ariaLabel": "Search recipes",
+      "style": "margin-inline: 16px"
     },
     "data": {
       "items": [
@@ -898,7 +955,7 @@
         }
       ]
     },
-    "note": "A boxed slot, because the list is portalled to the window: 158px is the least height at which the list stays beneath the field with all three rows (157 floors it to two). The list keeps the layout's 16px margin from the box edges, so it stands 268px wide and 16px in from the field. The act focuses the field synthetically and presses ArrowDown twice."
+    "note": "A boxed slot, because the list is portalled to the window: 158px is the least height at which the list stays beneath the field with all three rows (157 floors it to two). The list keeps the layout's 16px margin from the box edges, so the field stands 16px in from each (the box is 332px, the field 300px) and the list, which takes the field's left edge and width, is as wide as the field. The act focuses the field synthetically and presses ArrowDown twice."
   },
   {
     "spec": "<Typeahead>",

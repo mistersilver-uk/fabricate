@@ -105,6 +105,13 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/DiceTiles.svelte': 1 },
   ],
   [
+    "the maintainer ruled on 2026-10-11 that the swatch's keyboard cursor must be the picker's " +
+      'inset outline and its hover the outline alone, never a fill, so this row returns to target ' +
+      'until the sheet draws the inset cursor, owned by issue 2416 (library.html, the target ' +
+      'popover specimen)',
+    { 'src/ui/svelte/components/TintPicker.svelte': 1 },
+  ],
+  [
     'InlineRenameField is a new manager-only member at target, because it replaces ' +
       'PartyNameField and RealmNameField and so has two callers (issue 1521)',
     { 'src/ui/svelte/apps/manager/InlineRenameField.svelte': 1 },
@@ -123,6 +130,16 @@ const ALLOWLIST = Object.freeze([
     'a composition of the Medallion member and two text runs, shared by the crafting ' +
       "detail's two award lists rather than offered as a vocabulary member",
     { 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte': 1 },
+  ],
+  [
+    'ProgressiveStageRow is a new shared member at target, because the crafting and salvage ' +
+      "progressive bodies both render it as SortableList's row (issue 2381)",
+    { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte': 1 },
+  ],
+  [
+    'ProgressiveStageBand is a new shared member at target, because the crafting and salvage ' +
+      "progressive bodies both render it as SortableList's body (issue 2381)",
+    { 'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte': 1 },
   ],
   [
     "the gathering task editor's own card, the chrome and header snippet its view carried at " +

@@ -37,9 +37,15 @@ body:not(.pl-boxed) .fabricate-manager {
   display: contents;
 }
 
-/* The one box a default slot must generate: `specimenMount.js` measures it to size the iframe. */
+/*
+ * The one box a default slot must generate: `specimenMount.js` measures it to size the iframe.
+ * `vertical-align: top` keeps it at the document's top edge. On the default baseline a control whose
+ * own baseline sits low (the `overflow: hidden` tag track puts it at its bottom edge) is pushed down by
+ * the line box's strut, so the iframe, sized from this box alone, cuts a pixel off the control's edge.
+ */
 body:not(.pl-boxed) .pl-specimen {
   display: inline-block;
+  vertical-align: top;
 }
 
 /* A block specimen in a block drawing's slot takes the iframe's width, which the page sizes. */

@@ -129,6 +129,22 @@
       "why": "The executed check's evidence rows (issue 2005): Target, Pre-rolled and Margin, or Needed and Margin for a fixed roll-high target, drawn by the crafting result box and the salvage summary, so its two independent callers are the player crafting and inventory applications. Each row renders through `apps/journal/JournalFactRow.svelte` in its `keyed` form, the `.k-fact` fact atom `library.html:1141` names for recorded check evidence, so the label and value typography are that atom's, save a counting check's `Count`, `Pool` and `Result` sentences, which take the row's `prose` form (issue 2134); this component owns only the bordered list, the same neutral frame around a count's tiles (issue 2134) and the 120px key column, which a box narrower than 360px sets to the chat card's 88px. No library entry names the list itself, so `library` stays null. Targeted: the roll-result and salvage-result frames claim it by `sourceMatches`. Scoped `shared` DESPITE its `apps/crafting/` path, because the inventory application renders it as well."
     },
     {
+      "path": "src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "shared",
+      "why": "The player progressive stage row's content in `SortableList`'s `row` snippet (issue 2381): the stage's `Medallion` art, its name and its DC and cumulative threshold, inline in the crafting body (`ProgressiveBody`) and stacked in the salvage body (`SalvageProgressiveBody`), its two independent callers. Its module exports `stageLabel`, `stageRowClass` and `stageRowData`, the per-stage callbacks both bodies hand the list. It draws no control of its own; the grip, ordinal and rocker are the list's. No library entry names the row, so `library` stays null; the `<SortableList>` entry's player unit draws it. Targeted: the progressive crafting and salvage frames claim it by `sourceMatches`. Scoped `shared` DESPITE its `apps/crafting/` path, because the inventory application renders it as well."
+    },
+    {
+      "path": "src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "shared",
+      "why": "The per-stage complication band (issue 1286) a player progressive stage row opens to in `SortableList`'s `body` snippet (issue 2381): the lead complication through `ComplicationSummaryRow`'s player variant, in the `forecast` or `resolved` tense, plus a \"+N more\" count, rendered by the crafting body (`ProgressiveBody`) and the salvage body (`SalvageProgressiveBody`), its two independent callers. Its module export `stageHasBand` is the one render gate, read by the band and by `stageRowClass`. It draws no control of its own. No library entry names the band, so `library` stays null; the `<SortableList>` entry's player unit draws it. Targeted: the progressive crafting and salvage frames claim it by `sourceMatches`. Scoped `shared` DESPITE its `apps/crafting/` path, because the inventory application renders it as well."
+    },
+    {
       "path": "src/ui/svelte/components/EditorTabs.svelte",
       "library": "<TabBar>",
       "status": "target",
@@ -411,10 +427,10 @@
     {
       "path": "src/ui/svelte/components/TintPicker.svelte",
       "library": "<TintPicker>",
-      "status": "shipped",
+      "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `shipped` at issue 2257: the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell is `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the frames that draw a pressed cell. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2352, and neither blocks the flip."
+      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. It shipped at issue 2257, when the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell became `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry named the frames that draw a pressed cell. It returned to `target` on the maintainer's rulings of 2026-10-11: its keyboard cursor must be the picker's inset outline, still to do and owned by issue 2416, and its hover is the outline alone, never a fill, which it already ships. The hover animation is fixed. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2352."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",

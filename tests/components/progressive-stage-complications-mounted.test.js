@@ -10,6 +10,7 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+// Mounted through the salvage body, the one caller that draws both tenses (issue 2381).
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-stage-complications-',
@@ -17,8 +18,12 @@ const harness = createMountedComponentHarness({
   // under test's own compiled artefact and every leaf it reaches, and the omission HANGS the
   // suite (# cancelled) rather than failing it — which is how it reached the driver green.
   rawModules: CRAFTING_APP_RAW_MODULES,
-  compiledModules: CRAFTING_APP_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  compiledModules: [
+    ...CRAFTING_APP_COMPILED_MODULES,
+    'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
+  rootClass: 'fabricate-app',
 });
 
 before(() => harness.setup());
@@ -50,13 +55,15 @@ const stages = (complications) => [
   },
 ];
 
-const mount = (props = {}) =>
+/** A resolved run record: the roll has been spent down the list. */
+const SPENT = Object.freeze({ state: 'success', awardedComponentIds: ['c1'] });
+
+const mount = ({ tense = 'forecast', ...props } = {}) =>
   harness.mount({
     stages: stages([complication()]),
     canReorder: true,
     announcement: '',
-    stacked: true,
-    complications: 'forecast',
+    result: tense === 'resolved' ? SPENT : null,
     ...props,
   });
 
@@ -68,54 +75,57 @@ const tenseOf = (root, id) =>
 const badgeIn = (root, id) => bandIn(root, id).querySelectorAll('.manager-chip')[0];
 
 describe('the per-stage complication band (issue 1286)', () => {
-  // ── The extension is OPT-IN, and the row flip is gated on CONTENT ────────────────
-
-  it('draws nothing at all when the caller does not opt in, even with data on the row', async () => {
-    const root = await mount({ complications: 'off' });
-    assert.ok(
-      !root.querySelector('[data-progressive-stage-complications]'),
-      'the presence of the DATA is never the switch — only the caller opt-in'
-    );
-    assert.ok(
-      !stageRow(root, 's2').classList.contains('has-complications'),
-      'and the row keeps its single-line shape'
-    );
-  });
+  // ── The row flip is gated on CONTENT ───────────────────────────────────────────
 
   it('flips ONLY the row that has content, never every row in the list', async () => {
     const root = await mount();
-    assert.ok(stageRow(root, 's2').classList.contains('has-complications'));
+    assert.ok(stageRow(root, 's2').classList.contains('has-band'));
     assert.ok(
-      !stageRow(root, 's1').classList.contains('has-complications'),
-      'a stage whose component authors nothing is the row it was before this feature'
+      !stageRow(root, 's1').classList.contains('has-band'),
+      'a stage whose component authors nothing is the plain row'
     );
     assert.ok(!bandIn(root, 's1'), 'and it draws no band');
   });
 
-  it('renders the band INSIDE the row, as the sibling of the line that carries the padding', async () => {
+  it('renders the band in the row’s body, the sibling of the line that carries the padding', async () => {
     const root = await mount();
     const row = stageRow(root, 's2');
-    const line = row.querySelector('.crafting-stage-line');
-    const band = bandIn(root, 's2');
-    assert.ok(line, 'the row wraps its own content in a line');
-    // Compared as INDICES, never as nodes.
     const children = [...row.children];
+    // Compared as INDICES, never as nodes.
+    const line = row.querySelector('.fabricate-sortable-list-line');
+    const body = row.querySelector('.fabricate-sortable-list-body');
     assert.equal(children.indexOf(line), 0, 'the line is the row’s first child');
+    assert.equal(children.indexOf(body), 1, 'and the body follows it as its SIBLING');
+    assert.equal([...body.children].indexOf(bandIn(root, 's2')), 0, 'the band fills the body');
+  });
+
+  it('lies outside the drag source: only the grip arms a drag', async () => {
+    const root = await mount();
+    assert.ok(!stageRow(root, 's2').hasAttribute('draggable'), 'the row is not draggable');
     assert.equal(
-      children.indexOf(band),
-      1,
-      'and the band follows it as its SIBLING, so the border-top divides two surfaces that meet'
+      stageRow(root, 's2').querySelector('[data-sortable-grip]').getAttribute('draggable'),
+      'true',
+      'its grip is'
     );
   });
 
-  it('is NOT a drag source, so a mousedown in the prose selects text instead of dragging', async () => {
-    const root = await mount();
-    assert.equal(bandIn(root, 's2').getAttribute('draggable'), 'false');
-    assert.equal(
-      stageRow(root, 's2').getAttribute('draggable'),
-      'true',
-      'while the row around it still is — which is exactly why the band must say so'
-    );
+  it('a drag begun inside the band reorders nothing; one begun on the grip does', async () => {
+    const moves = [];
+    const root = await mount({
+      onReorder: (...move) => {
+        moves.push(move);
+      },
+    });
+    const fire = (node, type) =>
+      node.dispatchEvent(new globalThis.Event(type, { bubbles: true, cancelable: true }));
+
+    fire(bandIn(root, 's2').firstElementChild, 'dragstart');
+    fire(stageRow(root, 's1'), 'drop');
+    assert.deepEqual(moves, [], 'the band arms no drag, so the drop lands nothing');
+
+    fire(stageRow(root, 's2').querySelector('[data-sortable-grip]'), 'dragstart');
+    fire(stageRow(root, 's1'), 'drop');
+    assert.deepEqual(moves, [[1, 0]], 'the same drop from the grip reorders');
   });
 
   // ── The two tenses ──────────────────────────────────────────────────────────────
@@ -128,14 +138,14 @@ describe('the per-stage complication band (issue 1286)', () => {
 
   it('reads in the PAST tense once the roll is spent — the prototype’s own bug', async () => {
     // The prototype derives `fired` from a stage being short.
-    const root = await mount({ complications: 'resolved' });
+    const root = await mount({ tense: 'resolved' });
     assert.equal(tenseOf(root, 's2'), 'resolved');
     assert.equal(badgeIn(root, 's2').textContent.trim(), "This didn't happen");
   });
 
   it('marks the occurrence the record named, and tones the band with it', async () => {
     const root = await mount({
-      complications: 'resolved',
+      tense: 'resolved',
       stages: stages([complication({ fired: true })]),
     });
     assert.equal(tenseOf(root, 's2'), 'fired');
@@ -159,7 +169,7 @@ describe('the per-stage complication band (issue 1286)', () => {
     harness.remount();
 
     const fired = await mount({
-      complications: 'resolved',
+      tense: 'resolved',
       stages: stages([complication({ fired: true })]),
     });
     const firedTile = bandIn(fired, 's2').querySelector('.fab-complication-severity');
@@ -232,7 +242,7 @@ describe('the per-stage complication band (issue 1286)', () => {
 
   it('tones the band FIRED when the firing sits behind the count', async () => {
     const root = await mount({
-      complications: 'resolved',
+      tense: 'resolved',
       stages: stages([
         complication(),
         complication({ id: 'x-shatter', name: 'The vessel shatters', fired: true }),
@@ -262,7 +272,7 @@ describe('the per-stage complication band (issue 1286)', () => {
   });
 
   it('draws the band on a FIXED row too — a spent order still explains itself', async () => {
-    const root = await mount({ canReorder: false, complications: 'resolved' });
+    const root = await mount({ canReorder: false, tense: 'resolved' });
     assert.ok(stageRow(root, 's2').hasAttribute('data-progressive-stage-fixed'));
     assert.ok(bandIn(root, 's2'), 'the post-roll list is exactly where the fired tense is read');
   });

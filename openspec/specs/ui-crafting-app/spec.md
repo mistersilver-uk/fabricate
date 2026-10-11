@@ -690,14 +690,14 @@ The rail's geometry — a 72px column of labelled 44px icon wells, with the Jour
 
 ##### Progressive Stage List
 
-This section governs **every ordered-stage surface**, not crafting alone: the progressive recipe body and the progressive **salvage** body in the Inventory tab's salvage panel (§Player Salvage Surface) render the same component under the same invariants.
+This section governs **every ordered-stage surface**, not crafting alone: the progressive recipe body and the progressive **salvage** body in the Inventory tab's salvage panel (§Player Salvage Surface) render the same shared ordered list (`SortableList`) with the same row content (`ProgressiveStageRow`) under the same invariants.
 Where a requirement says "recipe", read it as "the progressive subject" — a recipe or a salvageable component.
 The salvage deltas are stated at the end of this section; everything else applies identically to both.
 
 - A progressive recipe's detail body renders an **ordered stage list**, replacing the generic input/output table: a progressive output is not a flat set, because one roll is spent down the list and the order decides what the player receives.
 - The stage list is built from the **authored** result group and deliberately bypasses the award loop.
   Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
-- Each row carries: its **ordinal** (the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
+- Each row carries: its **ordinal** (the list's numbered badge: the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
 - The cumulative threshold is the player's decision input: per-stage difficulty alone forces the player to do the arithmetic and redo it after every move.
 - The threshold is **derived from the award mode**, not a running sum of difficulties.
   A running sum is correct only for `equal`; `exceed` gates on a strict comparison and sits one above each cumulative sum, and `partial` awards a tail result whenever any budget remains, making its final stage reachable _below_ its cumulative sum.
@@ -705,9 +705,9 @@ The salvage deltas are stated at the end of this section; everything else applie
   Such a stage must not advance the cumulative total for later stages.
 - The displayed threshold and the awarded result MUST agree with the award loop for every award mode and every budget.
 - Stages are shown in the **player's** order (see `resolution-modes` §Player Reorder), reconciled against the authored list.
-- When the permission is true the rows are reorderable by **drag** and by **keyboard**: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the stage they move, with the new position announced through an `aria-live="polite"` region.
-  Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
-- The announcement names the stage that MOVED, read before the move is applied, and is a single localized string carrying name, position and total (never assembled from fragments).
+- When the permission is true the rows are reorderable by the **grip** (pointer drag, and up/down arrow keys while focused) and by the per-row **rocker**, disabled at the ends, whose accessible names name the stage, with the new position announced through the list's `aria-live="polite"` region.
+  Drag is mouse-only; the rocker is the touch path and meets the 24 by 24 hit-area floor (`design-system` §pointer targets).
+- The announcement names the stage that MOVED, read before the move is applied, and is the shared reorder sentence ("Moved {name} to position {position} of {total}.") — a single localized string carrying name, position and total, never assembled from fragments.
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
 - The key a debounced reorder write commits the **Player Result Order** under is captured when the reorder is **scheduled**, never re-derived when the write flushes.
   A subject change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** recipe or participation, silently — the player reorders one subject's stages and another subject's preference moves.
@@ -718,41 +718,39 @@ The salvage deltas are stated at the end of this section; everything else applie
   The write stays pending rather than committing when the reload seeds it, so the flush-before-salvage rule below still sees it and a rejection can still abort the run.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
   A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
-- When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
-  No live region is rendered in this state, because nothing can change.
+  A reset to the GM's order is announced through the same region.
+- When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip and the rocker** (the grip is the affordance signal), attach **no** drag handlers, and show one muted caller-rendered line explaining why.
+  Nothing is announced in this state: the list's live region stays mounted and emits nothing of its own.
   Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, an optional **stacked row layout**, and an optional per-stage **complication strip**.
-**All four ship.**
-The strip's opt-in is a **tense token** — `off` by default, else `forecast` or `resolved` — and never a caller-supplied snippet, and that spelling is normative rather than incidental: a snippet is defined in the CALLER, so two bodies passing "the same" strip would be two copies of its markup, which is exactly the duplication this shared section exists to prevent.
+The extension set is exactly four, all opt-in: a per-stage **state chip** (`ProgressiveStageRow`'s `stateChip` snippet), a **fixed-state note** (caller-rendered after the list), a **stacked layout** (`ProgressiveStageRow`'s `layout`, default `inline`), and a per-stage **complication strip** (`ProgressiveStageBand`).
+The strip's opt-in is that the caller mounts `ProgressiveStageBand` as the list's `body`, passing a `tense` token (`forecast` or `resolved`); the caller mounts the one shared component and never supplies its own markup.
 A token is sufficient because nothing about the strip varies per caller except the tense, and the tense is the one thing the row data cannot say for itself: an un-fired complication looks identical before a roll and after one that spared it.
 (The per-stage **quantity** opt-in was deleted, not defaulted off: no stage renders a quantity on either surface, consistent with the "result entries carry no quantity" rule.)
-A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
-This exists so a second consumer can add rendering without re-skinning the first.
-The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
-Defaulting to the GM reason keeps the crafting rendering unchanged, since there it is the only cause; a caller with a second cause MUST supply the note, or the surface asserts something untrue about the roll that just happened.
-The GM reason takes precedence where both apply — it stays true whether or not a roll has since been spent.
+A stage that carries no visible complications renders no body, and its row is the plain row.
+The fixed-state note is caller-owned because `canReorder: false` has two causes the list cannot distinguish: the GM pinned the order, or a resolved roll has spent it.
+Each caller renders the note matching its own cause, and the GM reason takes precedence where both apply.
 The set is enumerated deliberately: a future extension is added to this list, so "not listed" means "not supported", not "not yet noticed".
 
 The **stacked row layout** exists because the default inline row lays every part on one line and lets only the name flex, so the name absorbs every other part's width.
 In a narrow column (the player inspector's 300px) that measures a **zero-width name** and overflows the trailing controls out of the panel — the row does not degrade gracefully, it fails.
-Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (the name in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
+Stacked, the grip leads the row, the rocker trails it, and the stage's identity is a flexible **column** (the name in one wrapping text flow, then the numbers, then the state chip).
 Every progressive surface, stacked rows included, shows **both** the component's progressive DC ("DC N") and the cumulative threshold ("Reach ≥N"), per the issue #675 ruling and matching `resolution-modes` §Progressive Mode Semantics.
 The "DC N" value is `component.difficulty`, which the GM authors via the stepper titled "This component's Progressive DC"; the **check-level** DC remains nonexistent (the projection resolves it to null, and a component's `dcOverride` does not shift these thresholds).
 
 **The per-stage complication strip.**
 
-`ProgressiveStageList.svelte` takes it as `complications`, the tense token named above, and BOTH shipped bodies pass it: the crafting body passes `forecast` always, and the salvage body passes `resolved` once its run has resolved and `forecast` before that.
+`ProgressiveStageBand.svelte` takes it as `tense`, the token named above, and BOTH shipped bodies mount it: the crafting body passes `forecast` always, and the salvage body passes `resolved` once its run has resolved and `forecast` before that.
 Crafting can pass nothing else, because the fired record lives on the salvage run record and the immediate crafting path writes none.
 It is stated here, in the same section that owns the extension contract, because the projection the strip reads (`forecastComplications`) is shared with the GM authoring surface that fills it, and a strip specified anywhere else would be specified away from the enumeration rule it has to obey.
 
-The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it did before the strip existed, and both bodies pass it so neither gets a private copy of the treatment.
+The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a stage with no visible complications renders no body, and both bodies pass it so neither gets a private copy of the treatment.
 
 **The data is published on the stage row, and the strip MUST NOT re-derive any of it.**
 Both progressive read-models attach the player projection to the stage rows they already publish — `InventoryListingBuilder._buildSalvage` for salvage and `CraftingListingBuilder._buildProgressiveStages` for crafting — through the one shared `attachStageComplications` helper, so the audience filter, the activity gate and the could-never-fire exclusion are all decided builder-side against the same records the engine fires from.
-A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed; the presence of the DATA is still never the switch, only the caller's opt-in.
+A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed, and such a stage's row renders no body.
 The projection is attached TO the row rather than published beside it because the player's reorder is applied downstream of the builder, and a parallel list keyed by result id would desynchronise at exactly that point.
 Marking the fired tense onto an already-attached list is the paired `markFiredStageComplications`, which only ever MARKS what the forecast already published and can therefore never surface a record the forecast withheld.
 
@@ -767,11 +765,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A stage with several applicable complications renders the FIRST in fire order plus a "+N more" affordance.
   The inspector column is 300px wide — the documented reason the stacked layout exists — and an unbounded list turns one row into several prose paragraphs.
 - A stage that is both awarded AND fired renders its success state chip **and** the fired band together, the band reading as a consequence of the award rather than a contradiction of it.
-- The strip is a full-bleed band INSIDE the row, so the row becomes a column with today's line wrapped.
-  **That row-structure flip is gated on the strip rendering CONTENT for that stage, not on the extension being passed.**
-  Both bodies pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
-- The band is explicitly NOT draggable.
-  Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
+- The strip is a full-bleed band in the row's body, beneath its line.
+  A stage whose strip has no content draws no body box (`has-band` gates it), so a row without complications is the plain row.
+  The gate is the strip's CONTENT for that stage, not the caller's mounting of it: both bodies mount it, so a presence gate would re-skin every progressive stage row in every world.
 - The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (`ui-entity-editors/spec.md` §Component Studio requirement 16).
 - **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
   Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
@@ -784,9 +780,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
   It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
   It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
-- **The band is not a drag source and carries no destructive or navigational control.**
-  Pre-roll the salvage list is reorderable and the row IS a drag source, so a mousedown inside the prose would start a drag rather than a text selection.
-  It also carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
+- **The band lies outside the drag source and carries no destructive or navigational control.**
+  Only the grip starts a drag, so a mousedown-drag inside the prose selects text.
+  It carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
 - **The progressive CRAFTING surface is forecast-only.** The fired record is defined on the salvage run record, and crafting has no run record on the immediate path; inventing a second carrier for it is out of scope here.
 
 **Progressive salvage deltas.**

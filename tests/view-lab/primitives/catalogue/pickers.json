@@ -190,7 +190,7 @@
       "width": 300,
       "height": 260
     },
-    "note": "The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel neither flips nor clamps. Trimmed from 320 when the iframe viewport became the box.",
+    "note": "The trigger renders through Button, as every caller’s does: the primitive’s bare trigger carries no styling of its own, so a row passing none draws a core button. The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel does not flip. The trigger sits 16px in, the panel family's clamp inset, so the panel opens flush with it, unclamped. Trimmed from 320 when the iframe viewport became the box.",
     "undrawn": {
       "steel-ingot": "the picked option’s id, not its words",
       "Choose a component": "the trigger’s and the panel’s accessible name; the drawing draws no name",
@@ -201,6 +201,12 @@
     "props": {
       "open": true,
       "value": "steel-ingot",
+      "triggerButton": {
+        "role": "neutral"
+      },
+      "triggerProps": {
+        "style": "margin-left: 16px"
+      },
       "triggerIcon": "fas fa-hammer",
       "triggerLabel": "Steel Ingot",
       "ariaLabel": "Choose a component",
@@ -234,7 +240,7 @@
   },
   {
     "spec": "<TintPicker> <Menu>",
-    "cap": "popover — 220px, eight 46px swatches four to a row, then the custom hex",
+    "cap": "popover — shipped",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
     "slot": {
@@ -252,6 +258,7 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
     "fixture": "TintPickerInlineClear",
+    "inset": 4,
     "undrawn": {
       "Essence colour presets": "the preset group’s accessible name; the drawing names no group",
       "No colour": "the No-colour cell’s accessible name and title; the drawing draws the cell unlabelled"
@@ -277,7 +284,7 @@
       "width": 260,
       "height": 170
     },
-    "note": "Open, so the panel the drawing shows is drawn. The box holds the trigger and the panel under it; the panel caps itself at the box width less 32px, so the box is wide enough for the longest label not to clip.",
+    "note": "Open, so the panel the drawing shows is drawn. The trigger stands 8px in from the box edge, the layout’s own margin, because the panel is clamped that far in and would otherwise sit 8px right of the button it is aligned to. The box holds the trigger and the panel under it; the panel caps itself at the box width less 32px, so the box is wide enough for the longest label not to clip.",
     "undrawn": {
       "Add an alternative": "the menu’s accessible name; the drawing draws no name"
     },
@@ -285,6 +292,9 @@
       "open": true,
       "align": "start",
       "ariaLabel": "Add an alternative",
+      "triggerProps": {
+        "style": "margin-left: 8px"
+      },
       "items": [
         {
           "id": "component",
