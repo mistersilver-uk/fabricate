@@ -794,6 +794,30 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  // A recipe routed by ingredients: each set's `Ingredient` adder above the full-width `Add ingredient set`.
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-sets',
+    label: 'Manager — Recipe edit ingredients, the Ingredient adder on each of several sets',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="jw-r-cast"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-add="ingredient-set"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.manager-recipe-ingredient-sets .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
+    expectCenterHit:
+      '.manager-recipe-ingredient-set-item:last-child [data-recipe-add="ingredient"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
   managerCase({
     id: 'manager-recipe-edit-validation',
     label: 'Manager — Recipe edit validation',
