@@ -658,6 +658,7 @@ export const CASES = Object.freeze([
       },
     ],
     // No pager, so the rows scroller is the column's foot: edge to edge, with a 12px floor inside it (issue 2373).
+    // This claim checks declared padding; the geometry suite's foot-gap assertion measures the rendered room.
     expectLayout: {
       containerSelector: '.manager-scoped-list-layout',
       gridSelector: '.manager-scoped-list-layout',
