@@ -1007,11 +1007,10 @@
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
     "cap": "the slot row — four tile states, one row",
-    "draws": ":scope > div:nth-of-type(2)",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/SlotRow.svelte",
     "fixture": "SlotRowReadings",
     "inset": 8,
-    "partial": "list opens beneath",
     "props": {
       "requirements": [
         {
@@ -1085,20 +1084,16 @@
       },
       "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
       "chooseKey": "FABRICATE.App.Journal.Stage.Choose",
-      "choicesKey": "FABRICATE.App.Journal.Stage.Choices"
+      "choicesKey": "FABRICATE.App.Journal.Stage.Choices",
+      "labelKey": "FABRICATE.App.Journal.Stage.Requirements",
+      "hintKey": "FABRICATE.App.Journal.Stage.RequirementsHint"
     },
-    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` and `claimed` read stock by component, each tile is named by its slot's label, and the open slot's list takes the Journal's kicker, summary and readings (`:448-456`). The binder slot is open, as the Journal always shows a pressed tile with its list beneath; the drawing shows a pressed tile with no list, which the product never shows. The list's radiogroup is named Choose an ingredient, as in the Journal, and the open and essence tiles are named Any binder and Essence pool where the drawing says Choose a component for this slot and Channel essence for this step. The kicker and hint stay drawn above, outside `draws`. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`. The open tile's solid circle is `SlotRow`'s default; whether an unchosen slot should default to `fa-regular fa-circle` (Font Awesome Free) is a product question for P2-C, not a library redraw. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it.",
-    "undrawn": {
-      "Rune Stylus": "a candidate the open slot lists beneath the row; the next caption draws the list",
-      "Rune Chalk": "a candidate the open slot lists beneath the row; the next caption draws the list",
-      "Duskglass": "a candidate the open slot lists beneath the row; the next caption draws the list",
-      "Choose an ingredient": "the open slot's list kicker and radiogroup name, as the Journal words them"
-    }
+    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` and `claimed` read stock by component, each tile is named by its slot's label, and the heading and the open slot's list take the Journal's own copy. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it."
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
     "cap": "the open slot’s candidates — one 44px row each, in flow beneath",
-    "draws": "[role=\"radiogroup\"]",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
     "fixture": "ChoiceOptionListReadings",
     "props": {
@@ -1142,9 +1137,11 @@
       "claimed": {
         "duskglass": 2
       },
-      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading"
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
+      "labelKey": "FABRICATE.App.Journal.Stage.Choose",
+      "summaryKey": "FABRICATE.App.Journal.Stage.Choices"
     },
-    "note": "Wired as `SlotRow.svelte:115-127` hands its list the `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies; no candidate carries a reason, so each reading is the Journal's own copy alone, which adds `· N spare` where the drawing omits it and reads 0 spare where it says none spare. The kicker and summary stay drawn above, outside `draws`, because the drawing does not wrap them with the group, so the row passes no `label` and the specimen's radiogroup is unnamed; `StepDetails` names it Choose an ingredient through `SlotRow`'s `choiceLabel`."
+    "note": "Wired as `SlotRow.svelte:115-127` hands its list the heading, `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies."
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
@@ -1213,7 +1210,7 @@
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
-    "cap": "locked — the check has been rolled",
+    "cap": "locked — a stage you cannot change",
     "draws": ":scope > div:nth-of-type(2) > div",
     "path": "src/ui/svelte/components/SlotTile.svelte",
     "inset": 8,
@@ -1227,7 +1224,7 @@
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
-    "cap": "locked — the check has been rolled",
+    "cap": "locked — a stage you cannot change",
     "draws": ":scope > div:nth-of-type(2) > div",
     "path": "src/ui/svelte/components/SlotTile.svelte",
     "inset": 8,
@@ -1236,7 +1233,7 @@
       "icon": "fas fa-atom",
       "tint": "aqua",
       "state": "met",
-      "pip": "4/4 3/3"
+      "pip": "2/2"
     }
   },
   {
