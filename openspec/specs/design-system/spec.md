@@ -2176,6 +2176,10 @@ Its shipped composition is `apps/PlayerDetailHeader.svelte`, which renders the p
 A pane with no identity row of its own — the alchemy Workbench, the inventory bulk panel — still carries at most one primary, beside the flow it commits.
 The player window carries NO premium signal in any state.
 A player never authors a choice group, and MAY pick from a result-side choice group whose chooser is the player, at award time, through the requirement chooser's award face.
+Where a player browse column closes with a pagination bar, the bar MUST be that column's footer: its outer box MUST meet the app rail, the window's bottom edge and the border of the pane beside it with no gutter, and the panes beside the browse column MUST be square pane sections divided from it by one rule, not floating cards (this governs the pane containers, not the rows or cards inside them).
+In the stacked layout (below the 960px container breakpoint) the bar MUST span the window and the next pane's top rule MUST sit directly beneath it.
+Where the browse column shows no bar, its own padding applies.
+A compact pager (`density="compact"`) is not a column footer and is not governed by this rule.
 
 #### Scenario: A new GM browse surface is built
 
@@ -2194,6 +2198,13 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 - **WHEN** a player pane's commit verb is unavailable
 - **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
 - **AND** no second-choice verb takes its place
+
+#### Scenario: A browse column closes with a pager
+
+- **WHEN** a player browse column closes with a pagination bar
+- **THEN** the bar meets the app rail, the window's bottom edge and the adjacent pane's border with no gutter
+- **AND** the adjacent pane is a square pane section divided by one rule
+- **AND** in the stacked layout the bar spans the window
 
 ### Requirement: The application shell renders through the shell primitives
 
