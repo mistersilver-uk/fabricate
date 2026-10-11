@@ -658,7 +658,7 @@ export async function assertRecipeRowsHittable(page, label) {
 
 /**
  * Assert the player's progressive stage list is sound — the checks no unit test can make (issue
- * 651).
+ * 651), read off `SortableList`'s rocker and the one live region following the list (issue 2381).
  */
 export async function assertProgressiveStageListSound(
   page,
@@ -678,38 +678,43 @@ export async function assertProgressiveStageListSound(
         (node) => Number(node.dataset.progressiveStageThreshold)
       );
 
-      const chevrons = [...document.querySelectorAll('[data-progressive-stage-move] button')].map(
+      // Each rocker control's hit area: its own box, joined with a `::before` that extends it.
+      const rocker = [...document.querySelectorAll('[data-progressive-stage] [data-sortable-move]')].map(
         (button) => {
           const box = button.getBoundingClientRect();
+          const pseudo = getComputedStyle(button, '::before');
           const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
           return {
-            height: box.height,
-            width: box.width,
+            width: Math.max(box.width, Number.parseFloat(pseudo.width) || 0),
+            height: Math.max(box.height, Number.parseFloat(pseudo.height) || 0),
             glyphContained: glyph ? contains(box, glyph) : false,
             hasGlyph: Boolean(glyph),
           };
         }
       );
 
-      // Per row: the horizontal gap between the up and down buttons.
-      const chevronGaps = [...document.querySelectorAll('[data-progressive-stage-move]')]
-        .map((group) => {
-          const buttons = [...group.querySelectorAll('button')];
-          if (buttons.length < 2) return null;
-          const a = buttons[0].getBoundingClientRect();
-          const b = buttons[1].getBoundingClientRect();
-          return Math.round(b.left - a.right);
+      // Per row: the down control sits directly below the up control, on its left edge.
+      const pairs = rows
+        .map((row) => {
+          const up = row.querySelector('[data-sortable-move="up"]');
+          const down = row.querySelector('[data-sortable-move="down"]');
+          if (!up || !down) return null;
+          const a = up.getBoundingClientRect();
+          const b = down.getBoundingClientRect();
+          return { gap: b.top - a.bottom, drift: Math.abs(a.left - b.left) };
         })
-        .filter((gap) => gap !== null);
+        .filter(Boolean);
 
-      const region = document.querySelector('[data-progressive-stage-status]');
+      const region = document.querySelector(
+        '[data-recipe-section="progressive-stages"] + [data-sortable-list-status]'
+      );
       const regionBox = region?.getBoundingClientRect() ?? null;
 
       return {
         rowCount: rows.length,
         thresholds,
-        chevrons,
-        chevronGaps,
+        rocker,
+        pairs,
         region: region
           ? {
               text: region.textContent?.trim() ?? '',
@@ -727,17 +732,21 @@ export async function assertProgressiveStageListSound(
     throw new Error(`${label}: expected >= 3 progressive stages, saw ${report.rowCount}`);
   }
 
-  const cropped = report.chevrons.filter((c) => !c.hasGlyph || !c.glyphContained || c.height < 30);
+  const cropped = report.rocker.filter(
+    (c) => !c.hasGlyph || !c.glyphContained || c.width < 24 || c.height < 24
+  );
   if (cropped.length > 0) {
     throw new Error(
-      `${label}: chevron buttons cropped or under-sized (Foundry .app button reset leaked): ${JSON.stringify(cropped.slice(0, 4))}`
+      `${label}: rocker controls cropped or under the 24x24 hit area: ${JSON.stringify(cropped.slice(0, 4))}`
     );
   }
 
-  const spaced = report.chevronGaps.filter((gap) => gap > 8);
-  if (spaced.length > 0) {
+  const unstacked = report.pairs.filter(
+    ({ gap, drift }) => gap < 0 || gap > 4 || drift > 1
+  );
+  if (unstacked.length > 0) {
     throw new Error(
-      `${label}: chevrons not adjacent — a leaked .app button margin: gaps ${JSON.stringify(spaced)}`
+      `${label}: rocker not a stacked pair (down 0-4px below up, same left edge): ${JSON.stringify(unstacked)}`
     );
   }
 
