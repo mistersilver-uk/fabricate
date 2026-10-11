@@ -20733,6 +20733,13 @@
   background: transparent;
 }
 
+/* The end chevron dims bare, as the library's `dis` chevron does: the icon button's disabled box
+   (0,3,0) would otherwise fill it. */
+.fabricate-icon-button.fabricate-icon-button.fabricate-sortable-list-move:disabled {
+  border-color: transparent;
+  background: transparent;
+}
+
 .fabricate-sortable-list-move i {
   font-size: 9px;
 }

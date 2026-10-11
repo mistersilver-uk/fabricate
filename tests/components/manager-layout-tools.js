@@ -515,6 +515,12 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
     // without any rule in the sheet changing.
     assert.equal(edges.listPaddingLeft, '0px', 'the list contributes no inline padding of its own');
     assert.equal(edges.listPaddingRight, '0px');
+    // A disabled end chevron dims bare, as the library's `dis` chevron does, never a filled box.
+    assert.deepEqual(edges.disabledMove, {
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      borderTopColor: 'rgba(0, 0, 0, 0)',
+      opacity: '0.62',
+    });
 
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await checksRollEdges(page, 'fabricate-card');
