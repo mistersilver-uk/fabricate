@@ -142,8 +142,13 @@ const buttonHarness = createMountedComponentHarness({
   componentPath: BUTTON,
 });
 
-/** A core-like `button` rule in a layer below the sheet's, as Foundry orders them. */
-const CORE_BUTTON = '@layer core, modules; @layer core { button { transition: 0.5s; } }';
+/** Core-like `button` rules in a layer below the sheet's, as Foundry orders them. */
+const CORE_BUTTON =
+  '@layer core, modules; @layer core { button { transition: 0.5s; } ' +
+  'button:hover { background: rgb(1, 2, 3); } }';
+
+/** The host clips its overflow, so it stands at a window's height rather than the trigger's. */
+const HOST_HEIGHT = '.fabricate-manager { height: 360px; }';
 
 describe('the tint trigger and swatches, over a core button transition', () => {
   let chrome;
@@ -158,7 +163,7 @@ describe('the tint trigger and swatches, over a core button transition', () => {
     const markup = globalThis.document.body.innerHTML;
     page = await chrome.newPage({ viewport: { width: 400, height: 400 } });
     await page.setContent(
-      `<!doctype html><html><head><meta charset="utf-8"><style>${CORE_BUTTON}</style>` +
+      `<!doctype html><html><head><meta charset="utf-8"><style>${CORE_BUTTON}${HOST_HEIGHT}</style>` +
         `<style>@layer modules { ${sheet} }</style><style>${scoped.css}</style></head>` +
         `<body><div class="fabricate" data-fabricate-theme="fabricate">${markup}</div></body></html>`
     );
@@ -182,5 +187,24 @@ describe('the tint trigger and swatches, over a core button transition', () => {
       `the trigger and eight swatches rendered: ${durations.length}`
     );
     assert.deepEqual(new Set(durations), new Set(['0s']));
+  });
+
+  it('hovers a swatch with its outline alone, never a fill (ruling 2026-10-11)', async () => {
+    const cell = '[data-manager-color-picker-popover] [data-manager-color-token="sage"]';
+    const read = (selector) => {
+      const button = globalThis.document.querySelector(selector);
+      const swatch = button.querySelector('.manager-color-swatch');
+      return {
+        cell: globalThis.getComputedStyle(button).backgroundColor,
+        swatch: globalThis.getComputedStyle(swatch).backgroundColor,
+        outline: globalThis.getComputedStyle(button).outlineStyle,
+      };
+    };
+    const rest = await page.evaluate(read, cell);
+    const box = await page.locator(cell).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const hovered = await page.evaluate(read, cell);
+    assert.equal(rest.outline, 'none');
+    assert.deepEqual(hovered, { ...rest, outline: 'solid' });
   });
 });

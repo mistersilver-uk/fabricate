@@ -105,9 +105,10 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/DiceTiles.svelte': 1 },
   ],
   [
-    "the maintainer ruled on 2026-10-11 that the swatch highlight must be the picker's own hover " +
-      'fill and inset cursor, with no animation, so this row returns to target until the sheet ' +
-      'draws it, owned by issue 2416 (library.html, the target popover specimen)',
+    "the maintainer ruled on 2026-10-11 that the swatch's keyboard cursor must be the picker's " +
+      'inset outline and its hover the outline alone, never a fill, so this row returns to target ' +
+      'until the sheet draws the inset cursor, owned by issue 2416 (library.html, the target ' +
+      'popover specimen)',
     { 'src/ui/svelte/components/TintPicker.svelte': 1 },
   ],
   [
