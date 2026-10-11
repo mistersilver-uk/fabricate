@@ -20910,11 +20910,6 @@
   background: var(--fab-bg-1);
 }
 
-/* ── THE TOOLBAR AND THE ROWS SHARE THEIR INLINE EDGES (r8 GATES alignment `catalogue-list-rows`) ── `proto:576` pads the toolbar `14px 20px 0` and `proto:597` pads the row scroller `2px 20px 18px`, so the filter line and every row beneath it start and end together. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows {
-  padding-inline: var(--fab-space-3);
-}
-
 /* ── THE ROW'S OPEN CONTROL IS A 28px PEN (gap-list row 17) ── `proto:609` draws a 28x28 square on a 7px corner, titled `Open catalogue entry`. */
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row .fabricate-icon-button {
   width: 28px;

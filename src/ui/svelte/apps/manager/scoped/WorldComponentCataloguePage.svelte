@@ -347,7 +347,6 @@
     )}
     membershipFilter={false}
     autoSelectFirst
-    flushColumn
     flushBulkDock
     bind:browserState
     bind:selectedId

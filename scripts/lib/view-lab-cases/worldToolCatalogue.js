@@ -86,8 +86,12 @@ export const CASES = Object.freeze([
       },
       // The fifth inspector card is gone, and nothing replaces it here.
     ],
-    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
+    // the search, the scope band and every row on one 12px gutter (issue 2373).
     expectLayout: {
+      containerSelector: '.manager-scoped-list-column',
+      alignedLeft:
+        '.manager-scoped-list-toolbar .fabricate-search, [data-world-tool-break-mode], [data-scoped-list-row]',
       controls: [
         {
           selector: '[data-scoped-tool-open-entry]',
@@ -146,6 +150,17 @@ export const CASES = Object.freeze([
         target: '[data-pagination-prev]',
       },
     ],
+    // The column runs edge to edge: toolbar, rows and pager share its edges and the pager its foot (issue 2373).
+    expectLayout: {
+      containerSelector: '.manager-scoped-list-layout',
+      gridSelector: '.manager-scoped-list-layout',
+      expectedTracks: 2,
+      fillSelector: '.manager-scoped-list-column > .fabricate-pagination',
+      alignedLeft:
+        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows, .manager-scoped-list-column > .fabricate-pagination',
+      alignedRight:
+        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows, .manager-scoped-list-column > .fabricate-pagination',
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
