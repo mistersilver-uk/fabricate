@@ -1015,10 +1015,134 @@
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "a tag requirement — several items satisfy it",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/RequirementChooser.svelte",
+    "note": "The #Hardwood slot open, its alternatives in the well beneath: Oak Haft chosen, and Bog Oak short with no reading. The chooser always draws the tile row of the slot that opens a panel, so the tile stands above the well the drawing draws alone. The drawing’s badge row and hint are not shipped; the live panel is the slot tile and the alternatives well.",
+    "undrawn": {
+      "Requirements": "the tile row’s accessible name; the drawing draws no name",
+      "Alternatives": "the kicker naming the alternatives’ well, the crafting rail’s; the drawing draws no kicker"
+    },
+    "props": {
+      "ariaLabel": "Requirements",
+      "alternativesLabel": "Alternatives",
+      "openSlotId": "hardwood",
+      "slots": [
+        {
+          "key": "hardwood",
+          "slotId": "hardwood",
+          "kind": "choice",
+          "state": "met",
+          "name": "#Hardwood",
+          "label": "#Hardwood",
+          "icon": "fas fa-tag",
+          "pip": "12/2",
+          "alternatives": [
+            {
+              "id": "oak-haft",
+              "name": "Oak Haft",
+              "label": "Oak Haft",
+              "icon": "fas fa-leaf",
+              "tint": "sage",
+              "pip": "12/2",
+              "selected": true
+            },
+            {
+              "id": "ash-haft",
+              "name": "Ash Haft",
+              "label": "Ash Haft",
+              "icon": "fas fa-leaf",
+              "tint": "peach",
+              "pip": "5/2"
+            },
+            {
+              "id": "yew-stave",
+              "name": "Yew Stave",
+              "label": "Yew Stave",
+              "icon": "fas fa-leaf",
+              "tint": "butter",
+              "pip": "3/2"
+            },
+            {
+              "id": "bog-oak",
+              "name": "Bog Oak",
+              "label": "Bog Oak",
+              "icon": "fas fa-leaf",
+              "tint": "mist",
+              "pip": "1/2",
+              "short": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "an essence requirement — contributions add up",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/RequirementChooser.svelte",
+    "fixture": "RequirementChooserEssence",
+    "note": "The Vitality slot open, and beneath it the stage’s pool as the chooser’s `panel`, wired as `StepDetails` wires its pool: Steel Ingot ×2 and Ash Haft ×1 deliver 6 of 4. The chooser always draws the tile row of the slot that opens a panel, so the tile stands above the pool the drawing draws alone. The drawing’s contribution bars and Change button are not shipped; the live panel is the slot tile and the pool, a stepper per carrier and the overshoot in the Journal’s copy. Each carrier’s reading is the row’s string, because the caller assembles it with punctuation a fixture may not author.",
+    "undrawn": {
+      "Requirements": "the tile row’s accessible name; the drawing draws no name",
+      "6/4": "the tile’s pip, in the shipped held/needed form; the drawing writes the pool’s total as 6 / 4",
+      "+2 Vitality each · 3 held": "Steel Ingot’s reading, the row’s string; the drawing draws a contribution bar",
+      "+2 Vitality each · 1 held": "Ash Haft’s reading, the row’s string; the drawing draws a contribution bar"
+    },
+    "props": {
+      "ariaLabel": "Requirements",
+      "openSlotId": "vitality",
+      "slots": [
+        {
+          "key": "vitality",
+          "slotId": "vitality",
+          "kind": "essence",
+          "state": "met",
+          "name": "Vitality",
+          "label": "Vitality",
+          "icon": "fas fa-flask",
+          "pip": "6/4"
+        }
+      ]
+    },
+    "data": {
+      "thresholds": [
+        {
+          "essence": "Vitality",
+          "amount": 4,
+          "icon": "fas fa-flask",
+          "sources": [
+            {
+              "id": "steel-ingot",
+              "label": "Steel Ingot",
+              "icon": "fas fa-hammer",
+              "tint": "mist"
+            },
+            { "id": "ash-haft", "label": "Ash Haft", "icon": "fas fa-hammer", "tint": "peach" }
+          ]
+        }
+      ],
+      "allocation": { "steel-ingot": 2, "ash-haft": 1 },
+      "readings": {
+        "steel-ingot": "+2 Vitality each · 3 held",
+        "ash-haft": "+2 Vitality each · 1 held"
+      },
+      "yields": { "steel-ingot": { "Vitality": 2 }, "ash-haft": { "Vitality": 2 } },
+      "held": { "steel-ingot": 3, "ash-haft": 1 },
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
+      "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
+      "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
+      "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
+    }
+  },
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
     "cap": "requirement chooser — the player side",
     "draws": ":scope > div:nth-of-type(1)",
     "path": "src/ui/svelte/components/RequirementChooser.svelte",
-    "note": "The tile row, the haft slot open, as its accent outline draws it. The \"This craft will use\" well below stays drawn; the tag and essence units do too, because each draws an open panel with no tile row above it, and the chooser always draws the row of the slot that opens it.",
+    "note": "The tile row, the haft slot open, as its accent outline draws it. The \"This craft will use\" well below stays drawn.",
     "undrawn": {
       "Requirements": "the tile row’s accessible name; the drawing draws no name"
     },
