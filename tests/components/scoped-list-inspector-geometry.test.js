@@ -29,6 +29,8 @@ const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte
 const fabricateCss = readStylesheet();
 const frameCss = scopedComponentCss(resolve(repoRoot, FRAME));
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL));
+/** The unavailable warning is a `<p>`, so without its own sheet it measures a UA margin. */
+const calloutCss = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/components/Callout.svelte'));
 /** The selection band's own children (issue 1373, maintainer feedback round 4). */
 const selectionToolbarCss = scopedComponentCss(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte')
@@ -76,6 +78,8 @@ const SELECTION_ROW_COUNT = 11;
 const SELECTION_TICKS = 4;
 /** The world catalogues' short select-all caption, which both of them pass. */
 const SELECT_ALL_SHORT = 'All';
+/** `--fab-space-3`: the gutter the list column's boxed children keep inside its flush edges (M21). */
+const GUTTER_PX = 12;
 
 const laneInspectorBody = createRawSnippet(() => ({
   render: () => `<p data-lane-inspector-body>The lane's own panel.</p>`,
@@ -89,6 +93,11 @@ const laneBulkBody = createRawSnippet(() => ({
 /** A lane's `listLead`, standing in for the world Tool catalogue's create-from-drop zone. */
 const laneListLead = createRawSnippet(() => ({
   render: () => `<div data-lane-list-lead style="height:60px">Drop zone</div>`,
+}));
+
+/** A lane's `columnLead`, standing in for the world Tools catalogue's scope band. */
+const laneColumnLead = createRawSnippet(() => ({
+  render: () => `<div data-lane-column-lead style="height:48px">Scope band</div>`,
 }));
 
 const harness = createMountedComponentHarness({
@@ -152,7 +161,7 @@ const harness = createMountedComponentHarness({
   componentPath: SHELL,
 });
 
-function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
+function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX, view = 'world-components') {
   // ── THE MODULE SHEET IS LAYERED AND THE COMPONENT SHEETS ARE NOT ─────────────────────────────
   // `module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports
   // an unlayered module stylesheet at `layer(modules)` — `tests/view-lab/cascade.css` reproduces
@@ -164,6 +173,7 @@ function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
     <style>${frameCss.css}</style>
     <style>${shellCss.css}</style>
     <style>${selectionToolbarCss.css}</style>
+    <style>${calloutCss.css}</style>
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
@@ -172,7 +182,7 @@ function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
     <body>
       <div class="probe-host">
         <div class="fabricate fabricate-manager" data-fabricate-theme="dark"
-             data-manager-view="world-components">
+             data-manager-view="${view}">
           <div class="probe-band"></div>
           <div class="probe-band"></div>
           <div class="manager-body" style="grid-template-columns: ${RAIL_PX}px minmax(0, 1fr);">
@@ -220,6 +230,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let browser = null;
   let markup = '';
   let unavailableMarkup = '';
+  let unavailableLeadMarkup = '';
+  let essenceMarkup = '';
   let shortMarkup = '';
   let shortPagedMarkup = '';
   let leadMarkup = '';
@@ -287,6 +299,44 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       inspectorBody: laneInspectorBody,
     });
     unavailableMarkup = unavailableTarget.innerHTML;
+    // The world Tools catalogue's shape: its scope band leads the column above the warning.
+    const unavailableLeadTarget = await harness.mount({
+      scope: projectWorldScopeEntity({ entityType: 'tool', corpus: null }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-tools',
+      title: 'Tools Catalogue',
+      subtitle: 'One Tool per game-world Item.',
+      columnLead: laneColumnLead,
+      inspectorBody: laneInspectorBody,
+    });
+    unavailableLeadMarkup = unavailableLeadTarget.innerHTML;
+    // A one-page essence catalogue: no pager, so the rows scroller is the column's foot.
+    const essenceTarget = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'essence',
+        corpus: {
+          entities: Array.from({ length: 3 }, (unused, index) => ({
+            id: `essence-${index}`,
+            name: `Fire ${index}`,
+            description: 'An essence',
+            img: 'icons/magic/fire.webp',
+          })),
+          defaults: [],
+          membership: [],
+        },
+        systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-essences',
+      title: 'Essence Catalogue',
+      subtitle: 'One per world.',
+      countUnit: 'essences',
+      membershipFilter: false,
+      inspectorBody: laneInspectorBody,
+    });
+    essenceMarkup = essenceTarget.innerHTML;
     const shortTarget = await harness.mount({
       scope: projectWorldScopeEntity({
         entityType: 'component',
@@ -457,27 +507,34 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     if (browser) await browser.close();
   });
 
-  async function measureUnavailable(windowWidth) {
+  async function measureUnavailable(windowWidth, productMarkup = unavailableMarkup) {
     const context = await browser.newContext({
       viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
     });
     const tab = await context.newPage();
-    await tab.setContent(page(unavailableMarkup, windowWidth));
+    await tab.setContent(page(productMarkup, windowWidth));
     const result = await tab.evaluate(() => {
       const layout = document.querySelector('.manager-scoped-list-layout');
-      const callout = document.querySelector('[data-scoped-list-state="unavailable"]');
-      if (!layout || !callout) return { rendered: false };
-      // The CONTENT box, not the border box. The list column carries the pane's inset now
-      // (issue 1373 round 4 - `.manager-main` dropped it so the aside beside this column can
-      // bleed), so a child that fills its parent stops one inset short of the border edge. The
-      // void this asserts against is an inspector TRACK, which is an order of magnitude larger.
       const column = document.querySelector('.manager-scoped-list-column');
-      const inset = column ? parseFloat(getComputedStyle(column).paddingRight) || 0 : 0;
+      const wrapper = document.querySelector('.manager-scoped-list-unavailable');
+      const callout = document.querySelector('[data-scoped-list-state="unavailable"]');
+      if (!layout || !column || !wrapper || !callout) return { rendered: false };
+      // The wrapper carries the gutter, so a callout filling it stops one gutter short of the
+      // layout; the void this asserts against is an inspector TRACK, an order of magnitude larger.
+      const style = getComputedStyle(wrapper);
+      const columnBox = column.getBoundingClientRect();
+      const wrapperBox = wrapper.getBoundingClientRect();
+      const calloutBox = callout.getBoundingClientRect();
+      const lead = document.querySelector('[data-lane-column-lead]')?.getBoundingClientRect();
       return {
         rendered: true,
-        layoutRight: layout.getBoundingClientRect().right - inset,
-        calloutRight: callout.getBoundingClientRect().right,
+        layoutRight: layout.getBoundingClientRect().right - (parseFloat(style.paddingRight) || 0),
+        calloutRight: calloutBox.right,
         columns: getComputedStyle(layout).gridTemplateColumns,
+        gutter: [parseFloat(style.paddingLeft), parseFloat(style.paddingRight)],
+        wrapperInset: [wrapperBox.left - columnBox.left, columnBox.right - wrapperBox.right],
+        leadTop: lead ? lead.top - columnBox.top : null,
+        leadGap: lead ? calloutBox.top - lead.bottom : null,
       };
     });
     await context.close();
@@ -506,11 +563,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       return {
         rendered: true,
         hasPagination: Boolean(pagination),
-        // The CONTENT box: the column carries the pane's inset (see the unavailable measurement
-        // above), so its border-box bottom sits one inset below anything filling it.
-        columnBottom:
-          column.getBoundingClientRect().bottom -
-          (parseFloat(getComputedStyle(column).paddingBottom) || 0),
+        // The border box: the column carries no inset (M21), so its foot child fills to it.
+        columnBottom: column.getBoundingClientRect().bottom,
         rowsBottom: rowsRegion.getBoundingClientRect().bottom,
         paginationBottom: pagination ? pagination.getBoundingClientRect().bottom : 0,
         paginationHeight: pagination ? pagination.getBoundingClientRect().height : 0,
@@ -783,6 +837,108 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         `leaving a ${Math.round(box.layoutRight - box.calloutRight)}px void`
     );
   });
+
+  it('keeps the unavailable warning on the gutter, its wrapper flush to the column (issue 2373)', async () => {
+    const box = await measureUnavailable(WIDE_WINDOW_PX);
+    assert.equal(box.rendered, true, 'the unavailable wrapper or its callout is absent');
+    assert.deepEqual(box.gutter, [GUTTER_PX, GUTTER_PX], 'one gutter on each side of the warning');
+    assert.ok(
+      box.wrapperInset.every((edge) => Math.abs(edge) <= EPSILON_PX),
+      `the wrapper sits ${box.wrapperInset.join('/')}px inside the column's left/right edges`
+    );
+  });
+
+  it('puts one gutter, not two, between a column lead and the unavailable warning (issue 2373)', async () => {
+    const box = await measureUnavailable(WIDE_WINDOW_PX, unavailableLeadMarkup);
+    assert.equal(box.rendered, true, 'the unavailable wrapper or its callout is absent');
+    assert.ok(box.leadTop !== null, 'NON-VACUITY: the column lead rendered above the warning');
+    assert.ok(
+      Math.abs(box.leadTop - GUTTER_PX) <= EPSILON_PX,
+      `the lead starts ${box.leadTop}px below the column's top, not one ${GUTTER_PX}px gutter`
+    );
+    assert.ok(
+      Math.abs(box.leadGap - GUTTER_PX) <= EPSILON_PX,
+      `the warning starts ${box.leadGap}px below the lead, not one ${GUTTER_PX}px gutter`
+    );
+  });
+
+  /** The list column's padding and its bands' edges, under one route's surface ladder. */
+  async function measureFlushColumn(productMarkup, view) {
+    const context = await browser.newContext({
+      viewport: { width: CATALOGUE_WINDOW_PX, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(productMarkup, CATALOGUE_WINDOW_PX, HOST_HEIGHT_PX, view));
+    const result = await tab.evaluate(() => {
+      const column = document.querySelector('.manager-scoped-list-column');
+      const toolbar = column?.querySelector(':scope > .manager-scoped-list-toolbar');
+      const rows = column?.querySelector(':scope > .manager-scoped-list-rows');
+      const row = rows?.querySelector('[data-scoped-list-row]');
+      if (!column || !toolbar || !rows || !row) return { rendered: false };
+      const columnBox = column.getBoundingClientRect();
+      const edges = (element) => {
+        const box = element.getBoundingClientRect();
+        return [box.left - columnBox.left, columnBox.right - box.right];
+      };
+      const style = getComputedStyle(column);
+      return {
+        rendered: true,
+        padding: ['Top', 'Right', 'Bottom', 'Left'].map((side) =>
+          parseFloat(style[`padding${side}`])
+        ),
+        toolbar: edges(toolbar),
+        rows: edges(rows),
+        rowInset: row.getBoundingClientRect().left - columnBox.left,
+        rowsPaddingBottom: parseFloat(getComputedStyle(rows).paddingBottom),
+        footClass: String(column.lastElementChild.className),
+        footGap: columnBox.bottom - column.lastElementChild.getBoundingClientRect().bottom,
+      };
+    });
+    await context.close();
+    return result;
+  }
+
+  for (const { view, markupOf, foot, footPadding } of [
+    // Eleven tools over a ten-row page, so the pager is the foot and the scroller pads nothing.
+    {
+      view: 'world-tools',
+      markupOf: () => selectionRestingMarkup,
+      foot: 'fabricate-pagination',
+      footPadding: 0,
+    },
+    {
+      view: 'world-essences',
+      markupOf: () => essenceMarkup,
+      foot: 'manager-scoped-list-rows',
+      footPadding: GUTTER_PX,
+    },
+  ]) {
+    it(`runs the ${view} list column edge to edge, its rows on the gutter (M21, issue 2373)`, async () => {
+      const box = await measureFlushColumn(markupOf(), view);
+      assert.equal(box.rendered, true, 'the column, its toolbar, its rows or a row did not render');
+      assert.deepEqual(box.padding, [0, 0, 0, 0], 'the list column carries no inset');
+      for (const band of ['toolbar', 'rows']) {
+        assert.ok(
+          box[band].every((edge) => Math.abs(edge) <= EPSILON_PX),
+          `the ${band} stops ${box[band].join('/')}px short of the column's left/right edges`
+        );
+      }
+      assert.ok(
+        Math.abs(box.rowInset - GUTTER_PX) <= EPSILON_PX,
+        `a row starts ${box.rowInset}px inside the column, not on the ${GUTTER_PX}px gutter`
+      );
+      assert.ok(box.footClass.includes(foot), `NON-VACUITY: the foot is \`${box.footClass}\``);
+      assert.ok(
+        Math.abs(box.footGap) <= EPSILON_PX,
+        `the foot stops ${box.footGap}px above the column's bottom`
+      );
+      assert.equal(
+        box.rowsPaddingBottom,
+        footPadding,
+        'the scroller pads its foot only when it is the foot'
+      );
+    });
+  }
 
   it('gives the ROWS REGION the slack on a short list rather than sizing it to its content', async () => {
     // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS.

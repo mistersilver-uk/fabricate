@@ -2540,23 +2540,6 @@ describe('world Component Catalogue (issue 1371)', () => {
       search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
     }
 
-    it('turns the flush list column ON, so the toolbar, rows and pager run edge to edge (M21)', async () => {
-      // The page-level half of M21; the shell-level default-OFF half sits with the shell mounts
-      // below. Mounted on THIS harness, not the shell's: the two harnesses own different
-      // documents and a page mounted inside the shell block lands on a foreign DOM.
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: {},
-      });
-      const column = target.querySelector('.manager-scoped-list-column');
-      assert.ok(Boolean(column), 'NON-VACUITY: the page renders the frame`s list column');
-      assert.ok(
-        column.classList.contains('is-flush'),
-        'the page hands the shell `flushColumn`; the rendered suite measures what that yields'
-      );
-    });
-
     it('inspects the FIRST row in the shown order the moment it opens, with nothing else chosen', async () => {
       const target = await mountOpen();
       // Name ascending is the shipped sort, so `Coal` leads the corpus.
@@ -2739,16 +2722,6 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.equal(target.querySelectorAll('[data-scoped-list-row]').length, 0);
       assert.deepEqual(selected, [], 'the owner never hears a selection there is no row for');
-    });
-
-    it('leaves the list column carrying the pane inset with `flushColumn` unset, exactly as the other catalogues do (M21)', async () => {
-      const target = await shellHarness.mount(shellProps());
-      const column = target.querySelector('.manager-scoped-list-column');
-      assert.ok(Boolean(column), 'NON-VACUITY: the frame renders its list column');
-      assert.ok(
-        !column.classList.contains('is-flush'),
-        'the default is OFF: the essence and tool catalogues keep the inset they always had'
-      );
     });
 
     it('leaves the inspector column`s inset alone with `flushBulkDock` unset (M24)', async () => {
