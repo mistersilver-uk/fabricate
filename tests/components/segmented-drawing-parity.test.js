@@ -28,14 +28,17 @@ const shipped = scopedComponentCss(resolve(repoRoot, COMPONENT));
 /** Each form: the props its callers pass, the drawn well that draws it, and how many uses draw it. */
 const FORMS = Object.freeze({
   default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field)', uses: 10 },
-  tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag', uses: 4 },
-  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline', uses: 30 },
-  field: { props: { density: 'field' }, drawn: '.k-seg.field', uses: 1 },
+  tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
+  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 30 },
+  field: { props: { density: 'field' }, drawn: '.k-seg.field:not(.tag)', uses: 1 },
+  // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet.
+  tagInline: { props: { tone: 'tag', density: 'inline' }, drawn: '.k-seg.tag.inline', uses: 1 },
+  tagField: { props: { tone: 'tag', density: 'field' }, drawn: '.k-seg.tag.field', uses: 1 },
 });
 
 /** D1: the shipped idle ink measures under 4.5:1 at these sizes, so the drawing passes (#2368). */
 const D1 = Object.freeze(
-  ['tag', 'inline', 'field'].map((form) => ({
+  ['tag', 'inline', 'field', 'tagInline', 'tagField'].map((form) => ({
     pair: `${form} idle color`,
     drawn: '--fab-text-muted',
     shipped: '--fab-text-subtle',
