@@ -12,6 +12,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 // The Overview cells and the ingredient row's kind control are the shared `<Select>` since issue
 // 1510, so choosing a value is an open-then-click on a panel portaled onto the mount target.
@@ -527,12 +528,6 @@ function alternativeTrigger(target, groupId) {
     group.querySelector('.manager-recipe-or-trigger') ??
     group.querySelector('[data-recipe-add="alternative"]')
   );
-}
-
-// A focus move is a task queued behind the menu's own `tick()` restore, so wait out both.
-async function settleFocus() {
-  await tick();
-  await flushRender();
 }
 
 // Open a BARE row's single "or..." menu.
@@ -3818,7 +3813,8 @@ describe('RecipeEditView (mounted)', () => {
       );
       try {
         await addRequirement(target, tone);
-        await settleFocus();
+        await tick();
+        await settle();
         assert.equal(patches.length, 1, `${tone}: one write`);
         const groups = patches[0].ingredientSets[0].ingredientGroups;
         assert.equal(groups.length, 2, `${tone}: a requirement is appended`);
@@ -3848,7 +3844,8 @@ describe('RecipeEditView (mounted)', () => {
     document
       .querySelector('.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]')
       .click();
-    await settleFocus();
+    await tick();
+    await settle();
     assert.equal(patches.length, 1, 'exactly one write');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'carrying one requirement');
@@ -3858,6 +3855,43 @@ describe('RecipeEditView (mounted)', () => {
     const addTag = target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add-tag]');
     assert.ok(Boolean(addTag), 'the new row draws its + Tag');
     assert.ok(document.activeElement === addTag, 'and focus lands on it');
+    editHarness.remount();
+  });
+
+  it('a refused Ingredient write never moves focus onto a requirement added later', async () => {
+    const herb = {
+      id: 'grp-1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+    };
+    const { target, patches } = await mountIngredientGroups([herb], {
+      set: { name: 'Primary' },
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+    });
+    await addRequirement(target, 'tag');
+    await tick();
+    await settle();
+    assert.equal(patches.length, 1, 'the adder asks once, and the parent refuses');
+    const resting = document.activeElement;
+    const tagged = { quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } };
+    await editHarness.setProps({
+      recipe: {
+        ...RECIPE,
+        ingredientSets: [
+          {
+            id: 'set-1',
+            name: 'Primary',
+            ingredientGroups: [herb, { id: 'grp-2', options: [tagged] }],
+          },
+        ],
+      },
+    });
+    await tick();
+    await settle();
+    const later = target.querySelector(
+      ':scope [data-recipe-group-id="grp-2"] [data-recipe-add-tag]'
+    );
+    assert.ok(Boolean(later), 'an unrelated update grows the set by a tag requirement');
+    assert.ok(document.activeElement === resting, 'and focus stays where the refusal left it');
     editHarness.remount();
   });
 
@@ -4269,7 +4303,8 @@ describe('RecipeEditView (mounted)', () => {
       try {
         const adder = alternativeTrigger(target, 'grp-1');
         await pickKind(target, adder, `alternative-${tone}`);
-        await settleFocus();
+        await tick();
+        await settle();
         assert.equal(patches.length, 1, `${tone}: one write`);
         const options = patches[0].ingredientSets[0].ingredientGroups[0].options;
         assert.deepEqual(options[2], { quantity: 1, match: EMPTY[tone] }, `${tone}: born empty`);
@@ -4285,6 +4320,38 @@ describe('RecipeEditView (mounted)', () => {
     }
   });
 
+  it('a refused Alternative write never moves focus onto an alternative added later', async () => {
+    const options = [
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+      { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+    ];
+    const { target, patches } = await mountSingleGroup(options, {
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+    });
+    await pickKind(target, alternativeTrigger(target, 'grp-1'), 'alternative-component');
+    await tick();
+    await settle();
+    assert.equal(patches.length, 1, 'the adder asks once, and the parent refuses');
+    const resting = document.activeElement;
+    const tagged = { quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'any' } };
+    await editHarness.setProps({
+      recipe: {
+        ...RECIPE,
+        ingredientSets: [
+          { id: 'set-1', ingredientGroups: [{ id: 'grp-1', options: [...options, tagged] }] },
+        ],
+      },
+    });
+    await tick();
+    await settle();
+    const rows = target.querySelectorAll(
+      ':scope [data-recipe-group-id="grp-1"] [data-recipe-option]'
+    );
+    assert.equal(rows.length, 3, 'an unrelated update grows the box by a tag alternative');
+    assert.ok(document.activeElement === resting, 'and focus stays where the refusal left it');
+    editHarness.remount();
+  });
+
   it('Escape closes the box adder’s menu and returns focus to the adder', async () => {
     const { target, patches } = await mountSingleGroup(
       [
@@ -4295,13 +4362,15 @@ describe('RecipeEditView (mounted)', () => {
     );
     const adder = alternativeTrigger(target, 'grp-1');
     await openKindMenu(target, adder);
-    await settleFocus();
+    await tick();
+    await settle();
     const item = document.querySelector(OR_MENU_ITEMS);
     assert.ok(document.activeElement === item, 'opening focuses the first item');
     item.dispatchEvent(
       new globalThis.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
     );
-    await settleFocus();
+    await tick();
+    await settle();
     assert.ok(!document.querySelector(OR_MENU_ITEMS), 'the menu closes');
     assert.ok(document.activeElement === adder, 'focus returns to the adder');
     assert.equal(patches.length, 0, 'and nothing is written');
@@ -5002,7 +5071,7 @@ describe('RecipeEditView (mounted)', () => {
       props: { componentOptions: COMPONENT_OPTIONS },
     });
     await addRequirement(target, 'component');
-    assert.equal(patches.length, 1, 'the adder patches the recipe directly, with no popover');
+    assert.equal(patches.length, 1, 'choosing a kind patches the recipe once');
     const groups = patches[0].ingredientSets[0].ingredientGroups;
     assert.equal(groups.length, 1, 'a requirement is appended to the set');
     assert.deepEqual(

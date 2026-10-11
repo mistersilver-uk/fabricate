@@ -62,8 +62,9 @@
     offeredIngredientKinds({ essenceOptions, currencyUnits, currencyEnabled })
   );
 
-  // The index of the requirement whose name field takes focus once the caller hands it back;
-  // rooted at the card because the groups container does not exist while the set is empty.
+  // The id of the requirement whose name field takes focus once the caller hands it back; the next
+  // set that does not hold it disarms it, so a refused write never moves focus. Rooted at the card
+  // because the groups container does not exist while the set is empty.
   let root = $state(null);
   let pendingFocus = null;
 
@@ -72,23 +73,25 @@
    * because the set keys its children by it; the OPTION stays id-less for the store to normalize.
    */
   function addRequirement(kind) {
-    pendingFocus = groups.length;
+    const id = newId();
+    pendingFocus = id;
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [emptyIngredientOption(kind)] }],
+      ingredientGroups: [...groups, { id, options: [emptyIngredientOption(kind)] }],
     });
   }
 
   // A task, so the focus lands after `ActionMenu` hands focus back to the adder.
   $effect(() => {
-    const count = groups.length;
-    if (!root || pendingFocus === null || count <= pendingFocus) return;
+    const id = pendingFocus;
+    const held = groups.some((group) => group?.id === id);
+    pendingFocus = null;
+    if (!id || !held) return;
     setTimeout(() => {
-      const at = pendingFocus;
-      pendingFocus = null;
-      if (at === null) return;
-      const group = root?.querySelectorAll('[data-recipe-group]')[at];
-      group?.querySelector('[data-recipe-option-search], [data-recipe-add-tag]')?.focus();
+      root
+        ?.querySelector(`[data-recipe-group-id="${id}"]`)
+        ?.querySelector('[data-recipe-option-search], [data-recipe-add-tag]')
+        ?.focus();
     }, 0);
   });
 

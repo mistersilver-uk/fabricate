@@ -136,30 +136,42 @@
   }
 
   // Choosing a kind appends an alternative carrying its kind and no value, and focus moves to its
-  // name field once the caller hands it back; a removed member's moves to the member taking its
-  // place, else the one before.
+  // name field once the caller hands that entry back; a removed member's moves to the member taking
+  // its place, else the one before. The next group that does not hold the entry disarms the focus,
+  // so a refused write never moves it.
   let root = $state(null);
   let pendingFocus = null;
   const NAME_FIELD = '[data-recipe-option-search], [data-recipe-add-tag]';
   const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
-  const focusNameAt = (at) => (pendingFocus = { at, selector: NAME_FIELD });
+  const focusOn = (at, entry, selector = NAME_FIELD) => (pendingFocus = { at, entry, selector });
+
+  // Whether `entries[at]` is `entry`: the same id where it carries one (a result member), else the
+  // same unnamed subject (an id-less ingredient option).
+  function holds(entries, at, entry) {
+    const arrived = entries[at];
+    if (!arrived) return false;
+    if (entry.id) return arrived.id === entry.id;
+    const [now, then] = [toValue(arrived), toValue(entry)];
+    return now.kind === then.kind && now.id === then.id && String(now.tags) === String(then.tags);
+  }
 
   function selectKind(type) {
-    focusNameAt(options.length);
-    onChange({ ...group, options: [...options, emptyIngredientOption(type)] });
+    const option = emptyIngredientOption(type);
+    focusOn(options.length, option);
+    onChange({ ...group, options: [...options, option] });
   }
 
   const members = $derived(isChoiceGroup(group) ? group.alternatives : []);
 
-  // The entry count is read first, so the effect tracks it even while no focus is pending. The
-  // focus is a task, so it lands after `ActionMenu` hands focus back to the adder that stays.
+  // Runs once per group the caller hands back. The focus is a task, so it lands after
+  // `ActionMenu` hands focus back to the adder that stays.
   $effect(() => {
-    const count = side === 'result' ? members.length : options.length;
-    if (!root || !pendingFocus || count <= pendingFocus.at) return;
+    const entries = side === 'result' ? members : options;
+    const pending = pendingFocus;
+    pendingFocus = null;
+    if (!pending || !holds(entries, pending.at, pending.entry)) return;
     setTimeout(() => {
-      const pending = pendingFocus;
-      pendingFocus = null;
-      const row = pending && root?.querySelectorAll('[data-recipe-option]')[pending.at];
+      const row = root?.querySelectorAll('[data-recipe-option]')[pending.at];
       row?.querySelector(pending.selector)?.focus();
     }, 0);
   });
@@ -197,13 +209,15 @@
   // The bare row's `or…` keeps the row's id as the group's, so this instance and its pending
   // focus survive the conversion.
   function convert(kind) {
-    focusNameAt(1);
-    onChange(convertToGroup(group, kind));
+    const next = convertToGroup(group, kind);
+    focusOn(1, next.alternatives[1]);
+    onChange(next);
   }
 
   function addMember(kind) {
-    focusNameAt(members.length);
-    onChange(withAlternative(group, kind));
+    const next = withAlternative(group, kind);
+    focusOn(members.length, next.alternatives[members.length]);
+    onChange(next);
   }
 
   function updateMember(index, next) {
@@ -214,7 +228,8 @@
   function removeMember(index) {
     const next = withoutAlternative(group, index);
     if (isChoiceGroup(next)) {
-      pendingFocus = { at: Math.min(index, next.alternatives.length - 1), selector: FIRST_CONTROL };
+      const at = Math.min(index, next.alternatives.length - 1);
+      focusOn(at, next.alternatives[at], FIRST_CONTROL);
     }
     if (next) onChange(next);
     else onRemove();
