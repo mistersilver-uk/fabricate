@@ -155,20 +155,11 @@ function memoizedBySource(compute) {
   };
 }
 
-/**
- * Files a pattern names before the file exists (issue 2381): the lab registry lands one PR ahead of
- * the stage row and band it points at, so the guard waits for them. Once tracked, an entry here is inert.
- */
-const AWAITED_FILES = [
-  'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
-  'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
-];
-
 /** What one pattern strands: itself when it matches no tracked file, then each stranded path. */
 const strandedIn = memoizedBySource((pattern) => [
   ...(tracked.some((file) => pattern.test(file)) ? [] : ['']),
   ...alternativesOf(pattern)
-    .filter((regex) => [...tracked, ...AWAITED_FILES].every((file) => !regex.test(file)))
+    .filter((regex) => tracked.every((file) => !regex.test(file)))
     .map((regex) => ` (expansion ${regex})`),
 ]);
 
@@ -320,13 +311,4 @@ test('no file the app View Lab is built from loads anything of the Primitive Lab
     )
   );
   assert.deepEqual(reaching, [], 'these app lab inputs load the Primitive Lab');
-});
-
-test('an awaited file leaves the allowance the moment it is tracked', () => {
-  // Otherwise a later rename of the arrived file would hide behind its stale entry here.
-  assert.deepEqual(
-    AWAITED_FILES.filter((file) => tracked.includes(file)),
-    [],
-    'delete these from AWAITED_FILES now that they exist'
-  );
 });
