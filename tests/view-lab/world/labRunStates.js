@@ -575,7 +575,7 @@ function journalCaseFactories(context) {
     'waiting-auto-eligible': () => active(waiting('lab-v1-waiting-auto-eligible')),
     'waiting-open-choice': () =>
       active(unbegun('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
-    // Issue 2366: every group's pick points past its options, so the slot falls back to the open face.
+    // Issue 2366: each group's pick points past its options, so its slot shows the open face.
     'stale-choice': () => {
       const run = unbegun('lab-v1-stale-choice', choice(), { completionMode: 'manual' });
       const [stage] = run.steps;

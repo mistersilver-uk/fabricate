@@ -47,7 +47,7 @@
     {...attributes}
   >
     <!-- ratchet-exempt(design-system): the specimen's own 56px tap target, not a record tile -->
-    <Medallion {art} icon={glyphClass} {tint} alt="" size={56} glyph={unpicked ? 13 : 19} />
+    <Medallion {art} icon={glyphClass} {tint} alt="" size={56} glyph={unpicked ? 15 : 19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}

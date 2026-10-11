@@ -595,7 +595,8 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '[data-journal-detail][data-run-key*="lab-v1-stale-choice"]' +
-      ' [data-slot-row] [data-slot-state="open"] .fab-slot-tile i.fa-regular.fa-circle:not(.fas):not(.fa-solid)',
+      ' [data-slot-row] [data-slot-state="open"] .fab-slot-tile' +
+      ' i.fa-regular.fa-circle:not(.fas):not(.fa-solid)',
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
   }),

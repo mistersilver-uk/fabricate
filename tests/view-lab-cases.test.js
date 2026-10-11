@@ -1283,7 +1283,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  // 76 since issue 2366 added the stale choice, registered beside the generated family in playerJournal.js.
+  // 76 since issue 2366 added the stale choice, registered in playerJournal.js.
   assert.equal(cases.length, 76);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);

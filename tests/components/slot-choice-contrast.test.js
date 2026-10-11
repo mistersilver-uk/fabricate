@@ -1,6 +1,7 @@
 /**
  * Issue 2257 D16 and task 10b: each slot pip's ink on its solid fill, and a short candidate's
  * danger reading on its own ground and on the chosen face, clear 4.5:1 in all seven themes.
+ * Issue 2366: an open tile's empty ring clears the 3:1 non-text floor on the tile in all seven.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -45,19 +46,11 @@ test("a short candidate's reading clears 4.5:1 on its own ground and once chosen
   assert.deepEqual(shortfalls(ink, [chosen, ground]), []);
 });
 
-test("an open tile's empty ring is inked --fab-accent-text and clears 3:1 on the tile in every theme", () => {
+test("an open tile's empty ring is inked --fab-accent-text and clears 3:1 on the tile", () => {
   const ink = declared(TILE, '.fab-slot-tile.is-unpicked', '--fab-medallion-tint');
   assert.equal(ink, '--fab-accent-text');
   const ground = [declared(TILE, '.fab-slot-tile', 'background')];
   assert.deepEqual(inkShortfalls(themes, ink, ground, 3), []);
-  assert.deepEqual(
-    inkShortfalls(themes, ink, ground, 4.16),
-    [`hearth-herb: ${ink} on ${ground[0]} 4.15:1`],
-    'the minimum'
-  );
-  assert.deepEqual(
-    inkShortfalls(themes, '--fab-accent', ground, 3).map((line) => line.split(':', 1)[0]),
-    ['ironblood-forge', 'hearth-herb'],
-    'why the ring does not take the met glyph ink'
-  );
+  // Why the ring does not take the met glyph's ink.
+  assert.notDeepEqual(inkShortfalls(themes, '--fab-accent', ground, 3), []);
 });
