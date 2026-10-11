@@ -11,9 +11,12 @@
   {
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "empty — where every row starts",
-    "draws": ":scope > div:nth-of-type(1) > div",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "The search's open list beneath stays drawn until phase 2.",
+    "fixture": "PickerRowSearchOpen",
+    "slot": { "width": 620, "height": 163 },
+    "data": { "typed": "ingot" },
+    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window: 620 by 163 holds the row on one line with the search as wide as the list's 220px floor, and the list opens 4px beneath the search at its left edge, unclamped and unflipped.",
     "props": {
       "value": {
         "kind": "component",
@@ -47,7 +50,6 @@
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(1)",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "The named pill draws the subject's name alone, so the drawn \"Metal · #Refined\" line has no prop. The fifth drawing, Completed activity, is not a shipped kind and stays drawn.",
     "props": {
       "value": {
         "kind": "component",
@@ -153,7 +155,7 @@
     "cap": "result side — the same row, a different offered set",
     "draws": ":scope > div > div:nth-child(1)",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "A result row, offering the result kinds. The drawn \"learns the recipe\" line has no prop.",
+    "note": "A result row, offering the result kinds.",
     "props": {
       "value": {
         "kind": "knowledge",
@@ -319,7 +321,7 @@
     "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: they are the result set's, not the row's.",
+    "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: `KindAdder` renders them for `RecipeResultGroupCard`, which no library entry names, so a row for them would stand outside its entry. The adder's menu is drawn in the kind menu's inks, which carry its #2368 debt.",
     "props": {
       "value": {
         "kind": "component",
@@ -626,7 +628,6 @@
     "draws": ":scope > div > div > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
     "fixture": "KindMenuOpen",
-    "partial": "first item unfocused",
     "slot": { "width": 515, "height": 197 },
     "undrawn": {
       "Oak Haft": "the row’s named component; the drawing draws the trigger without its row"
@@ -639,7 +640,7 @@
       },
       "allowAny": true
     },
-    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 515 by 197 holds the row on one line with its named pill whole, and the menu opens beneath its trigger, unclamped and unflipped; below 507 the pill is squeezed under the stepper. The shipped menu is headed “Accept instead” at the Kind menu panel row’s 150px, where the drawing heads it “Add an alternative” at 210px, and lists the four kinds this side offers: the drawing’s fifth item, Completed activity, does not ship. The menu moves real focus to its first item, which paints `--fab-surface-raised` and an accent ring only while it holds focus, never the drawing’s `--fab-surface-active`, and the page takes that focus away."
+    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 515 by 197 holds the row on one line with its named pill whole, and the menu opens beneath its trigger, unclamped and unflipped; below 507 the pill is squeezed under the stepper. On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
@@ -647,7 +648,6 @@
     "draws": ":scope > div > div > div",
     "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
     "fixture": "KindMenuOpen",
-    "partial": "first item unfocused",
     "slot": { "width": 630, "height": 375 },
     "undrawn": {
       "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
@@ -673,7 +673,7 @@
       "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
       "currencyEnabled": true
     },
-    "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. The heading, the 150px width, the missing fifth item and the first item’s focus diverge as the bare row’s do."
+    "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. Its drawn inks carry the bare row's #2368 debt."
   },
   {
     "spec": "<SetPicker>",
