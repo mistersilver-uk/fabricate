@@ -487,7 +487,12 @@ export const CASES = Object.freeze([
       },
       {
         container: '[data-scoped-page="world-tool-entry"]',
-        target: '[data-tool-repair-requirements] [data-recipe-add="component"]',
+        target: '[data-tool-repair-requirements] [data-recipe-add="ingredient"]',
+      },
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-group].has-alternatives',
+        target:
+          '[data-tool-repair-requirements] [data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
       },
       {
         container: '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag',
@@ -501,6 +506,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
       // The row itself, because this is the only frame photographing a tag requirement inside a Tool inspector.
       /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/ChoiceGroup\.svelte$/,
     ],
   }),
   managerCase({
@@ -552,7 +559,8 @@ export const CASES = Object.freeze([
       },
       { selector: '[data-world-tool-entry-tab="breakage"]' },
       { selector: '[data-tool-repair-requirements]', scroll: true },
-      { selector: '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]' },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add="ingredient"]' },
+      { selector: '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]' },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',

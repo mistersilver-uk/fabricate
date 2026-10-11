@@ -467,10 +467,11 @@ export const CASES = Object.freeze([
         container: '[data-recipe-option]',
         target: '[data-recipe-option-kind]',
       },
-      // And the adders, which are three controls in one row rather than three stacked buttons: the set card draws them.
+      // And the set's one adder over the kind menu, the only child of its foot.
       {
         container: '[data-recipe-set]',
-        target: '[data-recipe-add="tag-requirement"]',
+        target:
+          '[data-recipe-set] .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
       },
     ],
     kinds: ['manager', 'recipes'],
@@ -561,7 +562,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // The `Any one of` box: a requirement with two alternatives, its pill, its hint and its adders.
+  // The `Any one of` box: a requirement with two alternatives, its pill, its hint and its one adder.
   managerCase({
     id: 'manager-recipe-edit-ingredients-choice-group',
     label: 'Manager — Recipe edit ingredients, a choice group of two alternatives',
@@ -572,20 +573,34 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-tincture"]' },
       { selector: '#recipe-tab-ingredients' },
-      { selector: '[data-recipe-any-one-of]', scroll: true },
+      {
+        selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
+        scroll: true,
+      },
     ],
     expectView: 'recipe-edit',
-    // Two member rows inside the box, and neither draws the convert control the bare row carries.
+    // Two member rows inside the box, neither drawing a convert control, and one menu adder at its foot.
     expectSelector:
       '[data-recipe-group].has-alternatives:has([data-recipe-any-one-of])' +
       ':has([data-recipe-option] ~ [data-recipe-option])' +
-      ':not(:has(.manager-recipe-or-trigger)) [data-recipe-add="alternative-component"]',
+      ':not(:has(.manager-recipe-or-trigger, [data-recipe-add^="alternative-"])) ' +
+      '.manager-recipe-requirement-adds:has(> :only-child) [data-recipe-add="alternative"][aria-haspopup="menu"]',
     expectContained: [
       {
         container: '[data-recipe-group].has-alternatives',
         target: '[data-recipe-group].has-alternatives [data-recipe-option]',
       },
     ],
+    // The dashed `Button`'s pinned 34px, as the set's own adder below it.
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
+          styles: 'height: 34px; border-top-style: dashed',
+        },
+      ],
+    },
+    expectCenterHit: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -691,11 +706,12 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
-  // The kind menu opened from the bare row beneath a choice group, so the menu and the box's
-  // `alt <kind>` adders, which state the same kinds in the same order, share one frame.
+  // The kind menu opened from a choice group's Alternative adder: the menu the bare row's `or…`
+  // opens, from the adder's start edge.
   managerCase({
     id: 'manager-recipe-edit-choice-group-menu',
-    label: 'Manager — Recipe edit ingredients, the kind menu beside a choice group',
+    label:
+      'Manager — Recipe edit ingredients, the kind menu opened from a choice group’s Alternative adder',
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -703,23 +719,70 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-tincture"]' },
       { selector: '#recipe-tab-ingredients' },
-      { selector: '[data-recipe-any-one-of]', scroll: true },
-      { selector: '[data-recipe-group-id="hb-set-tincture-g3"] .manager-recipe-or-trigger' },
+      {
+        selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
+        scroll: true,
+      },
+      { selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]' },
     ],
     expectView: 'recipe-edit',
-    // The open menu, headed and named by its heading, while the box keeps its four adders.
+    // The open menu, headed and named by its heading, opened from the box's adder.
     expectSelector:
-      '.fabricate-manager:has([data-recipe-group].has-alternatives [data-recipe-add="alternative-cost"]) ' +
+      '.fabricate-manager:has([data-recipe-group].has-alternatives [data-recipe-add="alternative"][aria-expanded="true"]) ' +
       '.fabricate-action-menu-panel.manager-recipe-or-menu:has(.manager-action-menu-heading) ' +
       '[role="menu"][aria-labelledby] [data-recipe-add="alternative-currency"]',
     expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-menu' }],
     expectCenterHit: '.manager-recipe-or-menu [data-recipe-add="alternative-tag"]',
-    // The shared panel's 11 and items' 7, which the kind menu inherits (issue 2257).
     expectLayout: {
+      containerSelector: '.manager-recipe-ingredients-section',
+      alignedLeft: '[data-recipe-add="alternative"][aria-expanded="true"], .manager-recipe-or-menu',
+      // The shared panel's 11 and items' 7, which the kind menu inherits (issue 2257).
       controls: [
         { selector: '.manager-recipe-or-menu', styles: 'border-radius: 11px' },
         {
           selector: '.manager-recipe-or-menu [data-recipe-add="alternative-tag"]',
+          styles: 'border-radius: 7px',
+        },
+      ],
+    },
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // An ingredient set's Ingredient adder open: the kind menu headed "Add an ingredient".
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-adder-menu',
+    label: 'Manager — Recipe edit ingredients, the Ingredient adder’s kind menu open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-add="ingredient"]', scroll: true },
+      { selector: '[data-recipe-add="ingredient"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-action-menu-panel.manager-recipe-ingredient-menu:has(.manager-action-menu-heading) ' +
+      '[role="menu"][aria-labelledby] [data-recipe-add="ingredient-tag"]',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.manager-recipe-ingredient-menu' },
+    ],
+    expectCenterHit: '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]',
+    // The menu opens from the adder's start edge, at the shared panel's 11 and items' 7.
+    expectLayout: {
+      containerSelector: '.manager-recipe-ingredients-section',
+      alignedLeft:
+        '[data-recipe-add="ingredient"][aria-expanded="true"], .manager-recipe-ingredient-menu',
+      controls: [
+        { selector: '.manager-recipe-ingredient-menu', styles: 'border-radius: 11px' },
+        {
+          selector: '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]',
           styles: 'border-radius: 7px',
         },
       ],
@@ -1148,11 +1211,18 @@ export const CASES = Object.freeze([
     steps: [
       ...REWARD_RESULTS_STEPS,
       { selector: RESULT_GROUP('sm-r-horseshoe-reward'), scroll: true },
+      {
+        selector:
+          '[data-recipe-result-group="sm-r-horseshoe-reward"] [data-recipe-add="alternative"]',
+        scroll: true,
+      },
     ],
     expectView: 'recipe-edit',
     expectSelector:
       `${RESULT_GROUP('sm-r-horseshoe-reward')}:not(:has([data-recipe-group-repeats], ` +
       '[data-recipe-range-cell])) [data-recipe-group-count]',
+    expectCenterHit:
+      '[data-recipe-result-group="sm-r-horseshoe-reward"] [data-recipe-add="alternative"]',
     expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-reward'),
     kinds: ['manager', 'recipes'],
     sourceMatches: [...GROUP_SOURCES],
