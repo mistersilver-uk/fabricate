@@ -2641,3 +2641,87 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 });
+
+describe('a Primitive Lab file is not a render file (issue 2382)', () => {
+  const PAGE_CSS = 'tests/view-lab/primitives/page.css';
+  const RENDER_FILE = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+  const primitiveLab = spawnSync(
+    'git',
+    ['ls-files', '--', 'tests/view-lab/primitives/', 'tests/view-lab/primitives.html'],
+    { encoding: 'utf8' },
+  ).stdout.split(/\r?\n/).filter(Boolean);
+  const viewIds = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
+  const armedBy = files => [
+    hasUiChanges(files) && 'hasUiChanges',
+    viewIds(files).length > 0 && viewIds(files).join(', '),
+    smokeLabelsForChangedFiles(files).length > 0 && 'smoke labels',
+  ].filter(Boolean);
+
+  it('arms nothing and maps no view for any tracked Primitive Lab path', () => {
+    assert.ok(primitiveLab.length >= 10, `only ${primitiveLab.length} Primitive Lab paths are tracked`);
+    assert.ok(primitiveLab.includes('tests/view-lab/primitives.html'));
+    assert.ok(primitiveLab.includes(PAGE_CSS));
+    assert.ok(primitiveLab.some(file => file.endsWith('.svelte')));
+
+    const armed = primitiveLab
+      .map(file => [file, armedBy([file])])
+      .filter(([, reasons]) => reasons.length > 0)
+      .map(([file, reasons]) => `${file} → ${reasons.join('; ')}`);
+    assert.deepEqual(armed, []);
+    assert.equal(explainScreenshotEvidenceFailure(primitiveLab, ''), null);
+
+    for (const form of [`./${PAGE_CSS}`, String.raw`tests\view-lab\primitives\page.css`]) {
+      assert.deepEqual(armedBy([form]), [], form);
+    }
+  });
+
+  it('leaves a mixed set armed by its render file, with that file\'s views', () => {
+    const mixed = [...primitiveLab, RENDER_FILE];
+    assert.equal(hasUiChanges(mixed), true);
+    assert.deepEqual(viewIds(mixed), viewIds([RENDER_FILE]));
+    assert.deepEqual(armedBy([PAGE_CSS, 'lang/en.json']), []);
+  });
+
+  it('keeps a path only near the Primitive Lab armed', () => {
+    for (const file of [
+      'tests/view-lab/primitives.css',
+      'tests/view-lab/primitivesNobodyMadeYet.css',
+      'tests/view-lab/primitives-extra/a.css',
+    ]) {
+      assert.equal(hasUiChanges([file]), true, file);
+    }
+    assert.equal(hasUiChanges(['tests/view-lab/cascade.css']), true);
+    assert.deepEqual(viewIds(['tests/view-lab/cascade.css']), ['theme-or-global-ui']);
+  });
+
+  it('check skips a Primitive Lab-only change before awaiting the capture', async () => {
+    const paths = writeGateCliInputs({ prefix: 'fabricate-primitive-lab-', changedFiles: primitiveLab });
+    const gh = makeGhFake({ runs: [workflowRun({ prNumber: 2382 })] });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          gateCheckArgv(paths, {
+            prNumber: 2382,
+            extra: [
+              '--repo', 'misterpotts/fabricate',
+              '--head-sha', 'a'.repeat(40),
+              '--await-capture',
+              '--capture-eligible', 'true',
+              '--capture-workflow', 'pr-screenshots.yml',
+            ],
+          }),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0, captured.error.join('\n'));
+      assert.ok(captured.log.includes('No UI files changed - screenshot check skipped.'), captured.log.join('\n'));
+      assert.equal(gh.calls.length, 0);
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+});

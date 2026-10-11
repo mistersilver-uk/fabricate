@@ -16,6 +16,7 @@ import {
   VIEW_LAB_CASES,
   hasUiChanges,
   isLabInput,
+  isPrimitiveLabPath as labIsPrimitiveLabPath,
   isUiFile,
   mapChangedFilesToCases,
   normalizePath,
@@ -227,26 +228,82 @@ const PRIMITIVE_LAB_PAGE = 'tests/view-lab/primitives.html';
 const isPrimitiveLabPath = (file) =>
   file === PRIMITIVE_LAB_PAGE || file.startsWith('tests/view-lab/primitives/');
 
-test('a Primitive Lab file selects no app frame, and only the fallback when it arms the gate', () => {
+const PAGE_CSS = 'tests/view-lab/primitives/page.css';
+const RENDER_FILE = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+const NEAR_MISSES = [
+  'tests/view-lab/primitives.css',
+  'tests/view-lab/primitivesNobodyMadeYet.css',
+  'tests/view-lab/primitives-extra/a.css',
+  'tests/view-lab/cascade.css',
+];
+
+/** Every way a changed set can reach a frame or the evidence gate, for a set that reaches none. */
+const reachedBy = (files) =>
+  [
+    files.some(isUiFile) && 'isUiFile',
+    hasUiChanges(files) && 'hasUiChanges',
+    selectedIds(files).length > 0 && `${selectedIds(files).length} case(s)`,
+    rendersCapture(files) && 'rendersCapture',
+  ].filter(Boolean);
+
+test('the exported Primitive Lab boundary agrees with the restated one', () => {
+  const disagreeing = [...tracked, ...NEAR_MISSES].filter(
+    (file) => labIsPrimitiveLabPath(file) !== isPrimitiveLabPath(file)
+  );
+  assert.deepEqual(disagreeing, []);
+});
+
+test('a Primitive Lab file selects no app frame and never arms the gate', () => {
   const primitiveLab = tracked.filter(isPrimitiveLabPath);
-  const renderFiles = primitiveLab.filter(isUiFile);
-  const nonRender = primitiveLab.filter((file) => !isUiFile(file));
   assert.ok(
     primitiveLab.length >= 10,
     `only ${primitiveLab.length} Primitive Lab paths are tracked`
   );
-  assert.ok(renderFiles.length > 0, 'no Primitive Lab .svelte or .css file is tracked');
-  assert.ok(nonRender.length > 0, 'no Primitive Lab non-render file is tracked');
+  assert.ok(primitiveLab.includes(PRIMITIVE_LAB_PAGE), `${PRIMITIVE_LAB_PAGE} is not tracked`);
+  assert.ok(
+    primitiveLab.some((file) => /\.(?:svelte|css)$/.test(file)),
+    'no Primitive Lab .svelte or .css file is tracked'
+  );
 
-  // A non-render file selects and renders nothing; a render file arms the gate, so it selects the
-  // fallback frame alone.
-  const framed = nonRender
-    .filter((file) => selectedIds([file]).length > 0 || rendersCapture([file]))
-    .map((file) => `${file} → ${selectedIds([file]).length} case(s)`);
-  const beyondFallback = renderFiles
-    .filter((file) => JSON.stringify(selectedIds([file])) !== JSON.stringify([FALLBACK_CASE_ID]))
-    .map((file) => `${file} → ${selectedIds([file]).length} case(s)`);
-  assert.deepEqual({ framed, beyondFallback }, { framed: [], beyondFallback: [] });
+  const reaching = primitiveLab
+    .map((file) => [file, reachedBy([file])])
+    .filter(([, reached]) => reached.length > 0)
+    .map(([file, reached]) => `${file} → ${reached.join(', ')}`);
+  assert.deepEqual(reaching, []);
+
+  for (const form of [`./${PAGE_CSS}`, String.raw`tests\view-lab\primitives\page.css`]) {
+    assert.deepEqual(reachedBy([form]), [], form);
+  }
+});
+
+test('a deleted Primitive Lab fixture selects nothing from its patch', () => {
+  const gone = 'tests/view-lab/primitives/fixtures/RetiredSpecimen.svelte';
+  const patches = { [gone]: '@@ -1,2 +0,0 @@\n-<script></script>\n-<div></div>' };
+  assert.deepEqual(mapChangedFilesToCases([gone], { patches }), []);
+  assert.equal(hasUiChanges([gone]), false);
+  assert.equal(rendersCapture([gone]), false);
+});
+
+test('a Primitive Lab file beside a real render file leaves the gate armed by that file', () => {
+  const fixture = tracked.find((file) => isPrimitiveLabPath(file) && file.endsWith('.svelte'));
+  assert.ok(fixture, 'no Primitive Lab .svelte file is tracked');
+  assert.ok(tracked.includes(PAGE_CSS) && tracked.includes(RENDER_FILE));
+
+  const mixed = [fixture, PAGE_CSS, RENDER_FILE];
+  assert.equal(hasUiChanges(mixed), true);
+  assert.equal(rendersCapture(mixed), true);
+  assert.deepEqual(selectedIds(mixed), selectedIds([RENDER_FILE]));
+  assert.deepEqual(reachedBy([PAGE_CSS, 'lang/en.json']), []);
+  assert.deepEqual(selectedIds([PAGE_CSS, 'tests/view-lab/world/labContent.js']), [
+    ...LAB_SURFACE_CASE_IDS,
+  ]);
+});
+
+test('a path only near the Primitive Lab still arms the gate', () => {
+  for (const file of NEAR_MISSES) {
+    assert.equal(isUiFile(file), true, file);
+    assert.equal(hasUiChanges([file]), true, file);
+  }
 });
 
 test('a Primitive Lab file leaves a real lab input its coverage, and a near miss keeps it', () => {
