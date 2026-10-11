@@ -12,6 +12,8 @@ import {
   attributeValue,
   declaresAttribute,
   importsModule,
+  passesProp,
+  propNone,
 } from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +36,8 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const INSPECTOR = 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte';
+const BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const VIEW_TOGGLE = 'src/ui/svelte/components/ViewToggle.svelte';
 const inspectorSource = read(INSPECTOR);
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
@@ -584,21 +588,17 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // (~86px for the pair); the shipped toggle spelled out "List" and "Grid" and measured
     // ~135px, which made a presentation switch shout as loudly as the status FILTER beside
     // it and pushed row one to the edge of the 1280px capture.
-    const viewControl = browserSource.slice(browserSource.indexOf('options={viewModeOptions}'));
+    const browser = componentAstOf(BROWSER);
     assert.ok(
-      /^[^/]*?\biconOnly\b/s.test(viewControl.slice(0, viewControl.indexOf('/>'))),
-      'the view-mode segmented control opts into the compact variant'
+      importsModule(browser, '../../components/ViewToggle.svelte') &&
+        renderedNodes(browser, 'ViewToggle').length === 1,
+      'the browser switches its arrangement through ViewToggle'
     );
-    // Opt-IN, so the status filter one line above must not have been swept along.
-    const statusControl = browserSource.slice(
-      browserSource.indexOf('options={statusOptions}'),
-      browserSource.indexOf('options={viewModeOptions}')
+    assert.ok(
+      passesProp(componentAstOf(VIEW_TOGGLE), 'SegmentedControl', 'iconOnly'),
+      'which is the segmented control at its compact glyph form'
     );
-    assert.equal(
-      /\biconOnly\b/.test(statusControl),
-      false,
-      'the status filter keeps its words — its options are not glyphs'
-    );
+    assert.ok(propNone(browser, 'SegmentedControl', 'iconOnly'), 'the membership filter keeps its words');
 
     // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name.
     const segmentedStyles = styleBlock(segmentedControlSource);
