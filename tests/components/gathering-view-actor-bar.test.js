@@ -654,6 +654,42 @@ describe('GatheringView ↔ actor bar wiring', () => {
     }
   });
 
+  // Issue 2398: a dismissed d100 prompt leaves its run ready in the Journal, so the listing reloads.
+  it('reloads the listing and warns nothing when the roll prompt is dismissed', async () => {
+    const warns = [];
+    const notifications = {
+      warn: (msg) => {
+        warns.push(msg);
+      },
+    };
+    Object.defineProperty(globalThis, 'ui', { value: { notifications }, configurable: true, writable: true });
+    try {
+      let listings = 0;
+      const services = {
+        listGatheringForActor: () => {
+          listings += 1;
+          return Promise.resolve(listing([attemptableEnv()], 'a1'));
+        },
+        startGatheringAttempt: () =>
+          Promise.resolve({ accepted: true, success: false, cancelled: true })
+      };
+      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      services.actorBar = store;
+      await mountView(services);
+      assert.equal(listings, 1, 'the mount fetched once');
+
+      target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
+      await settle();
+
+      assert.equal(listings, 2, 'the dismissal refreshed task and run state');
+      assert.deepEqual(warns, [], 'a dismissal is not a refusal');
+    } finally {
+      delete globalThis.ui;
+    }
+  });
+
   it('never warns with a non-string, whatever refusal shape the authority returns', async () => {
     const shapes = [
       { success: false },
