@@ -36,6 +36,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
     'fabricate-journal-lifecycle-paused',
+    'fabricate-journal-lifecycle-waiting-auto-eligible',
   ]),
   'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',

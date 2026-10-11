@@ -480,6 +480,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'manager-recipes-normal',
       'a frame that measures an open group box on its own route',
     ],
+    [
+      'src/ui/svelte/components/RunActionBar.svelte',
+      'fabricate-journal-lifecycle-waiting-auto-eligible',
+      'the one frame that draws the completion switch and its kicker',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
     assert.ok(

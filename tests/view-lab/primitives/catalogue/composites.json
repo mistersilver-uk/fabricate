@@ -1342,7 +1342,7 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
     "partial": "no body",
-    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
+    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
     "props": {
       "stage": {
         "name": "Hammer the rivets"
@@ -1409,7 +1409,7 @@
     "cap": "a stage you are only looking at — dashed, muted, inert",
     "draws": ":scope > div > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
-    "note": "The past stage, consumed and produced. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
+    "note": "The past stage, consumed and produced. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
     "props": {
       "stage": {
         "name": "Draw the billet",

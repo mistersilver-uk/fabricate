@@ -3,6 +3,7 @@
   import SegmentedControl from './SegmentedControl.svelte';
   import IconButton from './IconButton.svelte';
   import Button from './Button.svelte';
+  import Kicker from './Kicker.svelte';
 
   let {
     run = {},
@@ -129,7 +130,7 @@
 
       {#if completion}
         <div class="fab-run-action-completion" data-run-completion>
-          {#if completion.label}<span class="fab-run-action-kicker">{completion.label}</span>{/if}
+          {#if completion.label}<Kicker as="span">{completion.label}</Kicker>{/if}
           <SegmentedControl
             options={completion.options ?? []}
             value={completion.value}
@@ -224,19 +225,9 @@
     gap: var(--fab-space-2);
   }
 
-  .fab-run-action-kicker {
-    color: var(--fab-text-subtle);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
   .fab-run-action-completion :global(.manager-segmented) {
     box-sizing: border-box;
-    min-height: 34px;
     padding: var(--fab-space-1);
-    border-radius: 9px;
   }
 
   .fab-run-action-completion :global(.manager-segment) {

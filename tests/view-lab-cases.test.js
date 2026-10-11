@@ -786,6 +786,12 @@ const sortRow = (select, direction) => [
 /** An empty panel's padding, by the one selector a case draws it with (issue 2257 D9). */
 const emptyPadding = (selector, padding) => [{ selector, styles: `padding: ${padding}` }];
 const FAILED_RUN = '[data-history-run-id="lab-run-failed"]';
+/** A run kicker in `Kicker`'s muted scale (issue 2257 D22). */
+const runKicker = (selector) => ({
+  selector,
+  styles: 'font-size: 8.5px; letter-spacing: 0.935px; color: var(--fab-text-muted)',
+});
+const RUN_HEADING = '[data-journal-detail] .fab-run-progress-heading';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -909,6 +915,14 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: slotRing('s1-g1'), styles: 'box-shadow: 0 0 0 1px var(--fab-danger-border)' },
     { selector: slotRing('s1-g3'), styles: 'box-shadow: 0 0 0 1px var(--fab-warning-border)' },
     { selector: '[data-requirement-slot="s1-g2"] .fab-slot-pip', styles: 'line-height: 1.6' },
+  ],
+  'fabricate-journal-lifecycle-waiting-auto-eligible': [
+    runKicker('[data-run-completion] > :first-child'),
+    { selector: '[data-run-completion-switch]', styles: 'box-sizing: border-box; height: 36px' },
+  ],
+  'fabricate-journal-lifecycle-past-stage': [
+    runKicker(`${RUN_HEADING} .fab-kicker`),
+    { selector: RUN_HEADING, styles: 'box-sizing: border-box; height: 11.046875px' },
   ],
   'player-crafting-stack-picker': [
     {
