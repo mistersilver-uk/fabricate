@@ -641,6 +641,20 @@ describe('anchoredPopover', () => {
       handle.destroy();
     });
 
+    it('queues one re-measure however often an open panel updates', async () => {
+      const { trigger, panel } = scene();
+      const { counts, layout } = counted(panel);
+      const handle = anchoredPopover(panel, options({ trigger, layout }));
+
+      handle.update(options({ trigger, layout }));
+      handle.update(options({ trigger, layout }));
+      assert.equal(counts.layouts, 3);
+      await settleFonts();
+
+      assert.equal(counts.layouts, 4, 'one re-measure for the open, not one per update');
+      handle.destroy();
+    });
+
     it('neither measures nor writes after a destroy that lands first', async () => {
       const { trigger, panel } = scene();
       const { counts, layout } = counted(panel);

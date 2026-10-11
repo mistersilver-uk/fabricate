@@ -64,7 +64,7 @@ function startedInsidePanel(node, event) {
 // loses: an end-aligned or start-aligned edge lands off its trigger by the difference. Fonts still
 // loading settle the width, so one more pass follows them; with none loading it is a no-op repeat.
 function afterFontsLoad(run) {
-  // `fonts.ready` never rejects, so there is nothing to catch.
+  // The chain rejects only if a measure throws, which surfaces as an unhandled rejection.
   void document.fonts?.ready?.then?.(run);
 }
 
@@ -89,6 +89,8 @@ export function anchoredPopover(node, params = {}) {
   let portalHandle = null;
   let listening = false;
   let destroyed = false;
+  // One font-load re-measure per open: an `update` while open queues no second one.
+  let fontsQueued = false;
 
   function validate() {
     if (!options.component) {
@@ -230,6 +232,7 @@ export function anchoredPopover(node, params = {}) {
   function sync() {
     validate();
     if (!isOpen()) {
+      fontsQueued = false;
       detach();
       clear();
       return;
@@ -237,6 +240,8 @@ export function anchoredPopover(node, params = {}) {
     portalToHost();
     measure();
     attach();
+    if (fontsQueued) return;
+    fontsQueued = true;
     afterFontsLoad(() => !destroyed && measure());
   }
 
