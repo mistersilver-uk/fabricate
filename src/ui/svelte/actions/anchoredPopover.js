@@ -64,7 +64,8 @@ function startedInsidePanel(node, event) {
 // loses: an end-aligned or start-aligned edge lands off its trigger by the difference. Fonts still
 // loading settle the width, so one more pass follows them; with none loading it is a no-op repeat.
 function afterFontsLoad(run) {
-  document.fonts?.ready?.then?.(run);
+  // `fonts.ready` never rejects, so there is nothing to catch.
+  void document.fonts?.ready?.then?.(run);
 }
 
 // This action writes `node`'s inline `style`, so the component must NOT also bind `style` on it.
