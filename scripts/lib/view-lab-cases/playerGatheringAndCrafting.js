@@ -1737,6 +1737,22 @@ export const CASES = Object.freeze([
     ],
   }),
   playerCase({
+    id: 'player-crafting-progressive-narrow',
+    label: 'Player app — Crafting progressive narrow',
+    smokeLabels: [],
+    // The stage list at the narrowest two-column width, where the crafting name must ellipsize rather than collapse.
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+    ],
+    position: { width: 1064, height: 860 },
+    kinds: ['player', 'crafting', 'responsive'],
+    sourceMatches: [CRAFTING_PROGRESSIVE, /^src\/ui\/svelte\/stores\/craftingStore/],
+    expectSelector: '[data-recipe-mode="progressive"] [data-recipe-section="progressive-stages"]',
+  }),
+  playerCase({
     id: 'player-crafting-stacked',
     label: 'Player app — Crafting stacked',
     smokeLabels: ['player-crafting-stacked'],

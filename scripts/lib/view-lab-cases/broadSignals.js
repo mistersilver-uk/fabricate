@@ -392,6 +392,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-step-open',
     'manager-checks-crafting-recipe-tiers-narrow',
     'manager-environment-edit-blind-weights-narrow',
+    'player-crafting-progressive',
+    'player-salvage',
   ]),
   // The product's ONE row disclosure (issue 1512), promoted on its second importer. Its own frame is
   // the open step row: the disclosure is the sole opener there, and `aria-expanded="true"` with the

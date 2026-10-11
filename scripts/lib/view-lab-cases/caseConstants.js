@@ -104,7 +104,12 @@ const CRAFTING_MODE_FILES = Object.freeze({
   simple: ['SimpleRecipeBody', 'StepRequirementsList'],
   routedByIngredients: ['IngredientRoutedBody'],
   routedByCheck: ['RoutedByCheckBody', 'OutcomeTierTable'],
-  progressive: ['ProgressiveBody', 'ProgressiveStageList'],
+  progressive: [
+    'ProgressiveBody',
+    'ProgressiveStageList',
+    'ProgressiveStageRow',
+    'ProgressiveStageBand',
+  ],
 });
 
 /** The one not-yet-ready chrome all five player views draw (issue 1514). */
@@ -133,6 +138,10 @@ export const CRAFTING_SIMPLE = craftingMode('simple');
 export const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
 export const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
 export const CRAFTING_PROGRESSIVE = craftingMode('progressive');
+
+/** The progressive stage list and the row and band it composes; salvage draws them too (issue 2381). */
+export const PROGRESSIVE_STAGE_PARTS =
+  /^src\/ui\/svelte\/apps\/crafting\/detail\/ProgressiveStage(?:List|Row|Band)\.svelte$/;
 
 /** Bulk salvage / bulk destroy (issue 859): the fields every one of its cases shares. */
 export const BULK_DEFAULTS = Object.freeze({

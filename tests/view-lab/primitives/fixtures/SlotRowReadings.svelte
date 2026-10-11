@@ -1,6 +1,6 @@
 <!--
   A stage's requirement row, as `StepDetails` wires its `SlotRow`: held and claimed stock by
-  component, each tile named by its slot, and the open slot's list in the Journal's own copy.
+  component, each tile named by its slot, and the heading and open list in the Journal's own copy.
 -->
 <script>
   import { format, localize } from '../fixtureActs.js';
@@ -13,6 +13,8 @@
     readingKey,
     chooseKey,
     choicesKey,
+    labelKey,
+    hintKey,
   } = $props();
 
   const heldCount = (componentId) => held[componentId] ?? 0;
@@ -27,6 +29,8 @@
 
 <Specimen
   {...props}
+  label={localize(labelKey)}
+  hint={localize(hintKey)}
   held={heldCount}
   claimed={claimedCount}
   onChoose={choose}
