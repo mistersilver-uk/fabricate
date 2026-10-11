@@ -542,6 +542,60 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     );
   });
 
+  /** The progressive row over a real store whose order writes are recorded, Salvage tab open. */
+  async function mountRecordingWrites() {
+    const writes = [];
+    const services = makeServices({
+      rows: [progressiveSalvageRow(), otherRow()],
+      services: {
+        setProgressiveResultOrder: async (key, ids) => {
+          writes.push(ids);
+        },
+      },
+    });
+    const target = await mountWithProgressiveSalvage(services);
+    return { target, services, writes };
+  }
+
+  const firstGrip = (target) =>
+    target.querySelector('[data-progressive-stage]').querySelector('[data-sortable-grip]');
+  const stageOrder = (target) =>
+    [...target.querySelectorAll('[data-progressive-stage]')].map((row) =>
+      row.getAttribute('data-progressive-stage')
+    );
+
+  it('ArrowDown on a stage grip reorders, keeps focus on that grip and speaks the move', async () => {
+    const { target, services, writes } = await mountRecordingWrites();
+
+    fire(firstGrip(target), 'keydown', { key: 'ArrowDown' });
+    await settle();
+
+    assert.deepEqual(stageOrder(target), ['s2', 's1'], 'the reorder lands');
+    assert.equal(
+      target.ownerDocument.activeElement?.getAttribute('data-sortable-grip'),
+      's1',
+      'focus follows the moved stage’s grip'
+    );
+    assert.equal(
+      regionAfterList(target).textContent.trim(),
+      'FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement:' +
+        '{"name":"Iron Shard","position":"2","total":"2"}',
+      'the region after the list carries the shared sentence'
+    );
+    assert.deepEqual(writes, [], 'a key move is the burst the debounce coalesces');
+    await services.inventory.flushSalvageOrder();
+  });
+
+  it('a drop from the grip writes the order at once, without waiting out the debounce', async () => {
+    const { target, writes } = await mountRecordingWrites();
+
+    fire(firstGrip(target), 'dragstart');
+    fire(target.querySelectorAll('[data-progressive-stage]')[1], 'drop');
+    await settle();
+
+    assert.deepEqual(writes, [['s2', 's1']], 'the drop settled the write through the flush');
+  });
+
   it('a pending revert is not re-spoken by the next participation’s stage list', async () => {
     // The tab survives a participation switch, so this list changes subject without unmounting.
     const row = progressiveSalvageRow();

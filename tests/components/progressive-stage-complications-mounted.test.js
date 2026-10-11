@@ -109,6 +109,25 @@ describe('the per-stage complication band (issue 1286)', () => {
     );
   });
 
+  it('a drag begun inside the band reorders nothing; one begun on the grip does', async () => {
+    const moves = [];
+    const root = await mount({
+      onReorder: (...move) => {
+        moves.push(move);
+      },
+    });
+    const fire = (node, type) =>
+      node.dispatchEvent(new globalThis.Event(type, { bubbles: true, cancelable: true }));
+
+    fire(bandIn(root, 's2').firstElementChild, 'dragstart');
+    fire(stageRow(root, 's1'), 'drop');
+    assert.deepEqual(moves, [], 'the band arms no drag, so the drop lands nothing');
+
+    fire(stageRow(root, 's2').querySelector('[data-sortable-grip]'), 'dragstart');
+    fire(stageRow(root, 's1'), 'drop');
+    assert.deepEqual(moves, [[1, 0]], 'the same drop from the grip reorders');
+  });
+
   // ── The two tenses ──────────────────────────────────────────────────────────────
 
   it('forecasts before a resolution, in the future tense', async () => {
