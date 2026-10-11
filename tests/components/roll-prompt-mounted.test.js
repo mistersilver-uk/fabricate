@@ -594,6 +594,19 @@ describe('mounted roll prompt', () => {
     }
   });
 
+  it('shows a d100 gather its 1d100, no target chip and the bonus field (issue 2398)', async () => {
+    const view = buildSinglePromptData({
+      formula: '1d100', resolvedFormula: '1d100', displayFormula: '1d100',
+      name: 'Gather Meadow Herbs', actorName: 'Brenna', activity: 'Gathering', offerSituationalBonus: true,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector('.formula').textContent, '1d100');
+    assert.ok(!dialog.querySelector(':scope .formula-content .manager-chip'), 'every row grades itself: no target');
+    assert.ok(dialog.querySelector('input[name="situationalBonus"]'), 'the bonus is offered');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
   it('hides a bulk bonus only when every row with a check declines the offer (Q6)', async () => {
     const rows = (offers) =>
       offers.map((offerSituationalBonus, index) => ({

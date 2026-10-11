@@ -647,38 +647,6 @@ export function resolveCheckFormulaDisplay(
 }
 
 /**
- * A free-text situational bonus as a number, for the d100 gathering path, which needs a scalar:
- * a plain number is used as-is with no engine, anything else is rolled, and a malformed entry is
- * `0`, never `NaN` or a throw.
- */
-export async function evaluateSituationalBonus(bonus, actor = null) {
-  const text = typeof bonus === 'string' ? bonus.trim() : bonus;
-  if ([null, undefined, ''].includes(text)) return 0;
-  const direct = Number(text);
-  if (Number.isFinite(direct)) return direct;
-  const RollClass = globalThis.Roll;
-  if (typeof RollClass !== 'function') return 0;
-  const formula = String(text);
-  // Called as a METHOD, not detached — see the note in `evaluateCheckRoll`.
-  if (typeof RollClass.validate === 'function' && RollClass.validate(formula) === false) {
-    console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
-    return 0;
-  }
-  try {
-    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-    // `allowInteractive: false`, as on the check path.
-    const rolled = await new RollClass(formula, rollData).evaluate({
-      allowInteractive: false,
-    });
-    const total = Number(rolled?.total);
-    return Number.isFinite(total) ? total : 0;
-  } catch (error) {
-    console.warn('Fabricate | Ignoring invalid situational bonus', bonus, error);
-    return 0;
-  }
-}
-
-/**
  * Rolls a runner's formula, or answers `{ exit }`: the runner's result for a thrown roll, a
  * cancelled prompt (zero mutation) or a missing dice engine. A blank formula rolls nothing.
  */

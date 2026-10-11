@@ -180,7 +180,7 @@ export const gatheringFacade = {
 
   /**
    * The engine stays module-internal, so every public attempt enforces the current user as viewer.
-   * `interactive` prompts on the routed and progressive paths only.
+   * `interactive` opens the roll prompt for an untimed d100, routed or progressive task's check.
    */
   startGatheringAttempt(options = {}) {
     if (!this.ready) {
