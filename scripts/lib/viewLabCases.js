@@ -82,6 +82,9 @@ const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
+/** The broad-signal table, as a diff names it. Attributed by override entry — see below. */
+const BROAD_SIGNALS_PATH = 'scripts/lib/view-lab-cases/broadSignals.js';
+
 export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 
 /** The Foundry application theme every case renders under unless it says otherwise. */
@@ -389,6 +392,9 @@ const mountSourceLines = memoized(() =>
 const runStateSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_RUN_STATES_PATH}`, import.meta.url))
 );
+const broadSignalSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${BROAD_SIGNALS_PATH}`, import.meta.url))
+);
 
 /** One case file's `CASES` array body, with the file line number its first line has. */
 function caseArrayBody(sourceLines) {
@@ -673,6 +679,100 @@ const runStateLineRegions = memoized(() => parseRunStateRegions(runStateSourceLi
  */
 const rendersRunState = (state) => (viewCase) => viewCase.query?.journalCaseState === state;
 
+const OVERRIDES_OPEN_LINE = 'export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({';
+const OVERRIDES_CLOSE_LINE = '});';
+
+/** Every shape a line inside `BROAD_SIGNAL_CASE_OVERRIDES` may take at Prettier's indents. */
+const OVERRIDE_LINE_SHAPES = Object.freeze([
+  ['open', /^ {2}'(?<key>[^']+)': Object\.freeze\(\[$/],
+  ['entry', /^ {2}'(?<key>[^']+)': Object\.freeze\(\['(?<id>[^']+)'\]\),$/],
+  ['id', /^ {4}'(?<id>[^']+)',$/],
+  ['close', /^ {2}\]\),$/],
+  ['inert', /^\s*(?:\/\/.*)?$/],
+]);
+
+/** The kinds that open, close or are a whole entry, rather than sit inside one. */
+const OVERRIDE_ENTRY_BOUNDS = new Set(['open', 'entry', 'close']);
+
+/** One table line's shape, or null when the line is outside the table's grammar. */
+function overrideLineShape(line) {
+  for (const [kind, pattern] of OVERRIDE_LINE_SHAPES) {
+    const match = pattern.exec(line);
+    if (match) return { kind, ...match.groups };
+  }
+  return null;
+}
+
+/** The 0-based lines opening and closing the table, or null when either is missing. */
+function overrideTableSpan(sourceLines) {
+  const open = sourceLines.indexOf(OVERRIDES_OPEN_LINE);
+  const close = open === -1 ? -1 : sourceLines.indexOf(OVERRIDES_CLOSE_LINE, open + 1);
+  return close === -1 ? null : { open, close };
+}
+
+/** Fold one table line into the walk; false when it breaks the grammar. */
+function consumeOverrideLine(walk, shape, lineNumber) {
+  if (shape.kind === 'inert') return true;
+  if (shape.kind === 'id' || shape.kind === 'close') {
+    if (!walk.open) return false;
+    if (shape.kind === 'id') {
+      walk.open.ids.push(shape.id);
+    } else {
+      walk.open.end = lineNumber;
+      walk.open = null;
+    }
+    return true;
+  }
+  if (walk.open) return false;
+  const ids = shape.id ? [shape.id] : [];
+  const entry = { key: shape.key, ids, start: lineNumber, end: lineNumber };
+  walk.entries.push(entry);
+  if (shape.kind === 'open') walk.open = entry;
+  return true;
+}
+
+/** Whether parsed entries are the table the selector loads: the same keys, order and ids. */
+function agreesWithOverrideTable(entries) {
+  const keys = Object.keys(BROAD_SIGNAL_CASE_OVERRIDES);
+  return (
+    entries.length === keys.length &&
+    entries.every(
+      ({ key, ids }, index) =>
+        key === keys[index] && ids.join('\n') === BROAD_SIGNAL_CASE_OVERRIDES[key].join('\n')
+    )
+  );
+}
+
+/**
+ * The 1-based, inclusive span of every entry in `BROAD_SIGNAL_CASE_OVERRIDES`, keyed by its file.
+ * Null unless every line fits the grammar and the parse equals the loaded table, so an entry the
+ * parser cannot read widens rather than selecting less.
+ */
+export function parseBroadSignalOverrideRegions(sourceLines) {
+  const span = overrideTableSpan(sourceLines);
+  if (!span) return null;
+  const walk = { entries: [], open: null };
+  for (let index = span.open + 1; index < span.close; index += 1) {
+    const shape = overrideLineShape(sourceLines[index]);
+    if (!shape || !consumeOverrideLine(walk, shape, index + 1)) return null;
+  }
+  if (walk.open || !agreesWithOverrideTable(walk.entries)) return null;
+  return walk.entries.map(({ key, start, end }) => ({ key, start, end }));
+}
+
+const broadSignalRegions = memoized(() =>
+  parseBroadSignalOverrideRegions(broadSignalSourceLines())
+);
+
+/**
+ * A broad signal's selection for some override ids, as `selectRenderFileCases` makes it: each id
+ * with its palette variants, and the representative pair without theirs.
+ */
+const selectsOverrideIds = (ids) => (viewCase) =>
+  ids.includes(viewCase.id) ||
+  ids.includes(viewCase.baseCaseId) ||
+  REPRESENTATIVE_CASE_IDS.includes(viewCase.id);
+
 /**
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
@@ -761,17 +861,19 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   return { keys, unattributable: unattributable || !anchored };
 }
 
+/** A patch's hunks, or null when it is missing, empty or malformed. */
+function parsePatch(patch) {
+  return typeof patch === 'string' && patch.trim() !== '' ? parseHunks(patch) : null;
+}
+
 /** The regions of one file a patch is confined to. */
 function touchedRegionKeys(patch, readSource, readRegions) {
-  const nothingLocated = { keys: new Set(), unattributable: true };
-  if (typeof patch !== 'string' || patch.trim() === '') return nothingLocated;
+  return touchedHunkRegionKeys(parsePatch(patch), readSource(), readRegions());
+}
 
-  const hunks = parseHunks(patch);
-  if (!hunks) return nothingLocated;
-  const regions = readRegions();
-  if (!regions) return nothingLocated;
-
-  const sourceLines = readSource();
+/** The regions a file's parsed hunks touch, or nothing located when either input is missing. */
+function touchedHunkRegionKeys(hunks, sourceLines, regions) {
+  if (!hunks || !regions) return { keys: new Set(), unattributable: true };
   const keys = new Set();
   let unattributable = false;
   for (const hunk of hunks) {
@@ -782,6 +884,76 @@ function touchedRegionKeys(patch, readSource, readRegions) {
   return { keys, unattributable };
 }
 
+/** A hunk's `-` runs, each with its lines' shapes and how many kept lines precede it. */
+function removedRuns(hunk) {
+  const runs = [];
+  let kept = 0;
+  let run = null;
+  for (const { marker, text } of hunk) {
+    if (marker !== '-') {
+      kept += 1;
+      run = null;
+      continue;
+    }
+    if (!run) {
+      run = { follows: kept, shapes: [] };
+      runs.push(run);
+    }
+    run.shapes.push(overrideLineShape(text));
+  }
+  return runs;
+}
+
+/** Where each run is removed — the 0-based line after it — under every anchor of the kept lines. */
+function removalPoints(keptLines, runs, sourceLines) {
+  const kept = keptLines.map(({ text }) => text);
+  return anchorOffsets(sourceLines, kept).flatMap((offset) =>
+    runs.map((run) => ({ run, point: offset + run.follows }))
+  );
+}
+
+/**
+ * The entry a run was removed from: the one holding the line after it. A run carrying an opener or
+ * a close credits it only when that line is strictly inside, so an entry removed beside it does not.
+ */
+function entryAround({ run, point }, regions) {
+  const kinds = run.shapes.map((shape) => shape.kind);
+  if (kinds.every((kind) => kind === 'inert')) return null;
+  const tail = kinds.some((kind) => OVERRIDE_ENTRY_BOUNDS.has(kind)) ? 1 : 0;
+  return regions.find((region) => region.start <= point && point < region.end - tail)?.key ?? null;
+}
+
+/**
+ * Take a hunk's removed table lines out before it is located, since the loaded file no longer holds
+ * them, when every `-` line fits the grammar and every anchor puts each removal inside the table.
+ * A run with no line after it widens the hunk alone; any other hunk is located whole. Every path
+ * keeps the ids its `-` lines name.
+ */
+function splitOverrideRemovals(hunk, sourceLines, regions) {
+  const runs = removedRuns(hunk);
+  const ids = runs.flatMap((run) => run.shapes.map((shape) => shape?.id).filter(Boolean));
+  const whole = { hunk, ids, keys: [], widens: false };
+  if (runs.length === 0 || !regions) return whole;
+  const keptLines = hunk.filter(({ marker }) => marker !== '-');
+  if (runs.some((run) => run.follows === keptLines.length)) {
+    return { ...whole, hunk: keptLines, widens: true };
+  }
+  if (runs.some((run) => run.shapes.includes(null))) return whole;
+
+  const span = overrideTableSpan(sourceLines);
+  const points = removalPoints(keptLines, runs, sourceLines);
+  // The bound is inclusive at `});`: a removal just before it is the table's last line.
+  if (points.length === 0 || points.some(({ point }) => point <= span.open || point > span.close)) {
+    return whole;
+  }
+  return {
+    hunk: keptLines,
+    ids,
+    keys: points.map((removal) => entryAround(removal, regions)).filter(Boolean),
+    widens: false,
+  };
+}
+
 /**
  * Widen a located selection by surface coverage when part of the change could not be attributed.
  */
@@ -790,6 +962,14 @@ function widenedByCoverage(ids, unattributable) {
   for (const id of LAB_SURFACE_CASE_IDS) ids.add(id);
   return ids;
 }
+
+const BROAD_SIGNAL_ATTRIBUTION = Object.freeze({
+  path: BROAD_SIGNALS_PATH,
+  sourceLines: broadSignalSourceLines,
+  regions: broadSignalRegions,
+  selectsRegion: (key) => selectsOverrideIds(BROAD_SIGNAL_CASE_OVERRIDES[key]),
+  readsRemovedLines: true,
+});
 
 /**
  * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
@@ -825,6 +1005,7 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     path: LAB_INTERACTABLES_PATH,
     selects: rendersInCanvasWindow,
   }),
+  BROAD_SIGNAL_ATTRIBUTION,
 ]);
 
 /**
@@ -851,12 +1032,45 @@ function casesFromCaseFilePatch(patch, attribution) {
 
 /** The cases a REGION-attributed lab input selects: the union of what each touched region feeds. */
 function casesFromRegionPatch(patch, attribution) {
-  const { keys, unattributable } = touchedRegionKeys(
-    patch,
-    attribution.sourceLines,
-    attribution.regions
-  );
+  const touched = touchedRegionKeys(patch, attribution.sourceLines, attribution.regions);
+  return casesFromTouchedRegions(touched, attribution);
+}
 
+/** The cases a change to `broadSignals.js` selects: its kept lines by entry, and its removed ids. */
+function casesFromOverridePatch(patch, attribution) {
+  const sourceLines = attribution.sourceLines();
+  const regions = attribution.regions();
+  const hunks = parsePatch(patch);
+  const splits = (hunks ?? []).map((hunk) => splitOverrideRemovals(hunk, sourceLines, regions));
+  const touched = touchedHunkRegionKeys(
+    hunks && splits.map((split) => split.hunk),
+    sourceLines,
+    regions
+  );
+  for (const split of splits) {
+    for (const key of split.keys) touched.keys.add(key);
+    touched.unattributable ||= split.widens;
+  }
+
+  const ids = casesFromTouchedRegions(touched, attribution);
+  const removedIds = splits.flatMap((split) => split.ids);
+  if (removedIds.length > 0) {
+    for (const id of casesSelecting(selectsOverrideIds(removedIds))) ids.add(id);
+  }
+  return ids;
+}
+
+/** What a `broadSignals.js` patch selects when read against these lines of it, in no order. */
+export function casesFromBroadSignalPatch(patch, sourceLines) {
+  return casesFromOverridePatch(patch, {
+    ...BROAD_SIGNAL_ATTRIBUTION,
+    sourceLines: () => sourceLines,
+    regions: () => parseBroadSignalOverrideRegions(sourceLines),
+  });
+}
+
+/** What each touched region feeds, widened when part of the patch could not be attributed. */
+function casesFromTouchedRegions({ keys, unattributable }, attribution) {
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
@@ -878,6 +1092,9 @@ function selectLabInputCases(file, patchByPath) {
   if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.attributesByCase) {
     return casesFromCaseFilePatch(patchByPath.get(file), attribution);
+  }
+  if (attribution.readsRemovedLines) {
+    return casesFromOverridePatch(patchByPath.get(file), attribution);
   }
   if (attribution.regions) return casesFromRegionPatch(patchByPath.get(file), attribution);
   return casesSelecting(attribution.selects);
