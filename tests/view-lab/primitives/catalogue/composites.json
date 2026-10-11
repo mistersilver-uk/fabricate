@@ -783,7 +783,7 @@
     "cap": "unauthored — presets only",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RuleRow.svelte",
-    "note": "An unauthored rule, its two presets. The one-line rule is live through `RuleRowOneLine`. The collapsible rule stays drawn: it needs its schema's `head` function and its steps' `render` snippets, which no fixture yet supplies.",
+    "note": "An unauthored rule, its two presets. The collapsed rule is live through `RuleRowCollapsed` and the one-line rule through `RuleRowOneLine`. The open rule stays drawn: its steps are `CheckTriggers`' own cells and plain number input, which a fixture may not author.",
     "props": {
       "class": "manager-checks-trigger-presets",
       "presets": [
@@ -803,7 +803,59 @@
   {
     "spec": "<RuleRow> <RuleSentence>",
     "cap": "collapsible — one rule open, the next collapsed",
-    "draws": "button[aria-expanded] > span:nth-of-type(2) > span:nth-of-type(2)",
+    "draws": ":scope > div > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "fixture": "RuleRowCollapsed",
+    "props": {
+      "value": {
+        "id": "natural-one"
+      },
+      "class": "manager-checks-breakage-trigger"
+    },
+    "data": {
+      "icon": "fas fa-arrow-down",
+      "tone": "warning",
+      "title": "Any die of 1d20 is exactly 1",
+      "chip": "Step down 1",
+      "sentence": {
+        "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
+        "clauseKeys": ["FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown"],
+        "joinKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin",
+        "params": {
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence": {
+            "condition": {
+              "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryDiceGroupInSentence",
+              "params": {
+                "aggregate": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryAnyDieInSentence",
+                  "params": {}
+                },
+                "die": "1d20",
+                "comparison": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.OpExactly",
+                  "params": {}
+                },
+                "value": "1"
+              }
+            }
+          },
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown": {
+            "steps": "1"
+          }
+        }
+      },
+      "removeLabel": "Remove trigger",
+      "expandKey": "FABRICATE.Admin.Manager.Checks.Breakage.ExpandTrigger"
+    },
+    "undrawn": {
+      ", and": "the sentence's clause join, which a one-clause rule never draws"
+    },
+    "note": "Wired as `CheckTriggers` wires a trigger, collapsed: the effect's glyph, tone and chip head it, the condition titles it, and its sentence is the structured one the sentence rows carry. `role=\"listitem\"` is left off, because the card stands without the trigger list around it. The shipped glyph is an arrow down, which the drawing draws with its chevron."
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "collapsible — one rule open, the next collapsed",
+    "draws": "button[aria-expanded=\"true\"] > span:nth-of-type(2) > span:nth-of-type(2)",
     "path": "src/ui/svelte/components/RuleSentence.svelte",
     "note": "The sentence, from the shipped trigger summary over the drawn rule. It carries no type of its own, so it stands in the frame's body face rather than the head's 10.5px muted line.",
     "props": {
@@ -830,41 +882,6 @@
             }
           },
           "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepUp": {
-            "steps": "1"
-          }
-        }
-      }
-    }
-  },
-  {
-    "spec": "<RuleRow> <RuleSentence>",
-    "cap": "collapsible — one rule open, the next collapsed",
-    "draws": "button[aria-expanded] > span:nth-of-type(2) > span:nth-of-type(2)",
-    "path": "src/ui/svelte/components/RuleSentence.svelte",
-    "props": {
-      "sentence": {
-        "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
-        "clauseKeys": ["FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown"],
-        "joinKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin",
-        "params": {
-          "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence": {
-            "condition": {
-              "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryDiceGroupInSentence",
-              "params": {
-                "aggregate": {
-                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryAnyDieInSentence",
-                  "params": {}
-                },
-                "die": "1d20",
-                "comparison": {
-                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.OpExactly",
-                  "params": {}
-                },
-                "value": "1"
-              }
-            }
-          },
-          "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown": {
             "steps": "1"
           }
         }
@@ -926,7 +943,7 @@
       "title": "Forest",
       "removeLabel": "Delete modifier"
     },
-    "note": "Wired as `GatheringModifierEditor` wires a condition modifier, with its sheet class for the positive tone. The value field is that editor's own snippet markup, so the rule carries no steps."
+    "note": "Wired as `GatheringModifierEditor` wires a condition modifier, with its sheet class for the positive tone. The value field is that editor's own snippet markup, so the rule carries no steps; a follow-up renders it through `Stepper`."
   },
   {
     "spec": "<SortableList>",
