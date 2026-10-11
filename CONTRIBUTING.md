@@ -768,6 +768,7 @@ The four patch-narrowed inputs — the case registry, the actor fixture, the run
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
+The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because `npm run lab:check` verifies them, so a change there alone selects no frame — except that a `.svelte` or `.css` file there still arms the evidence gate and selects the fallback frame.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
 true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
