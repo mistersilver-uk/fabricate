@@ -13150,6 +13150,7 @@
   font-size: 0.8rem;
 }
 
+/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in and out over half a second; a highlight appears in the frame the state changes, on the trigger, the popover and the inline strip alike. */
 .fabricate-color-picker .manager-color-picker-trigger,
 .fabricate-color-picker-popover .manager-color-preset {
   display: inline-flex;
@@ -13163,6 +13164,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
+  transition: none;
 }
 
 .fabricate-manager .manager-condition-add .manager-color-picker-trigger {
@@ -16028,10 +16030,10 @@
   gap: var(--fab-space-2xs);
   padding: var(--fab-space-1);
   box-sizing: border-box;
-  border: 1px solid var(--fab-border);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 11px;
-  background: var(--fab-bg-3);
-  box-shadow: var(--fab-shadow-md);
+  background: var(--fab-bg-0);
+  box-shadow: var(--fab-shadow-lg);
 }
 
 /* The item's 7 is the panel's 11 less its 4px padding, so the corners stay concentric. */
@@ -18032,7 +18034,7 @@
   margin-inline-start: auto;
 }
 
-/* THE PANEL. The specimen corners the option list at 11px; `.fabricate-picker-popover.manager-travel-popover` corners it at 10 and floors it at 240px. */
+/* THE PANEL. The specimen corners the option list at 11px, as `.fabricate-picker-popover.manager-travel-popover` does, which also floors it at 240px. */
 .fabricate-picker-popover.fabricate-select-popover {
   border-radius: 11px;
 }

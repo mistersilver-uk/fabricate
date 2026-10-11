@@ -53,8 +53,8 @@ const VALUE_PROP_NAMES = new Set([
   'groupName',
 ]);
 
-/** A name that ends in an identifier, key or icon suffix: `slotId`, `openKey`, `stateIcon`. */
-const VALUE_PROP_SUFFIX = /^\w+(?:Id|Keys?|Icon)$/;
+/** A name that ends in an identifier, key, icon or style suffix: `slotId`, `openKey`, `stateIcon`, `wellStyle`. */
+const VALUE_PROP_SUFFIX = /^\w+(?:Id|Keys?|Icon|Style)$/;
 
 export const VALUE_PROP = Object.freeze({
   test: (name) => VALUE_PROP_NAMES.has(name) || VALUE_PROP_SUFFIX.test(name),

@@ -322,6 +322,25 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('keeps both the tone and the density class when a tag track takes a rung', async () => {
+    for (const density of ['inline', 'field']) {
+      const root = await harness.mount({
+        options: OPTIONS,
+        value: 'destroyed',
+        groupName: 'g',
+        tone: 'tag',
+        density
+      });
+      const track = root.querySelector('.manager-segmented');
+      assert.ok(
+        track.classList.contains('is-tag'),
+        `tone="tag" density="${density}" keeps is-tag`
+      );
+      assert.ok(track.classList.contains(`is-${density}`), `and is-${density}`);
+      harness.remount();
+    }
+  });
+
   // ── THE PILL SHAPE AND THE SOFT-ACCENT TONE (issue 1371) ───────────────────────────────
   // The reference draws its entry filter (`proto:5457`, `All / With rules / Without`) as a RUN
   // OF SEPARATE PILLS rather than as tiles inside a frame: no track fill, no track edge, radius

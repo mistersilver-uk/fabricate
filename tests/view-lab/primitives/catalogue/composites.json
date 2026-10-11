@@ -981,7 +981,9 @@
           "fallback": "Severe"
         }
       ],
-      "shownHint": "They see the complication when it fires."
+      "shownHint": "They see the complication when it fires.",
+      "wellStyle": "display: grid; gap: var(--fab-space-3)",
+      "severityStyle": "justify-self: start"
     },
     "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The adder beneath stays drawn."
   },
