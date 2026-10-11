@@ -429,7 +429,7 @@ describe('SortableList — reorder answers both inputs', () => {
     });
 
     const rows = rowsOf(target);
-    rows[2].dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
+    gripOf(rows[2]).dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
     flushSync();
     assert.ok(
       rowsOf(target)[2].classList.contains('is-dragging'),
