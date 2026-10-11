@@ -1,19 +1,15 @@
 import { existsSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
+import { openServedFile } from './servedFile.js';
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-// By URL, so it is loaded unbundled and the stylesheet read guard can admit its frame.
-const { openServedFile } = await import(
-  pathToFileURL(join(import.meta.dirname, 'servedFile.js')).href
-);
 const chromeCache = resolveChromeCache(repoRoot);
 const dnd5eRoot = join(repoRoot, '.foundry-e2e', 'systems', 'dnd5e');
 

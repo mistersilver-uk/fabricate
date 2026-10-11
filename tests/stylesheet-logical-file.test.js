@@ -8,7 +8,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { STYLESHEET_CUT } from '../scripts/lib/stylesheetCut.js';
 import { stylesheetIntegrityFailures } from '../scripts/lib/stylesheetIntegrity.js';
 import {
   STYLESHEET_ENTRY,
@@ -199,7 +198,8 @@ test('an edit to any partial selects what an edit to the sheet selects', () => {
   const sheet = selectedIds([STYLESHEET_ENTRY]);
   assert.ok(sheet.length > 0, 'the sheet selects cases');
   const partials = [
-    ...STYLESHEET_CUT.map(({ partial }) => `styles/${partial}`),
+    'styles/fabricate-tokens.css',
+    'styles/fabricate-manager-shell.css',
     'styles/fabricate-gone.css',
   ];
   for (const partial of partials) {
