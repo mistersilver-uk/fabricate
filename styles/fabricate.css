@@ -13150,6 +13150,7 @@
   font-size: 0.8rem;
 }
 
+/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in and out over half a second; a highlight appears in the frame the state changes, on the trigger, the popover and the inline strip alike. */
 .fabricate-color-picker .manager-color-picker-trigger,
 .fabricate-color-picker-popover .manager-color-preset {
   display: inline-flex;
@@ -13163,6 +13164,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
+  transition: none;
 }
 
 .fabricate-manager .manager-condition-add .manager-color-picker-trigger {
@@ -13200,11 +13202,9 @@
   gap: var(--fab-space-chip);
 }
 
-/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in over half a second; a highlight appears in the frame the state changes, in the popover and the inline strip alike, which both draw these cells. */
 .fabricate-color-picker-popover .manager-color-preset {
   aspect-ratio: 1;
   border: 1px solid var(--fab-border);
-  transition: none;
 }
 
 /* A selected swatch is an inset ring at 3:1 on its fill, apart from the outset focus ring (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
