@@ -190,7 +190,7 @@
       "width": 300,
       "height": 260
     },
-    "note": "The trigger renders through Button, as every caller’s does: the primitive’s bare trigger carries no styling of its own, so a row passing none draws a core button. The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel neither flips nor clamps. Trimmed from 320 when the iframe viewport became the box.",
+    "note": "The trigger renders through Button, as every caller’s does: the primitive’s bare trigger carries no styling of its own, so a row passing none draws a core button. The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel does not flip. The trigger sits 16px in, the panel family's clamp inset, so the panel opens flush with it, unclamped. Trimmed from 320 when the iframe viewport became the box.",
     "undrawn": {
       "steel-ingot": "the picked option’s id, not its words",
       "Choose a component": "the trigger’s and the panel’s accessible name; the drawing draws no name",
@@ -203,6 +203,9 @@
       "value": "steel-ingot",
       "triggerButton": {
         "role": "neutral"
+      },
+      "triggerProps": {
+        "style": "margin-left: 16px"
       },
       "triggerIcon": "fas fa-hammer",
       "triggerLabel": "Steel Ingot",
