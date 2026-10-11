@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(design-system): the maintainer ruled on 2026-10-11 that the swatch highlight must be the picker's own hover fill and inset cursor, with no animation, so this row returns to target until the sheet draws it (library.html, the target popover specimen) -->
+<!-- ratchet-exempt(design-system): the maintainer ruled on 2026-10-11 that the swatch highlight must be the picker's own hover fill and inset cursor, with no animation, so this row returns to target until the sheet draws it, owned by issue 2416 (library.html, the target popover specimen) -->
 <!--
   The manager's colour palette and the library's `<TintPicker>` specimen, rendered as a popover by
   three pickers and inline by two editors; `TintPickerButton.svelte` is its single-caller trigger.

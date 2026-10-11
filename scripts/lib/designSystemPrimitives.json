@@ -430,7 +430,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `shipped` at issue 2257: the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell is `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the frames that draw a pressed cell. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2352, and neither blocks the flip."
+      "why": "5 callers, measured with `componentImporters.js` at issue 1776. The tint swatch panel, which is the `<TintPicker>` specimen; its sibling `TintPickerButton.svelte` is the panel's single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. It shipped at issue 2257, when the specimen was redrawn to the shipped 220px popover and 28px inline strip, the selected cell became `aria-pressed` under a 2px inset ring in a `group` named by its label, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry named the frames that draw a pressed cell. It returned to `target` on the maintainer's ruling of 2026-10-11 that the swatch highlight must be the picker's own hover fill and inset cursor: the hover animation is fixed, and the hover fill and the inset cursor are still to do, owned by issue 2416. The entity-tint offering rule and the `allowCustom` default stay recorded divergences under issue 2352."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",
