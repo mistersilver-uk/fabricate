@@ -59,8 +59,12 @@
     "draws": ".stage.col > div:nth-child(2)",
     "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
     "inset": 12,
-    "partial": "no Status axis",
-    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis stays unshown: it is a `SegmentedControl` under a `BulkEditSection` label, scoped components a node array cannot stand up, so the panel stages no axis.",
+    "fixture": "BulkEditPanelStatus",
+    "undrawn": {
+      "unchanged": "an option’s value, which its segment shows by its label",
+      "enable": "an option’s value, which its segment shows by its label",
+      "disable": "an option’s value, which its segment shows by its label"
+    },
     "props": {
       "heading": "4 essences selected",
       "applyLabel": "Apply to 3 essences",
@@ -72,7 +76,27 @@
           "reason": "Moonsilver is referenced by a locked compendium."
         }
       ]
-    }
+    },
+    "data": {
+      "labelKey": "FABRICATE.Admin.Manager.Essence.Status.Label",
+      "options": [
+        {
+          "value": "unchanged",
+          "labelKey": "FABRICATE.Admin.Manager.BulkEdit.Unchanged"
+        },
+        {
+          "value": "enable",
+          "labelKey": "FABRICATE.Admin.Manager.Essence.BulkEdit.Enable"
+        },
+        {
+          "value": "disable",
+          "labelKey": "FABRICATE.Admin.Manager.Essence.BulkEdit.Disable"
+        }
+      ],
+      "value": "unchanged",
+      "groupName": "essence-bulk-status"
+    },
+    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it; the chosen segment is `SegmentedControl`’s raised dark tile (`--fab-surface-active` on a `--fab-border-strong` edge, `--fab-text` ink) where the drawing fills it with the accent, and the track is 34px where the drawing’s is 36."
   },
   {
     "spec": "<Modal>",
@@ -447,14 +471,20 @@
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
-    "partial": "badges and trailing controls stay drawn",
-    "note": "The default density at the 38 mark, its facts passed as the `meta` snippet. The badges, the level chip, and the trailing status toggle and menu stay drawn: each is a component, a Chip or a button whose styles are its own, which a node array cannot stand up; raw `manager-chip` markup was tried and rendered unstyled, because Chip’s styles are scoped. The selected edge is not drawn either: the row draws selection only as the pressed state of its open button, which renders only beside an `onOpen` handler, and a row passes no function.",
+    "fixture": "ListRowDefaultBrowse",
+    "partial": "status button stays drawn",
+    "undrawn": {
+      "Export system": "a menu item’s label; the drawing draws the menu closed",
+      "Delete system": "a menu item’s label; the drawing draws the menu closed",
+      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+    },
     "props": {
       "name": "Riverbridge",
       "icon": "fas fa-book",
       "tint": "peach",
       "density": "default",
-      "markSize": 38
+      "markSize": 38,
+      "selected": true
     },
     "snippets": {
       "meta": [
@@ -498,20 +528,55 @@
           ]
         }
       ]
-    }
+    },
+    "data": {
+      "chips": [
+        {
+          "label": "Reopened Mine",
+          "tone": "success"
+        },
+        {
+          "label": "L 2",
+          "tone": "neutral"
+        }
+      ],
+      "items": [
+        {
+          "id": "export",
+          "labelKey": "FABRICATE.Admin.Manager.ExportSystem",
+          "icon": "fas fa-file-export"
+        },
+        {
+          "id": "delete",
+          "labelKey": "FABRICATE.Admin.Manager.DeleteSystem",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ],
+      "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+    },
+    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and the kebab is `ActionMenu`’s `IconButton` trigger, 34px with a 1px border at radius 9 and the vertical `fa-ellipsis-vertical` every shipped menu uses, where the drawing’s is a 28px borderless square at radius 7 with horizontal dots."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
-    "partial": "badges and trailing controls stay drawn",
+    "fixture": "ListRowDefaultBrowse",
+    "partial": "status button stays drawn",
+    "undrawn": {
+      "Export system": "a menu item’s label; the drawing draws the menu closed",
+      "Delete system": "a menu item’s label; the drawing draws the menu closed",
+      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+    },
     "props": {
       "name": "Oakhollow",
       "icon": "fas fa-leaf",
       "tint": "sage",
       "density": "default",
-      "markSize": 38
+      "markSize": 38,
+      "selected": false
     },
     "snippets": {
       "meta": [
@@ -542,7 +607,31 @@
           ]
         }
       ]
-    }
+    },
+    "data": {
+      "chips": [
+        {
+          "label": "L 1",
+          "tone": "neutral"
+        }
+      ],
+      "items": [
+        {
+          "id": "export",
+          "labelKey": "FABRICATE.Admin.Manager.ExportSystem",
+          "icon": "fas fa-file-export"
+        },
+        {
+          "id": "delete",
+          "labelKey": "FABRICATE.Admin.Manager.DeleteSystem",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ],
+      "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+    },
+    "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -932,25 +1021,102 @@
   },
   {
     "spec": "<DataTable>",
+    "draws": ".spec-head + .stage.col > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "fixture": "DataTableHistory",
+    "undrawn": {
+      "desc": "the sort’s direction, which the drawing shows as the When column’s glyph",
+      "Search runs": "the search field’s accessible name; the drawing names no field"
+    },
+    "props": {
+      "heading": "Craft history",
+      "count": 128,
+      "columns": [
+        {
+          "key": "when",
+          "label": "When",
+          "sortable": true,
+          "mono": true
+        },
+        {
+          "key": "recipe",
+          "label": "Recipe"
+        },
+        {
+          "key": "crafter",
+          "label": "Crafter"
+        },
+        {
+          "key": "outcome",
+          "label": "Outcome"
+        },
+        {
+          "key": "produced",
+          "label": "Produced"
+        }
+      ],
+      "rows": [
+        {
+          "id": "day-214",
+          "when": "Day 214",
+          "recipe": "Karrun Warblade",
+          "crafter": "Brenna",
+          "outcome": "Critical",
+          "tone": "success",
+          "produced": "Masterwork ×1"
+        },
+        {
+          "id": "day-211",
+          "when": "Day 211",
+          "recipe": "Ingotwort Draught",
+          "crafter": "Vosk",
+          "outcome": "Failed",
+          "tone": "danger",
+          "produced": "—"
+        },
+        {
+          "id": "day-209",
+          "when": "Day 209",
+          "recipe": "Karrun Warblade",
+          "crafter": "Brenna",
+          "outcome": "Success",
+          "tone": "success",
+          "produced": "Fine blade ×1"
+        }
+      ],
+      "sort": {
+        "key": "when",
+        "dir": "desc"
+      },
+      "selectedKey": "day-211",
+      "perPage": 10,
+      "perPageOptions": [10, 25, 50]
+    },
+    "data": {
+      "badgeColumnId": "outcome",
+      "searchKey": "FABRICATE.App.Journal.Filters.SearchLabel",
+      "placeholder": "Search"
+    },
+    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the per-page choice is a `Select` where the drawing draws segments; the drawing’s pager figures (1–3 of 128, page 1 of 43) mean three a page against its chosen 10, so the live pager reads 1–10 and page 1 of 13 over the drawing’s three rows; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; the Outcome chips carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and `Pagination` adds a ‘Per page’ label, a footer ground lighter than the drawn bg-1, and bordered arrows."
+  },
+  {
+    "spec": "<DataTable>",
     "draws": ".stage.col ~ .stage.col > div",
     "path": "src/ui/svelte/components/DataTable.svelte",
-    "partial": "empty state only",
-    "note": "The empty table. The populated one above stays drawn: its rows need `rowKey`, a function with no default, and every cell is the `cell(row, column, index)` snippet, handed the cell it draws, which a row cannot carry.",
     "props": {
       "heading": "Craft history",
       "count": 0,
       "empty": {
         "hint": "No crafts recorded yet. A row lands here each time a character completes a craft with this system."
       }
-    }
+    },
+    "note": "The empty table: the heading and the count, and no header row."
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
     "cap": "inspector rail section",
     "draws": ":scope > div > section:nth-child(1)",
     "path": "src/ui/svelte/components/Rail.svelte",
-    "partial": "first section only",
-    "note": "The first section, its three stats in the shipped inspector stat grid at three columns, as drawn. The \"Appears in\" section stays drawn: its body is a list row, a component a node array cannot stand up.",
     "props": {
       "label": "Settlement snapshot"
     },
@@ -1030,15 +1196,29 @@
           }
         ]
       }
-    ]
+    ],
+    "note": "The first section, its three stats in the shipped inspector stat grid at three columns, as drawn."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "inspector rail section",
+    "draws": ":scope > div > section:nth-child(2)",
+    "path": "src/ui/svelte/components/Rail.svelte",
+    "fixture": "RailAppearsIn",
+    "props": {
+      "label": "Appears in"
+    },
+    "data": {
+      "name": "Karrun Warblade"
+    },
+    "note": "The second section, its body a dense `ListRow`. No shipped `Rail` caller hosts a list row, so this composition is the drawing’s. Drawn differently: the untinted `Medallion` takes the accent ink, at 14.4px, where the drawing draws a 10px glyph in text-secondary; the tile carries a 1px border the drawn tile lacks."
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
     "cap": "log list",
     "draws": ":scope > div[role=\"list\"]",
     "path": "src/ui/svelte/components/LogList.svelte",
-    "partial": "no dismiss buttons",
-    "note": "Each entry's dismiss is the caller's `action(entry)` snippet, handed the entry it draws beside, which a row cannot carry, so the live list draws none. The first entry’s `selectedKey` draws the accent border on an inert div, with no `aria-pressed`: the list announces selection only through its open button, which renders only beside an `onOpen` handler.",
+    "fixture": "LogListHistory",
     "props": {
       "ariaLabel": "History",
       "selectedKey": "warblade",
@@ -1078,7 +1258,21 @@
           }
         }
       ]
-    }
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ],
+    "data": {
+      "dismissKey": "FABRICATE.App.Journal.History.Dismiss",
+      "class": "is-ghost"
+    },
+    "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`. Drawn differently: the dismiss glyph takes the ghost `IconButton`’s text-subtle ink where the drawing’s is text-muted."
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",

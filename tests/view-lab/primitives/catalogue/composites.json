@@ -1007,65 +1007,144 @@
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
     "cap": "the slot row — four tile states, one row",
-    "draws": ":scope > div:nth-of-type(2) > div",
-    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "draws": ":scope > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/SlotRow.svelte",
+    "fixture": "SlotRowReadings",
     "inset": 8,
-    "note": "One tile per drawn tile, the row around them being SlotRow, which stays in the baseline. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it.",
+    "partial": "list opens beneath",
     "props": {
-      "label": "Charcoal",
-      "icon": "fas fa-hammer",
-      "tint": "mist",
-      "state": "met",
-      "pip": "4/1"
+      "requirements": [
+        {
+          "id": "charcoal",
+          "label": "Charcoal",
+          "kind": "fixed",
+          "componentId": "charcoal",
+          "needed": 1,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "moonsilver",
+          "label": "Moonsilver",
+          "kind": "fixed",
+          "componentId": "moonsilver",
+          "needed": 2,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        },
+        {
+          "id": "binder",
+          "label": "Any binder",
+          "kind": "choice",
+          "needed": 1,
+          "affordanceLabel": "1 of 3",
+          "candidates": [
+            {
+              "id": "rune-stylus",
+              "label": "Rune Stylus",
+              "icon": "fas fa-star",
+              "tint": "butter"
+            },
+            {
+              "id": "rune-chalk",
+              "label": "Rune Chalk",
+              "icon": "fas fa-leaf",
+              "tint": "sage"
+            },
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            }
+          ]
+        },
+        {
+          "id": "essence",
+          "label": "Essence pool",
+          "kind": "essence",
+          "icon": "fas fa-atom",
+          "tint": "aqua",
+          "poolsMet": 1,
+          "poolsRequired": 2,
+          "affordanceLabel": "channel"
+        }
+      ],
+      "openSlot": "binder"
+    },
+    "data": {
+      "held": {
+        "charcoal": 4,
+        "moonsilver": 0,
+        "rune-stylus": 2,
+        "rune-chalk": 5,
+        "duskglass": 2
+      },
+      "claimed": {
+        "duskglass": 2
+      },
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
+      "chooseKey": "FABRICATE.App.Journal.Stage.Choose",
+      "choicesKey": "FABRICATE.App.Journal.Stage.Choices"
+    },
+    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` and `claimed` read stock by component, each tile is named by its slot's label, and the open slot's list takes the Journal's kicker, summary and readings (`:448-456`). The binder slot is open, as the Journal always shows a pressed tile with its list beneath; the drawing shows a pressed tile with no list, which the product never shows. The list's radiogroup is named Choose an ingredient, as in the Journal, and the open and essence tiles are named Any binder and Essence pool where the drawing says Choose a component for this slot and Channel essence for this step. The kicker and hint stay drawn above, outside `draws`. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`. The open tile's solid circle is `SlotRow`'s default; whether an unchosen slot should default to `fa-regular fa-circle` (Font Awesome Free) is a product question for P2-C, not a library redraw. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it.",
+    "undrawn": {
+      "Rune Stylus": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Rune Chalk": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Duskglass": "a candidate the open slot lists beneath the row; the next caption draws the list",
+      "Choose an ingredient": "the open slot's list kicker and radiogroup name, as the Journal words them"
     }
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
-    "cap": "the slot row — four tile states, one row",
-    "draws": ":scope > div:nth-of-type(2) > div",
-    "path": "src/ui/svelte/components/SlotTile.svelte",
-    "inset": 8,
+    "cap": "the open slot’s candidates — one 44px row each, in flow beneath",
+    "draws": "[role=\"radiogroup\"]",
+    "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
+    "fixture": "ChoiceOptionListReadings",
     "props": {
-      "label": "Moonsilver",
-      "icon": "fas fa-star",
-      "tint": "lavender",
-      "state": "short",
-      "pip": "0/2"
-    }
-  },
-  {
-    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
-    "cap": "the slot row — four tile states, one row",
-    "draws": ":scope > div:nth-of-type(2) > div",
-    "path": "src/ui/svelte/components/SlotTile.svelte",
-    "inset": 8,
-    "props": {
-      "label": "Any binder",
-      "ariaLabel": "Choose a component for this slot",
-      "state": "open",
-      "pip": "3",
-      "pipKind": "candidate",
-      "affordance": "1 of 3",
-      "interactive": true,
-      "pressed": true
-    }
-  },
-  {
-    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
-    "cap": "the slot row — four tile states, one row",
-    "draws": ":scope > div:nth-of-type(2) > div",
-    "path": "src/ui/svelte/components/SlotTile.svelte",
-    "inset": 8,
-    "props": {
-      "label": "Essence pool",
-      "ariaLabel": "Channel essence for this step",
-      "icon": "fas fa-atom",
-      "tint": "aqua",
-      "state": "partial",
-      "pip": "1/2",
-      "affordance": "channel",
-      "interactive": true
-    }
+      "slotId": "binder",
+      "needed": 1,
+      "selectedId": "rune-stylus",
+      "options": [
+        {
+          "id": "rune-stylus",
+          "label": "Rune Stylus",
+          "icon": "fas fa-star",
+          "tint": "butter"
+        },
+        {
+          "id": "rune-chalk",
+          "label": "Rune Chalk",
+          "icon": "fas fa-leaf",
+          "tint": "sage"
+        },
+        {
+          "id": "duskglass",
+          "label": "Duskglass",
+          "icon": "fas fa-flask",
+          "tint": "aqua"
+        },
+        {
+          "id": "bone-ash",
+          "label": "Bone Ash",
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        }
+      ]
+    },
+    "data": {
+      "held": {
+        "rune-stylus": 2,
+        "rune-chalk": 5,
+        "duskglass": 2,
+        "bone-ash": 0
+      },
+      "claimed": {
+        "duskglass": 2
+      },
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading"
+    },
+    "note": "Wired as `SlotRow.svelte:115-127` hands its list the `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies; no candidate carries a reason, so each reading is the Journal's own copy alone, which adds `· N spare` where the drawing omits it and reads 0 spare where it says none spare. The kicker and summary stay drawn above, outside `draws`, because the drawing does not wrap them with the group, so the row passes no `label` and the specimen's radiogroup is unnamed; `StepDetails` names it Choose an ingredient through `SlotRow`'s `choiceLabel`."
   },
   {
     "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
@@ -1263,7 +1342,7 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
     "partial": "no body",
-    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
+    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
     "props": {
       "stage": {
         "name": "Hammer the rivets"
@@ -1330,7 +1409,7 @@
     "cap": "a stage you are only looking at — dashed, muted, inert",
     "draws": ":scope > div > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
-    "note": "The past stage, consumed and produced. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
+    "note": "The past stage, consumed and produced. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
     "props": {
       "stage": {
         "name": "Draw the billet",
@@ -1364,6 +1443,185 @@
         }
       ]
     }
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "before the roll — the scale, commonest first",
+    "draws": ":scope > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "greyfell",
+          "name": "Greyfell Scree",
+          "chance": 100,
+          "qty": 3,
+          "icon": "fas fa-hammer",
+          "tint": "slate"
+        },
+        {
+          "id": "iron",
+          "name": "Iron Nodule",
+          "chance": 70,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "silver",
+          "name": "Silver Seam",
+          "chance": 30,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "bone"
+        },
+        {
+          "id": "skyfall",
+          "name": "Skyfall Shard",
+          "chance": 5,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        }
+      ]
+    },
+    "data": {
+      "chances": {
+        "greyfell": "100%",
+        "iron": "70%",
+        "silver": "30%",
+        "skyfall": "5%"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "thresholdKey": "FABRICATE.App.Journal.Yields.HighRollThreshold"
+    },
+    "note": "Wired as `RunDetail.svelte:582-602` wires a d100 run's preview: each threshold and quantity is the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author. The kicker and hint stay drawn above, outside `draws`, and the neutral chance pills stand on a darker ground than the drawing's."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "after the roll — the same scale, cut once",
+    "draws": ":scope > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "greyfell",
+          "name": "Greyfell Scree",
+          "chance": 100,
+          "qty": 3,
+          "icon": "fas fa-hammer",
+          "tint": "slate"
+        },
+        {
+          "id": "iron",
+          "name": "Iron Nodule",
+          "chance": 70,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "silver",
+          "name": "Silver Seam",
+          "chance": 30,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "bone"
+        },
+        {
+          "id": "skyfall",
+          "name": "Skyfall Shard",
+          "chance": 5,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        }
+      ],
+      "roll": 41
+    },
+    "data": {
+      "chances": {
+        "greyfell": "100%",
+        "iron": "70%",
+        "silver": "30%",
+        "skyfall": "5%"
+      },
+      "readings": {
+        "greyfell": "came back",
+        "iron": "came back",
+        "silver": "needed 71 or higher",
+        "skyfall": "needed 96 or higher"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "rolledKey": "FABRICATE.App.Journal.History.RolledValue",
+      "cutKey": "FABRICATE.App.Journal.History.Cut"
+    },
+    "undrawn": {
+      "Anything rarer than this fell short": "the cut note as `HistoricalRunDetail` words it; the drawing begins it in lower case"
+    },
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the cut chip and cut note are the Journal's own copy, and the top and bottom cut notes go unwired because this roll cuts between rows. Each reading and chance is the row's string, because `dropEvidence` (`HistoricalRunDetail.svelte:33-57`) joins its parts with a separator a fixture may not author; it would read Needed 71 or higher · Missed the roll. The kicker and hint stay drawn above, outside `draws`, and the missed rows' neutral chance pills stand on a darker ground than the drawing's."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "legacy history — recorded row rolls, no global cut",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "ore",
+          "name": "Ore",
+          "chance": 90,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "cleared": true
+        }
+      ],
+      "rollModel": "perRow"
+    },
+    "data": {
+      "chances": {
+        "ore": "90%"
+      },
+      "readings": {
+        "ore": "Rolled 12 · needed 11 or higher · cleared"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity"
+    },
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls. The drawing has no wrapper around its two rows, so each stands as its own one-entry scale. Each reading and chance is the row's string, as in the shared record above; `dropEvidence` would read Rolled 12 · Needed 11 or higher · Cleared the roll. A cleared row takes the success ground, its reading sits at the row's end rather than under the name, and its chance is an outlined chip where the drawing fills a badge, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "legacy history — recorded row rolls, no global cut",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "gem",
+          "name": "Gem",
+          "chance": 20,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "cleared": true
+        }
+      ],
+      "rollModel": "perRow"
+    },
+    "data": {
+      "chances": {
+        "gem": "20%"
+      },
+      "readings": {
+        "gem": "Rolled 94 · needed 81 or higher · cleared"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity"
+    },
+    "note": "Wired as the row above: a cleared row takes the success ground, its reading sits at the row's end, its chance is an outlined chip, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",

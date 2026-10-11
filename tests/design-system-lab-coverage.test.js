@@ -633,7 +633,8 @@ test('every prop a catalogue row passes is a prop the component declares', () =>
           'no prop of that name to render it'
       );
     }
-    if (entry.row.content === undefined) continue;
+    // A fixture takes a row's `content` as its own `children`; the fixture gate holds it to render them.
+    if (entry.row.content === undefined || entry.row.fixture !== undefined) continue;
     assert.ok(
       names.has(CHILDREN_PROP),
       `${where(entry)}: the row supplies \`content\` and ${entry.row.path} declares no ` +
@@ -723,21 +724,10 @@ function unsectionedManifestRows({ library, manifestRows }) {
  */
 const AWAITING_SPECIMEN = Object.freeze({
   pickers: [
-    // The parent's portaled panel, drawn as the grid form: six columns of icon-only tiles, which
-    // is not a shipped form, since the sheet lays out two columns and no icon-only tile ships. The
-    // list-form `SearchablePopover` specimen mounts the panel through its one real caller.
+    // The library draws the panel only in its grid form, six columns of icon-only tiles, which
+    // does not ship: the sheet lays out two columns and no icon-only tile ships (phase 2 of issue
+    // 2339). The list-form `SearchablePopover` specimen mounts the panel through its one caller.
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
-  ],
-  composites: [
-    // Each candidate's held count, claim and reading come from the `held`, `claimed` and
-    // `candidateReading` functions; without them every candidate reads short, dimmed and blank.
-    '<ChoiceOptionList> src/ui/svelte/components/ChoiceOptionList.svelte',
-    // A tile's held-over-needed pip and its met or short state are read through `held`, so with
-    // none every fixed tile reads 0 and short; its candidate list needs the readings above.
-    '<SlotRow> src/ui/svelte/components/SlotRow.svelte',
-    // Every reading, chance and cut note is worded by a `labels` callback, so with none the
-    // chances read as bare numbers and the readings are empty.
-    '<YieldScale> src/ui/svelte/components/YieldScale.svelte',
   ],
 });
 

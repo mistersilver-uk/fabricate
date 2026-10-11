@@ -36,6 +36,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
     'fabricate-journal-lifecycle-paused',
+    'fabricate-journal-lifecycle-waiting-auto-eligible',
   ]),
   'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
@@ -203,8 +204,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
-  // The most-used control in the app, and until issue 1378 it published no frame that renders one.
-  'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // The most-used control in the app, and until issue 1378 it published no frame that renders one;
+  // the outcome tiers' Failure row is its formatted null endpoint (issue 2357).
+  'src/ui/svelte/components/Stepper.svelte': Object.freeze([
+    'manager-gathering-economy-actors',
+    'manager-checks-parity-outcomes-multiply',
+  ]),
   // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
     'manager-tool-prerequisites-selected-1280x720',

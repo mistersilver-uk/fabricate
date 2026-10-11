@@ -169,8 +169,10 @@ A block drawing that caps its own width (`max-width`) drew that region, so its
 slot keeps the drawn width; one with no cap drew the primitive alone, so its slot
 adds the inset on both sides, unless the slot stretches it, when the width is the
 page's.
-`<SlotTile>` is the second kind: its count pip sits 7px above the tile and its
-pressed outline 4px outside it.
+`<SlotTile>` and `<SlotRow>` are the second kind: a tile's count pip sits 7px above
+it and its pressed outline 4px outside it.
+A drawing that stretched to its parent keeps the page's width, so its inset pads
+the specimen inside that width rather than widening the slot.
 
 ## `content` — what a call site puts inside
 
@@ -222,14 +224,17 @@ The fixture is the row's call site, copied from the component's shipped caller.
 It is handed the row's component as `component` and the row's `props` as `props`, renders the component with `{...props}`, and supplies the functions and snippets that caller would.
 Every other attribute it passes the component is a prop the component declares.
 `data` is the fixture's own props, as plain JSON: each key is a prop the fixture declares, and `component`, `props`, `children` and the snippet names are refused.
+A fixtured row's `content` reaches the fixture as its `children`, which it renders inside the component or a shipped primitive that declares `children`.
 
 **A fixture authors no word.**
 Every string it hands a component comes from the row's `props`, `content`, `snippets` or `data`, from a lang key passed in a `data` key ending in `Key` and resolved by the lab's localizer, or from a pure helper the shipped caller imports.
 `tests/primitive-lab-fixtures.test.js` holds every fixture to that on its syntax tree, and the drawing-text gate reads `data` as it reads `props`, and a `…Key` as the shipped string it names.
 
 A fixture's template holds only the component, shipped primitives and snippet wiring.
+A shipped primitive is a component under `src/ui/svelte/components/`, or a `.svelte` composition `scripts/lib/designSystemPrimitives.json` lists under `designSystemPrimitives`; a `notAPrimitive` path, or a component the library names only in prose, is refused.
 It renders no raw element, `<style>` or `{@html}`, and a `class` or `style` it passes reads the row, so it has no class, style or ancestor context class of its own, and markup only the shipped caller's own scope draws is left out and named in `partial`.
-A snippet the row's `snippets` names is a prop the fixture declares and passes on.
+A snippet the row's `snippets` names is a prop the fixture declares and passes on, and a snippet the fixture declares itself is passed on too.
+The gate reads the template rather than which branch runs, so a snippet passed on only in a dead `{#if}` branch is out of its reach.
 A part may stand inside its real parent: `NavSidebarRows` stands in `<NavSidebar>`'s `content` snippet.
 Every callback a fixture passes is a no-op, so nothing writes back.
 

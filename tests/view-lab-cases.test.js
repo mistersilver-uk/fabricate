@@ -721,8 +721,8 @@ const HEADING_FLOOR_LAYOUT_CASES = {
   'manager-components-premium-ad-full': { width: 1330, height: 820 },
 };
 const HEADING_FLOOR_LAYOUT_CASE_IDS = Object.keys(HEADING_FLOOR_LAYOUT_CASES);
-// And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
-// at its own window.
+// And the requirement row's result cases (issue 1516) and the outcome tier rows (issue 2360), which
+// assert row geometry and no grid, each at its own window.
 const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-rolled',
   'manager-recipe-edit-results-rolled-hearth-herb',
@@ -736,6 +736,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-gathering-task-editor-straight-rolled',
   'manager-component-edit-salvage-rolled-narrow',
   'manager-component-edit-salvage-narrow',
+  'manager-checks-parity-outcomes-multiply',
+  'manager-checks-parity-outcomes-under-fixed',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
@@ -784,6 +786,12 @@ const sortRow = (select, direction) => [
 /** An empty panel's padding, by the one selector a case draws it with (issue 2257 D9). */
 const emptyPadding = (selector, padding) => [{ selector, styles: `padding: ${padding}` }];
 const FAILED_RUN = '[data-history-run-id="lab-run-failed"]';
+/** A run kicker in `Kicker`'s muted scale (issue 2257 D22). */
+const runKicker = (selector) => ({
+  selector,
+  styles: 'font-size: 8.5px; letter-spacing: 0.935px; color: var(--fab-text-muted)',
+});
+const RUN_HEADING = '[data-journal-detail] .fab-run-progress-heading';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -907,6 +915,14 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: slotRing('s1-g1'), styles: 'box-shadow: 0 0 0 1px var(--fab-danger-border)' },
     { selector: slotRing('s1-g3'), styles: 'box-shadow: 0 0 0 1px var(--fab-warning-border)' },
     { selector: '[data-requirement-slot="s1-g2"] .fab-slot-pip', styles: 'line-height: 1.6' },
+  ],
+  'fabricate-journal-lifecycle-waiting-auto-eligible': [
+    runKicker('[data-run-completion] > :first-child'),
+    { selector: '[data-run-completion-switch]', styles: 'box-sizing: border-box; height: 36px' },
+  ],
+  'fabricate-journal-lifecycle-past-stage': [
+    runKicker(`${RUN_HEADING} .fab-kicker`),
+    { selector: RUN_HEADING, styles: 'box-sizing: border-box; height: 11.046875px' },
   ],
   'player-crafting-stack-picker': [
     {

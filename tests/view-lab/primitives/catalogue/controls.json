@@ -156,6 +156,28 @@
     "note": "The value reads through the shipped multiplier formatter and steps through its stops, as the check tiers wire it."
   },
   {
+    "spec": "<Stepper>",
+    "cap": "formatted · null endpoint",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "fixture": "StepperFormatted",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": null,
+      "nullLabel": "Otherwise",
+      "ariaLabel": "Tier adjustment, Otherwise"
+    },
+    "data": {
+      "kind": "multiply"
+    },
+    "note": "The endpoint input fits its label at the shipped type, 67px against the drawn 64."
+  },
+  {
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",

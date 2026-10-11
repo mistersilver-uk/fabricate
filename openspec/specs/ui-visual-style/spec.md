@@ -504,6 +504,7 @@ A formatted stepper is a `role="spinbutton"` text input with decimal inputmode t
 Enter never submits an enclosing form, invalid or partial text restores the committed display, and Escape during an edit restores it without blurring and without reaching Foundry's bindings.
 Stepping moves to the nearest strictly greater or smaller stop, so an off-list value stays exact until it is stepped, and Home and End select the lowest and highest numeric stops.
 A caller-named null endpoint (Otherwise) is distinct from an unset value: the endpoint sits one step below the lowest stop, renders its label and states it in `aria-valuetext` with no `aria-valuenow`, while an unset value renders the placeholder and persists null.
+At the endpoint the label reads in `--fab-text-muted` while it is not being edited, clearing 4.5:1 on its caller's ground in every shipped theme, and a horizontal stepper that does not fill its row widens its input at the endpoint to fit the label, never narrower than 64px; a filling stepper does not widen, so its caller sizes the slot to show the label unclipped.
 An empty edit never manufactures the endpoint.
 
 **Native spinner suppression.**

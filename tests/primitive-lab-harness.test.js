@@ -355,6 +355,22 @@ test('an uncapped sized host widens by its row inset on both sides; a capped one
   assert.equal(describeHost({ ...HOST, inset: 12 }).presize, '300px', 'a stretched host adds none');
 });
 
+test('the host says whether its drawing stretched and whether an inset widens its slot', () => {
+  const decision = (facts) => {
+    const { stretched, widened } = describeHost({
+      ...HOST,
+      availableWidth: 718,
+      inset: 8,
+      ...facts,
+    });
+    return { stretched, widened };
+  };
+  assert.deepEqual(decision({ drawnWidth: 718 }), { stretched: true, widened: false });
+  assert.deepEqual(decision({ drawnWidth: 0 }), { stretched: false, widened: false });
+  assert.deepEqual(decision({ maxWidth: '460px' }), { stretched: false, widened: false });
+  assert.deepEqual(decision({ drawnWidth: 56 }), { stretched: false, widened: true });
+});
+
 const PARENT = {
   display: 'flex',
   clientWidth: 742,
