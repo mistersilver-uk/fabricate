@@ -18034,7 +18034,7 @@
   margin-inline-start: auto;
 }
 
-/* THE PANEL. The specimen corners the option list at 11px; `.fabricate-picker-popover.manager-travel-popover` corners it at 10 and floors it at 240px. */
+/* THE PANEL. The specimen corners the option list at 11px, as `.fabricate-picker-popover.manager-travel-popover` does, which also floors it at 240px. */
 .fabricate-picker-popover.fabricate-select-popover {
   border-radius: 11px;
 }
