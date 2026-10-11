@@ -209,7 +209,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppTitleBar',
-  'TierTrack', 'ViewToggle',
+  'TierTrack',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {

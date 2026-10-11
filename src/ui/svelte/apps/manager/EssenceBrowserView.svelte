@@ -18,6 +18,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
+  import ViewToggle from '../../components/ViewToggle.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import Button from '../../components/Button.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
@@ -30,7 +31,6 @@
   } from '../../../model/essenceBrowserModel.js';
   import { createBulkSelection } from './bulkSelection.svelte.js';
   import { createBrowserListState } from './browserListState.svelte.js';
-  import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
   import SearchField from '../../components/SearchField.svelte';
   import FilterBar from '../../components/FilterBar.svelte';
@@ -308,15 +308,6 @@
     selection.prune((essenceCards || []).map((essence) => essence.id));
   });
 
-  const viewModeOptions = $derived(
-    ESSENCE_VIEW_MODE_SEGMENTS.map((segment) => ({
-      value: segment.value,
-      labelKey: segment.labelKey,
-      fallback: segment.fallback,
-      icon: segment.icon,
-    }))
-  );
-
   const SORT_LABELS = {
     name: ['FABRICATE.Admin.Manager.Essence.SortName', 'Name'],
     status: ['FABRICATE.Admin.Manager.Essence.SortStatus', 'Status'],
@@ -448,14 +439,11 @@
         </Button>
       </div>
 
-      <!-- ICON-ONLY (issue 1036): a list glyph and a grid glyph ARE the two layouts. The compact
-           track is sized to sit with the 34px icon buttons rather than to the prototype's pixel
-           count, and the label survives in the a11y tree. -->
-      <SegmentedControl
-        options={viewModeOptions}
-        value={ui.viewMode}
-        iconOnly
-        groupName="manager-essence-view-mode"
+      <!-- The list/grid switch: see `ViewToggle` (issue 2412). -->
+      <ViewToggle
+        view={ui.viewMode}
+        listLabel={text('FABRICATE.Admin.Manager.Essence.ViewList', 'List')}
+        gridLabel={text('FABRICATE.Admin.Manager.Essence.ViewGrid', 'Grid')}
         ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
         data-essence-view-mode
         optionDataAttr="data-essence-view-option"

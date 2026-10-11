@@ -86,6 +86,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-component-tag-suggestions',
     'manager-gathering-task-drop-modifier-suggestions',
   ]),
+  // The list and grid switch (issue 2412): the essence browser in each arrangement.
+  'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([
+    'manager-essences-normal',
+    'manager-essences-grid',
+  ]),
   // The cross-reference list (issue 2321): the inventory inspector, a tool's Required for and an
   // essence's Contributing.
   'src/ui/svelte/components/XrefList.svelte': Object.freeze([

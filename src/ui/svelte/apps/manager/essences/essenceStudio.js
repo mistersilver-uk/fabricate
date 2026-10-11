@@ -9,22 +9,6 @@ import {
   essenceEditorValidation,
 } from '../../../../model/essenceValidation.js';
 
-/** The list / grid presentation toggle, as `SegmentedControl` options. */
-export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
-  Object.freeze({
-    value: 'list',
-    labelKey: 'FABRICATE.Admin.Manager.Essence.ViewList',
-    fallback: 'List',
-    icon: 'fas fa-list',
-  }),
-  Object.freeze({
-    value: 'grid',
-    labelKey: 'FABRICATE.Admin.Manager.Essence.ViewGrid',
-    fallback: 'Grid',
-    icon: 'fas fa-table-cells-large',
-  }),
-]);
-
 /**
  * The CREATE editor's three tabs, reached ONLY where there is no shared world definition to
  * contradict: `ui-world-scope/spec.md` `## GM World Essence Screens` requirement 10 makes identity
