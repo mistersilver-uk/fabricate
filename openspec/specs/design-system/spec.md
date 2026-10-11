@@ -298,7 +298,7 @@ The retirement is of those nine exact tokens; family descendants, `fab-manager-b
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
 All six that issue 1508 names are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
-The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageList.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
+The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageBand.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
 The absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
 After issue 2046 exactly one member row scoped `shared` lives under `apps/manager/`: `ComplicationSummaryRow.svelte`; `Modal.svelte`, which the player crafting application's roll prompt renders, moved into `components/` with that change.
@@ -1268,12 +1268,16 @@ This MUST be one switch in one component: no caller chooses it and no prop expos
 A whole-header row outside the list is not yet bound by this, and that debt is recorded in the non-conformance list under `ui-visual-style`'s "Shared product UI primitives" rather than treated as a conforming case.
 
 Reorder answers BOTH inputs, and the list owns both halves because no shared action supports either one for a reorder.
-The grip is the pointer's drag handle and a real button that moves its row with the up and down arrow keys, since HTML5 drag and drop has no keyboard path at all.
+The grip is the pointer's drag handle and the row's only drag source — a drag begun on any other element inside the row arms no move — and a real button that moves its row with the up and down arrow keys, since HTML5 drag and drop has no keyboard path at all.
 A visible up and down chevron rocker renders in every disclosure mode wherever the list orders; a list declared non-reorderable draws neither grip nor rocker, and at the ends the unavailable chevron is disabled rather than hidden.
-The grip LEADS and the rocker TRAILS: the rocker's two controls are named for the direction they move the row and sit in the trailing cluster, and the disclosure sits leading, so the two chevron pairs are never adjacent.
+The grip LEADS and the rocker TRAILS: the rocker's two controls are named for the direction they move the row and for the record they move ("Move {name} up") and sit in the trailing cluster, and the disclosure sits leading, so the two chevron pairs are never adjacent.
 The row being dragged carries a state class so the GM can see which row is travelling.
 The move is announced through a polite live region by the shared reorder helper, AFTER focus has landed on the control that made the move — the grip for its own arrow keys, the pressed chevron for a rocker click, and the grip again where that chevron has disabled itself at an end.
 The moved item's name is read BEFORE the move, because the caller round-trips the array and the item at that index afterwards is a different record.
+A caller MAY announce an outcome the list cannot see — a rejected write reverting the order, a reset — through the list's own live region by passing it as `announcement`; the list speaks each new non-empty value it receives after mounting, never the value it mounts with, and never clears its region for an empty one.
+A pointer drop that moves a row notifies the caller that its move has settled (`onReorderSettled`); a keyboard or rocker move does not, because those arrive in bursts a caller may coalesce.
+A list declared non-reorderable keeps its live region mounted and emits nothing of its own; a caller's `announcement` is still spoken, and toggling reorder never clears the region, because a caller that toggles reorder during a save would otherwise unmount it mid-announcement.
+`SortableList` renders the player application's progressive stage lists as well as the manager's; no player surface hand-rolls an ordered list.
 
 An adder for the collection MUST render as the list's own footer rather than as a sibling of the list, so it stays in flow with the collection it extends.
 Where a surface replaces the list entirely with an empty message, the adder follows the message it now sits under, because a footer of a list that is not rendered cannot render either.
@@ -1302,6 +1306,12 @@ A surface whose prototype pins the adder outside the list in the POPULATED state
 - **WHEN** a GM focuses a row's grip and presses the down arrow
 - **THEN** the row moves one position and focus follows it
 - **AND** the new position is announced after the focus lands, not before
+
+#### Scenario: A rejected order write is announced through the list
+
+- **WHEN** a caller's order write is rejected and the caller passes the revert sentence as `announcement`
+- **THEN** the list's live region speaks it
+- **AND** exactly one live region follows the list
 
 #### Scenario: A whole-row control only selects a record
 

@@ -73,7 +73,7 @@ Each recipe carries an **Allow player result re-ordering** setting, which you au
 It is on by default.
 
 When it is on, a player can put that recipe's result stages into the order they prefer.
-They can drag a stage, or move it with the keyboard using the move up and move down controls on each stage.
+They can drag a stage by its grip, or use its grip arrow keys or move up and move down buttons.
 Each move is announced for screen readers, and the **Reached at** values update to match the new order.
 
 A player's chosen order is a standing preference, not a one-off choice for the next craft.
