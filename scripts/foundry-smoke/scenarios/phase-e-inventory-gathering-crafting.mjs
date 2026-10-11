@@ -1103,7 +1103,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         });
 
         // (3) Flag OFF (D13): no grips, no rocker, ordinals + difficulty kept, the muted
-        // "Order set by the GM" line, and the one live region kept mounted and empty.
+        // "Order set by your GM." line, and the one live region kept mounted and empty.
         // Default-true means an explicit false has to be authored to reach this state.
         await selectRecipeByName('Smoke Kiln Firing');
         const fixedReport = await page.evaluate(() => {
@@ -1113,8 +1113,10 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           );
           return {
             rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
-            grips: document.querySelectorAll('[data-progressive-stage] [data-sortable-grip]').length,
-            moves: document.querySelectorAll('[data-progressive-stage] [data-sortable-move]').length,
+            grips: document.querySelectorAll('[data-progressive-stage] [data-sortable-grip]')
+              .length,
+            moves: document.querySelectorAll('[data-progressive-stage] [data-sortable-move]')
+              .length,
             ordinals: document.querySelectorAll('[data-progressive-stage] [data-sortable-ordinal]')
               .length,
             difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
@@ -1137,7 +1139,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           );
         }
         if (fixedReport.note.length === 0)
-          throw new Error('fixed state shows no "order set by the GM" line');
+          throw new Error('fixed state shows no "Order set by your GM." line');
         if (fixedReport.liveRegions !== 1 || fixedReport.regionText.length > 0) {
           throw new Error(
             `fixed state needs exactly one empty live region after the list: ${JSON.stringify(fixedReport)}`
@@ -1180,16 +1182,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll(selector)].filter(
               (node) => node.getBoundingClientRect().width > 1
             ).length;
-          const names = [...document.querySelectorAll('[data-progressive-stage] .progressive-stage-name')];
+          const names = [
+            ...document.querySelectorAll('[data-progressive-stage] .progressive-stage-name'),
+          ];
           return {
             difficulties: visible('[data-progressive-stage-difficulty]'),
             thresholds: visible('[data-progressive-stage-threshold]'),
             ellipsed: names.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
             rowOverflow: [
               ...document.querySelectorAll('.fabricate-sortable-list-row.progressive-stage-row'),
-            ].filter(
-              (row) => row.scrollWidth > row.clientWidth + 2
-            ).length,
+            ].filter((row) => row.scrollWidth > row.clientWidth + 2).length,
           };
         });
         if (narrowChips.difficulties < 3 || narrowChips.thresholds < 3) {

@@ -314,7 +314,7 @@ A chosen order is a standing preference rather than a one-off choice, remembered
 The player can also **Reset** the list back to your authored order.
 Reset clears that player's preference rather than pinning your current order, so if you later re-author the stages, that player follows the new order.
 
-When it is off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
+When it is off, the stage list is shown in your authored order, marked **Order set by your GM**, and players cannot rearrange it.
 
 A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
 Once a salvage has resolved, the list locks and a note explains that the roll has already run down it.

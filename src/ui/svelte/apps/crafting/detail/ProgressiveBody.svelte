@@ -86,7 +86,7 @@
         {/key}
         {#if !canReorderStages}
           <p class="progressive-stage-fixed-note" data-progressive-stage-fixed-note>
-            {localizeOr('FABRICATE.App.Crafting.Detail.StageOrderFixed', 'Order set by the GM')}
+            {localizeOr('FABRICATE.App.Crafting.Detail.StageOrderFixed', 'Order set by your GM.')}
           </p>
         {/if}
       {:else}

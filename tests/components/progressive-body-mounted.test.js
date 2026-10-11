@@ -296,7 +296,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const target = await mountBody({ canReorder: false });
     const note = target.querySelector('[data-progressive-stage-fixed-note]');
     assert.ok(note, 'one muted line says why there is nothing to grab');
-    assert.match(note.textContent, /Order set by the GM/);
+    assert.match(note.textContent, /Order set by your GM\./);
     assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
     assert.equal(regionAfterList(target).textContent.trim(), '', 'nothing is announced');
     assert.ok(!target.querySelector('[data-progressive-stage-status]'), 'and no second region');

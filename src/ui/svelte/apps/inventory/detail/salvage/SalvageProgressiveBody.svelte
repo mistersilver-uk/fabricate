@@ -70,7 +70,7 @@
     // WHY the rows are fixed, decided by the panel (which is the only thing that knows):
     // the GM pinned the order, or this player's roll has already been spent down the list.
     fixedNoteKey = 'FABRICATE.App.Crafting.Detail.StageOrderFixed',
-    fixedNoteFallback = 'Order set by the GM',
+    fixedNoteFallback = 'Order set by your GM.',
     // Restore the GM's authored order. `canResetOrder` is the panel's read of whether
     // the player's order actually differs from it — resetting to the order you are
     // already in is a no-op the control should not offer.

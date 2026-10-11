@@ -81,7 +81,7 @@ Fabricate remembers it and uses it every time that player crafts that recipe, un
 The order is remembered per player and per recipe, in this world only.
 Other players are unaffected, and the same player in another world starts from your authored order.
 
-When you turn the setting off, the stage list is shown in your authored order, marked **Order set by the GM**, and players cannot rearrange it.
+When you turn the setting off, the stage list is shown in your authored order, marked **Order set by your GM**, and players cannot rearrange it.
 Turning it off does not erase any order a player already chose.
 Their order is simply ignored while the setting is off.
 
@@ -94,7 +94,7 @@ Their order is simply ignored while the setting is off.
 Components configured for progressive salvage carry the same **Allow player result re-ordering** setting, on the component's salvage setup, and it is on by default.
 Players re-order those stages on the **Salvage** tab of the Inventory inspector, exactly as they re-order a recipe's stages here.
 A salvage run fixes the order it will use at the moment it starts, so a run that finishes later, over world time, still awards the order it began with.
-Once a salvage has resolved, its stage list locks, with a note explaining that the roll has already run down it rather than the **Order set by the GM** note used here.
+Once a salvage has resolved, its stage list locks, with a note explaining that the roll has already run down it rather than the **Order set by your GM** note used here.
 
 See [Salvaging From the Inventory Tab]({% link components/salvage.md %}#salvaging-from-the-inventory-tab).
 

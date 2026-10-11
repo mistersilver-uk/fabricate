@@ -2352,7 +2352,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(regionAfterList(target).textContent.trim(), '', 'with nothing to announce');
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
-      'Order set by the GM',
+      'Order set by your GM.',
       'and says the GM set it — which, here, is the reason that actually applies'
     );
   });
@@ -2402,7 +2402,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const parts = [...identity.children].map((child) =>
       child.matches('.progressive-stage-name')
         ? 'name'
-        : child.querySelector('[data-progressive-stage-state]') || child.dataset.progressiveStageState
+        : child.querySelector('[data-progressive-stage-state]') ||
+            child.dataset.progressiveStageState
           ? 'chip'
           : 'numbers'
     );
@@ -2730,7 +2731,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(gmPinned.services);
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
-      'Order set by the GM',
+      'Order set by your GM.',
       'the GM reason stays true after a commit and keeps precedence'
     );
   });
