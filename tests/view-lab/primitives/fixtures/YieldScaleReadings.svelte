@@ -1,7 +1,7 @@
 <!--
-  A gathering run's rarity scale: before the roll as `RunDetail` words each threshold, after it as
-  `HistoricalRunDetail` records it. Each recorded reading and chance is the row's own string,
-  because those callers assemble them with punctuation a fixture may not author.
+  A gathering run's rarity scale under the Journal's heading: before the roll as `RunDetail` words
+  each threshold, after it as `HistoricalRunDetail` records it. Each recorded reading and chance is
+  the row's own string, as those callers assemble them with punctuation a fixture may not author.
 -->
 <script>
   import { format, localize } from '../fixtureActs.js';
@@ -15,6 +15,7 @@
     thresholdKey = '',
     rolledKey = '',
     cutKey = '',
+    labelKey,
   } = $props();
 
   const labels = $derived({
@@ -30,4 +31,4 @@
   });
 </script>
 
-<Specimen {...props} {labels} />
+<Specimen {...props} label={localize(labelKey)} {labels} />
