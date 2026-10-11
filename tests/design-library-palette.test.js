@@ -4,11 +4,11 @@
  * CSS is read: its `<style>` blocks and `style` attributes, never the prose that names a token.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { Window } from 'happy-dom';
+
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
 import { readDesignLibrary } from './helpers/designLibrary.js';
 import {
@@ -18,7 +18,6 @@ import {
   stripCssComments,
 } from './helpers/styleBlockScan.js';
 
-const SHEET = resolve(import.meta.dirname, '../styles/fabricate.css');
 /** The page names its own face stacks, as its `:root` comment says. */
 const EXEMPT = new Set(['--fab-font-serif', '--fab-font-mono']);
 const PALETTE_ROOTS = new Set([':root', '.fabricate[data-fabricate-theme="fabricate"]']);
@@ -96,7 +95,7 @@ test('a synthetic undeclared reference fails, while a fallback and prose do not'
 
 test("every :root token the sheet's palette also declares carries the sheet's value", () => {
   const drawn = rootValues(page.rules, new Set([':root']));
-  const shipped = rootValues(rulesIn(stripCssComments(readFileSync(SHEET, 'utf8'))), PALETTE_ROOTS);
+  const shipped = rootValues(rulesIn(stripCssComments(readStylesheet())), PALETTE_ROOTS);
   const shared = [...drawn.keys()].filter((token) => shipped.has(token) && !EXEMPT.has(token));
   assert.ok(shared.length > 0, 'the page and the sheet share no palette token');
   const differing = shared
