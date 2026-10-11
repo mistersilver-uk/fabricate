@@ -721,6 +721,13 @@ const HEADING_FLOOR_LAYOUT_CASES = {
   'manager-components-premium-ad-full': { width: 1330, height: 820 },
 };
 const HEADING_FLOOR_LAYOUT_CASE_IDS = Object.keys(HEADING_FLOOR_LAYOUT_CASES);
+// And the world catalogues whose list column runs edge to edge (M21, issue 2373), by the band that
+// closes the column at the layout's foot.
+const FLUSH_COLUMN_LAYOUT_CASES = {
+  'world-tool-catalogue-page-two': '.fabricate-pagination',
+  'world-essence-catalogue-resting': '.manager-scoped-list-rows',
+};
+const FLUSH_COLUMN_LAYOUT_CASE_IDS = Object.keys(FLUSH_COLUMN_LAYOUT_CASES);
 // And the requirement row's result cases (issue 1516) and the outcome tier rows (issue 2360), which
 // assert row geometry and no grid, each at its own window.
 const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
@@ -819,6 +826,12 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '[data-scoped-list-inherit-note="effectSource"]',
       styles: 'color: var(--fab-text-muted)',
+    },
+  ],
+  'world-essence-catalogue-resting': [
+    {
+      selector: '.manager-scoped-list-column > .manager-scoped-list-rows:last-child',
+      styles: 'padding-bottom: 12px',
     },
   ],
   'manager-essence-edit-unscoped-on-craft': [
@@ -952,6 +965,7 @@ const LAYOUT_CASE_REGISTRATIONS = [
   ...RAIL_FILL_LAYOUT_CASE_IDS,
   ...BAND_LAYOUT_CASE_IDS,
   ...HEADING_FLOOR_LAYOUT_CASE_IDS,
+  ...FLUSH_COLUMN_LAYOUT_CASE_IDS,
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
@@ -963,13 +977,21 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     LAYOUT_CASE_REGISTRATIONS.filter(
       (id, index) => LAYOUT_CASE_REGISTRATIONS.indexOf(id) !== index
     ),
-    ['manager-recipe-edit-results-adder-menu'],
-    "only the result adder's menu sits in two layout groups, row geometry and controls"
+    ['manager-recipe-edit-results-adder-menu', 'world-essence-catalogue-resting'],
+    "only the result adder's menu and the resting essence list measure a layout and controls"
   );
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
     const rowGeometry = ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id);
+    const foot = FLUSH_COLUMN_LAYOUT_CASES[viewCase.id];
+    if (foot) {
+      assert.deepEqual(viewCase.position, { width: 1280, height: 900 });
+      assert.equal(viewCase.expectLayout.gridSelector, '.manager-scoped-list-layout');
+      assert.equal(viewCase.expectLayout.expectedTracks, 2);
+      assert.equal(viewCase.expectLayout.fillSelector, `.manager-scoped-list-column > ${foot}`);
+      continue;
+    }
     // A row-geometry case that also measures controls keeps its row checks below.
     if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id) && !rowGeometry) continue;
     if (

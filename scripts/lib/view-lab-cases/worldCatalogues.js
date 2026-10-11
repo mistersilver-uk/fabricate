@@ -657,6 +657,23 @@ export const CASES = Object.freeze([
         target: '[data-scoped-list-inspector-state="resting"]',
       },
     ],
+    // No pager, so the rows scroller is the column's foot: edge to edge, with a 12px floor inside it (issue 2373).
+    expectLayout: {
+      containerSelector: '.manager-scoped-list-layout',
+      gridSelector: '.manager-scoped-list-layout',
+      expectedTracks: 2,
+      fillSelector: '.manager-scoped-list-column > .manager-scoped-list-rows',
+      alignedLeft:
+        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+      alignedRight:
+        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+      controls: [
+        {
+          selector: '.manager-scoped-list-column > .manager-scoped-list-rows:last-child',
+          styles: 'padding-bottom: 12px',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
@@ -690,8 +707,11 @@ export const CASES = Object.freeze([
         target: '[data-scoped-list-inspector-foot]',
       },
     ],
-    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
+    // the search and every row on one 12px gutter (issue 2373).
     expectLayout: {
+      containerSelector: '.manager-scoped-list-column',
+      alignedLeft: '.manager-scoped-list-toolbar .fabricate-search, [data-scoped-list-row]',
       controls: [
         {
           selector: '[data-scoped-essence-open-entry]',
