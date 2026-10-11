@@ -16030,10 +16030,10 @@
   gap: var(--fab-space-2xs);
   padding: var(--fab-space-1);
   box-sizing: border-box;
-  border: 1px solid var(--fab-border);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 11px;
   background: var(--fab-bg-0);
-  box-shadow: var(--fab-shadow-md);
+  box-shadow: var(--fab-shadow-lg);
 }
 
 /* The item's 7 is the panel's 11 less its 4px padding, so the corners stay concentric. */
