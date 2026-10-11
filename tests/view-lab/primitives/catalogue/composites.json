@@ -983,7 +983,7 @@
       ],
       "shownHint": "They see the complication when it fires."
     },
-    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The open row's ordinal takes the accent. The ordinals read 1 and 2, where the drawing is a slice of a longer list. The adder beneath stays drawn."
+    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The adder beneath stays drawn."
   },
   {
     "spec": "<SortableList>",
@@ -1450,58 +1450,51 @@
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
     "cap": "stage nav — a five-stage window over a longer run",
-    "draws": ":scope > div",
+    "draws": ":scope > nav",
     "path": "src/ui/svelte/components/StageNav.svelte",
     "fixture": "StageNavReadings",
     "props": {
       "stages": [
         {
           "id": "s1",
-          "stepName": "Gather"
+          "stepName": "Smelt the ore"
         },
         {
           "id": "s2",
-          "stepName": "Smelt"
+          "stepName": "Fold the bloom"
         },
         {
           "id": "s3",
-          "stepName": "Forge"
+          "stepName": "Draw the billet"
         },
         {
           "id": "s4",
-          "stepName": "Quench"
+          "stepName": "Hammer the rivets"
         },
         {
           "id": "s5",
-          "stepName": "Temper"
+          "stepName": "Quench and temper"
         },
         {
           "id": "s6",
-          "stepName": "Grind"
+          "stepName": "Grind the burrs"
         },
         {
           "id": "s7",
-          "stepName": "Polish"
+          "stepName": "Polish the heads"
         },
         {
           "id": "s8",
-          "stepName": "Finish"
+          "stepName": "Count the batch"
         }
       ],
       "current": 3,
       "view": 2
     },
     "undrawn": {
-      "Gather": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Smelt": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Forge": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Quench": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Temper": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Grind": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Polish": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Finish": "the step's name, read only by assistive technology; the drawing shows numerals",
-      "Previous stage": "the back arrow's accessible name, as `RunDetail` words it; the drawing words it Show the previous stage",
-      "Next stage": "the forward arrow's accessible name, as `RunDetail` words it; the drawing words it Show the next stage"
+      "Grind the burrs": "a stage outside the five-stage window; the nav draws no numeral for it",
+      "Polish the heads": "a stage outside the five-stage window; the nav draws no numeral for it",
+      "Count the batch": "a stage outside the five-stage window; the nav draws no numeral for it"
     },
     "data": {
       "openKey": "FABRICATE.App.Journal.Stage.Open",
@@ -1510,7 +1503,7 @@
       "positionKey": "FABRICATE.App.Journal.Stage.Position",
       "returnKey": "FABRICATE.App.Journal.Stage.Return"
     },
-    "note": "The component centres its window on the viewed stage within the run, so viewing stage 3 of 8 shows numerals 1–5 where the drawing shows 2–6; no view gives both, and the library's drawing is corrected in phase 2. Its accessible names follow `RunDetail`, so each numeral is named View stage N with its step's name and the arrows Previous stage and Next stage, where the drawing says Show stage N and Show the previous stage; its position line and return button are the Journal's own copy, where the drawing words them Stage 3 of 8 and Back to stage 4."
+    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. Its numerals and position line ship in `--fab-text-subtle`, under the 4.5:1 floor in six themes, so the drawing inks them `--fab-text-muted`; issue 2353 owns that debt."
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
