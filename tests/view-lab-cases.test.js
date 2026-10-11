@@ -721,8 +721,8 @@ const HEADING_FLOOR_LAYOUT_CASES = {
   'manager-components-premium-ad-full': { width: 1330, height: 820 },
 };
 const HEADING_FLOOR_LAYOUT_CASE_IDS = Object.keys(HEADING_FLOOR_LAYOUT_CASES);
-// And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
-// at its own window.
+// And the requirement row's result cases (issue 1516) and the outcome tier rows (issue 2360), which
+// assert row geometry and no grid, each at its own window.
 const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-rolled',
   'manager-recipe-edit-results-rolled-hearth-herb',
@@ -736,6 +736,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-gathering-task-editor-straight-rolled',
   'manager-component-edit-salvage-rolled-narrow',
   'manager-component-edit-salvage-narrow',
+  'manager-checks-parity-outcomes-multiply',
+  'manager-checks-parity-outcomes-under-fixed',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
