@@ -997,6 +997,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="delta ok"><b>The portaled panel moved into its own file (issue 1719).</b> <code>SearchablePopoverPanel.svelte</code> now carries the panel markup under <code>components/</code>, as a pure move on the #1710 model. It carries this entry rather than a specimen of its own, and its <code>NOT_A_PRIMITIVE</code> row names one caller, <code>SearchablePopover.svelte</code>. The only difference in the compiled output is the Svelte scope hash, which is derived from the filename.</div>
   </div>
 
+  <!-- ratchet-exempt(design-system): <TintPicker>: the maintainer ruled on 2026-10-11 that the swatch highlight must be the picker's own hover fill and inset cursor, with no animation; the target popover specimen draws it beside the live one until the sheet does -->
   <div class="spec" data-status="target" data-status-TintPicker="target" data-status-Menu="shipped">
     <div class="spec-head"><h4>&lt;TintPicker&gt; &lt;Menu&gt;</h4><span class="st st-target">TintPicker &middot; target</span><span class="st st-shipped">Menu &middot; shipped</span></div>
     <div class="stage">

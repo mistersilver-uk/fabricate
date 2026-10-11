@@ -235,7 +235,7 @@
   }
 
   .manager-segmented.is-tag.is-field .manager-segment {
-    height: 32px;
+    height: calc(34px - 2px);
     font-size: 10.5px;
   }
 
