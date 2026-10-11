@@ -1,18 +1,19 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 describe('GatheringTasksBrowserView card-style row', () => {
   it('renders four column labels (Task / Tags / Status / Actions)', () => {

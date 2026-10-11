@@ -3,12 +3,13 @@
  * dist/.
  */
 
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readFile, writeFile, mkdir, rm, cp, access, stat, readdir } from 'node:fs/promises';
 import { basename, join, dirname } from 'node:path';
-import { execSync } from 'node:child_process';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
+
 import {
   ARCHIVE_GATE_SKIPPED_MESSAGE,
   archiveNameMismatchMessage,
@@ -16,6 +17,8 @@ import {
   isReleaseZipName,
   releaseZipName
 } from './lib/releaseZipChunks.js';
+import { STYLESHEET_ENTRY, stylesheetImports, stylesheetParts } from './lib/stylesheetSource.js';
+import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -53,9 +56,10 @@ export function applyReleaseUrls(manifest, releaseVersion) {
 
 /**
  * Return the list of relative file paths that must exist inside dist/ based on the
- * (already-rewritten) manifest.
+ * (already-rewritten) manifest. Given `readFile(path)` over dist/, the partials the module sheet
+ * imports are required too (issue 1711).
  */
-export function getRequiredFiles(manifest) {
+export function getRequiredFiles(manifest, readFile = () => {}) {
   const files = ['module.json'];
 
   for (const p of manifest.esmodules ?? []) {
@@ -63,6 +67,8 @@ export function getRequiredFiles(manifest) {
   }
   for (const p of manifest.styles ?? []) {
     files.push(p);
+    const entry = p === STYLESHEET_ENTRY ? readFile(p) : undefined;
+    if (entry !== undefined) files.push(...stylesheetImports(entry));
   }
   for (const lang of manifest.languages ?? []) {
     if (lang.path) files.push(lang.path);
@@ -80,7 +86,13 @@ export async function validateDist(distDir, srcManifest) {
   const errors = [];
 
   const distManifest = rewriteModuleJson(srcManifest);
-  const required = getRequiredFiles(distManifest);
+  const required = getRequiredFiles(distManifest, (rel) => {
+    try {
+      return readFileSync(join(distDir, rel), 'utf8');
+    } catch {
+      return;
+    }
+  });
 
   for (const rel of required) {
     try {
@@ -267,7 +279,8 @@ async function main() {
   console.log('Copying static assets...');
 
   await mkdir(join(distDir, 'styles'), { recursive: true });
-  await cp(join(ROOT, 'styles', 'fabricate.css'), join(distDir, 'styles', 'fabricate.css'));
+  const stylesheetFiles = new Set([STYLESHEET_ENTRY, ...stylesheetParts().map(({ file }) => file)]);
+  await Promise.all([...stylesheetFiles].map((file) => cp(join(ROOT, file), join(distDir, file))));
 
   await mkdir(join(distDir, 'lang'), { recursive: true });
   await cp(join(ROOT, 'lang', 'en.json'), join(distDir, 'lang', 'en.json'));

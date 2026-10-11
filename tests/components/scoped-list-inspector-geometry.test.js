@@ -1,30 +1,32 @@
 /* THE SCOPED CATALOGUE'S INSPECTOR COLUMN. */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
+
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   STATUS_TONE_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL = 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte';
 const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
 
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 const frameCss = scopedComponentCss(resolve(repoRoot, FRAME));
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL));
 /** The selection band's own children (issue 1373, maintainer feedback round 4). */

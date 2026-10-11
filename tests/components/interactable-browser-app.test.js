@@ -4,12 +4,13 @@
  * are not compiled in the Node test runner, so we assert their source shape).
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   SMOKE_SOURCE,
   assertLocatorsEmitted,
@@ -44,7 +45,7 @@ const selectSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
   'utf8'
 );
-const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
+const sheetSource = readStylesheet();
 
 describe('InteractableBrowserApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {

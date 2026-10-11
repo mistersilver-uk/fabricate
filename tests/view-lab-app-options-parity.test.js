@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { APP_CHROME, frameClassesFor } from '../scripts/lib/foundryChromeSpec.js';
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -96,7 +97,7 @@ test('the player window minimum size matches the constants and the CSS floor', (
   // `_updatePosition` clamps to the COMPUTED box, so the CSS floor is what actually binds during a
   // lab capture. If it and the constant disagree, the lab silently captures the CSS one (issue
   // 1520).
-  const css = readFileSync(resolve(ROOT, 'styles/fabricate.css'), 'utf8');
+  const css = readStylesheet();
   const floorRule = /\.fabricate\.fabricate-app-window\s*\{([^}]*)\}/.exec(css);
   assert.ok(
     floorRule,

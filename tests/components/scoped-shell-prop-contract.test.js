@@ -1,9 +1,10 @@
 /** The SOURCE-level contract of the three scoped-entity list shells (issue 1380, epic 1357). */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
+import { describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { listSvelteComponents } from '../../scripts/lib/svelteComponentFiles.js';
 import {
   attributeValueOn,
@@ -483,7 +484,6 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
   // `ui-world-scope/spec.md` `## GM World Scoped Entity Routes` requirement 7 closes
   // `styles/fabricate.css` to the scoped-entity lanes, and voids that closure only for a seam
   // the enumeration does not name — with the reopening change's own unchanged-render evidence.
-  const CSS_PATH = 'styles/fabricate.css';
   const STEM = 'manager-scoped-list';
 
   /** Every rule in the sheet, as `{ selector, index }`, comments stripped. */
@@ -496,7 +496,7 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
   }
 
   it('finds the scoped-list rules at all, so the clauses below are not vacuous', () => {
-    const rules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+    const rules = rulesOf(readStylesheet());
     assert.ok(rules.length > 500, `the rule parse found only ${rules.length} rules`);
     assert.ok(
       rules.filter((rule) => rule.selector.includes(STEM)).length >= 8,
@@ -507,7 +507,7 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
   it('never APPENDS a scoped-list class to the SHIPPED multi-select row group', () => {
     // THE MUTATION THIS KILLS: joining `manager-scoped-list-filter-row` onto the `.is-selection`
     // group instead of authoring a new rule.
-    const css = readFileSync(resolve(repoRoot, CSS_PATH), 'utf8');
+    const css = readStylesheet();
     const joined = rulesOf(css).filter(
       (rule) => rule.selector.includes('.is-selection') && rule.selector.includes(STEM)
     );
@@ -525,7 +525,7 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
   });
 
   it('leaves the shipped multi-select row group naming exactly its three studios', () => {
-    const css = readFileSync(resolve(repoRoot, CSS_PATH), 'utf8');
+    const css = readStylesheet();
     const group = rulesOf(css).find(
       (rule) => rule.selector.includes('.is-selection') && rule.selector.includes('recipe')
     );
@@ -1365,13 +1365,11 @@ function sheetRulesOf(css) {
  * ruling M15).
  */
 describe('the entry’s per-system rows sit on one surface, with every name in full ink', () => {
-  const CSS_PATH = 'styles/fabricate.css';
-
   const ROW = '.fabricate-manager .manager-component-entry-system';
   const NAME = '.fabricate-manager .manager-component-entry-system-name';
 
   it('declares the row’s own transparent surface and its hairline, so nothing outside the module can band it', () => {
-    const rule = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+    const rule = sheetRulesOf(readStylesheet()).find(
       (candidate) => candidate.selector === ROW
     );
     assert.ok(Boolean(rule), 'NON-VACUITY: the row rule is still in the sheet');
@@ -1382,7 +1380,7 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
   it('paints NO wash and re-inks NO name on the without-rules rows', () => {
     // THE MUTATION THIS KILLS: restoring `.is-outsider { background: var(--fab-surface-soft) }`
     // or `.is-outsider .manager-component-entry-system-name { color: var(--fab-text-muted) }`.
-    const outsiderRules = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).filter(
+    const outsiderRules = sheetRulesOf(readStylesheet()).filter(
       (rule) =>
         rule.selector.includes('manager-component-entry-system') &&
         rule.selector.includes('.is-outsider')
@@ -1400,7 +1398,7 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
   });
 
   it('and the system name is full ink on every row (`proto:932`)', () => {
-    const rule = sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8')).find(
+    const rule = sheetRulesOf(readStylesheet()).find(
       (candidate) => candidate.selector === NAME
     );
     assert.ok(Boolean(rule), 'NON-VACUITY: the name rule is still in the sheet');
@@ -1413,7 +1411,6 @@ describe('the entry’s per-system rows sit on one surface, with every name in f
  * (issue 1371 r13-entry, maintainer ruling M16).
  */
 describe('the entry’s inventory tile mirrors the player inventory card’s art treatment', () => {
-  const CSS_PATH = 'styles/fabricate.css';
   const CARD_PATH = 'src/ui/svelte/apps/inventory/InventoryItemCard.svelte';
 
   /** The declarations of ONE rule, as `property -> value`. */
@@ -1436,7 +1433,7 @@ describe('the entry’s inventory tile mirrors the player inventory card’s art
     return svelteSource.slice(open + '<style>'.length, close);
   }
 
-  const sheet = () => sheetRulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+  const sheet = () => sheetRulesOf(readStylesheet());
   const card = () => sheetRulesOf(styleBlockOf(readFileSync(resolve(repoRoot, CARD_PATH), 'utf8')));
 
   it('fills the tile with the art exactly as `.inventory-card-art img` does', () => {

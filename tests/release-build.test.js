@@ -595,6 +595,24 @@ test('validateDist returns success when all required files are present', async (
   }
 });
 
+test('validateDist requires every partial the shipped module sheet imports (issue 1711)', async () => {
+  const manifest = { esmodules: ['main.js'], styles: ['styles/fabricate.css'] };
+  const dir = await makeTempDist(['main.js', 'styles/fabricate-one.css'], { ...manifest, id: 'fabricate' });
+  try {
+    await writeFile(
+      join(dir, 'styles/fabricate.css'),
+      '@import url("fabricate-one.css");\n@import url("fabricate-two.css");\n'
+    );
+    const result = await validateDist(dir, manifest);
+    assert.equal(result.valid, false);
+    assert.deepEqual(result.missing, ['styles/fabricate-two.css']);
+    await writeFile(join(dir, 'styles/fabricate-two.css'), '.fabricate .a {}\n');
+    assert.equal((await validateDist(dir, manifest)).valid, true);
+  } finally {
+    await rm(dir, { recursive: true });
+  }
+});
+
 test('validateDist returns failure when a pack path is missing', async () => {
   const manifest = {
     esmodules: ['main.js'],

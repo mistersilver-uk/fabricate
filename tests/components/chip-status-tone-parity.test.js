@@ -1,16 +1,16 @@
 /* THE CONVERTED STATUS TONES, ARBITRATED IN A REAL BROWSER, ONCE PER THEME (issue 1506). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { CHIP_TONES } from '../helpers/chipTone.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 const chip = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'));
 
 /** THE SEVEN THEME ROOTS, read from the sheet rather than typed. */

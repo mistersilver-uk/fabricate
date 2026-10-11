@@ -3,15 +3,17 @@
    screen, so a repair measured on one route and lost on the other is the failure this file exists
    to name. */
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { after, before, test } from 'node:test';
+
 import { chromium } from 'playwright';
 
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/VocabularyShell.svelte';
@@ -39,7 +41,7 @@ function findChromeCache(startRoot) {
 const chrome = findChromeCache(repoRoot);
 const CORE_SHEET = chrome ? join(chrome.dir, 'css', 'foundry2.css') : null;
 
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 const shell = scopedComponentCss(resolve(repoRoot, SHELL_PATH));
 const panel = scopedComponentCss(resolve(repoRoot, PANEL_PATH));
 

@@ -1,12 +1,10 @@
 /* THE SYSTEM COMPONENT RULES LIST. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
-import { borrowBrowser } from '../helpers/layout-harness.js';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { createComponentsBrowserViewHarness } from '../helpers/componentScopeMountModules.js';
 import {
   harvestedFoundryChromeCss,
@@ -14,10 +12,11 @@ import {
   registerChromeRunnerGuards,
   skipWithoutHarvest,
 } from '../helpers/harvestedFoundryChrome.js';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 import { collectScopedCss, managerShellPage } from '../helpers/renderedManagerShell.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const { harness, compiledModules } = createComponentsBrowserViewHarness({
   repoRoot,

@@ -1,10 +1,11 @@
 /** Issue 877 — the post-import reference report. */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { describe, it, before, after, afterEach } from 'node:test';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -219,7 +220,7 @@ describe('ImportReportModal (mounted)', () => {
     assert.ok(close.classList.contains('is-size-26'), 'the banded frame’s 26px close');
     // The 26px box is IconButton's rung in the module sheet, so the sheet is loaded to measure it.
     const moduleSheet = document.createElement('style');
-    moduleSheet.textContent = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    moduleSheet.textContent = readStylesheet();
     document.head.append(moduleSheet);
     const paint = getComputedStyle(close);
     assert.equal(paint.width, '26px', 'a 26px square');

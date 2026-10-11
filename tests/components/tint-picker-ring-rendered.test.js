@@ -1,11 +1,11 @@
 /** Issue 2257 D3: the selected tint cell wears the inset ring, apart from the focus outline, in a browser. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
@@ -15,7 +15,7 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PICKER = 'src/ui/svelte/components/TintPicker.svelte';
-const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheet = readStylesheet();
 const scoped = scopedComponentCss(resolve(repoRoot, PICKER));
 
 const harness = createMountedComponentHarness({

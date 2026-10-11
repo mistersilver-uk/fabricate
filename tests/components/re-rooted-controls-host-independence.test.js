@@ -16,10 +16,10 @@ import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 
 import { specificityOf } from '../../scripts/lib/stylesheetSelectorCensus.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const SHEET_PATH = resolve(repoRoot, 'styles/fabricate.css');
-const sheet = readFileSync(SHEET_PATH, 'utf8');
+const sheet = readStylesheet();
 
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
@@ -621,7 +621,6 @@ const FIELD_CHROME_MEMBERS = Object.freeze([
   '.fabricate-field input:not([type])',
   '.fabricate-field textarea',
 ]);
-const FIELD_CHROME_SELECTOR = FIELD_CHROME_MEMBERS.join(', ');
 
 /**
  * A rule's specificity as (ids, classes, elements), counted off the browser-serialised prelude.

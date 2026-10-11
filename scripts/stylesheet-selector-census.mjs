@@ -7,13 +7,17 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { duplicateSelectorCensus, formatCensusReport } from './lib/stylesheetSelectorCensus.js';
+import { STYLESHEET_ENTRY, readStylesheet } from './lib/stylesheetSource.js';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const sheets = process.argv.slice(2);
-const targets = sheets.length > 0 ? sheets : ['styles/fabricate.css'];
+const targets = sheets.length > 0 ? sheets : [STYLESHEET_ENTRY];
 
 for (const target of targets) {
   const absolute = path.isAbsolute(target) ? target : path.join(repoRoot, target);
-  const census = duplicateSelectorCensus(readFileSync(absolute, 'utf8'));
+  const isModuleSheet = absolute === path.join(repoRoot, STYLESHEET_ENTRY);
+  const census = duplicateSelectorCensus(
+    isModuleSheet ? readStylesheet() : readFileSync(absolute, 'utf8')
+  );
   process.stdout.write(formatCensusReport(census, path.relative(repoRoot, absolute)));
 }

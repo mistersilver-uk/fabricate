@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { INSPECTOR_VERB_SITES } from '../helpers/inspectorVerbRoles.js';
 import { importedModules, literalStrings, walkNodes } from '../helpers/moduleAst.js';
 import { componentAstOf, sourceAstEntriesUnder } from '../helpers/parsedSource.js';
@@ -19,11 +20,11 @@ import {
   rendersComponent,
   styleRules
 } from '../helpers/svelteStructureContract.js';
+
 import { LADDER_RUNGS } from './control-height-known-literals.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const SHEET = 'styles/fabricate.css';
-const css = stripCssComments(readFileSync(resolve(repoRoot, SHEET), 'utf8'));
+const css = stripCssComments(readStylesheet());
 
 /** The rung band the radius ladder gives 9px to, and the one below it, both from the spec text. */
 const BAND_9 = Object.freeze([34, 38]);

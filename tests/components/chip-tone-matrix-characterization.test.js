@@ -1,10 +1,11 @@
 /** CHARACTERIZATION suite for `Chip` (issue 1036). */
 
-import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   compiledPaint,
   injectedCss,
@@ -670,7 +671,7 @@ describe('1518 Chip — the solid emphasis', () => {
 
   after(() => harness.teardown());
 
-  const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
+  const THEMES = themeTokens(readStylesheet());
 
   async function paintOf(props) {
     const paint = compiledPaint(chipNode(await harness.mount(props)));

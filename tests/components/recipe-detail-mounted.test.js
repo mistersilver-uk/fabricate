@@ -1,15 +1,10 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
+import { describe, it, before, after, afterEach } from 'node:test';
 
-import {
-  createMountedComponentHarness,
-  CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import {
@@ -20,9 +15,14 @@ import {
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
+import {
+  createMountedComponentHarness,
+  CRAFTING_APP_RAW_MODULES,
+  CRAFTING_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
+const THEMES = themeTokens(readStylesheet());
 
 const harness = createMountedComponentHarness({
   repoRoot,

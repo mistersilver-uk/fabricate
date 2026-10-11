@@ -12,6 +12,7 @@ import { after, before, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -91,7 +92,7 @@ const PREREQUISITE_AT =
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 ${Object.keys(HARNESS)
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}

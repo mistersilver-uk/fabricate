@@ -1,9 +1,10 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,13 +17,12 @@ const eventInspectorPath = resolve(
   'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
 );
 const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 describe('GatheringEventsBrowserView source contract', () => {
   // The filter's own body; its forward to the leaf is asserted by DOM in
