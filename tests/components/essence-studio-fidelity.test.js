@@ -224,10 +224,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'and the min-width without which overflow never engages on a flex item'
     );
     // The full name stays reachable. Truncation that loses text is a defect, not a fix.
-    assert.ok(
-      rowSource.includes('nameTitle={essence.name}'),
-      'the whole name survives as a title'
-    );
+    assert.ok(rowSource.includes('nameTitle={essence.name}'), 'the whole name survives as a title');
     // LIST rows are untouched: a 76px row beside a clamped description has the width.
     assert.equal(
       /\.manager-system-name \{/.test(styleBlock(rowSource)),
@@ -282,9 +279,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fabricate-button\.fabricate-button\.fab-manager-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
       'the ghost verb sits ON the pane, bounded by --fab-border'
     );
-    const danger = /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
-      globalCss
-    );
+    const danger =
+      /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
+        globalCss
+      );
     assert.ok(danger, 'the danger role still has its resting rule');
     assert.match(danger[1], /color: var\(--fab-danger-text\);/, 'in danger text');
     assert.doesNotMatch(danger[1], /background/, 'and no fill of its own');
@@ -349,9 +347,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'so the picker + reset row beneath fills the tile width instead of sizing itself'
     );
     assert.ok(
-      globalCss.includes(
-        'grid-template-columns: 124px minmax(0, 1fr);'
-      ),
+      globalCss.includes('grid-template-columns: 124px minmax(0, 1fr);'),
       'in a column narrowed to the square tile width so the controls sit under it'
     );
     // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.
@@ -586,8 +582,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   it('compacts the presentation toggle to glyph tiles without losing its name', () => {
     // The rendered symptom: the prototype draws list/grid as two compact glyph tiles
     // (~86px for the pair); the shipped toggle spelled out "List" and "Grid" and measured
-    // ~135px, which made a presentation switch shout as loudly as the status FILTER beside
-    // it and pushed row one to the edge of the 1280px capture.
+    // ~135px, which pushed row one to the edge of the 1280px capture.
     const browser = componentAstOf(BROWSER);
     assert.ok(
       importsModule(browser, '../../components/ViewToggle.svelte') &&
@@ -598,7 +593,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       passesProp(componentAstOf(VIEW_TOGGLE), 'SegmentedControl', 'iconOnly'),
       'which is the segmented control at its compact glyph form'
     );
-    assert.ok(propNone(browser, 'SegmentedControl', 'iconOnly'), 'the membership filter keeps its words');
+    assert.ok(
+      propNone(browser, 'SegmentedControl', 'iconOnly'),
+      'the membership filter keeps its words'
+    );
 
     // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name.
     const segmentedStyles = styleBlock(segmentedControlSource);
