@@ -625,7 +625,7 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 
 #### Scenario: UI files changed
 
-- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
+- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css` other than the Primitive Lab's own (`tests/view-lab/primitives.html` and `tests/view-lab/primitives/`), or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
 - **AND** a view the registry covers IS captured by the Foundry-free renderer, which is the DEFAULT producer: it renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
 - **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which is the fallback producer rather than the routine one
@@ -727,6 +727,13 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **AND** that table narrows only while its parsed entries agree exactly with the table the selector loads, so a table the parser cannot read widens to the surface set rather than selecting less
 - **AND** widening is a UNION at every level and never a replacement: a change whose reach is partly attributable and partly not selects what was attributed TOGETHER WITH the surface set, whether the unattributable part is another hunk of the same patch, another shared input in the same change, or a co-changed render file
 - **AND** the reason that has to hold at every level is that the surface set contains no detailed state, so replacing an attributed selection with it would publish a capture of everything except the thing the change altered
+
+#### Scenario: only the Primitive Lab changes
+
+- **WHEN** a PR changes only the Primitive Lab's page or files under its directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`)
+- **THEN** those files are not render files: they do not arm the evidence gate, and the automated producer selects, renders and publishes no application frame for them, because no application window draws them and a local `npm run lab:check` verifies them
+- **AND** a PR that changes them alongside any other render file is armed by that other file, and its selection is exactly what that file selects
+- **AND** the gate and the automated producer apply the same exclusion, so neither arms on a file the other ignores
 
 #### Scenario: screenshot capture is blocked
 

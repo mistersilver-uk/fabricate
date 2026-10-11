@@ -143,9 +143,14 @@ function logicalPaths(files) {
   return [...new Set(files.map((file) => logicalStylesheetPath(normalizePath(file))))];
 }
 
+/** Whether one path is the Primitive Lab's page or under its directory (issue 2382). */
+export function isPrimitiveLabPath(filePath) {
+  return PRIMITIVE_LAB_PATTERN.test(normalizePath(filePath));
+}
+
 /** Whether one path can change what a window looks like. */
 export function isUiFile(filePath) {
-  return UI_PATH_PATTERN.test(normalizePath(filePath));
+  return UI_PATH_PATTERN.test(normalizePath(filePath)) && !isPrimitiveLabPath(filePath);
 }
 
 /**
@@ -1116,7 +1121,8 @@ function normalizePatches(patches) {
 
 /** Whether one path is an input of the lab itself rather than of the product it renders. */
 export function isLabInput(file) {
-  return LAB_INFRASTRUCTURE_PATTERN.test(file) && !PRIMITIVE_LAB_PATTERN.test(file);
+  const normalized = normalizePath(file);
+  return LAB_INFRASTRUCTURE_PATTERN.test(normalized) && !isPrimitiveLabPath(normalized);
 }
 
 /**
