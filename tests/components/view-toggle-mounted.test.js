@@ -74,19 +74,30 @@ describe('ViewToggle (issue 2412)', () => {
   after(() => harness.teardown());
 
   it('is a radiogroup named by ariaLabel whose two glyph radios are named by their labels', async () => {
-    const root = await harness.mount({ ...LABELS });
-    const group = root.querySelector('[role="radiogroup"]');
-    assert.equal(group.getAttribute('aria-label'), 'Essence presentation');
-    for (const [view, word, glyph] of [
-      ['list', 'List', 'fa-list'],
-      ['grid', 'Grid', 'fa-table-cells-large'],
-    ]) {
-      const label = labelOf(root, view);
-      assert.equal(label.querySelector('.manager-segment-label').textContent, word);
-      assert.equal(label.getAttribute('title'), word, `the ${view} option is titled with its name`);
-      assert.ok(label.querySelector(`i.${glyph}[aria-hidden="true"]`), `the ${view} glyph`);
+    const i18n = globalThis.game.i18n;
+    const localize = i18n.localize;
+    i18n.localize = () => 'UNTRANSLATED';
+    try {
+      const root = await harness.mount({ ...LABELS, listLabel: 'Rows', gridLabel: 'Tiles' });
+      const group = root.querySelector('[role="radiogroup"]');
+      assert.equal(group.getAttribute('aria-label'), 'Essence presentation');
+      for (const [view, word, glyph] of [
+        ['list', 'Rows', 'fa-list'],
+        ['grid', 'Tiles', 'fa-table-cells-large'],
+      ]) {
+        const label = labelOf(root, view);
+        assert.equal(label.querySelector('.manager-segment-label').textContent, word);
+        assert.equal(
+          label.getAttribute('title'),
+          word,
+          `the ${view} option is titled with its name`
+        );
+        assert.ok(label.querySelector(`i.${glyph}[aria-hidden="true"]`), `the ${view} glyph`);
+      }
+      assert.equal(group.querySelectorAll('input[type="radio"]').length, 2, 'a closed pair');
+    } finally {
+      i18n.localize = localize;
     }
-    assert.equal(group.querySelectorAll('input[type="radio"]').length, 2, 'a closed pair');
   });
 
   it('checks the option `view` names, and list for any value outside the pair', async () => {
@@ -99,12 +110,14 @@ describe('ViewToggle (issue 2412)', () => {
     assert.ok(labelOf(root, 'list').classList.contains('is-active'));
   });
 
-  it('follows a new `view` without remounting', async () => {
+  it('follows a new `view` and label without remounting', async () => {
     const root = await harness.mount({ ...LABELS, view: 'list' });
     await harness.setProps({ view: 'grid' });
     assert.equal(radio(root, 'grid').checked, true);
     assert.ok(labelOf(root, 'grid').classList.contains('is-active'));
     assert.ok(!labelOf(root, 'list').classList.contains('is-active'));
+    await harness.setProps({ listLabel: 'Rows' });
+    assert.equal(labelOf(root, 'list').querySelector('.manager-segment-label').textContent, 'Rows');
   });
 
   it('hands back the chosen view, and nothing for the one already checked', async () => {
@@ -137,6 +150,13 @@ describe('ViewToggle (issue 2412)', () => {
     assert.ok(group.classList.contains('manager-segmented'), 'the class extends the root');
     assert.ok(group.classList.contains('probe-class'));
     assert.equal(group.getAttribute('data-probe-root'), 'yes');
+  });
+
+  it('keeps the icon-only track when rest names a fixed prop', async () => {
+    const root = await harness.mount({ ...LABELS, iconOnly: false, density: 'compact' });
+    const group = root.querySelector('[role="radiogroup"]');
+    assert.ok(group.classList.contains('is-icon-only'), 'iconOnly is not the caller’s');
+    assert.ok(!group.classList.contains('is-compact'), 'density is not the caller’s');
   });
 
   it('names one control’s radios alike and two controls’ apart', async () => {
@@ -212,16 +232,21 @@ describe('ViewToggle (issue 2412)', () => {
 /** Icon-only controls that are not an arrangement switch, each with its reason. None yet. */
 const ICON_ONLY_ALLOWED = Object.freeze({});
 
+// Limit: it sees neither an aliased import nor a spread, only the literal tag and attribute.
 it('passes iconOnly to SegmentedControl only through ViewToggle', () => {
-  const passing = svelteFiles(path.join(repoRoot, 'src'))
+  const passingAll = svelteFiles(path.join(repoRoot, 'src'))
     .map((full) => path.relative(repoRoot, full).split(path.sep).join('/'))
     .filter((file) => {
-      // Any one site: `passesProp` asks whether EVERY site does, which a second track defeats.
+      // One site passing iconOnly is enough, so a file with a second,
+      // labelled track is still caught.
       const ast = componentAstOf(file);
       return (
         rendersComponent(ast, 'SegmentedControl') && !propNone(ast, 'SegmentedControl', 'iconOnly')
       );
-    })
-    .filter((file) => !Object.hasOwn(ICON_ONLY_ALLOWED, file));
+    });
+  for (const file of Object.keys(ICON_ONLY_ALLOWED)) {
+    assert.ok(passingAll.includes(file), `${file} is allowed but no longer passes iconOnly`);
+  }
+  const passing = passingAll.filter((file) => !Object.hasOwn(ICON_ONLY_ALLOWED, file));
   assert.deepEqual(passing, [VIEW_TOGGLE]);
 });
