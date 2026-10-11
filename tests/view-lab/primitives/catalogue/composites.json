@@ -728,14 +728,9 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/SetPicker.svelte",
     "fixture": "SetPickerOpen",
-    "partial": "no scroll, Apply disabled",
     "slot": {
       "width": 386,
       "height": 363
-    },
-    "undrawn": {
-      "Recipe tags": "the token group's and the panel's accessible name; the drawing names neither",
-      "#Smithcraft": "the sixth match; the shipped list grows to the window, where the drawing scrolls at five rows"
     },
     "props": {
       "value": ["#Smithing", "#Refined"],
@@ -781,7 +776,7 @@
         }
       ]
     },
-    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The panel stands at the shared popover's 240px, where the drawing draws it 330px wide. The act opens Add and types the query, nothing more, so the footer reads 2 selected. The drawing's enabled Apply cannot stand beside that: the shipped Apply is disabled until something is staged. The shipped list scrolls only once the window bounds it."
+    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The act opens Add and types the query, nothing more, so the footer reads 2 selected and Apply stays disabled until something is staged. The shipped 9px `--fab-text-subtle` count falls under 4.5:1 on bg-0 in six themes (3.64 to 4.10:1), so the drawing inks it in `--fab-text-muted`: debt owned by #2368."
   },
   {
     "spec": "<RuleRow> <RuleSentence>",

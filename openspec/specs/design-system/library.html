@@ -1851,30 +1851,31 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         </div>
       </div>
       <div class="unit"><span class="cap">the picker it opens &mdash; searchable, scrolling, counted, staged</span>
-        <div style="width:330px;border-radius:10px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:7px;display:grid;gap:5px">
-          <div style="display:flex;justify-content:flex-end;padding:4px 7px 6px"><span class="k-count" style="font-size:9px">6 of 412</span></div>
-          <div class="k-field" style="height:30px;border-radius:7px;border-color:var(--fab-accent-border)"><span class="ph">smith</span></div>
-          <div style="display:grid;gap:2px;max-height:168px;overflow-y:auto">
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithing</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithy</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Blacksmith</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Refined</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Raw</span></div>
+        <div aria-label="Recipe tags" style="box-sizing:border-box;width:240px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:6px;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px 6px"><span class="k-count" style="font-size:9px;color:var(--fab-text-muted)">6 of 412</span></div>
+          <div class="k-field" style="height:30px;padding:0 8px;border-radius:7px;border-color:var(--fab-accent-border);background:var(--fab-bg-0)">smith</div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithing</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid transparent"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithy</span></div>
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid transparent"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Blacksmith</span></div>
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Refined</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid transparent"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Raw</span></div>
+            <div style="box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 8px;border-radius:7px;border:1px solid transparent"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithcraft</span></div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;padding-top:4px;border-top:1px solid var(--fab-border)">
-            <span class="k-hint grow">2 selected</span>
-            <button class="k-btn ghost">Clear all</button>
-            <button class="k-btn primary">Apply</button>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;padding-top:4px;border-top:1px solid var(--fab-border)">
+            <span class="grow" style="font-size:11px;color:var(--fab-text-muted)">2 selected</span>
+            <button class="k-btn ghost" style="height:34px;min-height:34px;border-radius:9px;font-weight:700">Clear all</button>
+            <button class="k-btn dis" disabled style="height:34px;min-height:34px;border-radius:9px;font-weight:700">Apply</button>
           </div>
         </div>
-        <span class="k-hint">The list scrolls inside the panel; the count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling. A staged member carries the accent ground and a trailing check; while the staged set differs from the committed one the footer says what Apply will add and remove (&ldquo;1 to add &middot; 1 to remove&rdquo;) and Apply is enabled.</span>
+        <span class="k-hint">The panel grows with its matches to at most 380px, less where the window has less room, and the list scrolls inside it beyond that; it never grows the host, because the panel is portalled. The count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling. A staged member carries the accent ground and a trailing check; while the staged set differs from the committed one the footer says what Apply will add and remove (&ldquo;1 to add &middot; 1 to remove&rdquo;) and Apply is enabled.</span>
       </div>
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul>
         <li><b>trigger</b> a bounded run of row chips (22px, pill), then a <code>+N more</code> button named &ldquo;and N more&rdquo; and a dashed Add</li>
         <li><b>panel</b> <code>SearchablePopover</code> in its <code>multiple</code> mode &mdash; portalled, measured, flipped</li>
-        <li><b>list</b> scrolls inside the panel at a fixed max height; never grows the host</li>
+        <li><b>list</b> the panel grows with its matches to at most 380px, less where the window has less room, and the list scrolls inside it beyond that; it never grows the host, because the panel is portalled</li>
         <li><b>count</b> matched-of-total above the search, so the GM knows to refine</li>
         <li><b>commit</b> <code>staged</code>: Clear and Apply in the panel footer &mdash; nothing writes on click, and Escape or an outside press discards; <code>choose</code>: the session form, one write per choice, no token run and no footer</li>
       </ul></div>
