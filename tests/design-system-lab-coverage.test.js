@@ -484,15 +484,15 @@ test('every catalogue row stands up a component its drawing’s own entry names'
 });
 
 /**
- * The inline `repeat(auto-fit` grids directly inside a column stage that do not size themselves at the
- * stage's width: a column stage is a shrink-to-fit flex column, so such a grid is as wide as its
- * widest track needs and the rows stretch to fill the height it leaves.
+ * The inline `repeat(auto-fit` and `repeat(auto-fill` grids directly inside a column stage that do
+ * not size themselves at the stage's width: a column stage is a shrink-to-fit flex column, so such a
+ * grid is as wide as its widest track needs and the rows stretch to fill the height it leaves.
  *
  * @param {Element} root The library body.
  * @returns {{checked: number, unsized: string[]}} How many grids, and the entry of each unsized one.
  */
 function unsizedStageGrids(root) {
-  const grids = [...root.querySelectorAll(':scope .stage.col > [style*="repeat(auto-fit"]')];
+  const grids = [...root.querySelectorAll(':scope .stage.col > [style*="repeat(auto-fi"]')];
   const unsized = grids
     .filter((grid) => !/(^|;)\s*width:\s*100%\s*(;|$)/.test(grid.getAttribute('style')))
     .map(
@@ -501,7 +501,7 @@ function unsizedStageGrids(root) {
   return { checked: grids.length, unsized };
 }
 
-test('every auto-fit grid in a column stage is sized at the stage width', () => {
+test('every auto-fit or auto-fill grid in a column stage is sized at the stage width', () => {
   const { checked, unsized } = unsizedStageGrids(LIBRARY_BODY);
   assert.ok(checked >= 2, `${checked} grid(s) found, so this rule has no domain`);
   assert.deepEqual(unsized, [], 'add `;width:100%` to the inline style of each');
@@ -511,6 +511,11 @@ test('every auto-fit grid in a column stage is sized at the stage width', () => 
     '<body><div class="stage col"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9px,1fr))"></div></div></body>'
   );
   assert.equal(unsizedStageGrids(probe.body).unsized.length, 1);
+  const fillProbe = new Window().document;
+  fillProbe.write(
+    '<body><div class="stage col"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(9px,1fr))"></div></div></body>'
+  );
+  assert.equal(unsizedStageGrids(fillProbe.body).unsized.length, 1);
 });
 
 /**
@@ -724,8 +729,9 @@ function unsectionedManifestRows({ library, manifestRows }) {
  */
 const AWAITING_SPECIMEN = Object.freeze({
   pickers: [
-    // The parent's portaled panel, drawn as the grid form `EssenceSourceSelector` composes. The
-    // list-form `SearchablePopover` specimen mounts the panel through its one real caller.
+    // The parent's portaled panel, drawn as the icon-search grid form, which no caller composes (the
+    // library entry records why `EssenceSourceSelector` does not). The list-form `SearchablePopover`
+    // specimen mounts the panel through its one real caller.
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ],
 });

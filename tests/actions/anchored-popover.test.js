@@ -1,5 +1,5 @@
 /** THE ANCHORED-POPOVER ACTION, ON SYNTHETIC RECTS (issue 1500). */
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
@@ -588,5 +588,96 @@ describe('anchoredPopover', () => {
       () => anchoredPopover(panel, { trigger, component: 'TestPopover' }),
       /requires a `layout` function/
     );
+  });
+  describe('the re-measure once fonts load', () => {
+    let settleFonts;
+    let restoreFonts = () => {};
+
+    beforeEach(() => {
+      let resolve;
+      const ready = new Promise((settle) => {
+        resolve = settle;
+      });
+      // Resolving runs the action's queued callback before this await returns, as it was chained first.
+      settleFonts = async () => {
+        resolve();
+        await ready;
+      };
+      const own = Object.getOwnPropertyDescriptor(document, 'fonts');
+      Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
+      restoreFonts = () => {
+        if (own) Object.defineProperty(document, 'fonts', own);
+        else delete document.fonts;
+      };
+    });
+    afterEach(() => restoreFonts());
+
+    /** The picker layout behind a call counter, and the panel's `style` writes counted. */
+    function counted(panel) {
+      const counts = { layouts: 0, writes: 0 };
+      const setAttribute = panel.setAttribute.bind(panel);
+      panel.setAttribute = (name, value) => {
+        if (name === 'style') counts.writes += 1;
+        return setAttribute(name, value);
+      };
+      const layout = (...args) => {
+        counts.layouts += 1;
+        return pickerLayout(...args);
+      };
+      return { counts, layout };
+    }
+
+    it('measures again when the fonts finish loading', async () => {
+      const { trigger, panel } = scene();
+      const { counts, layout } = counted(panel);
+      const handle = anchoredPopover(panel, options({ trigger, layout }));
+      assert.equal(counts.layouts, 1);
+
+      measuring(trigger, box(140, 100, 200, 30));
+      await settleFonts();
+
+      assert.equal(counts.layouts, 2, 'the loaded fonts queue one more measure');
+      assert.match(panel.getAttribute('style'), /^left: 140px;/);
+      handle.destroy();
+    });
+
+    it('queues one re-measure however often an open panel updates', async () => {
+      const { trigger, panel } = scene();
+      const { counts, layout } = counted(panel);
+      const handle = anchoredPopover(panel, options({ trigger, layout }));
+
+      handle.update(options({ trigger, layout }));
+      handle.update(options({ trigger, layout }));
+      assert.equal(counts.layouts, 3);
+      await settleFonts();
+
+      assert.equal(counts.layouts, 4, 'one re-measure for the open, not one per update');
+      handle.destroy();
+    });
+
+    it('neither measures nor writes after a destroy that lands first', async () => {
+      const { trigger, panel } = scene();
+      const { counts, layout } = counted(panel);
+      const handle = anchoredPopover(panel, options({ trigger, layout }));
+
+      handle.destroy();
+      const before = { ...counts };
+      await settleFonts();
+
+      assert.deepEqual(counts, before);
+    });
+
+    it('writes nothing after a close that lands first', async () => {
+      const { trigger, panel } = scene();
+      const { counts, layout } = counted(panel);
+      const handle = anchoredPopover(panel, options({ trigger, layout }));
+
+      handle.update(options({ trigger, layout, open: false }));
+      const before = { ...counts };
+      await settleFonts();
+
+      assert.deepEqual(counts, before);
+      handle.destroy();
+    });
   });
 });
