@@ -82,13 +82,16 @@ test('a synthetic undeclared reference fails, while a fallback and prose do not'
   const html = readDesignLibrary().replace(
     '</body>',
     '<p style="color:var(--fab-probe-missing)">var(--fab-probe-prose)</p>' +
-      '<p style="color:var(--fab-probe-fallback, red)"></p></body>'
+      '<p style="color:var(--fab-probe-fallback, red)"></p>' +
+      '<style>.probe{color:var(--fab-probe-sheet)} /* var(--fab-probe-comment) */</style></body>'
   );
   assert.notEqual(html, readDesignLibrary(), 'the control markup was not injected');
   const { undeclared } = tokenUse(readPage(html));
   assert.ok(undeclared.includes('--fab-probe-missing'));
   assert.ok(!undeclared.includes('--fab-probe-prose'));
   assert.ok(!undeclared.includes('--fab-probe-fallback'));
+  assert.ok(undeclared.includes('--fab-probe-sheet'));
+  assert.ok(!undeclared.includes('--fab-probe-comment'));
 });
 
 test("every :root token the sheet's palette also declares carries the sheet's value", () => {
@@ -100,4 +103,9 @@ test("every :root token the sheet's palette also declares carries the sheet's va
     .filter((token) => normalise(drawn.get(token)) !== normalise(shipped.get(token)))
     .map((token) => `${token}: ${drawn.get(token)} (shipped ${shipped.get(token)})`);
   assert.deepEqual(differing, []);
+  assert.deepEqual(
+    [...drawn.keys()].filter((token) => !shipped.has(token) && !EXEMPT.has(token)),
+    [],
+    'the page declares palette tokens the sheet does not'
+  );
 });
