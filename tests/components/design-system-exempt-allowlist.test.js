@@ -105,6 +105,12 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/DiceTiles.svelte': 1 },
   ],
   [
+    "the maintainer ruled on 2026-10-11 that the swatch highlight must be the picker's own hover " +
+      'fill and inset cursor, with no animation, so this row returns to target until the sheet ' +
+      'draws it (library.html, the target popover specimen)',
+    { 'src/ui/svelte/components/TintPicker.svelte': 1 },
+  ],
+  [
     'InlineRenameField is a new manager-only member at target, because it replaces ' +
       'PartyNameField and RealmNameField and so has two callers (issue 1521)',
     { 'src/ui/svelte/apps/manager/InlineRenameField.svelte': 1 },
