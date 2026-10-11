@@ -1444,7 +1444,7 @@
   {
     "spec": "<YieldScale> <OutcomeLadder>",
     "cap": "before the roll — the scale, commonest first",
-    "draws": ":scope > div:nth-of-type(2)",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/YieldScale.svelte",
     "fixture": "YieldScaleReadings",
     "props": {
@@ -1491,14 +1491,15 @@
         "skyfall": "5%"
       },
       "quantityKey": "FABRICATE.App.Journal.Quantity",
-      "thresholdKey": "FABRICATE.App.Journal.Yields.HighRollThreshold"
+      "thresholdKey": "FABRICATE.App.Journal.Yields.HighRollThreshold",
+      "labelKey": "FABRICATE.App.Journal.Yields.PreviewTitle"
     },
-    "note": "Wired as `RunDetail.svelte:582-602` wires a d100 run's preview: each threshold and quantity is the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author. The kicker and hint stay drawn above, outside `draws`, and the neutral chance pills stand on a darker ground than the drawing's."
+    "note": "Wired as `RunDetail.svelte:582-602` wires a d100 run's preview: the heading, each threshold and each quantity are the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",
     "cap": "after the roll — the same scale, cut once",
-    "draws": ":scope > div:nth-of-type(2)",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/YieldScale.svelte",
     "fixture": "YieldScaleReadings",
     "props": {
@@ -1546,24 +1547,22 @@
         "skyfall": "5%"
       },
       "readings": {
-        "greyfell": "came back",
-        "iron": "came back",
-        "silver": "needed 71 or higher",
-        "skyfall": "needed 96 or higher"
+        "greyfell": "Effective roll 41 · Needed 1 or higher · Cleared the roll",
+        "iron": "Effective roll 41 · Needed 31 or higher · Cleared the roll",
+        "silver": "Effective roll 41 · Needed 71 or higher · Missed the roll",
+        "skyfall": "Effective roll 41 · Needed 96 or higher · Missed the roll"
       },
       "quantityKey": "FABRICATE.App.Journal.Quantity",
       "rolledKey": "FABRICATE.App.Journal.History.RolledValue",
-      "cutKey": "FABRICATE.App.Journal.History.Cut"
+      "cutKey": "FABRICATE.App.Journal.History.Cut",
+      "labelKey": "FABRICATE.App.Journal.History.Scale"
     },
-    "undrawn": {
-      "Anything rarer than this fell short": "the cut note as `HistoricalRunDetail` words it; the drawing begins it in lower case"
-    },
-    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the cut chip and cut note are the Journal's own copy, and the top and bottom cut notes go unwired because this roll cuts between rows. Each reading and chance is the row's string, because `dropEvidence` (`HistoricalRunDetail.svelte:33-57`) joins its parts with a separator a fixture may not author; it would read Needed 71 or higher · Missed the roll. The kicker and hint stay drawn above, outside `draws`, and the missed rows' neutral chance pills stand on a darker ground than the drawing's."
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the heading, cut chip and cut note are the Journal's own copy, and each reading and chance is the row's string, because `dropEvidence` (`:33-57`) joins its parts with a separator a fixture may not author."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",
     "cap": "legacy history — recorded row rolls, no global cut",
-    "draws": ".k-row",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/YieldScale.svelte",
     "fixture": "YieldScaleReadings",
     "props": {
@@ -1575,29 +1574,7 @@
           "qty": 2,
           "icon": "fas fa-hammer",
           "cleared": true
-        }
-      ],
-      "rollModel": "perRow"
-    },
-    "data": {
-      "chances": {
-        "ore": "90%"
-      },
-      "readings": {
-        "ore": "Rolled 12 · needed 11 or higher · cleared"
-      },
-      "quantityKey": "FABRICATE.App.Journal.Quantity"
-    },
-    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls. The drawing has no wrapper around its two rows, so each stands as its own one-entry scale. Each reading and chance is the row's string, as in the shared record above; `dropEvidence` would read Rolled 12 · Needed 11 or higher · Cleared the roll. A cleared row takes the success ground, its reading sits at the row's end rather than under the name, and its chance is an outlined chip where the drawing fills a badge, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
-  },
-  {
-    "spec": "<YieldScale> <OutcomeLadder>",
-    "cap": "legacy history — recorded row rolls, no global cut",
-    "draws": ".k-row",
-    "path": "src/ui/svelte/components/YieldScale.svelte",
-    "fixture": "YieldScaleReadings",
-    "props": {
-      "entries": [
+        },
         {
           "id": "gem",
           "name": "Gem",
@@ -1611,14 +1588,17 @@
     },
     "data": {
       "chances": {
+        "ore": "90%",
         "gem": "20%"
       },
       "readings": {
-        "gem": "Rolled 94 · needed 81 or higher · cleared"
+        "ore": "Rolled 12 · Needed 11 or higher · Cleared the roll",
+        "gem": "Rolled 94 · Needed 81 or higher · Cleared the roll"
       },
-      "quantityKey": "FABRICATE.App.Journal.Quantity"
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "labelKey": "FABRICATE.App.Journal.History.ScalePerRow"
     },
-    "note": "Wired as the row above: a cleared row takes the success ground, its reading sits at the row's end, its chance is an outlined chip, and its mark is a bordered medallion where the drawing draws a borderless 22px chip."
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls, each reading and chance the row's string as in the shared record above. The drawing inks the chance chip and the reading in the secondary ink, where the shipped neutral chip (3.70 to 5.69:1) and `--fab-text-subtle` reading (3.09 to 4.30:1 on the cleared wash) measure under 4.5:1; issue 2368 owns that debt."
   },
   {
     "spec": "<YieldScale> <OutcomeLadder>",
