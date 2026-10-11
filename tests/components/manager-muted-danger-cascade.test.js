@@ -16,15 +16,13 @@
  * of a real Chromium and reads `getComputedStyle(...).color` back.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 
 import { chromium } from 'playwright';
 
-const repoRoot = resolve(import.meta.dirname, '../..');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
-const sheet = readFileSync(cssPath, 'utf8');
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+
+const sheet = readStylesheet();
 
 // THE RULE THIS FILE PINS, matched literally so the "before" fixture can drop exactly it and
 // nothing else — not a hand-copied re-typing of the rule that could silently drift from the real

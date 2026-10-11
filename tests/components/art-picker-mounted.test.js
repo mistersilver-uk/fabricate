@@ -1,9 +1,9 @@
 /** `ArtPicker`, identity art picked as a picture (issue 1522). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
 import { declarationsIn, rulesIn, stripCssComments } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -172,7 +172,7 @@ describe('ArtPicker — the task editor sizes it through its one custom property
 
   it('sets that property to 88px for the task editor, and nothing else', () => {
     const sheet = 'styles/fabricate.css';
-    const css = stripCssComments(readFileSync(resolve(repoRoot, sheet), 'utf8'));
+    const css = stripCssComments(readStylesheet());
     const sizing = rulesIn(css).filter((rule) => rule.selector.endsWith(' .manager-task-art'));
     assert.equal(sizing.length, 1, 'one rule sizes the task art');
     const declared = declarationsIn(sheet, sizing[0].body).map((row) => [row.property, row.value]);

@@ -4,10 +4,12 @@
  *      slice that landed past the end of the template, or on a file whose classes were renamed
  *      wholesale, is reported rather than passing on an absence of markup.
  */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it } from 'node:test';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const managerDir = 'src/ui/svelte/apps/manager';
@@ -107,7 +109,7 @@ describe('one page header per manager route', () => {
 
   it('leaves no rule for the deleted class in the shared sheet', () => {
     // Comments are stripped first: the sheet's own history notes name the class by name.
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const rules = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
 
     assert.ok(rules.length > 0, 'the comment strip emptied the sheet; the read is broken');

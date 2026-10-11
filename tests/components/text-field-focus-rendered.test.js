@@ -11,6 +11,7 @@ import test, { after, before } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -23,7 +24,7 @@ const rollPrompt = scopedComponentCss(
 const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
 <style>${read('tests/fixtures/foundry-core-input-min.css')}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${rollPrompt.css}</style>
 <style>:root{--font-primary:Arial,sans-serif}</style></head>
 <body class="game"><div class="application theme-dark"><section class="window-content">

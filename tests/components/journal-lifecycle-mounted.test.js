@@ -6,6 +6,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { Recipe } from '../../src/models/Recipe.js';
@@ -475,7 +476,7 @@ async function measureDetailLayout(target, { width = 1240 } = {}) {
     // shrink-to-fit actions block only left-aligns — at the width the detail PANE really has
     // beside the run list.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
-      <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+      <style>${readStylesheet()}</style>
       <style>${styles}</style>
       <style>
         :root { --font-primary: Arial, sans-serif; }

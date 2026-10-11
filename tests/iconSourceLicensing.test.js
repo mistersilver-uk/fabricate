@@ -17,6 +17,11 @@ import {
   findIconLicensingViolations,
   readFreeIconVocabulary,
 } from '../scripts/lib/iconLicensing.js';
+import {
+  STYLESHEET_ENTRY,
+  STYLESHEET_PART_PATTERN,
+  readStylesheet,
+} from '../scripts/lib/stylesheetSource.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -44,13 +49,18 @@ function collectScannedFiles(directory) {
   return files;
 }
 
+/** Every scanned file; the module sheet is read once, as its partials joined (issue 1711). */
 function scannedSources() {
-  return SCANNED_ROOTS.flatMap((root) => collectScannedFiles(path.join(REPOSITORY_ROOT, root))).map(
-    (absolute) => ({
-      relative: path.relative(REPOSITORY_ROOT, absolute).split(path.sep).join('/'),
-      text: fs.readFileSync(absolute, 'utf8'),
-    })
-  );
+  return SCANNED_ROOTS.flatMap((root) => collectScannedFiles(path.join(REPOSITORY_ROOT, root)))
+    .map((absolute) => path.relative(REPOSITORY_ROOT, absolute).split(path.sep).join('/'))
+    .filter((relative) => !STYLESHEET_PART_PATTERN.test(relative))
+    .map((relative) => ({
+      relative,
+      text:
+        relative === STYLESHEET_ENTRY
+          ? readStylesheet()
+          : fs.readFileSync(path.join(REPOSITORY_ROOT, relative), 'utf8'),
+    }));
 }
 
 // THE ORACLE. Everything below is only as good as this, so it is checked before it is used: the

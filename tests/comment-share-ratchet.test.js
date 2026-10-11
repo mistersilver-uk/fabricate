@@ -12,6 +12,7 @@ import { byCodePoint } from './helpers/codePointOrder.js';
 import { compareToBase, headMarker, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { MARKER_ONLY } from './helpers/siteMarkers.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
+import { splitSheet } from './helpers/splitStylesheet.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
 const FAMILY = 'comment-share';
@@ -545,4 +546,27 @@ test('a reasoned marker in the file head of a file in the directory exempts it; 
     'src/d/two.js:1 has a ratchet-exempt(comment-share) marker with no reason; write why the ' +
       'regression is legitimate after the colon',
   ]);
+});
+
+test('the module sheet split into partials under a commented entry is one file (issue 1711)', () => {
+  const sheet = [
+    ...Array.from({ length: 3 }, (_, index) => `/* note ${index} */`),
+    '.fabricate .a {',
+    '  margin: 0;',
+    '}',
+    '',
+    '.fabricate .b {',
+    '  margin: 0;',
+    '}',
+  ];
+  const repo = repoWith({ 'styles/fabricate.css': `${sheet.join('\n')}\n` });
+  repo.write(
+    splitSheet(
+      { one: `${sheet.slice(0, 7).join('\n')}\n`, two: `${sheet.slice(7).join('\n')}\n` },
+      { entryPrefix: '/* The notes and the first rule. */\n/* The second rule. */\n' }
+    )
+  );
+  const result = repo.compare();
+  assert.equal(result.compared, true);
+  assert.deepEqual(result.failures, []);
 });

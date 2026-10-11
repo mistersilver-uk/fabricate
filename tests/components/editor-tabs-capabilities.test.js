@@ -5,13 +5,13 @@
  * stop, and names and describes a tab from its own entry").
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from 'svelte';
 
 import { censusRules } from '../../scripts/lib/stylesheetSelectorCensus.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -415,7 +415,7 @@ describe('a tier-gated tab carries the premium padlock', () => {
 });
 
 describe('the sheet draws the description, and the danger tint stays scoped', () => {
-  const rules = censusRules(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
+  const rules = censusRules(readStylesheet());
   const declared = (selector, property) =>
     rules
       .flatMap((rule) => (rule.selectors.includes(selector) ? rule.declarations : []))

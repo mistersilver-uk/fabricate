@@ -3,13 +3,13 @@
  * matrix and as the sheet's dense rules, so the selectable form provably leaves it unchanged.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import postcssScss from 'postcss-scss';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -178,8 +178,7 @@ const DENSE_CSS = [
   '}',
 ].join('\n');
 
-const SHEET_PATH = resolve(repoRoot, 'styles/fabricate.css');
-const SHEET = readFileSync(SHEET_PATH, 'utf8').replaceAll('\r\n', '\n');
+const SHEET = readStylesheet().replaceAll('\r\n', '\n');
 
 /** Dynamic states and pseudo-elements, stripped so a selector is matched as the element it paints. */
 const DYNAMIC_PARTS =

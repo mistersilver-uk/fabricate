@@ -1,13 +1,14 @@
 // Source-pin contract for the player Journal screen (Slice B).
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
-import { calledName, parseModule, walkNodes } from '../helpers/moduleAst.js';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { JOURNAL_RUN_REASON_KEYS } from '../../src/ui/svelte/util/journalRunReasons.js';
+import { calledName, parseModule, walkNodes } from '../helpers/moduleAst.js';
+import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +23,7 @@ const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js'
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
 const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
-const cssSource = read('../../styles/fabricate.css');
+const cssSource = readStylesheet();
 const enLang = JSON.parse(read('../../lang/en.json'));
 
 function resolveLangKey(key) {

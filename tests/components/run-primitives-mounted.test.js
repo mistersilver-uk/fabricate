@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+
 import { chromium } from 'playwright';
 import { createRawSnippet } from 'svelte';
 
-import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -750,7 +752,7 @@ describe('run primitives mounted behavior', () => {
     try {
       const page = await browser.newPage();
       await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
-        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${readStylesheet()}</style>
         <style>${styles.join('\n')}</style></head>
         <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
         <div data-rail style="width:200px">${target.innerHTML}</div>

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -16,7 +17,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const selectPath = resolve(repoRoot, 'src/ui/svelte/components/Select.svelte');
 const selectSource = readFileSync(selectPath, 'utf8');
 // The `.fabricate-select*` family lives in the GLOBAL SHEET (issue 1504).
-const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheetSource = readStylesheet();
 
 /** THE SENTINEL THIS SUITE AND EVERY DRIVER STEP USE, stated independently of the component. */
 const UNCHANGED_OPTION_ID = '__unchanged__';

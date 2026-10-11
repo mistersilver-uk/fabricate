@@ -1,11 +1,9 @@
 /* THE FOCUS HALF OF THE VALIDATION ROW ACTION. */
 import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   VALIDATION_FOCUS_ATTRIBUTE,
@@ -334,10 +332,7 @@ describe('validationFocus: focusValidationTarget resolves, focuses and marks', (
  * gate on the ARITHMETIC and not merely on the declaration.
  */
 describe('validationFocus: the pointer path is painted, measured in Chromium', () => {
-  const sheet = readFileSync(
-    resolve(dirname(fileURLToPath(import.meta.url)), '../../styles/fabricate.css'),
-    'utf8'
-  );
+  const sheet = readStylesheet();
 
   let browser;
 

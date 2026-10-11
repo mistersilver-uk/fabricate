@@ -5,16 +5,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const cssPath = resolve(__dirname, '../../styles/fabricate.css');
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
 // reason, so its scale is read out of the component rather than the global sheet.
 const chipPath = resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte');
 export const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
-export const css = readFileSync(cssPath, 'utf8');
+export const css = readStylesheet();
 const chipSource = readFileSync(chipPath, 'utf8');
 
 // Only the scoped `<style>` block.

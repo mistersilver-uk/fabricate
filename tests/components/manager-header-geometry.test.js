@@ -9,11 +9,13 @@
  *  3. The Premium advert gives way first: it compacts, then goes, so the heading keeps 320px and
  *     `Add from catalogue` stays on screen and on one row at every manager width.
  */
-import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test, { before } from 'node:test';
+
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -24,7 +26,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',

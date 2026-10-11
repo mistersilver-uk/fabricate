@@ -4,7 +4,13 @@
  */
 
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+
+import {
+  checkoutReader,
+  readStylesheet,
+  stylesheetSources,
+} from '../../scripts/lib/stylesheetSource.js';
 
 /** The repo root, resolved from this file's own location. */
 export const repoRoot = resolve(import.meta.dirname, '..', '..');
@@ -130,7 +136,25 @@ export function readScannedDirectory(dir, { isRoot }) {
 }
 
 /**
- * Walk `dir`, adding every file whose name ends with one of `extensions` to `sources`.
+ * The module sheet when `dir` is a checkout's `styles/` holding its entry: the entry's path and
+ * joined text, and the absolute paths of the partials it imports (issue 1711).
+ */
+function moduleSheetIn(dir, entries, extensions) {
+  const listed = extensions.some((extension) => 'fabricate.css'.endsWith(extension));
+  const named = entries.some((entry) => entry.name === 'fabricate.css');
+  if (basename(dir) !== 'styles' || !named || !listed) return null;
+  const readFile = checkoutReader(dirname(dir));
+  const { parts } = stylesheetSources(readFile);
+  return {
+    entry: join(dir, 'fabricate.css'),
+    text: readStylesheet(readFile),
+    parts: new Set(parts.map(({ file }) => join(dirname(dir), file))),
+  };
+}
+
+/**
+ * Walk `dir`, adding every file whose name ends with one of `extensions` to `sources`. The module
+ * sheet is one file, its entry's path holding its joined text; its partials are not listed.
  *
  * @param {string} dir Absolute directory to walk.
  * @param {readonly string[]} extensions Extensions to include.
@@ -139,13 +163,16 @@ export function readScannedDirectory(dir, { isRoot }) {
  * @returns {Record<string, string>} `sources`.
  */
 function walkSources(dir, extensions, sources, isRoot) {
-  for (const entry of readScannedDirectory(dir, { isRoot })) {
+  const entries = readScannedDirectory(dir, { isRoot });
+  const sheet = moduleSheetIn(dir, entries, extensions);
+  for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       walkSources(full, extensions, sources, false);
     } else if (extensions.some((extension) => entry.name.endsWith(extension))) {
+      if (sheet?.parts.has(full)) continue;
       const file = relative(repoRoot, full).replaceAll('\\', '/');
-      sources[file] = readListedSource(full, file);
+      sources[file] = full === sheet?.entry ? sheet.text : readListedSource(full, file);
     }
   }
   return sources;

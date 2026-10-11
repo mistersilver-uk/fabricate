@@ -1,10 +1,11 @@
 /** The GM Essence Studio's PROTOTYPE-FIDELITY contract (issue 1036). */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
 import { renderedNodes } from '../helpers/structureShapes.js';
 import {
@@ -38,7 +39,7 @@ const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorP
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
 const segmentedControlSource = read('src/ui/svelte/components/SegmentedControl.svelte');
-const globalCss = read('styles/fabricate.css');
+const globalCss = readStylesheet();
 
 // The scoped `<style>` block of a component.
 function styleBlock(source) {

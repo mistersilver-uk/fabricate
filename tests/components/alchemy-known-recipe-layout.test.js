@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   ALCHEMY_VIEW_HARNESS,
   alchemyServices,
@@ -124,7 +125,7 @@ const THEMES = [
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${SCOPED.map((path) => scopedComponentCss(resolve(repoRoot, path)).css).join('\n')}</style>
 <style>:root{--font-primary:Arial,sans-serif}.win{width:1024px;height:600px}</style>
 </head><body class="game"><div class="application theme-dark"><section class="window-content">
