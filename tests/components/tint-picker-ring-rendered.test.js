@@ -128,3 +128,59 @@ describe('2257 TintPicker — the selected ring, rendered', () => {
     }
   });
 });
+
+const BUTTON = 'src/ui/svelte/components/TintPickerButton.svelte';
+const buttonHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-tint-picker-button-rendered-',
+  rawModules: [
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/util/managerColorTokens.js',
+  ],
+  compiledModules: [PICKER, BUTTON],
+  componentPath: BUTTON,
+});
+
+/** A core-like `button` rule in a layer below the sheet's, as Foundry orders them. */
+const CORE_BUTTON = '@layer core, modules; @layer core { button { transition: 0.5s; } }';
+
+describe('the tint trigger and swatches, over a core button transition', () => {
+  let chrome;
+  let page;
+
+  before(async () => {
+    await buttonHarness.setup();
+    chrome = await chromium.launch();
+    const root = await buttonHarness.mount({ colorToken: 'rose' });
+    root.querySelector('.manager-color-picker-trigger').click();
+    await buttonHarness.setProps({});
+    const markup = globalThis.document.body.innerHTML;
+    page = await chrome.newPage({ viewport: { width: 400, height: 400 } });
+    await page.setContent(
+      `<!doctype html><html><head><meta charset="utf-8"><style>${CORE_BUTTON}</style>` +
+        `<style>@layer modules { ${sheet} }</style><style>${scoped.css}</style></head>` +
+        `<body><div class="fabricate" data-fabricate-theme="fabricate">${markup}</div></body></html>`
+    );
+  });
+
+  after(async () => {
+    await chrome?.close();
+    buttonHarness.teardown();
+  });
+
+  it('declares no transition on the trigger or any swatch cell', async () => {
+    const durations = await page.evaluate(() =>
+      [
+        ...globalThis.document.querySelectorAll(
+          '.manager-color-picker-trigger, .manager-color-preset'
+        ),
+      ].map((cell) => globalThis.getComputedStyle(cell).transitionDuration)
+    );
+    assert.ok(
+      durations.length >= 9,
+      `the trigger and eight swatches rendered: ${durations.length}`
+    );
+    assert.deepEqual(new Set(durations), new Set(['0s']));
+  });
+});
