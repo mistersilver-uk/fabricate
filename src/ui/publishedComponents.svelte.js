@@ -6,12 +6,26 @@
 import { mount, unmount, untrack } from 'svelte';
 
 import { publishedComponentSeam } from './publishedComponentSeam.js';
+import Avatar from './svelte/components/Avatar.svelte';
+import BandedBar from './svelte/components/BandedBar.svelte';
+import FillBar from './svelte/components/FillBar.svelte';
+import InfoStrip from './svelte/components/InfoStrip.svelte';
+import Medallion from './svelte/components/Medallion.svelte';
+import Meter from './svelte/components/Meter.svelte';
+import StatBox from './svelte/components/StatBox.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 
 // Keyed by manifest `path`; `published-components-mounted.test.js` holds the two equal.
 export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/TierTrack.svelte': TierTrack,
+  'src/ui/svelte/components/Avatar.svelte': Avatar,
+  'src/ui/svelte/components/Medallion.svelte': Medallion,
+  'src/ui/svelte/components/FillBar.svelte': FillBar,
+  'src/ui/svelte/components/Meter.svelte': Meter,
+  'src/ui/svelte/components/BandedBar.svelte': BandedBar,
+  'src/ui/svelte/components/StatBox.svelte': StatBox,
+  'src/ui/svelte/components/InfoStrip.svelte': InfoStrip,
 });
 
 export const publishedComponentRuntime = Object.freeze({

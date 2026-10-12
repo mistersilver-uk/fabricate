@@ -11,12 +11,21 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
+import {
+  PUBLISHED_ADAPTER as ADAPTER,
+  PUBLISHED_COMPILED_MODULES,
+  PUBLISHED_RAW_MODULES,
+  PUBLISHED_RUNE_MODULES,
+  PUBLISHED_SEAM as SEAM,
+  assertClipped,
+  companionTarget,
+  settle,
+  shippedSeam,
+} from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
-const ADAPTER = 'src/ui/publishedComponents.svelte.js';
-const SEAM = 'src/ui/publishedComponentSeam.js';
 const COMPANION = 'tests/fixtures/published-components/companionReactivity.svelte.js';
 const MANIFEST_PATHS = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path);
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
@@ -24,14 +33,9 @@ const FAULT_REPORT = 'Fabricate | Published component render failed:';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-published-components-',
-  rawModules: [SEAM, 'src/ui/publishedComponentManifest.js'],
-  runeModules: [ADAPTER, COMPANION],
-  compiledModules: [
-    'src/ui/svelte/published/PublishedComponentHost.svelte',
-    PROBE,
-    'src/ui/svelte/components/Chip.svelte',
-    ...MANIFEST_PATHS,
-  ],
+  rawModules: PUBLISHED_RAW_MODULES,
+  runeModules: [...PUBLISHED_RUNE_MODULES, COMPANION],
+  compiledModules: [...PUBLISHED_COMPILED_MODULES, PROBE],
   componentPath: PROBE,
 });
 
@@ -46,19 +50,6 @@ let targets;
 const recordEscape = (error) => {
   escaped.push(error);
 };
-
-// Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it.
-const settle = () => new Promise((done) => setTimeout(done, 0));
-
-function companionTarget() {
-  const shell = document.createElement('section');
-  shell.className = 'companion-sheet';
-  const target = document.createElement('div');
-  shell.append(target);
-  document.body.append(shell);
-  targets.push(shell);
-  return target;
-}
 
 function seam(options = {}) {
   return createPublishedComponents({
@@ -98,7 +89,7 @@ afterEach(() => {
 describe('a published component on the real runtime', () => {
   it('returns with the DOM in place and resets an omitted prop to its default on one root', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: { text: 'Hello' } });
     assert.equal(textOf(target), 'Hello', 'the DOM is in place when mount returns');
     await settle();
@@ -113,7 +104,7 @@ describe('a published component on the real runtime', () => {
 
   it('shows an applied update after the next microtask flush, or at once under flushSync', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: { text: 'A' } });
     await settle();
     assert.equal(handle.update({ text: 'B' }), true);
@@ -128,7 +119,7 @@ describe('a published component on the real runtime', () => {
 
   it('spreads data attributes onto the root', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: { 'data-rank': 2 } });
     assert.equal(target.querySelector('.probe').getAttribute('data-rank'), '2');
     handle.destroy();
@@ -136,7 +127,7 @@ describe('a published component on the real runtime', () => {
 
   it('destroys cleanly after the companion removed the target', async () => {
     const instance = seam();
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = instance.publicApi.mount('PublishedProbe', { target, props: {} });
     await settle();
     target.remove();
@@ -149,7 +140,7 @@ describe('a published component on the real runtime', () => {
 
   it('clips its hidden text from its own stylesheet under a bare ancestor', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: {} });
     await settle();
     assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
@@ -171,7 +162,7 @@ describe('a published component on the real runtime', () => {
     root.setAttribute('data-fabricate-theme', 'probe');
     try {
       const ui = seam().publicApi;
-      const target = companionTarget();
+      const target = companionTarget(targets);
       const handle = ui.mount('PublishedProbe', { target, props: {} });
       await settle();
       assert.equal(getComputedStyle(target.querySelector('.probe')).fontFamily, 'ProbeFace');
@@ -209,17 +200,15 @@ const LADDER = Object.freeze(
   }))
 );
 
-/** A fresh seam over the shipped manifest, registered with the adapter's own table. */
-function shippedSeam() {
-  const instance = createPublishedComponents({
-    isReady: () => true,
+const shipped = () =>
+  shippedSeam({
+    createPublishedComponents,
+    runtime,
+    components: adapterComponents,
     report: (...args) => {
       reports.push(args);
     },
   });
-  instance.register({ ...runtime, components: adapterComponents });
-  return instance.publicApi;
-}
 
 const tierProps = (props = {}) => ({ ...TIER_LABELS, tiers: LADDER, currentIndex: 2, ...props });
 const tierStates = (target) =>
@@ -229,18 +218,9 @@ const tierStates = (target) =>
   );
 
 function mountTierTrack(props = {}) {
-  const target = companionTarget();
+  const target = companionTarget(targets);
   assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
-  return { target, handle: shippedSeam().mount('TierTrack', { target, props: tierProps(props) }) };
-}
-
-function assertClipped(element, what) {
-  const style = getComputedStyle(element);
-  assert.equal(style.position, 'absolute', `${what} is taken out of flow`);
-  assert.equal(style.overflow, 'hidden', what);
-  assert.equal(style.width, '1px', what);
-  assert.equal(style.height, '1px', what);
-  assert.equal(style.clipPath, 'inset(50%)', what);
+  return { target, handle: shipped().mount('TierTrack', { target, props: tierProps(props) }) };
 }
 
 describe('TierTrack through the seam', () => {
@@ -266,8 +246,8 @@ describe('TierTrack through the seam', () => {
   it('refuses class, which it declares but does not publish', () => {
     assert.throws(
       () =>
-        shippedSeam().mount('TierTrack', {
-          target: companionTarget(),
+        shipped().mount('TierTrack', {
+          target: companionTarget(targets),
           props: tierProps({ class: 'x' }),
         }),
       /^TypeError: Fabricate \| published components: "class" is not a data attribute$/
@@ -281,7 +261,7 @@ describe('TierTrack through the seam', () => {
         if (value === undefined) delete props[key];
         else props[key] = value;
         assert.throws(
-          () => shippedSeam().mount('TierTrack', { target: companionTarget(), props }),
+          () => shipped().mount('TierTrack', { target: companionTarget(targets), props }),
           new RegExp(
             String.raw`^TypeError: Fabricate \| published components: TierTrack requires a non-empty "${key}"$`
           )
@@ -294,7 +274,7 @@ describe('TierTrack through the seam', () => {
     const { publishedComponentSeam } = await harness.loadRawModule(SEAM);
     globalThis.game.fabricate = { ready: true };
     try {
-      const target = companionTarget();
+      const target = companionTarget(targets);
       const handle = publishedComponentSeam.publicApi.mount('TierTrack', {
         target,
         props: tierProps(),
@@ -362,7 +342,7 @@ describe('TierTrack through the seam', () => {
 describe('a target claim on the real runtime', () => {
   it('M5: refuses a second mount into a live target and leaves the first intact', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const first = ui.mount('PublishedProbe', { target, props: { text: 'First' } });
     await settle();
     assert.throws(
@@ -378,7 +358,7 @@ describe('a target claim on the real runtime', () => {
 
   it('M5: holds the claim while the leading node toggles, by a stable anchor', async () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: { leading: true } });
     await settle();
     const leading = target.querySelector('.probe-leading');
@@ -396,7 +376,7 @@ describe('a target claim on the real runtime', () => {
 
   it('supersedes a mount whose DOM the companion cleared without destroying it', async () => {
     const instance = seam();
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const stale = instance.publicApi.mount('PublishedProbe', { target, props: { text: 'Old' } });
     await settle();
     target.replaceChildren();
@@ -411,7 +391,7 @@ describe('a target claim on the real runtime', () => {
 describe("a companion's own reactive context", () => {
   it('mounts from inside an $effect without that effect tracking the mount', () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const effect = companion.runInsideEffect(
       () => ui.mount('PublishedProbe', { target, props: { text: 'Inside' } }),
       flushSync
@@ -428,7 +408,7 @@ describe("a companion's own reactive context", () => {
 
   it("updates from inside a $derived without Svelte's state_unsafe_mutation", () => {
     const ui = seam().publicApi;
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = companion.runInsideDerived(() =>
       ui.mount('PublishedProbe', { target, props: { text: 'Derived' } })
     );
@@ -453,12 +433,12 @@ describe('a published component that faults', () => {
   for (const [fault, props, update] of FAULTS) {
     it(`contains a fault at ${fault}: reported once, target emptied, handle inert`, async () => {
       const instance = seam();
-      const siblingTarget = companionTarget();
+      const siblingTarget = companionTarget(targets);
       const sibling = instance.publicApi.mount('PublishedProbe', {
         target: siblingTarget,
         props: { text: 'Sibling' },
       });
-      const target = companionTarget();
+      const target = companionTarget(targets);
       const handle = instance.publicApi.mount('PublishedProbe', { target, props });
       assert.equal(
         reports.length,
@@ -491,7 +471,7 @@ describe('a published component that faults', () => {
 
   it('contains a fault Svelte delivers inside flushSync', async () => {
     const instance = seam();
-    const target = companionTarget();
+    const target = companionTarget(targets);
     const handle = instance.publicApi.mount('PublishedProbe', { target, props: {} });
     await settle();
     handle.update({ explode: true });
@@ -514,7 +494,7 @@ describe('a published component that faults', () => {
     };
     try {
       const ui = seam({ report: undefined }).publicApi;
-      ui.mount('PublishedProbe', { target: companionTarget(), props: { throwAt: 'init' } });
+      ui.mount('PublishedProbe', { target: companionTarget(targets), props: { throwAt: 'init' } });
       await settle();
     } finally {
       console.error = original;

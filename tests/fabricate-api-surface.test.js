@@ -182,7 +182,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
-    assert.deepEqual(ui.components, ['TierTrack']);
+    assert.deepEqual(ui.components, [
+      'TierTrack',
+      'Avatar',
+      'Medallion',
+      'FillBar',
+      'Meter',
+      'BandedBar',
+      'StatBox',
+      'InfoStrip',
+    ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
     assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
@@ -201,6 +210,64 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
       },
+      Avatar: {
+        version: 1,
+        props: {
+          art: optional,
+          name: required,
+          alt: optional,
+          size: optional,
+          shape: optional,
+          tint: optional,
+        },
+        rest: false,
+      },
+      Medallion: {
+        version: 1,
+        props: {
+          art: optional,
+          icon: optional,
+          size: required,
+          alt: optional,
+          tint: optional,
+          glyph: optional,
+          variant: optional,
+          tone: optional,
+          ink: optional,
+        },
+        rest: false,
+      },
+      FillBar: {
+        version: 1,
+        props: { value: optional, tone: optional, color: optional, density: optional },
+        rest: true,
+      },
+      Meter: {
+        version: 1,
+        props: {
+          value: optional,
+          max: optional,
+          segments: optional,
+          valueText: optional,
+          label: required,
+        },
+        rest: true,
+      },
+      BandedBar: {
+        version: 1,
+        props: { rows: required, direction: optional, density: optional },
+        rest: true,
+      },
+      StatBox: {
+        version: 1,
+        props: { value: required, label: required, icon: optional, tone: optional },
+        rest: true,
+      },
+      InfoStrip: {
+        version: 1,
+        props: { label: required, facts: required, badge: optional },
+        rest: true,
+      },
     });
     const header = '| Component | Version | Props | Rest |';
     const start = DOCUMENTED.indexOf(header);
@@ -212,6 +279,26 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
       'one documented row per published component, in publication order, with all four cells'
     );
+  });
+
+  it('gives each published component its own docs section, naming every prop it publishes', () => {
+    installPublicGame();
+    bindFabricateGlobal(recordingFacade().facade, {});
+    const { ui } = globalThis.game.fabricate.api;
+    const start = DOCUMENTED.indexOf('| Component | Version | Props | Rest |');
+    const end = DOCUMENTED.indexOf('\n### The descriptor\n', start);
+    assert.ok(start !== -1 && end !== -1, 'the table, then the descriptor section');
+    const sections = DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
+    assert.deepEqual(
+      sections.map((section) => section.slice(0, section.indexOf('\n'))),
+      ui.components,
+      'one section per published component, in publication order, and no other'
+    );
+    for (const [index, name] of ui.components.entries()) {
+      for (const key of Object.keys(ui.describe(name).props)) {
+        assert.ok(sections[index].includes(`\`${key}\``), `### ${name} names \`${key}\``);
+      }
+    }
   });
 
   it('publishes the canonical realm classes and the deprecated alias as the same class', () => {
