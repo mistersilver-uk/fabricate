@@ -1,6 +1,7 @@
 <!--
-  A test-only published component (issue 2426): it draws `text`, faults on demand at init, in an
-  effect or on an update that sets `explode`, and clips its hidden text with its own style.
+  A test-only published component (issue 2426): it draws `text` after an optional `leading` node,
+  faults on demand at init, in an effect or on an update that sets `explode`, and clips its hidden
+  text with its own style.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
@@ -13,7 +14,7 @@
 <script>
   import { untrack } from 'svelte';
 
-  let { text = 'DEFAULT', throwAt = null, explode = false, ...rest } = $props();
+  let { text = 'DEFAULT', leading = false, throwAt = null, explode = false, ...rest } = $props();
 
   if (untrack(() => throwAt) === 'init') throw PROBE_FAULTS.init;
 
@@ -27,12 +28,14 @@
   }
 </script>
 
+{#if leading}<span class="probe-leading">Leading</span>{/if}
 <p class="probe" {...rest}>
   <span class="probe-text">{text}</span>{guard(explode)}<span class="probe-hidden">Hidden</span>
 </p>
 
 <style>
   .probe {
+    position: relative;
     font-family: var(--fab-font-serif, serif);
   }
 

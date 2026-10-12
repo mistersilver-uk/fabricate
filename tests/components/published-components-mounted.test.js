@@ -1,13 +1,15 @@
 /**
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
- * microtask timing, three fault paths, destroy on a removed target and ancestor independence.
+ * microtask timing, the target claim, three fault paths, destroy on a removed target, ancestor
+ * independence, and a companion's own reactive contexts.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -15,18 +17,26 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
 const ADAPTER = 'src/ui/publishedComponents.svelte.js';
 const SEAM = 'src/ui/publishedComponentSeam.js';
+const COMPANION = 'tests/fixtures/published-components/companionReactivity.svelte.js';
+const MANIFEST_PATHS = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path);
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-published-components-',
   rawModules: [SEAM, 'src/ui/publishedComponentManifest.js'],
-  runeModules: [ADAPTER],
-  compiledModules: ['src/ui/svelte/published/PublishedComponentHost.svelte', PROBE],
+  runeModules: [ADAPTER, COMPANION],
+  compiledModules: [
+    'src/ui/svelte/published/PublishedComponentHost.svelte',
+    PROBE,
+    ...MANIFEST_PATHS,
+  ],
   componentPath: PROBE,
 });
 
 let runtime;
+let adapterComponents;
+let companion;
 let createPublishedComponents;
 let probe;
 let reports;
@@ -65,7 +75,9 @@ const textOf = (target) => target.querySelector('.probe-text')?.textContent;
 
 before(async () => {
   await harness.setup();
-  ({ publishedComponentRuntime: runtime } = await harness.loadRuneModule(ADAPTER));
+  ({ publishedComponentRuntime: runtime, COMPONENTS: adapterComponents } =
+    await harness.loadRuneModule(ADAPTER));
+  companion = await harness.loadRuneModule(COMPANION);
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
 });
@@ -106,7 +118,7 @@ describe('a published component on the real runtime', () => {
     assert.equal(handle.update({ text: 'B' }), true);
     assert.equal(textOf(target), 'A', 'the seam never flushes synchronously');
     await Promise.resolve();
-    assert.equal(textOf(target), 'B');
+    assert.equal(textOf(target), 'B', "applied by Svelte's microtask batch flush");
     handle.update({ text: 'C' });
     flushSync();
     assert.equal(textOf(target), 'C');
@@ -139,11 +151,126 @@ describe('a published component on the real runtime', () => {
     const target = companionTarget();
     const handle = ui.mount('PublishedProbe', { target, props: {} });
     await settle();
-    assert.equal(target.closest('.fabricate, .fabricate-app, .fabricate-manager'), null);
+    assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
+    assert.equal(getComputedStyle(target.querySelector('.probe')).position, 'relative');
     const hidden = getComputedStyle(target.querySelector('.probe-hidden'));
     assert.equal(hidden.position, 'absolute');
     assert.equal(hidden.overflow, 'hidden');
     assert.equal(hidden.width, '1px');
+    assert.equal(hidden.height, '1px');
+    assert.equal(hidden.clipPath, 'inset(50%)');
+    handle.destroy();
+  });
+
+  it('resolves a token from :root[data-fabricate-theme] over its own fallback', async () => {
+    const root = document.documentElement;
+    const theme = document.createElement('style');
+    theme.textContent = ':root[data-fabricate-theme] { --fab-font-serif: ProbeFace; }';
+    document.head.append(theme);
+    root.setAttribute('data-fabricate-theme', 'probe');
+    try {
+      const ui = seam().publicApi;
+      const target = companionTarget();
+      const handle = ui.mount('PublishedProbe', { target, props: {} });
+      await settle();
+      assert.equal(getComputedStyle(target.querySelector('.probe')).fontFamily, 'ProbeFace');
+      handle.destroy();
+    } finally {
+      root.removeAttribute('data-fabricate-theme');
+      theme.remove();
+    }
+  });
+});
+
+describe('the adapter', () => {
+  it("binds exactly the manifest paths, each to that path's own component", async () => {
+    assert.ok(Object.isFrozen(adapterComponents));
+    assert.deepEqual(Object.keys(adapterComponents), MANIFEST_PATHS);
+    for (const path of MANIFEST_PATHS) {
+      const { default: component } = await harness.loadRuneModule(path);
+      assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
+    }
+  });
+});
+
+describe('a target claim on the real runtime', () => {
+  it('M5: refuses a second mount into a live target and leaves the first intact', async () => {
+    const ui = seam().publicApi;
+    const target = companionTarget();
+    const first = ui.mount('PublishedProbe', { target, props: { text: 'First' } });
+    await settle();
+    assert.throws(
+      () => ui.mount('PublishedProbe', { target, props: {} }),
+      /^TypeError: Fabricate \| published components: target already holds a published component$/
+    );
+    assert.equal(textOf(target), 'First');
+    assert.equal(first.update({ text: 'Still' }), true);
+    await settle();
+    assert.equal(textOf(target), 'Still');
+    first.destroy();
+  });
+
+  it('M5: holds the claim while the leading node toggles, by a stable anchor', async () => {
+    const ui = seam().publicApi;
+    const target = companionTarget();
+    const handle = ui.mount('PublishedProbe', { target, props: { leading: true } });
+    await settle();
+    const leading = target.querySelector('.probe-leading');
+    assert.ok(Boolean(leading), 'the toggling node renders before the probe');
+    handle.update({ leading: false });
+    await settle();
+    assert.ok(!target.contains(leading), 'the leading node left the target');
+    assert.throws(
+      () => ui.mount('PublishedProbe', { target, props: {} }),
+      /target already holds a published component$/
+    );
+    assert.equal(handle.update({ text: 'Live' }), true);
+    handle.destroy();
+  });
+
+  it('supersedes a mount whose DOM the companion cleared without destroying it', async () => {
+    const instance = seam();
+    const target = companionTarget();
+    const stale = instance.publicApi.mount('PublishedProbe', { target, props: { text: 'Old' } });
+    await settle();
+    target.replaceChildren();
+    const fresh = instance.publicApi.mount('PublishedProbe', { target, props: { text: 'New' } });
+    assert.equal(stale.update({}), false, 'the stale mount was destroyed first');
+    assert.equal(textOf(target), 'New');
+    assert.equal(instance.liveMountCount(), 1);
+    fresh.destroy();
+  });
+});
+
+describe("a companion's own reactive context", () => {
+  it('mounts from inside an $effect without that effect tracking the mount', () => {
+    const ui = seam().publicApi;
+    const target = companionTarget();
+    const effect = companion.runInsideEffect(
+      () => ui.mount('PublishedProbe', { target, props: { text: 'Inside' } }),
+      flushSync
+    );
+    const [handle] = effect.runs;
+    assert.equal(textOf(target), 'Inside');
+    assert.equal(handle.update({ text: 'Updated' }), true);
+    flushSync();
+    assert.equal(textOf(target), 'Updated');
+    assert.equal(effect.runs.length, 1, "the probe's state is no dependency of the effect");
+    effect.dispose();
+    handle.destroy();
+  });
+
+  it("updates from inside a $derived without Svelte's state_unsafe_mutation", () => {
+    const ui = seam().publicApi;
+    const target = companionTarget();
+    const handle = companion.runInsideDerived(() =>
+      ui.mount('PublishedProbe', { target, props: { text: 'Derived' } })
+    );
+    assert.equal(textOf(target), 'Derived');
+    const accepted = companion.runInsideDerived(() => handle.update({ text: 'Again' }));
+    assert.equal(accepted, true, "the host's setProps writes its cell under untrack");
+    flushSync();
+    assert.equal(textOf(target), 'Again');
     handle.destroy();
   });
 });
@@ -167,9 +294,15 @@ describe('a published component that faults', () => {
       });
       const target = companionTarget();
       const handle = instance.publicApi.mount('PublishedProbe', { target, props });
+      assert.equal(
+        reports.length,
+        0,
+        'not the synchronous mount catch: the boundary reports later'
+      );
       await settle();
       if (update) {
         assert.equal(handle.update(update), true);
+        assert.equal(reports.length, 0, 'the boundary reports after the update returns');
         await settle();
       }
       assert.deepEqual(escaped, [], 'nothing escapes the boundary');
@@ -199,7 +332,7 @@ describe('a published component that faults', () => {
     flushSync();
     assert.deepEqual(escaped, []);
     assert.deepEqual(reports, [[FAULT_REPORT, 'PublishedProbe', probe.PROBE_FAULTS.explode]]);
-    assert.equal(handle.update({}), false);
+    assert.equal(handle.update({}), false, "the boundary's onerror retired it inside flushSync");
     assert.equal(target.childNodes.length, 0, 'unmounted inside the flush that delivered it');
     await settle();
     assert.deepEqual(escaped, []);
@@ -207,7 +340,7 @@ describe('a published component that faults', () => {
     assert.equal(instance.liveMountCount(), 0);
   });
 
-  it("reaches console.error through the adapter's default report", async () => {
+  it("reaches console.error through the seam's default reportToConsole", async () => {
     const original = console.error;
     const calls = [];
     console.error = (...args) => {

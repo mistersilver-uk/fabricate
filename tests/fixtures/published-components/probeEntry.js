@@ -5,6 +5,7 @@ export const PROBE_ENTRY = Object.freeze({
   version: 1,
   props: Object.freeze({
     text: Object.freeze({ kind: 'data' }),
+    leading: Object.freeze({ kind: 'data' }),
     throwAt: Object.freeze({ kind: 'data' }),
     explode: Object.freeze({ kind: 'data' }),
   }),

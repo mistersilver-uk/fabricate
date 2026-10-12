@@ -8,8 +8,8 @@ import { mount, unmount, untrack } from 'svelte';
 import { publishedComponentSeam } from './publishedComponentSeam.js';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 
-// Keyed by manifest `path`; `tests/published-component-manifest.test.js` holds the two equal.
-const COMPONENTS = Object.freeze({});
+// Keyed by manifest `path`; `published-components-mounted.test.js` holds the two equal.
+export const COMPONENTS = Object.freeze({});
 
 export const publishedComponentRuntime = Object.freeze({
   host: PublishedComponentHost,

@@ -1,51 +1,23 @@
 /**
- * The published component manifest (issue 2426) against the code it names: the adapter binds
- * exactly the manifest's paths, and each entry's props, rest and data-only kinds match the
- * component's own `$props()` declaration. The test-only probe gives the gate a domain while the
- * shipped manifest is empty.
+ * The published component manifest (issue 2426) against each component's parsed declaration: its
+ * props, rest and data-only kinds, and a stylesheet and template that need no Fabricate ancestor.
+ * The test-only probe gives the gate a domain while the shipped manifest is empty; the adapter's
+ * binding of each path is the mounted suite's.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, posix, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
-import { parseModule, walkNodes } from './helpers/moduleAst.js';
-
-const repoRoot = resolve(import.meta.dirname, '..');
-const ADAPTER = 'src/ui/publishedComponents.svelte.js';
-const HOST = 'src/ui/svelte/published/PublishedComponentHost.svelte';
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 
 const byName = (a, b) => a.localeCompare(b);
-const read = (file) => readFileSync(resolve(repoRoot, file), 'utf8');
 
-/** The adapter's `.svelte` default imports as `{ local: repoPath }`, the boundary host aside. */
-function adapterComponentImports() {
-  const { ast } = parseModule(read(ADAPTER));
-  const imports = {};
-  for (const node of ast.body) {
-    if (node.type !== 'ImportDeclaration' || !node.source.value.endsWith('.svelte')) continue;
-    const path = posix.join(dirname(ADAPTER), node.source.value);
-    if (path === HOST) continue;
-    const local = node.specifiers.find((s) => s.type === 'ImportDefaultSpecifier')?.local.name;
-    imports[local] = path;
-  }
-  return imports;
-}
-
-/** The adapter's `COMPONENTS` binding as `[path, local]` pairs, in source order. */
-function adapterBindings() {
-  const { ast } = parseModule(read(ADAPTER));
-  for (const node of walkNodes(ast)) {
-    if (node.type !== 'VariableDeclarator' || node.id?.name !== 'COMPONENTS') continue;
-    const object = node.init.type === 'CallExpression' ? node.init.arguments[0] : node.init;
-    return object.properties.map((property) => [property.key.value, property.value.name]);
-  }
-  throw new Error(`${ADAPTER} declares no COMPONENTS binding`);
-}
+const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
+const APP_TOKENS = ['var(--fab-manager-', 'var(--font-primary'];
 
 /** Each `$props()` key with its local name and whether it is `$bindable`. */
 function propLocals(ast) {
@@ -76,23 +48,29 @@ function renderedLocals(ast) {
   return called;
 }
 
-describe('the adapter binds exactly the manifest', () => {
-  it('imports one component per manifest path and no other', () => {
-    const imported = Object.values(adapterComponentImports()).sort(byName);
-    const published = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path).sort(byName);
-    assert.deepEqual(imported, published);
-  });
+/** What a component's own stylesheet and template borrow from a Fabricate window, by rule. */
+function ancestorDependencies(ast) {
+  const found = new Set();
+  for (const node of walkNodes(ast.css)) {
+    if (node.type === 'ClassSelector' && APP_ROOTS.has(node.name)) found.add('app-root selector');
+    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
+    if (node.type !== 'Declaration') continue;
+    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
+  }
+  for (const node of walkNodes(ast.fragment)) {
+    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
+  }
+  return [...found].sort(byName);
+}
 
-  it('keys COMPONENTS by manifest path, in manifest order, to the import of that path', () => {
-    const imports = adapterComponentImports();
-    const bindings = adapterBindings();
-    assert.deepEqual(
-      bindings.map(([path]) => path),
-      PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path)
-    );
-    for (const [path, local] of bindings) assert.equal(imports[local], path);
-  });
+/** The static class names one template node writes, by attribute or directive. */
+function classNames(node) {
+  if (node.type === 'ClassDirective') return [node.name];
+  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
+  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
+}
 
+describe('the manifest', () => {
   it('is a frozen list of frozen entries with unique names', () => {
     assert.ok(Object.isFrozen(PUBLISHED_COMPONENT_MANIFEST));
     const names = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name);
@@ -106,7 +84,7 @@ describe('the adapter binds exactly the manifest', () => {
 describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
     it(`${entry.name} publishes only declared data props, and rest exactly when declared`, () => {
-      const declaration = readDeclaration(templateOf(entry.path, read(entry.path)));
+      const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
       assert.deepEqual(Object.keys(entry).sort(byName), [
         'name',
         'path',
@@ -118,7 +96,11 @@ describe('each entry matches its component declaration', () => {
       assert.equal(entry.name, declaration.component);
       for (const [key, spec] of Object.entries(entry.props)) {
         assert.ok(declaration.names.includes(key), `${key} is a declared prop`);
-        assert.equal(spec.kind, 'data', `${key} is a data prop until #2427`);
+        assert.equal(spec.kind, 'data', `${key} is a data prop until issue 2427`);
+        assert.ok(
+          spec.required === undefined || typeof spec.required === 'boolean',
+          `${key} is required by a boolean, or not at all`
+        );
       }
       assert.equal(entry.rest, declaration.rest !== null, 'rest matches the rest declaration');
 
@@ -128,6 +110,10 @@ describe('each entry matches its component declaration', () => {
         assert.equal(bindable, false, `${key} is not $bindable`);
         assert.equal(rendered.has(local), false, `${key} is not rendered as a snippet`);
       }
+    });
+
+    it(`${entry.name} styles itself without a Fabricate ancestor`, () => {
+      assert.deepEqual(ancestorDependencies(componentAstOf(entry.path)), []);
     });
   }
 
@@ -141,5 +127,27 @@ describe('each entry matches its component declaration', () => {
       { key: 'value', local: 'value', bindable: true },
     ]);
     assert.deepEqual([...renderedLocals(ast)], ['body']);
+  });
+
+  it('sees every ancestor dependency the published-components spec forbids', () => {
+    const offenders = [
+      '<span class="a visually-hidden"></span><span class:visually-hidden={on}></span>',
+      '<style>',
+      '  :global(.fabricate-manager) .a { color: var(--fab-manager-ink); }',
+      '  @container app (width > 1px) { .a { font-family: var(--font-primary); } }',
+      '</style>',
+    ];
+    const { ast } = templateOf('Synthetic.svelte', offenders.join('\n'));
+    assert.deepEqual(ancestorDependencies(ast), [
+      '.visually-hidden',
+      '@container',
+      'app-root selector',
+      'var(--fab-manager-',
+      'var(--font-primary',
+    ]);
+    for (const root of ['.fabricate', '.fabricate-app']) {
+      const scoped = templateOf('Root.svelte', `<style>:global ${root} .a { color: red; }</style>`);
+      assert.deepEqual(ancestorDependencies(scoped.ast), ['app-root selector'], root);
+    }
   });
 });

@@ -153,6 +153,14 @@ function recordingFacade() {
   return { facade, calls };
 }
 
+/** The docs row a described published component must carry: name, version, props and rest. */
+function documentedComponentRow(name, { version, props, rest }) {
+  const cells = Object.entries(props).map(([key, spec]) =>
+    spec.required ? `\`${key}\` (required)` : `\`${key}\``
+  );
+  return `| \`${name}\` | ${version} | ${cells.join(', ') || '—'} | ${rest ? 'yes' : 'no'} |`;
+}
+
 describe('bindFabricateGlobal publishes the stable namespaces', () => {
   it('re-publishes the SAME extension registries through the init and ready binds', () => {
     installPublicGame();
@@ -182,9 +190,9 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     const end = DOCUMENTED.indexOf('\n\n', start);
     const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
     assert.deepEqual(
-      rows.map((row) => row.match(/^\| `([^`]+)` \|/)?.[1]),
-      ui.components,
-      'one documented row per published component, in publication order'
+      rows,
+      ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
+      'one documented row per published component, in publication order, with all four cells'
     );
   });
 
