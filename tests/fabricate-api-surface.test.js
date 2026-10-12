@@ -182,8 +182,26 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
-    assert.deepEqual(ui.components, []);
-    assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {});
+    assert.deepEqual(ui.components, ['TierTrack']);
+    const optional = { kind: 'data', required: false };
+    const required = { kind: 'data', required: true };
+    assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
+      TierTrack: {
+        version: 1,
+        props: {
+          tiers: required,
+          currentIndex: optional,
+          direction: optional,
+          layout: optional,
+          ariaLabel: required,
+          currentLabel: required,
+          reachedLabel: required,
+          aheadLabel: required,
+          hint: optional,
+        },
+        rest: true,
+      },
+    });
     const header = '| Component | Version | Props | Rest |';
     const start = DOCUMENTED.indexOf(header);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
