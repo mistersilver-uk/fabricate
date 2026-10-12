@@ -26,6 +26,7 @@ const extensionHostSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/PlayerExtensionHost.svelte'),
   'utf8'
 );
+// ratchet-exempt(source-pin): an absence gate for premium tokens on the player side, not a pin on the bar's shape
 const topBarSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/ActorSelectTopBar.svelte'),
   'utf8'
