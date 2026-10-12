@@ -582,10 +582,12 @@ Where the lab and the live smoke disagree, the smoke is right.
 
 A second page in the View Lab's Vite app, at `/tests/view-lab/primitives.html`, renders `openspec/specs/design-system/library.html` and stands each catalogued drawing up as the real component it ships.
 It is not a capture surface and publishes no frame.
+CI does capture the units a PR changes, by the separate `npm run lab:capture`, and publishes them as supplementary library frames.
 
 ```sh
 npm run lab          # open the page in a browser
 npm run lab:check    # mount every catalogued row; fail on any console, page or request error
+npm run lab:capture -- --base origin/main --output <dir>   # capture the units the diff selects (what CI publishes)
 npm run lab:parity   # compare every unreplaced element with library.html opened bare
 ```
 
