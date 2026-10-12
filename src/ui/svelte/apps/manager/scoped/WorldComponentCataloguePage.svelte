@@ -16,6 +16,7 @@
   import Button from '../../../components/Button.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
+  import { componentCategoryFilter } from './componentCategoryFilter.js';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {
     componentAliasNote,
@@ -60,11 +61,9 @@
 
   // INITIALISED, and not optionally: a bindable prop with a setter THROWS on `undefined`.
   let selectedId = $state('');
-
-  // AN IN-FLIGHT BULK WRITE: each action rewrites the WHOLE payload, so two runs cannot overlap.
+  // IN-FLIGHT BULK WRITE (each rewrites the WHOLE payload, so runs cannot overlap) and DELETE,
+  // held apart because the two put DIFFERENT controls into a busy state.
   let bulkApplying = $state(false);
-
-  // AN IN-FLIGHT BULK DELETE, held apart because the two put DIFFERENT controls into a busy state.
   let bulkDeleting = $state(false);
 
   function text(key, fallback) {
@@ -107,18 +106,19 @@
       )?.name ?? ''
     )
   );
-  // THE SOURCE FILTER TAKES THE ITEM ROSTER, because `Broken link` is a RESOLUTION question.
+  // THE BULK INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (M18): the union of what the
+  // records carry offered the SYSTEMS' categories as the world's, and missed unapplied tags.
+  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
+  // THE SOURCE FILTER TAKES THE ITEM ROSTER: `Broken link` is a RESOLUTION question.
   const filters = $derived([
     ...componentSourceFilters({ worldItems }, phrase),
-    // THE ESSENCE FILTER FOLLOWS THE SOURCE SELECT ON THE LEAD ROW (M30), as the rules list does.
+    // THE ESSENCE, THEN CATEGORY, FILTERS FOLLOW THE SOURCE SELECT ON THE LEAD ROW (M30, issue 2440).
     ...componentEssenceFilter({ essences: worldEssences, systems }, phrase),
+    ...componentCategoryFilter({ categories: categoryOptions, entries }, phrase),
     ...componentMembershipScopeFilter({ systemId, systemName: addressedSystemName }, phrase),
   ]);
   const sorts = $derived(componentSorts(phrase));
 
-  // THE BULK INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (M18): the union of what the
-  // records carry offered the SYSTEMS' categories as the world's, and missed unapplied tags.
-  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
   const tagOptions = $derived(worldVocabularyComponentTags(scope));
 
   // THE ONE WORLD-DEFAULT CARD, THROUGH THE SHELL; its TITLE names the VALUE, its NOTE the reach.

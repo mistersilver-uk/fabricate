@@ -2748,6 +2748,69 @@ describe('world Component Catalogue (issue 1371)', () => {
     });
   });
 
+  describe('the toolbar filters by category (#2440)', () => {
+    const rowIds = (target) =>
+      [...target.querySelectorAll('[data-scoped-list-row]')]
+        .map((row) => row.getAttribute('data-scoped-list-row'))
+        .sort((left, right) => left.localeCompare(right));
+
+    async function choose(target, value) {
+      chooseSelectOption(target, '[data-scoped-list-filter="category"]', value);
+      await drain();
+    }
+
+    it('offers the vocabulary after All and No world category, and narrows the rows', async () => {
+      const target = await harness.mount({
+        scope: scopeFor(),
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
+        'All categories',
+        'No world category',
+        'Raw',
+        'Refined',
+      ]);
+      assert.deepEqual(rowIds(target), ['coal', 'ingot', 'orphan', 'resin']);
+      await choose(target, 'Raw');
+      assert.deepEqual(rowIds(target), ['coal']);
+      await choose(target, '__none');
+      assert.deepEqual(rowIds(target), ['orphan', 'resin'], 'only uncategorised rows');
+    });
+
+    it('offers a stray category and narrows the rows by it', async () => {
+      const target = await harness.mount({
+        scope: scopeFor({
+          defaults: [
+            { id: 'ingot', category: 'Refined' },
+            { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+            { id: 'resin', category: '  Stray  ' },
+          ],
+        }),
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
+        'All categories',
+        'No world category',
+        'Raw',
+        'Refined',
+        'Stray',
+      ]);
+      await choose(target, 'Stray');
+      assert.deepEqual(rowIds(target), ['resin']);
+    });
+
+    it('is withheld when the world has no category', async () => {
+      const target = await harness.mount({
+        scope: { ...scopeFor({}, { categories: [], tags: [] }), entries: [] },
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.ok(!target.querySelector('[data-scoped-list-filter="category"]'));
+    });
+  });
+
   // ── M30: THE ESSENCE FILTER AND THE ROW'S ESSENCE CHIPS (issue 1371 r18-cat) ────────────────
   // "There's no way to filter the world component catalogue by essence like there is in the
   // system rules, and there's no way to view the essences on a component in the world catalogue
