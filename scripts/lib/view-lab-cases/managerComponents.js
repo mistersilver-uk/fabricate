@@ -9,6 +9,7 @@ import {
   COMPONENT_EDITOR_MATCHES,
   PREMIUM_ICONS_AD_PATTERN,
   REQUIREMENT_SUGGESTION,
+  STAGE_COMPLICATION_LIST_MATCH,
   TYPEAHEAD_COMBOBOX_SOURCE,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
@@ -785,7 +786,7 @@ export const CASES = Object.freeze([
     expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: [...SALVAGE_ROW_SOURCES, STAGE_COMPLICATION_LIST_MATCH],
   }),
   // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
   managerCase({
@@ -808,10 +809,10 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
-  // The stage list's complication band at the declared floor (issue 1522).
+  // A stage's read-only complication list at the declared floor (issues 1522, 2445).
   managerCase({
     id: 'manager-component-edit-salvage-stages-narrow',
-    label: 'Manager — Component edit progressive salvage, a stage’s complication band at the floor',
+    label: 'Manager — Component edit progressive salvage, a stage’s complication list at the floor',
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -828,7 +829,9 @@ export const CASES = Object.freeze([
       '.fabricate-manager .fabricate-sortable-list-row.has-band [data-salvage-stage-complications]',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: COMPONENT_EDITOR_MATCHES,
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
+    // Rows on a stage card share `--fab-bg-1`, parted by the border alone: judged on a second palette.
+    themeVariants: ['hearth-herb'],
   }),
   managerCase({
     id: 'manager-component-edit-salvage-off',
@@ -1091,7 +1094,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-component-complications-salvage-stage-strip',
     label: 'Manager — Component complications salvage stage strip',
-    // The read-only strip under a progressive salvage stage row.
+    // The read-only complication list nested in a progressive salvage stage row (issue 2445).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -1105,10 +1108,11 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     expectSelector:
-      '.fabricate-manager [data-salvage-stage-complications] [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band > .fabricate-sortable-list-body ul[data-salvage-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+      STAGE_COMPLICATION_LIST_MATCH,
       ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
@@ -1127,11 +1131,12 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipe-edit',
     expectSelector:
-      '.fabricate-manager [data-recipe-result-complications] [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band[data-recipe-result-row] > .fabricate-sortable-list-body ul[data-recipe-result-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'recipes', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
+      STAGE_COMPLICATION_LIST_MATCH,
     ],
   }),
   overrideCase({
