@@ -64,6 +64,22 @@ export async function underSheet(css, run) {
   }
 }
 
+/**
+ * Passes `record` every error thrown past the seam until the returned function is called: Node's
+ * uncaught exceptions, and those happy-dom traps in its timers and microtasks and reports on its
+ * own window, which never reach `process`.
+ */
+export function recordEscapes(record) {
+  const view = document.defaultView;
+  const trapped = (event) => record(event.error);
+  process.on('uncaughtException', record);
+  view.addEventListener('error', trapped);
+  return () => {
+    process.off('uncaughtException', record);
+    view.removeEventListener('error', trapped);
+  };
+}
+
 /** A fresh seam over the shipped manifest, registered with the adapter's own `components` table. */
 export function shippedSeam({ createPublishedComponents, runtime, components, report }) {
   const instance = createPublishedComponents({ isReady: () => true, report });
@@ -78,4 +94,8 @@ export function assertClipped(element, what) {
   assert.equal(style.width, '1px', what);
   assert.equal(style.height, '1px', what);
   assert.equal(style.clipPath, 'inset(50%)', what);
+  assert.equal(style.padding, '0px', what);
+  assert.equal(style.margin, '-1px', what);
+  assert.equal(style.whiteSpace, 'nowrap', what);
+  assert.equal(style.borderWidth, '0px', what);
 }

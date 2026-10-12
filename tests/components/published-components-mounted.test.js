@@ -21,6 +21,7 @@ import {
   PUBLISHED_SEAM as SEAM,
   assertClipped,
   companionTarget,
+  recordEscapes,
   settle,
   shippedSeam,
   underSheet,
@@ -407,8 +408,11 @@ describe("a companion's own reactive context", () => {
 });
 
 describe('a published component that faults', () => {
-  before(() => process.on('uncaughtException', recordEscape));
-  after(() => process.off('uncaughtException', recordEscape));
+  let stopRecording;
+  before(() => {
+    stopRecording = recordEscapes(recordEscape);
+  });
+  after(() => stopRecording());
 
   const FAULTS = [
     ['init', { throwAt: 'init' }, null],

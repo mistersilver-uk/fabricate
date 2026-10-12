@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import {
   FAULT_REPORT,
   PUBLISHED_ADAPTER,
@@ -17,6 +18,7 @@ import {
   PUBLISHED_SEAM,
   assertClipped,
   companionTarget,
+  recordEscapes,
   settle,
   shippedSeam,
   underSheet,
@@ -75,7 +77,7 @@ afterEach(() => {
   for (const shell of targets) shell.remove();
 });
 
-/** Each leaf's root, a mount and an update that changes `read`, and the keys its manifest requires. */
+/** Each leaf's root, and a mount and an update that changes `read`. */
 const LEAVES = Object.freeze([
   {
     name: 'Avatar',
@@ -84,7 +86,6 @@ const LEAVES = Object.freeze([
     next: { name: 'Tam Oakes' },
     read: (root) => root.querySelector('.fab-avatar-initials').textContent,
     drawn: ['MV', 'TO'],
-    required: ['name'],
   },
   {
     name: 'Medallion',
@@ -93,7 +94,6 @@ const LEAVES = Object.freeze([
     next: { size: 26, icon: 'fas fa-gem' },
     read: (root) => root.querySelector('i').classList.contains('fa-gem'),
     drawn: [false, true],
-    required: ['size'],
   },
   {
     name: 'FillBar',
@@ -102,7 +102,6 @@ const LEAVES = Object.freeze([
     next: { value: 64 },
     read: (root) => root.querySelector('.fab-fill-bar-fill').style.width,
     drawn: ['25%', '64%'],
-    required: [],
   },
   {
     name: 'Meter',
@@ -111,7 +110,6 @@ const LEAVES = Object.freeze([
     next: { value: 3, max: 4, label: 'Stamina' },
     read: (root) => root.getAttribute('aria-valuenow'),
     drawn: ['1', '3'],
-    required: ['label'],
   },
   {
     name: 'BandedBar',
@@ -120,7 +118,6 @@ const LEAVES = Object.freeze([
     next: { rows: [{ name: 'Event chance', percent: 20 }] },
     read: (root) => root.querySelector('[data-banded-bar-percent]').textContent,
     drawn: ['62%', '20%'],
-    required: ['rows'],
   },
   {
     name: 'StatBox',
@@ -129,7 +126,6 @@ const LEAVES = Object.freeze([
     next: { value: '13', label: 'Runs' },
     read: (root) => root.querySelector('.fab-stat-box-figure').textContent,
     drawn: ['12', '13'],
-    required: ['value', 'label'],
   },
   {
     name: 'InfoStrip',
@@ -138,13 +134,24 @@ const LEAVES = Object.freeze([
     next: { label: 'Conditions', facts: [{ value: 'Storm' }] },
     read: (root) => root.querySelector('.fabricate-info-strip-value').textContent,
     drawn: ['Clear', 'Storm'],
-    required: ['label', 'facts'],
   },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
 
+function requiredKeysOf(name) {
+  const { props } = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
+  return Object.keys(props).filter((key) => props[key].required);
+}
+
 describe('each published leaf through the seam', () => {
+  it('is every manifest entry but TierTrack, which the seam suite mounts', () => {
+    assert.deepEqual(
+      LEAVES.map((leaf) => leaf.name),
+      PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name).filter((name) => name !== 'TierTrack')
+    );
+  });
+
   for (const { name, root, props, next, read, drawn } of LEAVES) {
     it(`${name} mounts its root, updates on that root, and destroys`, async () => {
       const { target, handle } = mountLeaf(name, props);
@@ -162,7 +169,7 @@ describe('each published leaf through the seam', () => {
   }
 });
 
-describe('a prop a leaf declares but does not publish', () => {
+describe('a key a leaf does not publish', () => {
   const UNPUBLISHED = [
     ['Avatar', 'class', 'is not a prop of Avatar'],
     ['Medallion', 'src', 'is not a prop of Medallion'],
@@ -185,8 +192,8 @@ describe('a prop a leaf declares but does not publish', () => {
 });
 
 describe('a required prop', () => {
-  for (const { name, props, required } of LEAVES) {
-    for (const key of required) {
+  for (const { name, props } of LEAVES) {
+    for (const key of requiredKeysOf(name)) {
       for (const value of [undefined, '']) {
         it(`${name} refuses ${value === '' ? 'an empty' : 'an absent'} ${key}`, () => {
           const given = { ...props };
@@ -246,6 +253,26 @@ describe('FillBar under a bare ancestor', () => {
   });
 });
 
+describe("Medallion's glyph ink under a bare ancestor", () => {
+  const INKS =
+    ':root[data-fabricate-theme] { --fab-tag-rose: rgb(7, 8, 9); --fab-success-text: rgb(1, 2, 3); --fab-danger-text: rgb(4, 5, 6); }';
+  const PRECEDENCE = [
+    ['a tone outranks a tint', { tint: 'rose', tone: 'danger' }],
+    ['an ink outranks a tone', { tone: 'success', ink: 'danger' }],
+  ];
+  for (const [claim, props] of PRECEDENCE) {
+    it(`${claim}, so the glyph draws the danger ink`, async () => {
+      await underSheet(INKS, async () => {
+        const { target, handle } = mountLeaf('Medallion', { size: 26, ...props });
+        await settle();
+        const glyph = getComputedStyle(target.querySelector('i'));
+        assert.equal(glyph.color, 'rgb(4, 5, 6)');
+        handle.destroy();
+      });
+    });
+  }
+});
+
 describe("StatBox's kicker under a bare ancestor", () => {
   const faceOf = (target) => getComputedStyle(target.querySelector('.fab-kicker')).fontFamily;
 
@@ -267,8 +294,11 @@ describe("StatBox's kicker under a bare ancestor", () => {
 });
 
 describe('BandedBar with no drawable rows', () => {
-  before(() => process.on('uncaughtException', recordEscape));
-  after(() => process.off('uncaughtException', recordEscape));
+  let stopRecording;
+  before(() => {
+    stopRecording = recordEscapes(recordEscape);
+  });
+  after(() => stopRecording());
 
   it('contains rows: null as a fault: reported once under its name, target emptied, handle inert', async () => {
     const { target, handle } = mountLeaf('BandedBar', { rows: null });
@@ -299,5 +329,6 @@ describe('BandedBar with no drawable rows', () => {
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
     assert.deepEqual(reports, []);
+    assert.deepEqual(escaped, [], 'nothing was thrown past the seam');
   });
 });
