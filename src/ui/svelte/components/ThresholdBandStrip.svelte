@@ -42,6 +42,16 @@
     is never converted into a `<button>`, which would nest buttons and land invalid DOM.
 -->
 <script>
+  import {
+    ariaBoundsFor,
+    bandDomain,
+    boundsFor,
+    clampTo,
+    resolveBands,
+    snapTo,
+    trackMaxOf,
+  } from '../util/rangeBarGeometry.js';
+
   let {
     binding = 'relative',
     bands = [],
@@ -68,88 +78,23 @@
   let trackElement = $state(null);
   let dragIndex = $state(-1);
 
-  const numeric = (value) => {
-    if (value === null || value === undefined || value === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  const resolved = $derived.by(() => {
-    if (!Array.isArray(bands) || bands.length < 2) return null;
-    const rows = bands
-      .map((band, position) => ({
-        id: band?.id ?? '',
-        name: band?.name ?? '',
-        color: typeof band?.color === 'string' ? band.color : '',
-        ink: typeof band?.ink === 'string' ? band.ink : '',
-        range: typeof band?.range === 'string' ? band.range : '',
-        from: numeric(band?.from),
-        to: numeric(band?.to),
-        index: Number.isInteger(band?.index) ? band.index : position,
-      }))
-      .sort((a, b) => (a.from ?? 0) - (b.from ?? 0));
-    if (rows.some((row) => row.from === null)) return null;
-
-    for (let index = 0; index < rows.length - 1; index += 1) {
-      if (rows[index + 1].from <= rows[index].from) return null;
-      if (rows[index].to !== null && rows[index].to + 1 !== rows[index + 1].from) return null;
-    }
-    return rows;
-  });
+  const resolved = $derived(resolveBands(bands));
 
   const boundaries = $derived(resolved ? resolved.slice(1).map((row) => row.from) : []);
 
-  const domain = $derived.by(() => {
-    const rows = resolved;
-    const low = numeric(min);
-    const high = numeric(max);
-    if (!rows) return { min: low ?? 0, max: high ?? 1 };
-    const first = rows[0].from;
-    const last = rows.at(-1);
-    const tail = boundaries.length >= 2 ? boundaries.at(-1) - boundaries.at(-2) : step;
-    const derivedMax =
-      binding === 'fixed' && last.to !== null ? last.to : last.from + Math.max(tail, step);
-    return { min: low ?? first, max: high ?? derivedMax };
-  });
+  const domain = $derived(bandDomain({ rows: resolved, boundaries, min, max, binding, step }));
 
-  const trackMax = $derived.by(() => {
-    if (!resolved || binding !== 'fixed' || numeric(max) !== null) return domain.max;
-    return resolved.at(-1).to !== null ? domain.max + 1 : domain.max;
-  });
+  const trackMax = $derived(trackMaxOf({ rows: resolved, binding, max, domain }));
 
   const span = $derived(Math.max(trackMax - domain.min, Number.EPSILON));
 
   const percentOf = (value) => ((value - domain.min) / span) * 100;
 
-  function boundsFor(index) {
-    const lower = index === 0 ? domain.min + step : boundaries[index - 1] + step;
-    const upper = index === boundaries.length - 1 ? trackMax - step : boundaries[index + 1] - step;
-    if (lower > upper) {
-      const pinned = boundaries[index];
-      return [pinned, pinned];
-    }
-    return [lower, upper];
-  }
-
-  function ariaBoundsFor(index) {
-    const [lower, upper] = boundsFor(index);
-    const now = boundaries[index];
-    return [Math.min(lower, now), Math.max(upper, now)];
-  }
-
-  function clampTo(index, value) {
-    const [lower, upper] = boundsFor(index);
-    return Math.min(upper, Math.max(lower, value));
-  }
-
-  function snap(value) {
-    const size = step > 0 ? step : 1;
-    return domain.min + Math.round((value - domain.min) / size) * size;
-  }
+  const geometry = $derived({ boundaries, domainMin: domain.min, trackMax, step });
 
   function commit(index, rawValue) {
     if (disabled) return;
-    const next = clampTo(index, snap(rawValue));
+    const next = clampTo(index, snapTo(rawValue, domain.min, step), geometry);
     if (next === boundaries[index]) return;
     if (binding === 'simple') {
       onChange({ binding: 'simple', dc: next });
@@ -178,8 +123,8 @@
     if (event.key in KEY_DELTAS) next = current + KEY_DELTAS[event.key] * step;
     else if (event.key === 'PageUp') next = current + pageStep * step;
     else if (event.key === 'PageDown') next = current - pageStep * step;
-    else if (event.key === 'Home') next = boundsFor(index)[0];
-    else if (event.key === 'End') next = boundsFor(index)[1];
+    else if (event.key === 'Home') next = boundsFor(index, geometry)[0];
+    else if (event.key === 'End') next = boundsFor(index, geometry)[1];
     if (next === null) return;
     event.preventDefault();
     commit(index, next);
@@ -266,7 +211,7 @@
       {/each}
 
       {#each readonly ? [] : boundaries as boundary, index (index)}
-        {@const bounds = ariaBoundsFor(index)}
+        {@const bounds = ariaBoundsFor(index, geometry)}
         <span
           class="fab-band-strip-handle"
           class:is-dragging={dragIndex === index}

@@ -18,7 +18,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-band-strip-',
-  rawModules: [],
+  rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
   compiledModules: ['src/ui/svelte/components/ThresholdBandStrip.svelte'],
   componentPath: 'src/ui/svelte/components/ThresholdBandStrip.svelte',
 });
