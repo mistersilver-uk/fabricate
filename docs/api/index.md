@@ -19,7 +19,7 @@ Fabricate exposes its API through two Foundry globals:
   The [published UI components](#published-ui-components) a companion renders into an element it owns.
 
 All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires.
-`api.ui` is readable from `init`, but its `mount` throws until Fabricate is ready:
+`api.ui` exists once Fabricate's own `init` listener has run (read it in `setup` or later, never in your own `init`), and its `mount` throws until the `fabricate.ready` hook has fired:
 
 ```javascript
 Hooks.on('fabricate.ready', () => {
@@ -33,7 +33,7 @@ Hooks.on('fabricate.ready', () => {
 > The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
 > A companion's extension registrations are the exceptions, and there are two of them.
 > Register each during the companion's `init` callback, as described in [Manager Navigation Extension](#manager-navigation-extension) and [Player Navigation Extension](#player-navigation-extension).
-> `api.ui` is readable from `init`, but its `mount` throws until Fabricate is ready.
+> `api.ui` exists once Fabricate's own `init` listener has run, but its `mount` throws until `fabricate.ready` fires; a companion's own Foundry `ready` callback runs while Fabricate is still initialising, so mount from `fabricate.ready` or later.
 
 ---
 
@@ -2006,6 +2006,10 @@ The published components, in publication order:
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+None yet.
+Phase 1 ships the seam over an empty manifest.
+Each row lists the component's published props, marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount }`.
@@ -2020,21 +2024,23 @@ A breaking change to one component bumps that component's `version`, keeps the o
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
 It returns a frozen `{ update(props), destroy() }`.
 
-- `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window works), must be empty, and must not hold a live mount.
+- `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
 - `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with no function at any depth and no cycle.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
 - `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
   It is atomic: when it throws, the previous props stay rendered.
   It returns `true` once accepted and `false` after `destroy` or a fault.
-- `destroy()` is idempotent and unmounts whether or not `target` is still in the document.
-  Call it from your own cleanup, from an ApplicationV2 `_preClose` (or before `super.close`), and before any re-render that replaces the target's ancestors, because DialogV2 and Handlebars `_replaceHTML` replace their content on every render.
+- `destroy()` is idempotent, never throws, and releases the target.
+  Call it from your own cleanup, from an ApplicationV2 `_preClose` or `_onClose` (or before `super.close`), and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting again), because DialogV2 and Handlebars `_replaceHTML` replace their content on render; `destroy` works whether or not `target` is still in the document.
+  It is safe after a fault, and still expected there.
   A mount that is never destroyed leaks for the life of the page.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 If the component faults while rendering, updating or in an effect, Fabricate logs `Fabricate | Published component render failed:` with the name and the error, empties `target`, and the handle goes inert.
+The report, and `update` answering `false`, arrive after a microtask, never inside the `mount` or `update` call that caused the fault.
 Any fallback copy is yours to draw.
 
 ### Ownership and theme
@@ -2042,8 +2048,16 @@ Any fallback copy is yours to draw.
 You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
 `.fab-*` classes and `svelte-*` hashes are private and may change in any release.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
+Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
 A published component resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor; mount it after `target` is attached to its final document.
+In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
+A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
+A later move between windows, or a theme change after a window detached, is not carried to the mount, so re-mount in `_onDetach` and `_onAttach` when that matters.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
+
+- Phase-1 components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
+- A required label is yours to localise.
+- Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 ## Data Persistence
 

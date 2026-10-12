@@ -508,7 +508,7 @@ Spec reference: openspec/specs/ui-extension-points/spec.md
 
 ## Published UI Component
 
-A presentation seam, not a record: Fabricate persists nothing for it.
+A presentation primitive, not a record: Fabricate persists nothing for it.
 A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy }` handle.
 "Seam" names that mount function only; the target is the companion's element, and the component is Fabricate's primitive.
 The published set is a frozen data manifest of `{ name, path, version, props, rest }` entries, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
