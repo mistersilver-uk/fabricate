@@ -319,7 +319,7 @@
         ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         triggerTitle={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.TagPanel', 'Tags')}
-        showFilteredCount
+        showFilteredCount={entries.length > 0}
         filteredCountTemplate={localizeOr(
           'FABRICATE.Admin.Manager.Recipe.TagPanelCount',
           '{matched} of {total}'

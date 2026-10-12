@@ -985,6 +985,7 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
     const panel = await openTagAdder(target);
     assert.equal(panel.getAttribute('aria-label'), 'Tags', 'the panel is named for its list');
     assert.ok(!panel.querySelector('[role="listbox"]'), 'no listbox');
+    assert.ok(!panel.querySelector('[data-popover-header]'), 'no "0 of 0" over an empty list');
     assert.equal(
       optionText(panel.querySelector('.manager-travel-popover-empty')),
       'No tags defined'
