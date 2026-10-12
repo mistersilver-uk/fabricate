@@ -3021,7 +3021,7 @@
           "DifficultyUnset": "No difficulty",
           "DifficultyShort": "DC",
           "EditDifficulty": "Edit",
-          "OpenComponentDifficulty": "Edit difficulty on the component",
+          "OpenComponentDifficulty": "Edit difficulty and complications on the component",
           "Instantaneous": "Instantaneous",
           "Duration": "Duration",
           "DurationHint": "How long this recipe takes to craft. Leave blank for an instant craft.",
@@ -3686,7 +3686,6 @@
             "PlayerPillTitle": "Shown to the player when it fires.",
             "StripTitle": "{count} complications on {name}",
             "StripTitleOne": "1 complication on {name}",
-            "StripEdit": "Edit complications on {name}",
             "ActivityProgressiveCount": "{activity} uses progressive resolution in this system — {count} complications.",
             "ActivityProgressiveCountOne": "{activity} uses progressive resolution in this system — 1 complication.",
             "Activity": {
@@ -3844,7 +3843,7 @@
             "NoResultsYet": "No results yet.",
             "DifficultyShort": "DC",
             "Edit": "Edit",
-            "EditDcHint": "Set on this component in its editor"
+            "EditDcHint": "Difficulty and complications are set on this component in its editor"
           },
           "SalvageQuantity": "{count} required",
           "SalvageTools": "{count} tools",

@@ -1,22 +1,31 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The progressive stage's read-only complication band (issue 1286): full-bleed, so it is what
-  `SortableList` renders as the row's body rather than part of the row's content (issue 1512).
-  The caller hands the already-filtered `complications`, because the same filter decides whether
-  the row carries `has-band` at all. Read-only end to end.
+  The GM read-only list of the complications a progressive stage's component authors, in the stage
+  row's body in both studios (issues 1286, 2445): a muted "Complications" kicker over a nested,
+  non-reorderable, unnumbered `SortableList` whose rows are `ComplicationSummaryRow`'s `readonly-gm`
+  variant. It draws no band, fill, accent rule, tile or control; the stage row's own Edit is the route.
+
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `complications` | complication[] | `[]` | already filtered to the surface's activity by the caller, whose same filter decides `has-band` |
+  | `ownerName` | string | `''` | the referenced component's name, for the list's count-and-owner accessible name |
+  | `macroNames` / `triggerLabels` | `Map` | `undefined` | the system-scoped uuid→name and trigger id→label vocabularies; absent, the sentence names the shape |
+
+  Rest spread:
+  - `{...rest}` lands on the nested list's `<ul>` and carries the caller's `data-*` hook.
+
+  Invariants:
+  - No complications renders nothing at all — pinned by `tests/components/stage-complication-list-mounted.test.js`.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
-  // The one complication summary row (issue 1286), shared with the salvage strip, not copied.
+  import { localizeOr } from '../../util/localizeOr.js';
+  import Kicker from '../../components/Kicker.svelte';
+  import SortableList from '../../components/SortableList.svelte';
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../model/complicationSummary.js';
 
-  let { complications = [], componentId = '' } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  let { complications = [], ownerName = '', macroNames, triggerLabels, ...rest } = $props();
 
   const stageComplications = $derived(Array.isArray(complications) ? complications : []);
 
@@ -30,48 +39,78 @@
   // `${BASE}.${severity}` as a namespace base without resolving the leaf.
   function severityLabel(severity) {
     const declared = SEVERITY_LABELS[severity];
-    return declared ? text(...declared) : String(severity ?? '');
+    return declared ? localizeOr(...declared) : String(severity ?? '');
   }
 
-  // No `macroName` / `triggerName`: those vocabularies are system-scoped and this band has neither,
-  // so the builder degrades to the shape of the effect.
-  function stripSummary(complication) {
-    return complicationSummary(complication, { translate: text });
+  // Two FULL key literals rather than one composed key, for the same reason.
+  const listName = $derived(
+    stageComplications.length === 1
+      ? localizeOr(
+          'FABRICATE.Admin.Manager.Component.Complications.StripTitleOne',
+          '1 complication on {name}',
+          { name: ownerName }
+        )
+      : localizeOr(
+          'FABRICATE.Admin.Manager.Component.Complications.StripTitle',
+          '{count} complications on {name}',
+          { count: stageComplications.length, name: ownerName }
+        )
+  );
+
+  function triggerSentence(complication) {
+    return complicationSummary(complication, {
+      translate: localizeOr,
+      macroName: macroNames?.get(complication?.macroUuid) || '',
+      triggerName: triggerLabels?.get(complication?.when?.checkTrigger) || '',
+    });
   }
 </script>
 
 {#if stageComplications.length > 0}
-  <div class="manager-recipe-stage-complications" data-recipe-result-complications={componentId}>
-    {#each stageComplications as complication (complication.id)}
-      <ComplicationSummaryRow
-        variant="readonly-gm"
-        nameEmphasis="inline"
-        name={complication.name}
-        severity={complication.severity}
-        severityLabel={severityLabel(complication.severity)}
-        visibility={complication.visibility}
-        playerLabel={text('FABRICATE.Admin.Manager.Component.Complications.PlayerPill', 'Player')}
-        playerTitle={text(
-          'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
-          'Shown to the player when it fires.'
-        )}
-        triggerSentence={stripSummary(complication)}
-        data-recipe-result-complication={complication.id || true}
-      />
-    {/each}
+  <div class="manager-stage-complications">
+    <Kicker
+      >{localizeOr(
+        'FABRICATE.Admin.Manager.Component.Complications.Title',
+        'Complications'
+      )}</Kicker
+    >
+    <!-- ratchet-exempt(design-system): the spread carries one `data-*` hook, the caller's list hook -->
+    <SortableList
+      items={stageComplications}
+      itemLabel={(complication) => complication?.name || ''}
+      reorderable={false}
+      ariaLabel={listName}
+      {...rest}
+    >
+      {#snippet row(complication)}
+        <ComplicationSummaryRow
+          variant="readonly-gm"
+          nameEmphasis="display"
+          name={complication.name}
+          severity={complication.severity}
+          severityLabel={severityLabel(complication.severity)}
+          visibility={complication.visibility}
+          playerLabel={localizeOr(
+            'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
+            'Player'
+          )}
+          playerTitle={localizeOr(
+            'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
+            'Shown to the player when it fires.'
+          )}
+          triggerSentence={triggerSentence(complication)}
+          data-stage-complication={complication.id || true}
+        />
+      {/snippet}
+    </SortableList>
   </div>
 {/if}
 
 <style>
-  /* Component-scoped, never `styles/fabricate.css`: the strip adds no shared rule. No
-     `margin-top` — the band's `border-top` is the divider between it and the line above, and it
-     only reads as one while the two surfaces meet. */
-  .manager-recipe-stage-complications {
+  /* A plain column: the list rows are the boxes, so this draws no border, fill or padding. */
+  .manager-stage-complications {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
-    border-top: 1px solid var(--fab-warning-border);
-    background: var(--fab-warning-soft);
+    gap: var(--fab-space-2);
   }
 </style>

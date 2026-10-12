@@ -1,7 +1,8 @@
 <!--
   One summary row for a complication (issue 1286): severity tile, name, one body line, an optional
   Player pill, the severity pill and the activity glyph run, plus — in the authoring variant only —
-  a disclosure and a delete control. String props are PRE-LOCALIZED by the caller, on the
+  a disclosure and a delete control. `readonly-gm` draws no tile and no shell: it is the content of
+  a nested `SortableList` row, whose box it is drawn in (issue 2445). String props are PRE-LOCALIZED by the caller, on the
   `ToggleCard` precedent, so this stays a presentational leaf with no `localize` import.
 
   Props:
@@ -20,7 +21,7 @@
   - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
 
   Invariants:
-  - ONE SCAFFOLD, not a copy per variant: there are five call sites, and three `{#if}` branches each
+  - ONE SCAFFOLD, not a copy per variant: there are four call sites, and three `{#if}` branches each
     restating the shell is intra-file duplication SonarCloud's detector reads in `.svelte`.
   - THE ROW IS A `<div>` and `RowDisclosure` is the sole trigger, with the delete control as its
     SIBLING: a whole-row `<button>` would nest buttons, which `createElement` accepts and no mounted
@@ -71,6 +72,8 @@
   const gravity = $derived(SEVERITIES[severity] || SEVERITIES.minor);
   const isAuthoring = $derived(variant === 'authoring');
   const isPlayer = $derived(variant === 'player');
+  // Severity is the chip alone on the GM read-only list, as the library's complication row draws it.
+  const drawsTile = $derived(variant !== 'readonly-gm');
   // The typed body. `isPlayer` decides, so no call site can hand the player the trigger.
   const body = $derived(isPlayer ? description : triggerSentence);
   const showPlayerPill = $derived(!isPlayer && visibility === 'visible' && Boolean(playerLabel));
@@ -104,9 +107,11 @@
   {...rest}
 >
   <div class="fab-complication-row-line">
-    <span class="fab-complication-severity is-{gravity.tone}" aria-hidden="true"
-      ><i class={gravity.icon}></i></span
-    >
+    {#if drawsTile}
+      <span class="fab-complication-severity is-{gravity.tone}" aria-hidden="true"
+        ><i class={gravity.icon}></i></span
+      >
+    {/if}
     <span class="fab-complication-row-copy">
       {#if eyebrow}<span class="fab-complication-row-eyebrow">{eyebrow}</span>{/if}
       <!-- `display: contents` on every variant but `player`, so the GM strips' copy column
@@ -198,18 +203,27 @@
     border-color: var(--fab-danger-border);
   }
 
-  /* The two READ-ONLY strips are a tucked band rather than a card: no fill of their own, a
-     tighter line, and no disclosure or delete column. */
-  .fab-complication-row.is-readonly-gm,
+  /* The PLAYER strip is a tucked band rather than a card: no fill of its own, a tighter line, and
+     no disclosure or delete column. */
   .fab-complication-row.is-player {
     border-radius: 9px;
     background: none;
   }
 
   /* The PLAYER row draws no shell: its container is already a band. `transparent` rather than
-     `none` keeps the metrics identical to the GM strips'. */
+     `none` keeps its 1px border box. */
   .fab-complication-row.is-player {
     border-color: transparent;
+  }
+
+  /* The GM read-only row is a nested list row's content: the list row is the box, so this draws no
+     shell and fills the row's content line beside nothing but its own chips. */
+  .fab-complication-row.is-readonly-gm {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
   }
 
   .fab-complication-row-line {
@@ -221,7 +235,7 @@
 
   .fab-complication-row.is-readonly-gm .fab-complication-row-line {
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2) var(--fab-space-3);
+    padding: 0;
   }
 
   /* No padding of its own: the band or group card the player row sits in already carries the
@@ -300,7 +314,7 @@
     line-height: 1.2;
   }
 
-  /* The accordion's name: the heading of a row you are about to open. */
+  /* A complication row's name, in the accordion and the read-only stage list. */
   .fab-complication-row-name.is-display {
     font-family: var(--fab-font-serif);
     font-size: 12.5px;
