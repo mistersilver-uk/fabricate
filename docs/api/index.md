@@ -1979,7 +1979,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-Phase 1 publishes data-only leaf primitives; text and slot content, callbacks, bindables and overlays arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) publishes more data-only leaves; text and slot content, callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2018,46 +2018,52 @@ Each row lists the component's published props, marking a required one, and says
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
-A `tone`, `tint`, `ink` or `fill` restates what adjacent text already says and is never the only carrier of a state.
+Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
 A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
 
 ### TierTrack
 
 `TierTrack` states where a record stands on an ordered set of named tiers.
 `tiers` lists each tier as `{ id?, name, figure?, notes?, valence? }` in drawn order: `name` and `figure` are final display text, `notes` is a list of strings drawn in the `column` layout only, and `valence` is `positive` (the default), `negative` or `neutral` and colours only a reached tier.
-`currentIndex` is the tier the record sits at, and `-1` reaches nothing; `direction` is `ascending` or `descending` (highest first), and `layout` is `row` (badges) or `column` (a ladder).
-`ariaLabel` names the list, `currentLabel` marks the current tier, and `reachedLabel` and `aheadLabel` are the hidden state text on every other tier; all four are required and already localized, and `hint` is an optional sentence beneath the track.
+`currentIndex` is the tier the record sits at, and `-1` reaches nothing.
+`direction` is `ascending` or `descending` (highest first).
+`layout` is `row` (badges) or `column` (a ladder).
+`ariaLabel` names the list.
+`currentLabel` marks the current tier.
+`reachedLabel` and `aheadLabel` are the hidden state text on every other tier.
+All four labels are required and already localized.
+`hint` is an optional sentence beneath the track.
 The current tier keeps its valence colour and is marked by a location-dot glyph in `row` and by the visible `currentLabel` in `column`.
 
 ### Avatar
 
 `Avatar` draws an actor's portrait as a fixed-size tile: the artwork, or the initials of the name.
 `art` is an image path, and a falsy one draws the initials of `name`; a path that fails to load draws the browser's broken image, never the initials.
-`art` is an image path as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
+That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `name` is required and is the only source of the initials.
 `alt` is read only when `art` is set, and `''` marks the image decorative.
 `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
 `shape` is `round` or `square`.
 `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-The initials are hidden from assistive technology, so the tile never carries a name on its own: draw the name as text beside it, where `alt: ''` is correct.
-The tile is inline, so give its `target` `display: flex`, which makes it the flex item every Fabricate site draws.
+`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''`.
+The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### Medallion
 
 `Medallion` draws a record's identity tile: the artwork, or a glyph.
 `art` is an image path, and a falsy one draws `icon`, whose default is `fas fa-scroll`.
-`art` is an image path as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
+That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
 Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
 `icon` takes Font Awesome classes from the sheet the running Foundry ships (6 Pro on Foundry 13, 7 Pro on Foundry 14); a class absent from that build draws an empty box.
 `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
 `glyph` is the ladder's glyph size for that rung: `10`, `11`, `12` or `15`.
-`alt` is read only when `art` is set, and `''` marks the image decorative.
+`alt` is as for `Avatar`.
 `tint` is a tag key as for `Avatar`, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
 `tone` and `ink` are each `''`, `success` or `danger`: both outrank `tint`, and `ink` outranks `tone` on the glyph.
-The glyph is hidden from assistive technology, so the tile never carries a name on its own: draw the name as text beside it, where `alt: ''` is correct.
-The tile is inline, so give its `target` `display: flex`, which makes it the flex item every Fabricate site draws.
+The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''`.
+The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### FillBar
 
@@ -2072,36 +2078,41 @@ A value that must be announced is a `Meter`.
 ### Meter
 
 `Meter` states a value against a maximum to assistive technology, over a `FillBar` track.
-`value` is read against `max`, which defaults to 100; a `max` of zero or less reads full.
+`value` is read against `max`.
+`max` defaults to 100, and a `max` of zero or less reads full.
 `segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s, and an empty array draws `success`.
 A second or later entry is reserved and is not drawn.
 `valueText` is the reading, announced in place of the bare number.
+Pass `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
 `label` is required and is the meter's name, drawn visually hidden.
 It draws no figure, so the visible reading is yours to draw.
 
 ### BandedBar
 
 `BandedBar` draws percentages as bars whose whole fill takes one hue from a fixed ramp.
-`rows` is required and lists each row as `{ id?, name, percent, fill? }`.
+`rows` is required and is `{ id?, name, percent, fill? }[]`.
 `name` is required in every row, `percent` is a whole number 0–100 printed as `<percent>%`, and every `id` is unique.
-One row is a meter named by its `name`, which is also its visible caption; several rows are a histogram; no row draws nothing.
+One row is a meter named by its `name`, which is also its visible caption; several rows are a histogram; an empty `rows` draws nothing.
 `fill` is a `FillBar` tone, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
 Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
 `direction` is `ascending` or `descending`.
 `density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.
+In a histogram the bars are hidden from assistive technology and each row is read as its name and its percentage; the list carries no name, so head it with your own text.
 
 ### StatBox
 
 `StatBox` draws one figure over a micro-label in a bordered box.
-`value` is required and is the formatted figure, and `label` is required and is drawn beneath it.
+`value` is required and is the formatted figure.
+`label` is required and is drawn beneath it.
 `icon` is Font Awesome classes for an optional glyph before the figure.
 `tone` is `default`, `info` or `danger`.
+The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
 
 ### InfoStrip
 
 `InfoStrip` draws a read-only strip of current values under a kicker.
 `label` is required and is the kicker, which names the group.
-`facts` is required and lists each fact as `{ icon?, label?, value }`.
+`facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
 `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
 ### The descriptor
@@ -2140,6 +2151,7 @@ Any fallback copy is yours to draw.
 ### Ownership and theme
 
 You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
+A published component inherits from `target` every inherited text property its own rules do not state, so set none on `target`.
 `.fab-*` classes and `svelte-*` hashes are private and may change in any release.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
 Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
@@ -2150,7 +2162,7 @@ A later move between windows is not carried to a mount, and a theme change made 
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-- Phase-1 components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
+- Data-only components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
 - A required label is yours to localise.
 - Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 

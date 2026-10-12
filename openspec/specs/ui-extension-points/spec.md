@@ -401,6 +401,7 @@ Each group states the accepted values of every key that entry publishes.
   - `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
   - `shape` is `round` or `square`.
   - `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
+  - `name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''`.
 - **`Medallion`.**
   - `art` is an image path; a falsy one draws `icon`, Font Awesome classes whose default is `fas fa-scroll`.
   - `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
@@ -409,8 +410,7 @@ Each group states the accepted values of every key that entry publishes.
   - `tint` is a tag key as for `Avatar`, and it recolours the glyph alone.
   - `variant` is `''` or `glyph-chip`.
   - `tone` and `ink` are each `''`, `success` or `danger`; both outrank `tint`, and `ink` outranks `tone` on the glyph.
-- **`Avatar` and `Medallion`, both.**
-  The fallback is hidden from assistive technology, so the tile never carries a name on its own: the companion draws the name as text beside it, where `alt: ''` is correct.
+  - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''`.
 - **`FillBar`.**
   - `value` is 0–100, clamped.
   - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
@@ -423,6 +423,7 @@ Each group states the accepted values of every key that entry publishes.
   - `segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s; an empty array draws `success`.
     A second or later entry is reserved and is not drawn.
   - `valueText` is the reading, announced in place of the bare number.
+  - The companion passes `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
   - `label` is required and is the meter's name, drawn visually hidden.
   - It draws no figure; the visible reading is the companion's.
 - **`BandedBar`.**
@@ -434,18 +435,21 @@ Each group states the accepted values of every key that entry publishes.
   - Every `id` is unique.
   - `direction` is `ascending` or `descending`.
   - `density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.
+  - In a histogram the bars are hidden from assistive technology and each row is read as its name and its percentage; the list carries no name, so the companion heads it with its own text.
 - **`StatBox`.**
   - `value` is required and is the formatted figure.
-  - `label` is required, and `icon` is optional Font Awesome classes.
+  - `label` is required.
+  - `icon` is optional Font Awesome classes.
   - `tone` is `default`, `info` or `danger`.
+  - The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
-  - `facts` is required and is `{ icon?, label?, value }[]`.
+  - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
   - `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 - **Tones.**
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
-  A `tone`, `tint`, `ink` or `fill` restates what adjacent text already says and is never the only carrier of a state.
+  Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
 - **Private and undocumented:** every per-item `props` spread; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
@@ -509,7 +513,7 @@ It opens no portal, popover, tooltip or dialog, writes nothing to `document.body
 - Tokens resolve from `:root[data-fabricate-theme]`, which Fabricate's theme sets on `documentElement`.
 - **A published component's own `<style>` states everything it needs**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or a `--font-primary` read whose fallback does not end in a literal.
 - A published component that states the UI face MUST state it as `var(--font-body, var(--font-primary, sans-serif))` or another expression whose last fallback is a literal, so it resolves with no Foundry variable.
-- A published component's import closure MUST NOT read `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui` or `canvas`.
+- A published component's import closure MUST NOT read `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` or `getDocumentClass`.
 - A published component's rest keys are `data-*` attributes (M13), so a published `Meter` and `InfoStrip` are each named by their required `label`, and a single-row `BandedBar` by its row's `name`, which its docs section states as required.
 - A published component relies on one host baseline, Foundry core's element reset (universal `box-sizing: border-box`), which every document that holds `api.ui` carries; `Avatar` and `Medallion` take their edge length's box model from it.
 - A published component inherits from `target` every inherited text property its own rules do not state, so the companion sets none on `target`.
