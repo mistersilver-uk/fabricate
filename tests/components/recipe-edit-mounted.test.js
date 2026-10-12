@@ -148,6 +148,8 @@ const RAW_MODULES = [
   'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
+  // The tag adder's exact component counts (issue 2430).
+  'src/ui/model/vocabularyUsage.js',
 ];
 
 // The new tab + section components the editor shell composes.
@@ -6623,6 +6625,107 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(last, 'editing the collapsed results emits a STEP patch, not a recipe patch');
     assert.equal(last.stepId, 'step-2', 'the write goes THROUGH to the FINAL step');
     assert.equal(last.patch.resultGroups.length, 3, 'the final step gains the new result group');
+    editHarness.remount();
+  });
+});
+
+// The tag adder counts the system's own components by exact tag (issue 2430).
+describe('RecipeEditView — the tag adder counts the system’s components (mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  // `herbal` on two components, `liquid` on one, and `rare` on none: a likely typo.
+  const COMPONENT_TAG_OPTIONS = Object.freeze([
+    Object.freeze({ id: 'cmp-herb', tags: ['herbal'] }),
+    Object.freeze({ id: 'cmp-water', tags: ['herbal', 'liquid'] }),
+  ]);
+  const tagGroup = (id, tags = ['liquid']) => ({
+    id,
+    options: [{ quantity: 1, match: { type: 'tags', tags, tagMatch: 'any' } }],
+  });
+  const tagSet = (id) => ({ id, name: id, ingredientGroups: [tagGroup(`${id}-grp`)] });
+  const optionText = (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim();
+  const openPanel = () => document.querySelector('.fabricate-picker-popover');
+  const optionTitled = (tag) =>
+    [...(openPanel()?.querySelectorAll('[role="option"]') ?? [])].find(
+      (node) => node.title === tag
+    );
+
+  async function openTagAdder(scope) {
+    scope.querySelector('[data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    return [...openPanel().querySelectorAll('[role="option"]')].map(optionText);
+  }
+
+  it('reads each tag’s exact component count over a flat, a multi-set and a stepped recipe', async () => {
+    const shapes = {
+      'one chromeless set': {
+        recipe: { ingredientSets: [tagSet('set-1')] },
+        scope: '[data-recipe-section="ingredients"]',
+      },
+      'two ingredient sets': {
+        recipe: { ingredientSets: [tagSet('set-1'), tagSet('set-2')] },
+        scope: '[data-recipe-set-id="set-2"]',
+      },
+      'a step body': {
+        recipe: { steps: [{ id: 'sa', name: 'Forge', ingredientSets: [tagSet('set-1')] }] },
+        scope: '[data-recipe-section="step-sa-ingredients"]',
+        step: 'sa',
+      },
+    };
+    for (const [shape, { recipe, scope, step }] of Object.entries(shapes)) {
+      const target = await editHarness.mount(
+        identityProps({
+          recipe: { ...RECIPE, ...recipe },
+          canAddSet: true,
+          itemTags: ITEM_TAGS,
+          componentTagOptions: COMPONENT_TAG_OPTIONS,
+        })
+      );
+      try {
+        clickTab(target, 'ingredients');
+        await flushRender();
+        if (step) target.querySelector(`[data-sortable-disclosure="${step}"]`).click();
+        await flushRender();
+        assert.deepEqual(
+          await openTagAdder(target.querySelector(scope)),
+          ['herbal 2 components', 'liquid 1 component', 'rare 0 components'],
+          `${shape}: every tag carries its exact count`
+        );
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('keeps the panel open while an unheld tag is added and then a held one removed', async () => {
+    const { target, patches } = await mountIngredientGroups([tagGroup('grp-1')], {
+      props: { itemTags: ITEM_TAGS, componentTagOptions: COMPONENT_TAG_OPTIONS },
+      controlled: true,
+    });
+    const chips = () =>
+      [...target.querySelectorAll('[data-recipe-tag]')].map((node) => node.dataset.recipeTag);
+    await openTagAdder(target);
+    for (const [tag, expected] of [
+      ['herbal', ['liquid', 'herbal']],
+      ['liquid', ['herbal']],
+    ]) {
+      optionTitled(tag).click();
+      await tick();
+      await settle();
+      assert.deepEqual(
+        patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.tags,
+        expected,
+        `choosing ${tag} writes at once`
+      );
+      assert.deepEqual(chips(), expected, `the row's chips show the write of ${tag}`);
+      assert.ok(Boolean(openPanel()), `the panel stays open after choosing ${tag}`);
+      assert.equal(
+        optionText(optionTitled(tag)),
+        tag === 'herbal' ? 'herbal 2 components' : 'liquid 1 component'
+      );
+    }
     editHarness.remount();
   });
 });

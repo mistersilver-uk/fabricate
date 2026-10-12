@@ -71,7 +71,11 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     // No pattern for `components/ThresholdBandStrip.svelte`: it is a broad signal, so `sourceMatches` never sees it.
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+    // The strip's pure geometry is a util, so it is named here as well (issue 2431).
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
+    ],
   }),
   managerCase({
     id: 'coverage-mode-routed-check-five-bands',
@@ -357,6 +361,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
+      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
     ],
   }),
   managerCase({

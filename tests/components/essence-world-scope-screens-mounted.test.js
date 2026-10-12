@@ -26,6 +26,7 @@ const SCOPED_RAW_MODULES = [
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  'src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
   // per-entry references now, so its own static closure reaches the vocabulary core and the

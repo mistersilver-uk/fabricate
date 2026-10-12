@@ -220,6 +220,7 @@ const GATHERING_TASK_INSPECTOR =
 const GATHERING_RULE_STEPPER =
   'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte';
 const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
+const CONDITION_PANEL = 'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte';
 const GATHERING_ECONOMY = 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
 // The task editor's tabs and cards (issue 1522).
@@ -465,10 +466,29 @@ describe('CraftingSystemManager source contract', () => {
     { calls: ['resolveItemSourceSnapshot'] }
   );
 
+  // One keyed pick forwards the internal service set's keys into prepared Svelte props.
+  defineStructureContract(
+    'forwards the listed internal services into prepared Svelte props',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services'], names: ['COMPONENT_SERVICE_KEYS'] }
+  );
+
   defineStructureContract(
     'forwards Tool Item services from the internal service set into prepared Svelte props',
-    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
-    { reads: ['this._services.getWorldItemOptions', 'this._services.resolveToolSource'] }
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getWorldItemOptions', 'resolveToolSource'] }
+  );
+
+  defineStructureContract(
+    'forwards the world clock components into prepared Svelte props',
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getWorldTimeComponents'] }
+  );
+
+  defineStructureContract(
+    'reads the world clock components through the Fabricate facade',
+    { file: MANAGER_SERVICES, fn: 'worldTimeServices', property: 'getWorldTimeComponents' },
+    { reads: ['game.fabricate.getWorldTimeComponents'] }
   );
 
   // Under the accessor name the adminStore's read and write legs already call (issue 1392).
@@ -1874,18 +1894,26 @@ describe('CraftingSystemManager source contract', () => {
   // The settings tab is where a world's condition and vocabulary values are authored, through the
   // shared pickers rather than through bespoke inputs.
   defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
-    renders: ['TintPickerButton', 'IconPicker'],
-    writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
+    renders: ['TintPickerButton', 'IconPicker', 'GatheringConditionPanel'],
+    writes: ['data-gathering-vocabulary-panel'],
+    calls: [
+      'onAddGatheringVocabularyValue',
+      'onUpdateGatheringVocabularyValue',
+      'onDeleteGatheringVocabularyValue',
+    ],
+    spellsExactly: ['manager-condition-label-input'],
+  });
+
+  defineStructureContract('authors one global condition in its own panel', CONDITION_PANEL, {
+    renders: ['IconPicker', 'StatusToggle', 'Select'],
+    writes: ['data-gathering-condition-panel'],
     calls: [
       'onToggleGatheringConditionEnabled',
       'onAddGatheringConditionValue',
       'onUpdateGatheringConditionValue',
       'onDeleteGatheringConditionValue',
-      'onAddGatheringVocabularyValue',
-      'onUpdateGatheringVocabularyValue',
-      'onDeleteGatheringVocabularyValue',
     ],
-    callsWith: [['onAddGatheringConditionValue', 'conditionAddIcon']],
+    callsWith: [['onAddGatheringConditionValue', 'addIcon']],
     spellsExactly: ['manager-condition-label-input'],
   });
 
@@ -2854,8 +2882,8 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'exposes the setting seam to the Svelte component services',
-    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
-    { reads: ['this._services.getSetting', 'this._services.setSetting'] }
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getSetting', 'setSetting'] }
   );
 });
 

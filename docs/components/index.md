@@ -35,9 +35,11 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-A search field, a source filter, and an essence filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
+A search field, a source filter, an essence filter, and a category filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
 The source filter offers **Any source**, **World items**, **Compendium**, and **Broken link**.
 The essence filter offers **All essences**, **Carries any essence**, and **No essences**, then one option per essence in the world Essence catalogue, and it is left off the toolbar entirely on a world with no essences yet.
+The category filter offers **All categories** and **No world category**, then one option per category in the world's category vocabulary in its order, then any other category a component already carries.
+It is left off the toolbar entirely on a world with no categories yet.
 **Sort by** offers **Name**, **System count**, and **Source type**.
 The list column runs edge to edge across the middle of the screen, so the toolbar, the rows, and the pager at the foot share the same left and right edges with nothing wasted around them.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
@@ -57,6 +59,7 @@ A pencil control at the row's trailing edge, titled **Open catalogue entry**, op
 **Broken link** shows only the components carrying the **Broken link** pill.
 A compendium link is never reported broken here, because the catalogue checks addresses against the world's own Items directory alone.
 **Carries any essence** and **No essences** narrow the list by whether a component carries the chips described above at all, and choosing a named essence narrows it to components carrying that one.
+**No world category** shows components with no world category, and choosing a named category shows only components in that category.
 **System count** sorts by how many crafting systems have rules for the component.
 **Source type** groups compendium-linked components first, then world items, then components with no source item, or the reverse when you flip the toggle, with each group kept in name order either way.
 

@@ -13,6 +13,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import { TOOL_BREAKAGE_TRACK, toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -35,6 +36,7 @@
     authority = 'toolSpecific',
     componentOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     essenceOptions = [],
     currencyUnits = [],
     currencyEnabled = false,
@@ -96,14 +98,7 @@
       : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific');
   }
 
-  function formattedText(key, data, fallback) {
-    const template = localize(key);
-    if (template && template !== key) return localize(key, data);
-    return Object.entries(data).reduce(
-      (copy, [name, value]) => copy.replace(`{${name}}`, String(value)),
-      fallback
-    );
-  }
+  const formattedText = (key, data, fallback) => localizeOr(key, fallback, data);
 
   // WHERE THE MODE CAME FROM: `default` means this system follows the world's answer and the line
   // names it, which is the `World default` chip the rules list wears.
@@ -542,6 +537,7 @@
           groups={tool?.repairRequirements || []}
           {componentOptions}
           {itemTags}
+          {tagComponentCounts}
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}

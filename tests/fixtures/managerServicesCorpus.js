@@ -42,6 +42,7 @@ export const MANAGER_SERVICE_KEYS = Object.freeze([
   'getVocabularyScopeStore',
   'getWorldActors',
   'getWorldItemOptions',
+  'getWorldTimeComponents',
   'getWorldUsers',
   'isFabricateReady',
   'localize',
@@ -551,6 +552,12 @@ export function buildManagerWorld(options = {}) {
     getGatheringRealmStore: () => handles.gatheringRealmStore,
     getGatheringLocationService: () => handles.gatheringLocationService,
     getRecipeVisibilityService: () => recipeVisibilityService(record),
+    worldClock: { hour: 14, minute: 34, hoursPerDay: 24, minutesPerHour: 60 },
+    // A method reading `this`, as the real facade's default argument does, so a destructured
+    // call fails here rather than in Foundry.
+    getWorldTimeComponents() {
+      return { ...this.worldClock };
+    },
     gathering: { setConditions: async (conditions) => record('gathering.setConditions', conditions) },
     resetActorKnowledge: async (actorId, systemId) => {
       record('fabricate.resetActorKnowledge', actorId, systemId);

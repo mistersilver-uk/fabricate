@@ -9,6 +9,9 @@ manager-world-travel-map-collapsed-rail
 manager-world-travel-map-empty
 manager-world-travel-long-label-focus
 manager-gathering-settings-normal
+manager-gathering-time-of-day-bar
+manager-gathering-time-of-day-rail-seeded
+manager-gathering-time-of-day-fallback
 manager-gathering-biome-colour-popover
 manager-gathering-rules-select-open
 manager-gathering-condition-current-list

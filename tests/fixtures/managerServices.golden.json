@@ -34,6 +34,7 @@
     "getVocabularyScopeStore": "function",
     "getWorldActors": "function",
     "getWorldItemOptions": "function",
+    "getWorldTimeComponents": "function",
     "getWorldUsers": "function",
     "isFabricateReady": "function",
     "localize": "function",
@@ -349,6 +350,12 @@
         "uuid": "Item.hammer"
       }
     ],
+    "getWorldTimeComponents": {
+      "hour": 14,
+      "hoursPerDay": 24,
+      "minute": 34,
+      "minutesPerHour": 60
+    },
     "getWorldUsers": [
       {
         "avatar": "alice.webp",

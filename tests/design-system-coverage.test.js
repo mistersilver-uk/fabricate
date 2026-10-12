@@ -803,6 +803,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 2431: the range bar's single-caller marker; `<RangeBar>` specifies its parent.
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];

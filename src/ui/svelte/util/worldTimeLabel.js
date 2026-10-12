@@ -29,7 +29,8 @@ function resolveDay(components) {
   return rawDay + 1;
 }
 
-function clock(components) {
+/** `HH:MM` from calendar components' `hour` and `minute`, each read as 0 when absent. */
+export function clock(components) {
   const hour = clamp(Number(components?.hour), 0);
   const minute = clamp(Number(components?.minute), 0);
   return `${pad(hour)}:${pad(minute)}`;

@@ -234,6 +234,7 @@ On a requirement's bare row, **or…** opens the same kinds in a menu headed **A
 
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
+  The tag adder lists the system's tags with how many components carry each, marks the row's tags as selected, and choosing one again removes it.
 - Match an essence amount, satisfied by any combination of items whose totalled essence reaches the amount.
 - Match a currency cost, paid from the crafter's coins rather than consumed items.
 

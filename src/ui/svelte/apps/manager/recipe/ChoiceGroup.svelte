@@ -48,6 +48,8 @@
     group = {},
     componentOptions = [],
     itemTags = [],
+    // `{ [tag]: number }` of components carrying each tag exactly; `null` draws no counts.
+    tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled. Preset units are seeded even for a
     // disabled system, so the add-affordances gate on this flag and not on unit presence.
@@ -97,7 +99,14 @@
         img: item.img,
         icon: 'fas fa-cube',
       })),
-      tags: (itemTags || []).map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' })),
+      tags: (itemTags || []).map((tag) => ({
+        id: tag,
+        label: tag,
+        icon: 'fas fa-tag',
+        ...(tagComponentCounts && {
+          count: Object.hasOwn(tagComponentCounts, tag) ? tagComponentCounts[tag] : 0,
+        }),
+      })),
       essence: (essenceOptions || []).map((essence) => ({
         id: essence.id,
         label: essence.name,

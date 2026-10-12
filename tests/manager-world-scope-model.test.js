@@ -341,7 +341,8 @@ describe('world-scope model', () => {
           registeredItemUuid: 'Item.r',
           originItemUuid: 'Item.o',
         },
-        defaults: { tags: ['wood', 'alpha'] },
+        // `wood` twice on one entry still counts that entry once.
+        defaults: { tags: ['wood', 'alpha', 'wood'] },
       },
       { id: 'c2', entity: {}, defaults: { tags: ['wood', 'Beta'] } },
       { id: 'c3', entity: { name: 'Bare', registeredItemUuid: 'Item.only' } },
@@ -378,8 +379,16 @@ describe('world-scope model', () => {
           ],
         ],
         ['tags, de-duplicated and sorted', model.worldComponentTags, ['alpha', 'Beta', 'wood']],
+        [
+          'components carrying each tag',
+          model.worldComponentTagCounts,
+          { wood: 2, alpha: 1, Beta: 1 },
+        ],
       ];
       for (const [label, actual, expected] of rows) assert.deepEqual(actual, expected, label);
+      for (const tag of model.worldComponentTags) {
+        assert.ok(model.worldComponentTagCounts[tag] >= 1, `every listed tag is carried: ${tag}`);
+      }
     });
 
     it('joins the inspected essence to the selected system, and only when available', () => {

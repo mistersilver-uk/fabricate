@@ -156,6 +156,9 @@ function readParams() {
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
+    // Give herbalism the four default periods and the clock 14:34 for the time-of-day bar's
+    // frames: `1` tiles the day, `fallback` does not (issue 2431).
+    timeOfDayBar: params.get('timeOfDayBar') ?? '',
     longDowntimeLabels: params.get('longDowntimeLabels') === '1',
     // An active scene with no regions, for the Map Region Links no-regions empty state.
     noSceneRegions: params.get('noSceneRegions') === '1',
@@ -972,6 +975,7 @@ async function boot() {
         noTools: params.noTools,
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
+        timeOfDayBar: params.timeOfDayBar,
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,

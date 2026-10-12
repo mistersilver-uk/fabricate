@@ -90,6 +90,33 @@ const BULK_ROW = (row, panel) => `<ul style="list-style:none;margin:0;padding:0"
   </li></ul>`;
 
 /** The mounted primitives, each by the harness that compiles it. */
+const timeOfDayBar = (trackWidth) => ({
+  name: 'ThresholdBandStrip',
+  trackWidth,
+  props: {
+    binding: 'start',
+    min: 4,
+    max: 28,
+    ticks: false,
+    rangeSublabels: true,
+    addable: true,
+    railLabel: 'Add',
+    addLabel: (band) => `Add within ${band.name}`,
+    class: 'manager-time-of-day-bar',
+    bands: [
+      { id: 'dawn', name: 'The Long Grey Hour Before the Bells', from: 4, range: '04–06' },
+      { id: 'early', name: 'Early', from: 6, range: '06–08' },
+      { id: 'day', name: 'Day', from: 8, range: '08–17' },
+      { id: 'dusk', name: 'Dusk', from: 17, range: '17–21' },
+      { id: 'night', name: 'Night', from: 21, range: '21–04' },
+    ],
+    markers: [
+      { id: 'clock', value: 14.5, label: 'World clock', valueText: '14:30' },
+      { id: 'current', value: 12.5, label: 'Now', draggable: true, snap: 'band' },
+    ],
+  },
+});
+
 const MOUNTS = Object.freeze({
   stepper: { name: 'Stepper', props: { value: 3, min: 0, max: 9, ariaLabel: 'Count' } },
   fill: { name: 'Stepper', props: { value: 3, min: 0, max: 9, ariaLabel: 'Count', fill: true } },
@@ -157,6 +184,46 @@ const MOUNTS = Object.freeze({
       ),
     },
   },
+  /** The time-of-day bar's narrowest allowed band, three hours at a 326px track (issue 2431). */
+  rangeBar: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'start',
+      min: 4,
+      max: 28,
+      ticks: false,
+      addable: true,
+      railLabel: 'Add',
+      addLabel: (band) => `Add within ${band.name}`,
+      bands: [
+        { id: 'dawn', name: 'Dawn', from: 4 },
+        { id: 'day', name: 'Day', from: 8 },
+        { id: 'dusk', name: 'Dusk', from: 17 },
+        { id: 'night', name: 'Night', from: 20 },
+      ],
+      markers: [
+        { id: 'current', value: 18.5, label: 'Now', draggable: true, snap: 'band' },
+        { id: 'clock', value: 17, label: 'Clock' },
+      ],
+    },
+  },
+  /**
+   * The Times of day panel's bar, which spans the settings grid's full row: 543px of track at a
+   * 1121px manager, and 248px once the grid folds to one column and the panel is narrow.
+   */
+  rangeBarPanel: timeOfDayBar(543),
+  rangeBarPanelNarrow: timeOfDayBar(248),
+  /** The panel's fallback note, which keeps the bar's footprint beside it. */
+  rangeBarFallback: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'start',
+      bands: [],
+      fallbackNote:
+        'Give every time of day its own start hour below 24 to see the time-of-day bar. Check: Day and Night.',
+      class: 'manager-time-of-day-bar',
+    },
+  },
   componentChip: {
     name: 'Chip',
     props: {
@@ -166,6 +233,14 @@ const MOUNTS = Object.freeze({
         `<span style="display:contents"><span>Filter</span><button type="button" class="manager-component-chip-clear" aria-label="Clear">${GLYPH}</button></span>`
       ),
     },
+  },
+});
+
+/** What a mounted primitive renders besides itself, by name. */
+const MOUNT_DEPENDENCIES = Object.freeze({
+  ThresholdBandStrip: {
+    rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
+    compiledModules: [component('RangeBarMarker'), component('IconButton')],
   },
 });
 
@@ -199,7 +274,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
 <style>@layer modules {${readStylesheet()}}</style>
-${['Stepper', 'SelectionCheckbox', 'Chip']
+${['Stepper', 'SelectionCheckbox', 'Chip', 'ThresholdBandStrip', 'RangeBarMarker']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}
 ${Object.values(PARENTS)
@@ -222,6 +297,9 @@ ${Object.values(PARENTS)
   <div data-case="tagPill" class="row">${markup.tagPill}</div>
   <div data-case="truncChip" class="row">${markup.truncChip}</div>
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
+  <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
+  <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanel}</section><section class="manager-condition-panel">${markup.rangeBarFallback}</section></div></div></div>
+  <div class="fabricate-manager" style="width:306px;height:auto"><div data-case="rangeBarPanelNarrow" style="width:306px"><div class="manager-gathering-settings" style="grid-template-columns:minmax(0,1fr)"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanelNarrow}</section></div></div></div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
   <div data-case="decorativeHost" class="row"><div class="host" role="option">${markup.decorative}<span>Text</span></div></div>
   <div data-case="pager" style="width:300px;margin:12px">${scoped(PAGER, PARENTS.inset)}</div>
@@ -240,20 +318,45 @@ ${Object.values(PARENTS)
 let browser;
 let tab;
 
+/** Report `width` as the range bar track's `clientWidth`, which happy-dom lays out as 0. */
+function stubTrackWidth(width) {
+  const prototype = globalThis.HTMLElement.prototype;
+  const own = Object.getOwnPropertyDescriptor(prototype, 'clientWidth');
+  const inherited = Object.getOwnPropertyDescriptor(globalThis.Element.prototype, 'clientWidth');
+  Object.defineProperty(prototype, 'clientWidth', {
+    configurable: true,
+    get() {
+      return this.classList?.contains('fab-band-strip-track')
+        ? width
+        : (inherited?.get?.call(this) ?? 0);
+    },
+  });
+  return () => {
+    if (own) Object.defineProperty(prototype, 'clientWidth', own);
+    else delete prototype.clientWidth;
+  };
+}
+
 before(async () => {
   const markup = {};
   for (const name of new Set(Object.values(MOUNTS).map((mount) => mount.name))) {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: `fabricate-hit-areas-${name}-`,
-      compiledModules: [component(name)],
+      rawModules: MOUNT_DEPENDENCIES[name]?.rawModules ?? [],
+      compiledModules: [component(name), ...(MOUNT_DEPENDENCIES[name]?.compiledModules ?? [])],
       componentPath: component(name),
     });
     await harness.setup();
     try {
       for (const [key, mount] of Object.entries(MOUNTS)) {
         if (mount.name !== name) continue;
-        markup[key] = (await harness.mount(mount.props)).innerHTML;
+        const restore = mount.trackWidth ? stubTrackWidth(mount.trackWidth) : () => {};
+        try {
+          markup[key] = (await harness.mount(mount.props)).innerHTML;
+        } finally {
+          restore();
+        }
         harness.remount();
       }
     } finally {
@@ -693,6 +796,160 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     ]) {
       assert.equal(read(path).split(`class="${token}"`).length - 1, count, `${path}: ${token}`);
     }
+  });
+
+  it("keeps the range bar's dot and rail apart from its dividers at a three-hour band", async () => {
+    const bar = await tab.evaluate(() => {
+      const root = document.querySelector('[data-case="rangeBar"]');
+      const rect = (element) => {
+        const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+        return { left, top, right, bottom, width, height };
+      };
+      const centre = (element) => {
+        const box = element.getBoundingClientRect();
+        return [box.left + box.width / 2, box.top + box.height / 2];
+      };
+      const owns = (element) => {
+        const [x, y] = centre(element);
+        return element.contains(document.elementFromPoint(x, y));
+      };
+      const dot = root.querySelector('[data-band-strip-marker="current"]');
+      const dusk = root.querySelector('[data-band-strip-add="dusk"]');
+      const dividers = [...root.querySelectorAll('[data-band-strip-handle]')];
+      return {
+        dot: rect(dot),
+        dotPaint: rect(dot.querySelector('.fab-band-strip-dot')),
+        track: rect(root.querySelector('[data-band-strip-track]')),
+        duskBand: rect(root.querySelector('[data-band-strip-band="dusk"]')),
+        rail: rect(dusk),
+        dividers: dividers.map(rect),
+        dotOwnsCentre: owns(dot),
+        railOwnsCentre: owns(dusk),
+        dividersOwnCentres: dividers.map(owns),
+      };
+    });
+    const overlaps = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    for (const [name, box] of [
+      ['dot', bar.dot],
+      ['rail button', bar.rail],
+    ]) {
+      assert.ok(box.width >= 24 && box.height >= 24, `${name}: ${JSON.stringify(box)}`);
+      for (const divider of bar.dividers) {
+        assert.ok(!overlaps(box, divider), `${name} meets a divider: ${JSON.stringify(divider)}`);
+      }
+    }
+    const paintMid = (bar.dotPaint.top + bar.dotPaint.bottom) / 2;
+    assert.ok(
+      Math.abs(paintMid - bar.track.top) <= 0.5,
+      `the dot straddles the track's top edge: ${paintMid} vs ${bar.track.top}`
+    );
+    const dotMid = (bar.dot.left + bar.dot.right) / 2;
+    assert.ok(
+      dotMid > bar.duskBand.left && dotMid < bar.duskBand.right,
+      'the dot sits over its band'
+    );
+    assert.ok(bar.dotOwnsCentre, 'the dot resolves at its own centre');
+    assert.ok(bar.railOwnsCentre, 'the rail button resolves at its own centre');
+    assert.deepEqual(bar.dividersOwnCentres, [true, true, true]);
+  });
+
+  const RAILS_ALL = ['dawn', 'early', 'day', 'dusk', 'night'];
+  const RAILS_SKIPPED = ['dawn', 'day', 'dusk', 'night'];
+  const measurePanelBar = (caseId) =>
+    tab.evaluate((id) => {
+      const root = document.querySelector(`[data-case="${id}"]`);
+      const rect = (element) => {
+        const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+        return { left, top, right, bottom, width, height };
+      };
+      const owns = (element) => {
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return element.contains(hit);
+      };
+      const rails = [...root.querySelectorAll('[data-band-strip-add]')];
+      const dot = root.querySelector('[data-band-strip-marker="current"]');
+      return {
+        track: rect(root.querySelector('[data-band-strip-track]')),
+        scroller: rect(root.querySelector('.manager-gathering-settings')),
+        panel: rect(root.querySelector('.manager-condition-panel')),
+        rails: rails.map((rail) => ({ id: rail.dataset.bandStripAdd, ...rect(rail) })),
+        railsOwnCentres: rails.map(owns),
+        dot: rect(dot),
+        dotOwnsCentre: owns(dot),
+        dividers: [...root.querySelectorAll('[data-band-strip-handle]')].map(rect),
+        bands: [...root.querySelectorAll('[data-band-strip-band]')].map((band) => ({
+          id: band.dataset.bandStripBand,
+          box: rect(band),
+          name: rect(band.querySelector('.fab-band-strip-band-name')),
+          range: rect(band.querySelector('[data-band-strip-range]')),
+        })),
+        barHeight: rect(root.querySelector('.fab-band-strip.manager-time-of-day-bar')).height,
+        fallbackHeight: root.querySelector('[data-band-strip-fallback]')
+          ? rect(root.querySelector('[data-band-strip-fallback]')).height
+          : null,
+      };
+    }, caseId);
+
+  const assertPanelBarApart = (bar, trackWidth, railIds) => {
+    assert.ok(
+      Math.abs(bar.track.width - trackWidth) <= 1,
+      `the panel's track is ${bar.track.width}px`
+    );
+    const inside = (inner, outer) =>
+      inner.left >= outer.left - 0.5 &&
+      inner.right <= outer.right + 0.5 &&
+      inner.top >= outer.top - 0.5 &&
+      inner.bottom <= outer.bottom + 0.5;
+    // The track is 46px with a 1px border, so each band fills the 44px inside it and never grows.
+    assert.ok(Math.abs(bar.track.height - 46) <= 0.5, `the track is ${bar.track.height}px tall`);
+    for (const band of bar.bands) {
+      assert.ok(Math.abs(band.box.height - 44) <= 0.5, `${band.id} is ${band.box.height}px tall`);
+      assert.ok(inside(band.name, band.box), `${band.id}'s name leaves its band`);
+      assert.ok(inside(band.range, band.box), `${band.id}'s hours leave its band`);
+    }
+    if (bar.fallbackHeight !== null) {
+      assert.ok(
+        Math.abs(bar.fallbackHeight - bar.barHeight) <= 0.5,
+        `the fallback note is ${bar.fallbackHeight}px beside the ${bar.barHeight}px bar`
+      );
+    }
+    const overlaps = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    assert.deepEqual(
+      bar.rails.map((rail) => rail.id),
+      railIds,
+      `the rails at a ${trackWidth}px track`
+    );
+    for (let index = 1; index < bar.rails.length; index += 1) {
+      assert.ok(
+        !overlaps(bar.rails[index - 1], bar.rails[index]),
+        `${bar.rails[index - 1].id} and ${bar.rails[index].id} adds overlap`
+      );
+    }
+    for (const box of [bar.dot, ...bar.rails]) {
+      assert.ok(box.width >= 24 && box.height >= 24, JSON.stringify(box));
+      for (const divider of bar.dividers) {
+        assert.ok(!overlaps(box, divider), `${JSON.stringify(box)} meets a divider`);
+      }
+    }
+    assert.ok(bar.dotOwnsCentre && bar.railsOwnCentres.every(Boolean));
+    // The dot's inset focus ring sits inside its 24px box, which the panel and its scroller hold.
+    for (const container of [bar.panel, bar.scroller]) {
+      assert.ok(
+        bar.dot.top >= container.top && bar.dot.left >= container.left,
+        `the dot ${JSON.stringify(bar.dot)} leaves ${JSON.stringify(container)}`
+      );
+    }
+  };
+
+  it('keeps the Times of day bar`s rail, dot and dividers apart across the full-width panel', async () => {
+    assertPanelBarApart(await measurePanelBar('rangeBarPanel'), 543, RAILS_ALL);
+  });
+
+  it('skips the add that would overlap a neighbour once the panel folds to one narrow column', async () => {
+    assertPanelBarApart(await measurePanelBar('rangeBarPanelNarrow'), 248, RAILS_SKIPPED);
   });
 
   it('finds the condition label field at 34px, whatever its own 20px declaration says', async () => {

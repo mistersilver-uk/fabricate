@@ -210,7 +210,9 @@ Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam
 A day is `days.hoursPerDay * days.minutesPerHour * days.secondsPerMinute`, else the measured difference `componentsToTime({ day: 1 }) - componentsToTime({ day: 0 })`, else the Earth day of 86,400 seconds.
 A week is the weekday count `days.values.length` times the day length, else seven days, and the Earth week of 604,800 seconds when there is no calendar at all.
 A year is `days.daysPerYear`, else the sum of `months.values[].days`, else unresolved, so the caller falls back to a within-year day.
-Fabricate fixes minutes and hours at 60 and 3,600 seconds and never reads them from the calendar, although `CalendarData` makes `days.secondsPerMinute` and `days.minutesPerHour` configurable, so under a custom calendar only Fabricate's day and week lengths follow it.
+Interval lengths for regen and respawn still fix minutes and hours at 60 and 3,600 seconds; only the time-of-day bar reads the calendar's `days.hoursPerDay` and `days.minutesPerHour` (`hoursPerDayFromCalendar`, `minutesPerHourFromCalendar`), so its "hour" is a calendar hour while a regen "hour" is 3,600 seconds.
+`CalendarData` makes `days.secondsPerMinute` and `days.minutesPerHour` configurable, so under a custom calendar only Fabricate's day and week lengths follow it for intervals.
+`GameTime#onUpdateWorldTime` updates `worldTime` and `components` before `Hooks.callAll("updateWorldTime", ...)`, and V14 first awaits `calendar.onUpdateWorldTime`, so an `updateWorldTime` handler reads the new clock.
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - **The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.

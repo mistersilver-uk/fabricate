@@ -334,7 +334,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "A single-value percentage slider (4 callers). `<RangeBar>` (`library.html:716`) specifies a TILED strip of spans whose dividers are dragged, which is `ThresholdBandStrip`, not this. Issue 1508 rooted its family at `fabricate-slider`, written inline on the component’s own root span exactly as `Pagination` writes its root: of its 35 family selectors 22 are compounds or descendants of that class, one more is a caller-CLASS compound that moved with the fill rule it overrides, and the remaining 12 name the gathering task editor’s or the drop editor card’s own container and are exempt. It owns TWO controls — a number half and a range track — and its root is a span that is neither, so it declares a (0,1,1) font floor over `.fabricate-slider input` and its focus pair over that same bare element. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change: its new `BROAD_SIGNAL_CASE_OVERRIDES` entry names `world-tool-entry`, whose `sm-tool-hammer` fixture declares the `breakageChance` breakage mode and whose walk clicks the breakage tab, so that frame DRAWS a slider rather than merely claiming the file that renders one. Recorded at issue 1521 and not folded into `<FillBar>`: its track (`.fabricate-slider .manager-drop-rate-track` and its fill in `styles/fabricate.css`) is an input rail drawn under a native range thumb rather than a read-only measure, and 2 of its 5 importing files — `tools/ToolBreakageTab.svelte` and `scoped/WorldToolEntryPage.svelte` — pass a `trackGradient` that paints the full track, which `FillBar` forbids."
+      "why": "A single-value percentage slider (4 callers). `<RangeBar>` (`library.html:887`) specifies a TILED strip of spans whose dividers are dragged, which is `ThresholdBandStrip`, not this. Issue 1508 rooted its family at `fabricate-slider`, written inline on the component’s own root span exactly as `Pagination` writes its root: of its 35 family selectors 22 are compounds or descendants of that class, one more is a caller-CLASS compound that moved with the fill rule it overrides, and the remaining 12 name the gathering task editor’s or the drop editor card’s own container and are exempt. It owns TWO controls — a number half and a range track — and its root is a span that is neither, so it declares a (0,1,1) font floor over `.fabricate-slider input` and its focus pair over that same bare element. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change: its new `BROAD_SIGNAL_CASE_OVERRIDES` entry names `world-tool-entry`, whose `sm-tool-hammer` fixture declares the `breakageChance` breakage mode and whose walk clicks the breakage tab, so that frame DRAWS a slider rather than merely claiming the file that renders one. Recorded at issue 1521 and not folded into `<FillBar>`: its track (`.fabricate-slider .manager-drop-rate-track` and its fill in `styles/fabricate.css`) is an input rail drawn under a native range thumb rather than a read-only measure, and 2 of its 5 importing files — `tools/ToolBreakageTab.svelte` and `scoped/WorldToolEntryPage.svelte` — pass a `trackGradient` that paints the full track, which `FillBar` forbids."
     },
     {
       "path": "src/ui/svelte/components/CollapsibleGroupHeader.svelte",
@@ -510,7 +510,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not. Issue 2005 adds `readonly`, a derived band picture with no handles whose group is described by a visually hidden list of each band's name and caller-formatted `range`."
+      "why": "`library.html:887` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC, or the hours of the day\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not. Issue 2005 adds `readonly`, a derived band picture with no handles whose group is described by a visually hidden list of each band's name and caller-formatted `range`. Issue 2431 adds the hours-of-the-day unit's opt-in props — the `start` binding, `formatValue`, `ticks`, range sublabels, fixed and draggable markers drawn by `RangeBarMarker.svelte`, drag and commit phases and the add rail — which neither check caller passes, so their markup is frozen by `tests/fixtures/threshold-band-strip/checkCallerStrips.js`."
     },
     {
       "path": "src/ui/svelte/components/RunProgress.svelte",
@@ -784,6 +784,15 @@
         "src/ui/svelte/components/SearchablePopover.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/components/SearchablePopover.svelte`, whose portaled panel this is. It carries the `<SearchPopover>` entry that specifies its PARENT rather than a specimen of its own. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree opens a picker rather than failing it."
+    },
+    {
+      "path": "src/ui/svelte/components/RangeBarMarker.svelte",
+      "library": null,
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/ThresholdBandStrip.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/ThresholdBandStrip.svelte`, whose fixed and draggable markers this draws (issue 2431). It names no library entry: `<RangeBar>` specifies its PARENT, whose hours-of-the-day specimen draws it, and it is a file of its own because the strip would otherwise pass 500 lines. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree holds the strip."
     },
     {
       "path": "src/ui/svelte/components/NavSidebarRows.svelte",

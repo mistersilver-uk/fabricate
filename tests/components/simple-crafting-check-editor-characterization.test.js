@@ -80,6 +80,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Callout.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
+    // The range bar's marker (issue 2431). Manifest only.
+    'src/ui/svelte/components/RangeBarMarker.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     // The counting pool and the shared character-value field (issue 2006). Manifest only.
     'src/ui/svelte/components/Select.svelte',

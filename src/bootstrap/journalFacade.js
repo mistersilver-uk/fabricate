@@ -10,7 +10,11 @@ import {
   resolveToolDisplayName,
 } from '../models/toolDisplay.js';
 import { affordsCurrencySpends, buildCurrencyAffordProbe } from '../systems/currencyAffordance.js';
-import { daysPerYearFromCalendar } from '../systems/foundryCalendar.js';
+import {
+  daysPerYearFromCalendar,
+  hoursPerDayFromCalendar,
+  minutesPerHourFromCalendar,
+} from '../systems/foundryCalendar.js';
 import { authorityUnavailableRefusal } from '../systems/journalRunCommands.js';
 import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 import { withStationPresence } from '../systems/stationPresence.js';
@@ -144,7 +148,10 @@ export const journalFacade = {
     );
   },
 
-  /** Calendar components plus `daysPerYear` where derivable, for the pure `worldTimeLabel`. */
+  /**
+   * Calendar components plus `daysPerYear` where derivable, for the pure `worldTimeLabel`, and the
+   * calendar's `hoursPerDay` and `minutesPerHour` for the time-of-day bar.
+   */
   getWorldTimeComponents(worldTime = this.getWorldTime()) {
     const calendar = game.time?.calendar ?? null;
     if (typeof calendar?.timeToComponents !== 'function') return null;
@@ -153,6 +160,8 @@ export const journalFacade = {
       if (!components || typeof components !== 'object') return null;
       const daysPerYear = daysPerYearFromCalendar(calendar);
       if (daysPerYear !== null) components.daysPerYear = daysPerYear;
+      components.hoursPerDay = hoursPerDayFromCalendar(calendar);
+      components.minutesPerHour = minutesPerHourFromCalendar(calendar);
       return components;
     } catch {
       return null;

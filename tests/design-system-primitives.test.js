@@ -159,6 +159,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/RadioCardGroup.svelte',
   // Issue 1782: the inspector rail section, on a frame of each of its three inspectors.
   'src/ui/svelte/components/Rail.svelte',
+  // Issue 2431: the range bar's marker, on the time-of-day bar's frame, its only caller's.
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
   'src/ui/svelte/components/RequirementChooser.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the

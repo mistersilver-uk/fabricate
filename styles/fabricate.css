@@ -13004,6 +13004,10 @@
   background: var(--fab-overlay-light-035);
 }
 
+.fabricate-manager .manager-condition-panel.is-time-of-day {
+  grid-column: 1 / -1;
+}
+
 .fabricate-manager .manager-condition-panel.is-disabled {
   opacity: 0.72;
   background: var(--fab-overlay-dark-10);
@@ -13052,6 +13056,22 @@
   grid-template-columns: 38px 38px minmax(0, 1fr) max-content;
 }
 
+/* The time-of-day add form keeps the weather form's row; its captioned start-hour stepper takes a second row under the name, so the name never narrows (issue 2431). */
+.fabricate-manager .manager-time-of-day-add-start {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+}
+
+/* The fallback note keeps the bar's footprint, so stepping a pill through a duplicate hour does not shift the form. */
+.fabricate-manager .manager-time-of-day-bar.fab-band-strip-fallback {
+  min-height: 85px; /* 13px dot lane + 46px track + 2px rail gap + 24px rail */
+}
+
 /* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the sibling input at `.manager-condition-add input` below and is the only reason the row's controls line up. */
 .fabricate-manager .manager-add-button {
   height: 38px;
@@ -13087,6 +13107,15 @@
   color: var(--fab-text);
   background: var(--fab-bg-1);
   overflow: hidden;
+}
+
+/* The full-width panel packs pills 280px or wider, so each fits its start-hour stepper (issue 2431). */
+.fabricate-manager .manager-condition-pill-list.is-time-of-day {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.fabricate-manager .manager-condition-pill.is-time-of-day {
+  grid-template-columns: 30px minmax(0, 1fr) max-content 24px;
 }
 
 .fabricate-manager .manager-vocabulary-pill.is-region {

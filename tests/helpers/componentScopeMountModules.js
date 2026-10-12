@@ -10,6 +10,7 @@ import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBr
 /** THE COMPONENT SCOPE LEAVES, which three separate manifests used to spell out longhand. */
 export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  'src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's

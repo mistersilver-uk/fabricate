@@ -189,6 +189,20 @@ const radio = (target, mode) =>
 const tagMatchRadio = (target, mode) =>
   target.querySelector(`[data-recipe-tag-match="${mode}"]`).querySelector('input');
 
+/** Open a tag row's `+ Tag` adder and return its portaled panel. */
+async function openTagAdder(target) {
+  await click(target.querySelector('[data-recipe-add-tag]'));
+  return target.ownerDocument.querySelector('.fabricate-picker-popover');
+}
+const tagOptions = (panel) => [...panel.querySelectorAll('[role="option"]')];
+const tagOption = (panel, tag) => tagOptions(panel).find((node) => node.title === tag);
+const optionText = (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim();
+/** An option's announced selection, and whether it draws the held check. */
+const heldState = (node) => [
+  node.getAttribute('aria-selected'),
+  Boolean(node.querySelector('.manager-travel-option-marker.fa-check')),
+];
+
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
@@ -608,14 +622,17 @@ describe('PickerRow: the remaining branches', () => {
     assert.notEqual(names[0], names[1], 'two rows sharing a name would be one radio group');
   });
 
-  it('the tag picker offers the vocabulary less the tags already chosen', async () => {
+  it('the tag picker lists every vocabulary tag and marks the held ones selected', async () => {
     const { target } = await mountRow(ingredient, { ...unnamed('tags'), tags: ['herb'] });
-    await click(target.querySelector('[data-recipe-add-tag]'));
-    assert.deepEqual(
-      [...target.ownerDocument.querySelectorAll('[role="option"]')].map((node) =>
-        node.textContent.trim()
-      ),
-      ['rare']
+    const panel = await openTagAdder(target);
+    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare'], 'vocabulary order');
+    assert.deepEqual(tagOptions(panel).map(heldState), [
+      ['true', true],
+      ['false', false],
+    ]);
+    assert.equal(
+      panel.querySelector('[role="listbox"]').getAttribute('aria-multiselectable'),
+      'true'
     );
   });
 
@@ -931,5 +948,143 @@ describe('PickerRow: allowAny opens the kind menu', () => {
     trigger.dispatchEvent(new globalThis.window.MouseEvent('click', { bubbles: true }));
     await settle();
     assert.equal(menuItems().length, 0);
+  });
+});
+
+describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 2430)', () => {
+  const ingredient = SURFACES['recipe ingredient'];
+  const tagRow = (tags) => ({ ...unnamed('tags'), tags });
+
+  it('lists the vocabulary when the row holds only a tag outside it, and adds beside it', async () => {
+    const { target, applied } = await mountRow(ingredient, tagRow(['ghost']));
+    const panel = await openTagAdder(target);
+    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare']);
+    assert.deepEqual(tagOptions(panel).map(heldState), [
+      ['false', false],
+      ['false', false],
+    ]);
+    assert.equal(
+      panel.querySelector('[role="listbox"]').getAttribute('aria-multiselectable'),
+      'true'
+    );
+    await click(tagOption(panel, 'herb'));
+    assert.deepEqual((await applied('add herb')).tags, ['ghost', 'herb']);
+    harness.remount();
+
+    const ghost = await mountRow(ingredient, tagRow(['ghost']));
+    await click(
+      ghost.target.querySelector(':scope [data-recipe-tag="ghost"] [data-recipe-remove="tag"]')
+    );
+    assert.deepEqual((await ghost.applied('remove ghost')).tags, []);
+  });
+
+  it('opens to the empty note over an empty vocabulary, and a chip still removes', async () => {
+    const { target, applied } = await mountRow(ingredient, tagRow(['herb']), {
+      catalogue: EMPTY_CATALOGUE,
+    });
+    const panel = await openTagAdder(target);
+    assert.equal(panel.getAttribute('aria-label'), 'Tags', 'the panel is named for its list');
+    assert.ok(!panel.querySelector('[role="listbox"]'), 'no listbox');
+    assert.ok(!panel.querySelector('[data-popover-header]'), 'no "0 of 0" over an empty list');
+    assert.equal(
+      optionText(panel.querySelector('.manager-travel-popover-empty')),
+      'No tags defined'
+    );
+    await click(target.querySelector(':scope [data-recipe-tag="herb"] [data-recipe-remove="tag"]'));
+    assert.deepEqual((await applied('remove herb')).tags, []);
+  });
+
+  it('takes a held tag off the row when it is chosen again', async () => {
+    const { target, applied } = await mountRow(ingredient, tagRow(['herb', 'rare']));
+    const panel = await openTagAdder(target);
+    await click(tagOption(panel, 'herb'));
+    assert.deepEqual((await applied('remove herb')).tags, ['rare']);
+  });
+
+  it('adds an unheld tag and stays open with it now selected', async () => {
+    const { target, applied } = await mountRow(ingredient, tagRow([]));
+    const panel = await openTagAdder(target);
+    await click(tagOption(panel, 'rare'));
+    assert.deepEqual((await applied('add rare')).tags, ['rare']);
+    await settle();
+    const open = target.ownerDocument.querySelector('.fabricate-picker-popover');
+    assert.ok(Boolean(open), 'the panel stays open across a choice');
+    assert.deepEqual(heldState(tagOption(open, 'rare')), ['true', true]);
+    assert.deepEqual(heldState(tagOption(open, 'herb')), ['false', false]);
+  });
+
+  it('toggles the active option with Enter, keeps the cursor on it, and Escape closes', async () => {
+    const { target, applied } = await mountRow(ingredient, tagRow(['herb']));
+    const panel = await openTagAdder(target);
+    const field = panel.querySelector(':scope .manager-travel-popover-search input');
+    const press = async (key) => {
+      field.dispatchEvent(
+        new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      );
+      await settle();
+    };
+    const active = () =>
+      target.ownerDocument
+        .querySelector('.fabricate-picker-popover')
+        ?.querySelector('[data-active-option="true"]');
+    await press('ArrowDown');
+    assert.equal(active()?.title, 'herb', 'the cursor is on the held tag');
+    await press('Enter');
+    assert.deepEqual((await applied('enter removes')).tags, []);
+    assert.equal(active()?.title, 'herb', 'the cursor survives the removal');
+    await press('Enter');
+    assert.deepEqual((await applied('enter re-adds')).tags, ['herb']);
+    assert.equal(active()?.title, 'herb', 'and the re-add');
+    await press('Escape');
+    assert.ok(!target.ownerDocument.querySelector('.fabricate-picker-popover'), 'Escape closes');
+    assert.equal(
+      target.ownerDocument.activeElement,
+      target.querySelector('[data-recipe-add-tag]'),
+      'and focus returns to the adder'
+    );
+  });
+
+  it('draws each supplied count as a worded chip, and none where no count is supplied', async () => {
+    const catalogue = {
+      ...CATALOGUE,
+      tags: [
+        { id: 'herb', label: 'herb', icon: 'fas fa-tag', count: 24 },
+        { id: 'rare', label: 'rare', icon: 'fas fa-tag', count: 1 },
+        { id: 'typo', label: 'typo', icon: 'fas fa-tag', count: 0 },
+        { id: 'bare', label: 'bare', icon: 'fas fa-tag' },
+      ],
+    };
+    const { target } = await mountRow(ingredient, tagRow(['herb']), { catalogue });
+    const panel = await openTagAdder(target);
+    assert.deepEqual(tagOptions(panel).map(optionText), [
+      'herb 24 components',
+      'rare 1 component',
+      'typo 0 components',
+      'bare',
+    ]);
+    const chipClasses = (tag) => [
+      ...tagOption(panel, tag).querySelector('.manager-chip').classList,
+    ];
+    assert.ok(
+      chipClasses('herb').includes('is-secondary') && chipClasses('herb').includes('is-mono')
+    );
+    assert.ok(chipClasses('typo').includes('is-warning'), 'a zero is a warning');
+    assert.ok(!tagOption(panel, 'bare').querySelector('.manager-chip'), 'no count, no chip');
+  });
+
+  it('names the panel “Tags” and heads it with the filtered count', async () => {
+    const { target } = await mountRow(ingredient, tagRow([]));
+    const panel = await openTagAdder(target);
+    assert.equal(panel.getAttribute('aria-label'), 'Tags');
+    assert.equal(panel.querySelector('[role="listbox"]').getAttribute('aria-label'), 'Tags');
+    const count = () => panel.querySelector('[data-popover-filtered-count]')?.textContent;
+    assert.equal(count(), '2 of 2');
+    await type(panel.querySelector(':scope .manager-travel-popover-search input'), 'ra');
+    assert.equal(count(), '1 of 2');
+    assert.equal(
+      target.querySelector('[data-recipe-add-tag]').getAttribute('aria-label'),
+      'Add tag',
+      'the trigger keeps its own name'
+    );
   });
 });
