@@ -159,9 +159,14 @@ function withoutExtension(name) {
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
+/** The folder a design-library frame is published under, beside the application frames. */
+const LIBRARY_SEGMENT = 'library';
+
 /**
  * The View Lab case and head SHA a published frame's URL identifies, or `null` when the URL is not
- * one of this pull request's published frames.
+ * one of this pull request's published frames. A design-library frame (`…/library/<name>`) is
+ * never one, whichever key shape it has: without a head segment it would read as a case drawn for
+ * head `library`.
  */
 export function classifyPublishedFrameUrl(url, prNumber) {
   const target = String(prNumber ?? '').trim();
@@ -170,6 +175,7 @@ export function classifyPublishedFrameUrl(url, prNumber) {
     .split(/[?#]/, 1)[0]
     .split('/')
     .filter(Boolean);
+  if (segments.at(-2) === LIBRARY_SEGMENT) return null;
 
   const revisioned = segments.length - 3;
   if (revisioned >= 0 && segments[revisioned] === target) {

@@ -98,6 +98,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/renderedManagerShell.js': 'fixture',
   'tests/helpers/scoped-component-css.js': 'fixture',
   'tests/helpers/sourceScan.js': 'corpus',
+  'tests/helpers/staticImportGraph.js': 'ast',
   'tests/helpers/stepperSourceContract.js': 'legacy-scan',
   'tests/helpers/structureContract.js': 'ast',
   'tests/helpers/styleBlockScan.js': 'corpus',

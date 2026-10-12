@@ -91,6 +91,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // Issue 2420: the manager's title band, on the seven frames ManagerTitleBar's cases draw.
+  'src/ui/svelte/components/AppTitleBar.svelte',
   // Issue 1522: identity art picked as a picture, on the frames that draw each of its states.
   'src/ui/svelte/components/ArtPicker.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
@@ -557,6 +559,28 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
     'world-component-entry-systems',
   ]) {
     assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
+  }
+});
+
+test("(a) an AppTitleBar change publishes the title band's frames", () => {
+  const file = 'src/ui/svelte/components/AppTitleBar.svelte';
+  const frames = [
+    'manager-default-selection',
+    'manager-systems-empty',
+    'manager-selected-normal',
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-selected-stacked',
+    'manager-world-downtime-test-companion-installed',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `an AppTitleBar change does not select '${caseId}'`);
   }
 });
 

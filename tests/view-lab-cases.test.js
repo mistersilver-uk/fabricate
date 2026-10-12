@@ -5657,7 +5657,7 @@ test('the capture workflow renders and publishes the one id list it computed', (
   );
   assert.match(
     workflow,
-    /CASE_IDS: \$\{\{ needs\.select\.outputs\.ids }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
+    /CASE_IDS: \$\{\{ needs\.select\.outputs\.apps }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
     'the merge must account for the whole selection and write the directory publish reads'
   );
   assert.match(workflow, /name: view-lab-shard-\$\{\{ matrix\.shard }}/);
@@ -6726,4 +6726,9 @@ test('the title bar selects the system frames and the premium-installed frame', 
   ]);
   const shell = new Set(ids([`${MANAGER}/CraftingSystemManagerRoot.svelte`]));
   for (const id of titleBar) assert.ok(shell.has(id), `${id} is not a frame the shell draws`);
+  // Issue 2420: the primitive it renders through publishes the same seven and the representative pair.
+  assert.deepEqual(
+    ids(['src/ui/svelte/components/AppTitleBar.svelte']),
+    [...titleBar, 'fabricate-app-shell', 'manager-components-normal'].sort(byCodePoint)
+  );
 });

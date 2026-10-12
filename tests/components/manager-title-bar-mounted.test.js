@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -12,6 +16,7 @@ const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'))
 
 const ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const TITLE_BAR = 'src/ui/svelte/apps/manager/ManagerTitleBar.svelte';
+const APP_TITLE_BAR = 'src/ui/svelte/components/AppTitleBar.svelte';
 
 /** Each node the title bar draws, addressed by its class or its hook, so a re-inline under either is seen. */
 const TITLE_BAR_NODES = [
@@ -37,16 +42,27 @@ describe('the title bar is drawn by ManagerTitleBar alone', () => {
     ],
   });
 
-  defineStructureContract('ManagerTitleBar draws each title-bar node once', TITLE_BAR, {
+  defineStructureContract(
+    "ManagerTitleBar renders AppTitleBar and none of the band's markup",
+    TITLE_BAR,
+    {
+      renders: ['AppTitleBar'],
+      rendersTimes: TITLE_BAR_NODES.map((locator) => [locator, 0]),
+      spellsNo: ['manager-titlebar'],
+      requiresProp: ['text'],
+    }
+  );
+
+  defineStructureContract('AppTitleBar draws each title-bar node once', APP_TITLE_BAR, {
     rendersTimes: TITLE_BAR_NODES.map((locator) => [locator, 1]),
-    requiresProp: ['text'],
   });
 });
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-manager-title-bar-',
-  compiledModules: [TITLE_BAR],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  compiledModules: [APP_TITLE_BAR, TITLE_BAR],
   componentPath: TITLE_BAR,
 });
 
@@ -54,6 +70,12 @@ const harness = createMountedComponentHarness({
 function text(key, fallback) {
   const value = key.split('.').reduce((node, part) => node?.[part], lang);
   return typeof value === 'string' ? value : fallback;
+}
+
+/** The harness globals, with `localize` reading the same shipped copy as `text`. */
+async function setup() {
+  await harness.setup();
+  globalThis.game.i18n.localize = (key) => text(key, key);
 }
 
 const titleBarOf = (root) => root.querySelector('.manager-titlebar[data-manager-titlebar]');
@@ -72,7 +94,7 @@ function assertNoAriaLabel(root) {
 }
 
 describe('ManagerTitleBar', () => {
-  before(() => harness.setup());
+  before(setup);
   after(() => harness.teardown());
   afterEach(() => harness.remount());
 
@@ -147,4 +169,57 @@ describe('ManagerTitleBar', () => {
       ['manager-titlebar-badge', 'manager-titlebar-status']
     );
   });
+
+  it('draws no status line without a resolution mode, whatever the tier count', async () => {
+    const root = await harness.mount({ text, modeLabel: '', outcomeTierCount: 3 });
+    assert.ok(!statusOf(root), 'no status line without a mode');
+    await harness.setProps({ modeLabel: 'Simple' });
+    assert.equal(
+      statusOf(root).querySelector('.manager-titlebar-status-text').textContent,
+      'Simple · 3 outcome tiers'
+    );
+    await harness.setProps({ modeLabel: '' });
+    assert.ok(!statusOf(root), 'the status line goes again with the mode');
+  });
+});
+
+/** The band's rendered markup per state, comments removed, so a re-derivation draws no visible change (issue 2420). */
+const BAR_OPEN = '<div class="manager-titlebar" data-manager-titlebar="">';
+const PREMIUM_MARK =
+  '<span class="manager-titlebar-badge" data-manager-titlebar-premium="" title="Fabricate Premium is installed and connected">' +
+  '<span aria-hidden="true">PREMIUM</span>' +
+  '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>';
+const statusLine = (caption) =>
+  `<span class="manager-titlebar-status" data-manager-titlebar-status="" title="${caption}">` +
+  '<span class="visually-hidden">Selected system resolution</span> ' +
+  '<i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i> ' +
+  `<span class="manager-titlebar-status-text">${caption}</span></span>`;
+
+const MARKUP_PINS = [
+  ['nothing installed or selected', {}, `${BAR_OPEN} </div>`],
+  ['premium only', { premiumInstalled: true }, `${BAR_OPEN}${PREMIUM_MARK} </div>`],
+  [
+    'a mode with no tiers',
+    { modeLabel: 'Routed by check', outcomeTierCount: 0 },
+    `${BAR_OPEN} ${statusLine('Routed by check')}</div>`,
+  ],
+  [
+    'premium with a mode and tiers',
+    { premiumInstalled: true, modeLabel: 'Simple', outcomeTierCount: 3 },
+    `${BAR_OPEN}${PREMIUM_MARK} ${statusLine('Simple · 3 outcome tiers')}</div>`,
+  ],
+  ['tiers with no mode', { modeLabel: '', outcomeTierCount: 3 }, `${BAR_OPEN} </div>`],
+];
+
+describe('ManagerTitleBar markup pin', () => {
+  before(setup);
+  after(() => harness.teardown());
+  afterEach(() => harness.remount());
+
+  for (const [state, props, markup] of MARKUP_PINS) {
+    it(`draws the pinned markup: ${state}`, async () => {
+      const root = await harness.mount({ text, ...props });
+      assert.equal(root.innerHTML.replaceAll(/<!--[\s\S]*?-->/g, ''), markup);
+    });
+  }
 });

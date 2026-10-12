@@ -38,6 +38,7 @@ import {
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 import {
   BLOCK_END,
+  BLOCK_START,
   DEFAULT_HEAD_BRANCH,
   atClock,
   captureConsole,
@@ -1584,4 +1585,72 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     ),
     'the committed icon catalogue must select the case whose frame renders the icon picker'
   );
+});
+
+describe('design-library frames are not application evidence (issue 2413)', () => {
+  const CDN = 'https://cdn.example.test/pr-screenshots';
+  const LIBRARY_FRAME = '3-0-stepper.png';
+  // Both published key shapes: revision-addressed, and the legacy one with no head segment.
+  const LIBRARY_URLS = Object.freeze({
+    revisioned: `${CDN}/${PR}/${HEAD}/library/${LIBRARY_FRAME}`,
+    legacy: `${CDN}/${PR}/library/${LIBRARY_FRAME}`,
+  });
+
+  /** A managed block carrying the given app case ids, then a Library section of library URLs. */
+  function blockWithLibrary({ caseIds = [], libraryUrls }) {
+    const apps = caseIds.map((id) => `![pr-${PR} ${id}](${CDN}/${PR}/${HEAD}/${id}.png)`);
+    const library = libraryUrls.map((url) => `![pr-${PR} Library · Stepper](${url})`);
+    const inner = [...apps, '### Library', ...library].join('\n\n');
+    return `Some description.\n\n${BLOCK_START}\n## Screenshots\n\n${inner}\n${BLOCK_END}\n`;
+  }
+
+  for (const [shape, url] of Object.entries(LIBRARY_URLS)) {
+    it(`classifies a ${shape} library key as no published frame at all`, () => {
+      assert.equal(classifyPublishedFrameUrl(url, PR), null);
+    });
+
+    it(`answers none, never stale, for a ${shape} library-only block on an armed gate`, async () => {
+      const body = blockWithLibrary({ libraryUrls: [url] });
+      const decision = await decide({
+        gh: makeGhFake({}),
+        clock: makeGateClock({}),
+        body,
+        awaitCapture: false,
+        captureEligible: false,
+      });
+      assertFailedWith(decision, GATE_CODES.NO_SCREENSHOTS_SECTION);
+      assert.deepEqual(
+        parseScreenshotEvidenceImages(body, { prNumber: PR }).inBlock.map((frame) => frame.caseId),
+        [null]
+      );
+    });
+
+    it(`reports a concluded ${shape} library-only run as having published nothing`, async () => {
+      const body = blockWithLibrary({ libraryUrls: [url] });
+      const gh = makeGhFake({ runs: [workflowRun({})], body });
+      const decision = await decide({ gh, clock: makeGateClock({ start: 0, step: 1000 }) });
+      assertFailedWith(decision, GATE_CODES.CAPTURE_PUBLISHED_NOTHING);
+    });
+
+    it(`matches a mixed block on its app frames only, beside a ${shape} library frame`, async () => {
+      const body = blockWithLibrary({ caseIds: EXPECTED_CASE_IDS, libraryUrls: [url] });
+      const parsed = parseScreenshotEvidenceImages(body, { prNumber: PR });
+      assert.deepEqual(
+        parsed.inBlock.map((frame) => frame.caseId),
+        [...EXPECTED_CASE_IDS, null]
+      );
+      assert.deepEqual(parsed.outsideBlock, [], 'library frames sit inside the managed block');
+
+      const decision = await decide({
+        gh: makeGhFake({}),
+        clock: makeGateClock({}),
+        body,
+        headSha: '',
+        awaitCapture: false,
+        captureEligible: false,
+      });
+      assert.equal(decision.exitCode, 0, decision.message);
+      assert.doesNotMatch(decision.message, /3-0-stepper/);
+    });
+  }
 });

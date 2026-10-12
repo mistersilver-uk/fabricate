@@ -771,6 +771,9 @@ So does a patch to any lab input the registry does not attribute, or a hunk whos
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
 The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because a local `npm run lab:check` verifies them, so a change there alone selects no frame.
 Nor are they render files, because no application window draws them: a change there alone does not arm the evidence gate, its `.svelte` and `.css` files included.
+A Primitive Lab change does select the design-library units it touches, which is the exception to the app capture selecting no frame for it.
+CI publishes those units under a `### Library` heading in the managed screenshot block, each as the library drawing beside the live Primitive Lab render.
+A change to the lab's own machinery selects one unit per catalogue section.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
 true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
@@ -854,6 +857,7 @@ Do not commit PR-scoped screenshots under docs or other asset directories.
 The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
 A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
 A Primitive Lab file (`tests/view-lab/primitives.html`, or anything under `tests/view-lab/primitives/`) is not a render file whatever its extension; a local `npm run lab:check` verifies it, and a PR that changes one beside a real render file is still armed by that file.
+Library frames are supplementary and not gated: the `check-screenshots` job neither requires them nor reads them as evidence.
 
 ### Prerequisites
 

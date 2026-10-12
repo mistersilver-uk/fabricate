@@ -3,7 +3,7 @@
  * the mounted-set comparison, the page attribute contract and the lab server. Each CLI owns its
  * browser and exit code, because `unicorn/no-exports-in-scripts` forbids a CLI that is a module.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { Window } from 'happy-dom';
@@ -17,6 +17,10 @@ import {
   LIVE_LABEL_TEXT,
   PARTIAL_CLASS,
 } from '../../tests/view-lab/primitives/liveness.js';
+
+import { CATALOGUE_DIRECTORY, catalogueEntries } from './primitiveLabCatalogue.js';
+
+export { CATALOGUE_DIRECTORY, catalogueEntries, catalogueFiles } from './primitiveLabCatalogue.js';
 
 /** The lab page, relative to the Vite dev root (the repository root). */
 export const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
@@ -48,44 +52,12 @@ export const LIVE_LABEL_SELECTOR = `.${LIVE_LABEL_CLASS.trim().replaceAll(/\s+/g
 /** The qualifier a partial specimen's label or caption carries, as a selector. */
 export const PARTIAL_SELECTOR = `.${PARTIAL_CLASS}`;
 
-/** The catalogue directory, relative to the repository root. */
-export const CATALOGUE_DIRECTORY = 'tests/view-lab/primitives/catalogue';
-
 /** The library the page renders, and the manifest whose names decide each specimen's liveness. */
 const LIBRARY_PATH = 'openspec/specs/design-system/library.html';
 const MANIFEST_PATH = 'scripts/lib/designSystemPrimitives.json';
 
 /** The one file in the catalogue directory that is not a catalogue file. */
 export const CATALOGUE_README = 'README.md';
-
-/**
- * The catalogue's `*.json` files in code-point order, read non-recursively to match the page's
- * non-recursive `import.meta.glob`.
- *
- * @param {string} root Absolute repository root.
- * @returns {string[]} File names, extension included.
- */
-export function catalogueFiles(root) {
-  return readdirSync(path.join(root, CATALOGUE_DIRECTORY))
-    .filter((name) => name.endsWith('.json'))
-    .sort((left, right) => (left < right ? -1 : Number(left > right)));
-}
-
-/**
- * Every catalogue row, each carrying the file and index it was written at.
- *
- * @param {string} root Absolute repository root.
- * @returns {{file: string, index: number, row: object}[]} Rows in file then declaration order.
- */
-export function catalogueEntries(root) {
-  return catalogueFiles(root).flatMap((file) => {
-    const parsed = JSON.parse(readFileSync(path.join(root, CATALOGUE_DIRECTORY, file), 'utf8'));
-    if (!Array.isArray(parsed)) {
-      throw new TypeError(`${CATALOGUE_DIRECTORY}/${file} is not an array of catalogue rows`);
-    }
-    return parsed.map((row, index) => ({ file, index, row }));
-  });
-}
 
 /**
  * How many specimens the page must report having mounted.

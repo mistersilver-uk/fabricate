@@ -3,7 +3,7 @@
  * The PR capture's shard plan and merge (see `scripts/lib/viewLabShards.js`).
  *
  * Commands:
- *   plan  <ids> <render>                  print the render matrix as JSON: [{shard, ids}]
+ *   plan  <ids> <render> [<library>]      print the render matrix as JSON: [{shard, kind, …}]
  *   merge <ids> <shards-dir> <output-dir> merge every shard's frames and manifest into one
  */
 import {
@@ -24,13 +24,13 @@ const splitIds = (text) =>
     .split(',')
     .filter(Boolean);
 
-function commandPlan([idText, render]) {
+function commandPlan([idText, render, library]) {
   const cases = splitIds(idText).map((id) => {
     const viewCase = getCaseById(id);
     if (!viewCase) throw new Error(`no publishable case matches: ${id}`);
     return viewCase;
   });
-  process.stdout.write(JSON.stringify(renderMatrix(cases, render === 'true')));
+  process.stdout.write(JSON.stringify(renderMatrix(cases, render === 'true', library)));
 }
 
 /**
