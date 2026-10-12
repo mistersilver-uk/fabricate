@@ -2,8 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { Window } from 'happy-dom';
+
 import { MANAGER_COLOR_TOKEN_KEYS } from '../../src/ui/svelte/util/managerColorTokens.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
+import { readDesignLibrary } from '../helpers/designLibrary.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
 import {
   contrast,
@@ -85,6 +88,7 @@ test('the No-colour cell rings in the text ink at 3:1 on its own fill in every t
 });
 
 const CURSOR = '.fabricate-color-picker-popover .manager-color-preset:focus-visible';
+const HOVER = '.fabricate-color-picker-popover .manager-color-preset:hover';
 const PICKER_CURSOR =
   ".fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true']";
 
@@ -94,6 +98,24 @@ const outlineOf = (selector) =>
 
 test("the swatch's keyboard cursor declares the picker cursor's outline (issue 2416)", () => {
   assert.deepEqual(outlineOf(CURSOR), outlineOf(PICKER_CURSOR));
+});
+
+/** The inline `outline` and `outline-offset` of each outlined cell the library's shipped popover draws. */
+function drawnOutlines() {
+  const { document } = new Window();
+  document.write(readDesignLibrary());
+  const unit = [...document.querySelectorAll('.unit')].find(
+    (candidate) => candidate.querySelector('.cap')?.textContent === 'popover — shipped'
+  );
+  assert.ok(unit, 'the library draws no shipped popover unit');
+  return [...unit.querySelectorAll(':scope div[style]')]
+    .map((cell) => propertiesOf({ body: cell.getAttribute('style') }))
+    .filter((style) => style.has('outline'))
+    .map((style) => [style.get('outline'), style.get('outline-offset')]);
+}
+
+test("the library draws the shipped popover's cursor and hover as the sheet declares them", () => {
+  assert.deepEqual(drawnOutlines(), [outlineOf(CURSOR), outlineOf(HOVER)]);
 });
 
 /** A translucent stack's opaque ground in one palette, its tokens top first. */
