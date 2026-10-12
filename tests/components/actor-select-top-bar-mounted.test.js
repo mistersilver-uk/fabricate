@@ -149,7 +149,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     // named by a visually hidden label, reading the pool as its value text.
     const meter = bar.querySelector(':scope .actor-bar-stamina-track [role="meter"]');
     assert.ok(Boolean(meter), 'the stamina strip is a meter inside its width pin');
-    const name = meter.querySelector('.visually-hidden');
+    const name = meter.querySelector('.fab-meter-hidden');
     assert.equal(meter.getAttribute('aria-labelledby'), name.id, 'named by its hidden label');
     assert.equal(name.textContent, 'FABRICATE.App.ActorBar.Stamina');
     assert.equal(meter.getAttribute('aria-valuenow'), '40');

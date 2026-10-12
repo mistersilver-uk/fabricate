@@ -49,7 +49,7 @@ describe('Meter (mounted)', () => {
       ),
       ['0', '7', '11', '7 / 11']
     );
-    const label = node.querySelector('.visually-hidden');
+    const label = node.querySelector('.fab-meter-hidden');
     assert.equal(label.textContent, 'Labourers');
     assert.equal(node.getAttribute('aria-labelledby'), label.id, 'the hidden label names it');
     assert.match(node.querySelector('.fab-fill-bar-fill').getAttribute('style'), /width: 64%/u);
@@ -60,7 +60,7 @@ describe('Meter (mounted)', () => {
     const root = await meter.mount({ value: 1, max: 2, labelId: 'head-1' });
     const node = root.querySelector('[role="meter"]');
     assert.equal(node.getAttribute('aria-labelledby'), 'head-1');
-    assert.ok(!node.querySelector('.visually-hidden'), 'no second copy of the name');
+    assert.ok(!node.querySelector('.fab-meter-hidden'), 'no second copy of the name');
     assert.ok(!node.hasAttribute('aria-valuetext'), 'an absent reading is genuinely absent');
   });
 
@@ -94,7 +94,7 @@ describe('Meter (mounted)', () => {
     const root = await meter.mount({ value: 1, max: 2, 'aria-label': 'Stamina' });
     const node = root.querySelector('[role="meter"]');
     assert.ok(!node.hasAttribute('aria-labelledby'), 'no reference to an empty label');
-    assert.ok(!node.querySelector('.visually-hidden'), 'no empty hidden label');
+    assert.ok(!node.querySelector('.fab-meter-hidden'), 'no empty hidden label');
     assert.equal(node.getAttribute('aria-label'), 'Stamina', 'a rest aria-label names it');
   });
 });
