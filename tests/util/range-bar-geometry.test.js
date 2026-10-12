@@ -152,6 +152,8 @@ describe('rangeBarGeometry: the band a value falls in, and stepping between band
     assert.equal(markerBandStep('ArrowRight', 3, 4), 3, 'clamped at the last band');
     assert.equal(markerBandStep('ArrowLeft', 0, 4), 0, 'clamped at the first');
     assert.equal(markerBandStep('Enter', 1, 4), null, 'an unrelated key is not swallowed');
+    assert.equal(markerBandStep('PageUp', 1, 25, 5), 6, 'a page strides over grid stops');
+    assert.equal(markerBandStep('PageDown', 3, 25, 5), 0, 'clamped');
   });
 });
 
@@ -239,5 +241,16 @@ describe('rangeBarGeometry: patches, pointer values and marker layout', () => {
     );
     assert.equal(hour.stops.length, 25, 'one stop per grid value, 4 to 28');
     assert.deepEqual(hour.stops[hour.at], { from: 8.5, value: 9, now: 9, text: '9', index: 1 });
+  });
+
+  it("carries each band's authored index onto its stop when the list is authored high-to-low", () => {
+    const rows = resolveBands(DAY.toReversed().map((band, index) => ({ ...band, index })));
+    const geometry = { domainMin: 4, trackMax: 28, step: 1 };
+    const marker = { id: 'c', value: 12.5, draggable: true, snap: 'band' };
+    const [view] = markerLayout([marker], rows, geometry, String).draggable;
+    assert.deepEqual(
+      view.stops.map((stop) => stop.index),
+      [3, 2, 1, 0]
+    );
   });
 });

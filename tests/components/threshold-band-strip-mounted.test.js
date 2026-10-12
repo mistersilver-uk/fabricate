@@ -121,7 +121,10 @@ describe('ThresholdBandStrip: the two number systems', () => {
 
   it('draws a caller leading tick at the track start, and none by default', async () => {
     const plain = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
-    assert.ok(!plain.querySelector('[data-band-strip-leading-tick]'), 'no leading tick unless asked');
+    assert.ok(
+      !plain.querySelector('[data-band-strip-leading-tick]'),
+      'no leading tick unless asked'
+    );
     harness.remount();
     const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12, leadingTick: '<0' });
     const leading = root.querySelector('[data-band-strip-leading-tick]');
@@ -272,7 +275,11 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
     press(handles(root)[0], 'Home');
     assert.deepEqual(writes.at(-1), { binding: 'relative', index: 1, dc: -9 }, 'absolute 3, not 2');
     press(handles(root).at(-1), 'End');
-    assert.deepEqual(writes.at(-1), { binding: 'relative', index: 4, dc: 14 }, 'absolute 26, not 27');
+    assert.deepEqual(
+      writes.at(-1),
+      { binding: 'relative', index: 4, dc: 14 },
+      'absolute 26, not 27'
+    );
   });
 
   it('takes the fixed domain from the authored span, whose last band ends INCLUSIVELY', async () => {
@@ -719,7 +726,9 @@ describe('ThresholdBandStrip: readonly', () => {
     const root = await harness.mount({ bands, readonly: true });
     assert.ok(!root.querySelector('[role="slider"]'), 'no slider role on a count strip');
     assert.deepEqual(
-      [...root.querySelectorAll('[data-band-strip-band-list] li')].map((item) => item.textContent.trim()),
+      [...root.querySelectorAll('[data-band-strip-band-list] li')].map((item) =>
+        item.textContent.trim()
+      ),
       ['Botch: below 0', 'Ruined: 0–1', 'Success: 2', 'Fine: 3–4', 'Masterwork: 5 or more']
     );
     assert.deepEqual(
@@ -743,7 +752,15 @@ const clock = (value) => `${String(value % 24).padStart(2, '0')}:00`;
 const percentOnDay = (value) => ((value - 4) / 24) * 100;
 const leftOf = (element) => Number(/left:\s*([\d.]+)%/.exec(element.getAttribute('style'))?.[1]);
 const CLOCK = { id: 'clock', value: 14.5, label: 'World clock', valueText: '14:30' };
-const CURRENT = { id: 'current', value: 12.5, label: 'Current time of day', draggable: true, snap: 'band' };
+const CURRENT = {
+  id: 'current',
+  value: 12.5,
+  label: 'Current time of day',
+  draggable: true,
+  snap: 'band',
+};
+/** The same day authored Night-first, so each band's authored index differs from its place. */
+const REVERSED_HOURS = HOURS.toReversed().map((band, index) => ({ ...band, index }));
 
 /** The bar the time-of-day caller configures, with the writes it receives. */
 async function mountDay(props = {}) {
@@ -774,15 +791,25 @@ async function mountDay(props = {}) {
 
 const marker = (root, id = 'current') => root.querySelector(`[data-band-strip-marker="${id}"]`);
 const railButtons = (root) => [...root.querySelectorAll('[data-band-strip-add]')];
+/** happy-dom measures everything as zero, so a gesture needs the track's width stated. */
+function stubTrack(root, width = 240) {
+  root.querySelector('[data-band-strip-track]').getBoundingClientRect = () => ({
+    left: 0,
+    width,
+    right: width,
+    top: 0,
+    bottom: 46,
+  });
+}
 
 describe('ThresholdBandStrip: the start binding', () => {
   it('writes the start of the band beginning at the handle, through its authored index', async () => {
-    const { root, writes } = await mountDay({
-      bands: HOURS.toReversed().map((band, index) => ({ ...band, index })),
-    });
+    const { root, writes } = await mountDay({ bands: REVERSED_HOURS });
     assert.equal(handles(root).length, 3, 'the first start has no handle');
     press(handles(root)[0], 'ArrowRight');
-    assert.deepEqual(writes, [['band', { binding: 'start', index: 2, start: 9 }, { phase: 'commit' }]]);
+    assert.deepEqual(writes, [
+      ['band', { binding: 'start', index: 2, start: 9 }, { phase: 'commit' }],
+    ]);
   });
 
   it('announces each boundary through formatValue and names it by the band it starts', async () => {
@@ -809,7 +836,9 @@ describe('ThresholdBandStrip: formatted values, sublabels and the tick toggle', 
   it('formats every tick through formatValue, and String by default', async () => {
     const formatted = await harness.mount({ bands: RELATIVE_BANDS, formatValue: (v) => `<${v}>` });
     assert.deepEqual(
-      [...formatted.querySelectorAll('.fab-band-strip-tick')].map((tick) => tick.textContent.trim()),
+      [...formatted.querySelectorAll('.fab-band-strip-tick')].map((tick) =>
+        tick.textContent.trim()
+      ),
       ['<7>', '<12>', '<17>', '<22>']
     );
   });
@@ -822,7 +851,9 @@ describe('ThresholdBandStrip: formatted values, sublabels and the tick toggle', 
   it("draws each band's range under its name only when rangeSublabels is set", async () => {
     const { root } = await mountDay();
     assert.deepEqual(
-      [...root.querySelectorAll('[data-band-strip-range]')].map((range) => range.textContent.trim()),
+      [...root.querySelectorAll('[data-band-strip-range]')].map((range) =>
+        range.textContent.trim()
+      ),
       ['04–08', '08–17', '17–21', '21–04']
     );
     for (const range of root.querySelectorAll('[data-band-strip-range]')) {
@@ -904,6 +935,21 @@ describe('ThresholdBandStrip: a draggable band marker', () => {
     assert.deepEqual(nightWrites, [], 'clamped at the last band: nothing to write');
   });
 
+  it('writes the authored index of the band it reaches when the list is authored high-to-low', async () => {
+    const { root, writes } = await mountDay({ bands: REVERSED_HOURS, markers: [CURRENT] });
+    press(marker(root), 'ArrowRight');
+    assert.deepEqual(writes[0][1], { id: 'current', value: 19, index: 1 });
+  });
+
+  it('pages a grid-snapped marker by pageStep stops', async () => {
+    const hour = { id: 'hour', value: 9, label: 'Hour', draggable: true };
+    const { root, writes } = await mountDay({ markers: [hour], pageStep: 5 });
+    press(marker(root, 'hour'), 'PageUp');
+    assert.deepEqual(writes, [
+      ['marker', { id: 'hour', value: 14, index: 1 }, { phase: 'commit' }],
+    ]);
+  });
+
   it('selects the band under the pointer while dragging, and commits it on release', async () => {
     const { root, writes } = await mountDay({ markers: [CURRENT] });
     const track = root.querySelector('[data-band-strip-track]');
@@ -932,6 +978,31 @@ describe('ThresholdBandStrip: a draggable band marker', () => {
     const { root, writes } = await mountDay({ markers: [CURRENT], disabled: true });
     assert.equal(marker(root).getAttribute('tabindex'), '-1');
     press(marker(root), 'ArrowRight');
+    stubTrack(root);
+    marker(root).dispatchEvent(pointer('pointerdown', 85));
+    marker(root).dispatchEvent(pointer('pointermove', 140));
+    marker(root).dispatchEvent(pointer('pointerup', 140));
+    assert.deepEqual(writes, []);
+  });
+
+  it('commits nothing when the dot is pressed and released without a move', async () => {
+    const { root, writes } = await mountDay({ markers: [CURRENT] });
+    stubTrack(root);
+    marker(root).dispatchEvent(pointer('pointerdown', 85));
+    marker(root).dispatchEvent(pointer('pointerup', 85));
+    assert.deepEqual(writes, []);
+  });
+
+  it('commits nothing for a press and release after a completed drag', async () => {
+    const { root, writes } = await mountDay({ markers: [CURRENT] });
+    stubTrack(root);
+    const dot = marker(root);
+    dot.dispatchEvent(pointer('pointerdown', 85));
+    dot.dispatchEvent(pointer('pointermove', 140));
+    dot.dispatchEvent(pointer('pointerup', 140));
+    writes.length = 0;
+    dot.dispatchEvent(pointer('pointerdown', 85));
+    dot.dispatchEvent(pointer('pointerup', 85));
     assert.deepEqual(writes, []);
   });
 });
@@ -939,8 +1010,7 @@ describe('ThresholdBandStrip: a draggable band marker', () => {
 describe('ThresholdBandStrip: drag and commit phases on the handles', () => {
   it('emits drag on pointer moves, re-emits the last patch as commit on release', async () => {
     const { root, writes } = await mountDay();
-    const track = root.querySelector('[data-band-strip-track]');
-    track.getBoundingClientRect = () => ({ left: 0, width: 240, right: 240, top: 0, bottom: 46 });
+    stubTrack(root);
     const handle = handles(root)[0];
     handle.dispatchEvent(pointer('pointerdown', 40));
     handle.dispatchEvent(pointer('pointermove', 50)); // 9
@@ -956,11 +1026,83 @@ describe('ThresholdBandStrip: drag and commit phases on the handles', () => {
     );
   });
 
+  it('commits where the pointer is released, even back at its start', async () => {
+    const { root, writes } = await mountDay();
+    stubTrack(root);
+    const handle = handles(root)[0];
+    handle.dispatchEvent(pointer('pointerdown', 40));
+    handle.dispatchEvent(pointer('pointermove', 60)); // 10
+    handle.dispatchEvent(pointer('pointermove', 40)); // 8, the start
+    handle.dispatchEvent(pointer('pointerup', 40));
+    assert.deepEqual(
+      writes.map(([, patch, meta]) => [patch.start, meta.phase]),
+      [
+        [10, 'drag'],
+        [8, 'drag'],
+        [8, 'commit'],
+      ]
+    );
+  });
+
+  for (const end of ['pointercancel', 'lostpointercapture']) {
+    it(`commits on ${end} as on pointerup, for a divider and the dot`, async () => {
+      const { root, writes } = await mountDay({ markers: [CURRENT] });
+      stubTrack(root);
+      const handle = handles(root)[0];
+      handle.dispatchEvent(pointer('pointerdown', 40));
+      handle.dispatchEvent(pointer('pointermove', 60)); // 10
+      handle.dispatchEvent(pointer(end, 60));
+      const dot = marker(root);
+      dot.dispatchEvent(pointer('pointerdown', 85));
+      dot.dispatchEvent(pointer('pointermove', 140)); // 18, in Dusk
+      dot.dispatchEvent(pointer(end, 140));
+      const start = { binding: 'start', index: 1, start: 10 };
+      const dusk = { id: 'current', value: 19, index: 2 };
+      assert.deepEqual(writes, [
+        ['band', start, { phase: 'drag' }],
+        ['band', start, { phase: 'commit' }],
+        ['marker', dusk, { phase: 'drag' }],
+        ['marker', dusk, { phase: 'commit' }],
+      ]);
+    });
+  }
+
   it('commits nothing for a press and release with no move', async () => {
     const { root, writes } = await mountDay();
     handles(root)[0].dispatchEvent(pointer('pointerdown', 40));
     handles(root)[0].dispatchEvent(pointer('pointerup', 40));
     assert.deepEqual(writes, []);
+  });
+
+  it('commits nothing for a press and release after a completed drag', async () => {
+    const { root, writes } = await mountDay();
+    stubTrack(root);
+    const handle = handles(root)[0];
+    handle.dispatchEvent(pointer('pointerdown', 40));
+    handle.dispatchEvent(pointer('pointermove', 50));
+    handle.dispatchEvent(pointer('pointerup', 50));
+    writes.length = 0;
+    handle.dispatchEvent(pointer('pointerdown', 40));
+    handle.dispatchEvent(pointer('pointerup', 40));
+    assert.deepEqual(writes, []);
+  });
+
+  it("re-sends a check strip's last drag once on release, an identical write", async () => {
+    const calls = [];
+    const root = await harness.mount({
+      ...CHECK_CALLER_STRIPS[0].props,
+      onChange: (patch, meta) => calls.push([patch, meta.phase]),
+    });
+    stubTrack(root, 250);
+    const handle = handles(root)[1];
+    handle.dispatchEvent(pointer('pointerdown', 100));
+    handle.dispatchEvent(pointer('pointermove', 110)); // 13, one step past 12
+    handle.dispatchEvent(pointer('pointerup', 110));
+    const patch = { binding: 'relative', index: 2, dc: 1 };
+    assert.deepEqual(calls, [
+      [patch, 'drag'],
+      [patch, 'commit'],
+    ]);
   });
 });
 
@@ -999,6 +1141,16 @@ describe('ThresholdBandStrip: the add rail', () => {
     ]);
   });
 
+  it("emits each band's authored index when the list is authored high-to-low", async () => {
+    const { root, writes } = await mountDay({ addable: true, bands: REVERSED_HOURS });
+    railButtons(root)[1].click();
+    railButtons(root)[3].click();
+    assert.deepEqual(writes, [
+      ['add', { index: 2, value: 12 }],
+      ['add', { index: 0, value: 24 }],
+    ]);
+  });
+
   it('seeds a two-step band at its start plus one step', async () => {
     const { root, writes } = await mountDay({
       addable: true,
@@ -1018,10 +1170,36 @@ describe('ThresholdBandStrip: the add rail', () => {
     };
     assert.deepEqual(stops(), ['0', '-1', '-1', '-1']);
     assert.deepEqual(await pressed(0, 'ArrowRight'), ['-1', '0', '-1', '-1']);
-    assert.equal(document.activeElement, railButtons(root)[1]);
+    assert.ok(document.activeElement === railButtons(root)[1], 'focus moves to the next add');
     assert.deepEqual(await pressed(1, 'End'), ['-1', '-1', '-1', '0']);
     assert.deepEqual(await pressed(3, 'ArrowRight'), ['-1', '-1', '-1', '0'], 'clamped');
     assert.deepEqual(await pressed(3, 'Home'), ['0', '-1', '-1', '-1']);
+  });
+
+  it('moves the tab stop to a button focused by pointer or Tab', async () => {
+    const { root } = await mountDay({ addable: true });
+    railButtons(root)[2].focus();
+    await harness.setProps({});
+    assert.deepEqual(
+      railButtons(root).map((button) => button.getAttribute('tabindex')),
+      ['-1', '-1', '0', '-1']
+    );
+  });
+
+  it('keeps one tab stop when the rail loses its last button', async () => {
+    const { root } = await mountDay({ addable: true });
+    press(railButtons(root)[0], 'End');
+    await harness.setProps({});
+    await harness.setProps({ bands: [HOURS[0], HOURS[1], HOURS[2], { ...HOURS[3], from: 27 }] });
+    assert.deepEqual(
+      railButtons(root).map((button) => button.getAttribute('tabindex')),
+      ['-1', '-1', '0']
+    );
+  });
+
+  it('disables every add when the strip is disabled', async () => {
+    const { root } = await mountDay({ addable: true, disabled: true });
+    assert.ok(railButtons(root).every((button) => button.disabled));
   });
 
   it('follows the dot and the dividers in document order', async () => {
@@ -1035,5 +1213,12 @@ describe('ThresholdBandStrip: the add rail', () => {
   it('renders no rail unless addable', async () => {
     const { root } = await mountDay();
     assert.ok(!root.querySelector('[data-band-strip-rail]'));
+  });
+
+  it('draws neither the rail nor a draggable marker when readonly', async () => {
+    const { root } = await mountDay({ readonly: true, addable: true, markers: [CURRENT] });
+    assert.ok(!root.querySelector('[data-band-strip-rail]'), 'no rail');
+    assert.ok(!marker(root), 'no dot');
+    assert.ok(!root.querySelector('.fab-band-strip.has-marker-lane'), 'no lane reserved');
   });
 });

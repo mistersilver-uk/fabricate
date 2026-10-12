@@ -174,7 +174,10 @@ const MOUNTS = Object.freeze({
         { id: 'dusk', name: 'Dusk', from: 17 },
         { id: 'night', name: 'Night', from: 20 },
       ],
-      markers: [{ id: 'current', value: 18.5, label: 'Now', draggable: true, snap: 'band' }],
+      markers: [
+        { id: 'current', value: 18.5, label: 'Now', draggable: true, snap: 'band' },
+        { id: 'clock', value: 17, label: 'Clock' },
+      ],
     },
   },
   componentChip: {
@@ -745,6 +748,9 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
       const dividers = [...root.querySelectorAll('[data-band-strip-handle]')];
       return {
         dot: rect(dot),
+        dotPaint: rect(dot.querySelector('.fab-band-strip-dot')),
+        track: rect(root.querySelector('[data-band-strip-track]')),
+        duskBand: rect(root.querySelector('[data-band-strip-band="dusk"]')),
         rail: rect(dusk),
         dividers: dividers.map(rect),
         dotOwnsCentre: owns(dot),
@@ -763,6 +769,16 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
         assert.ok(!overlaps(box, divider), `${name} meets a divider: ${JSON.stringify(divider)}`);
       }
     }
+    const paintMid = (bar.dotPaint.top + bar.dotPaint.bottom) / 2;
+    assert.ok(
+      Math.abs(paintMid - bar.track.top) <= 0.5,
+      `the dot straddles the track's top edge: ${paintMid} vs ${bar.track.top}`
+    );
+    const dotMid = (bar.dot.left + bar.dot.right) / 2;
+    assert.ok(
+      dotMid > bar.duskBand.left && dotMid < bar.duskBand.right,
+      'the dot sits over its band'
+    );
     assert.ok(bar.dotOwnsCentre, 'the dot resolves at its own centre');
     assert.ok(bar.railOwnsCentre, 'the rail button resolves at its own centre');
     assert.deepEqual(bar.dividersOwnCentres, [true, true, true]);
