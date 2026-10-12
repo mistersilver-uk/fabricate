@@ -2728,3 +2728,266 @@ describe('a Primitive Lab file is not a render file (issue 2382)', () => {
     }
   });
 });
+
+describe('publishing design-library frames (issue 2413)', () => {
+  const PR = 2413;
+  const HEAD = 'deadbee';
+  const CONFIG = { bucket: 'b', baseUrl: 'https://b.example', prefix: 'pr-screenshots' };
+  const FRAME = Object.freeze({
+    id: '3-0-stepper',
+    label: 'Library · Stepper · formatted',
+    note: '`library.html` (left) · Primitive Lab (right) · 1 row(s) of `src/ui/svelte/components/Stepper.svelte`',
+    targets: ['row:controls/4'],
+    rows: 1,
+  });
+  const manifestOf = (overrides = {}) => ({
+    head: 'f00d',
+    foundryVersion: '14.365',
+    frames: [FRAME],
+    failures: [],
+    overflow: [],
+    labProblems: [],
+    timings: { bootMs: 1, perUnitMs: [1], totalMs: 2 },
+    ...overrides,
+  });
+
+  // Lays out an artifact, publishes it, and returns what reached S3 and the PR body. `library.files`
+  // are PNG names; `library.manifest` is an object, a raw string, or absent.
+  async function publishLibrary({ apps = [], library, targets = '', body = 'Body.', putObject } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-library-publish-'));
+    const appsDir = join(root, 'ui-screenshot-artifact/apps');
+    const libraryDir = join(root, 'ui-screenshot-artifact/library');
+    if (apps.length > 0) mkdirSync(appsDir, { recursive: true });
+    for (const name of apps) writeFileSync(join(appsDir, name), 'app');
+    if (library) {
+      mkdirSync(libraryDir, { recursive: true });
+      for (const name of library.files ?? []) writeFileSync(join(libraryDir, name), 'png');
+      if (library.manifest !== undefined) {
+        const raw = typeof library.manifest === 'string' ? library.manifest : JSON.stringify(library.manifest);
+        writeFileSync(join(libraryDir, 'manifest.json'), raw);
+      }
+    }
+    const puts = [];
+    const edits = [];
+    const runGh = (args) => {
+      if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
+      if (args[1] === 'view') return { status: 0, stdout: body, stderr: '' };
+      if (args[1] === 'edit') {
+        edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+        return { status: 0, stdout: '', stderr: '' };
+      }
+      return { status: 1, stdout: '', stderr: `unexpected ${args.join(' ')}` };
+    };
+    try {
+      const result = await publishScreenshotEvidence({
+        prNumber: PR,
+        headSha: HEAD,
+        root,
+        dir: 'ui-screenshot-artifact/apps',
+        libraryDir: 'ui-screenshot-artifact/library',
+        libraryTargets: targets,
+        runGh,
+        config: CONFIG,
+        putObject: putObject ?? (async (object) => { puts.push(object); }),
+      });
+      return { result, puts, written: edits.at(-1) ?? null, edits, appsDir };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  const librarySection = (written) => written.slice(written.indexOf('### Library'), written.indexOf('<!-- fabricate:screenshots:end -->'));
+
+  it('publishes a Library-only block when the apps directory is absent', async () => {
+    const { result, puts, written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.equal(result.skipped, false);
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+    assert.equal(puts[0].contentType, 'image/png');
+    assert.match(written, /## Screenshots\n\n### Library\n/);
+    assert.ok(written.includes(`![pr-${PR} Library · Stepper · formatted](https://b.example/pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png)`), written);
+    assert.ok(written.includes(`> ${FRAME.note}`), written);
+    assert.doesNotMatch(written, /Not captured/);
+  });
+
+  it('places the Library section after the app frames, inside one managed block', async () => {
+    const { puts, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.deepEqual(puts.map(put => put.key), [
+      `pr-screenshots/${PR}/${HEAD}/manager-tools.png`,
+      `pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`,
+    ]);
+    assert.ok(written.indexOf('manager-tools.png') < written.indexOf('### Library'), written);
+    assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
+  });
+
+  it('never writes the body file into the apps output directory', async () => {
+    const { result, appsDir } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.ok(!result.bodyFile.startsWith(appsDir), result.bodyFile);
+    assert.ok(!result.bodyFile.startsWith(result.destinationRoot), result.bodyFile);
+  });
+
+  it('still publishes library PNGs that arrive with no manifest, and says it could not reconcile', async () => {
+    const { puts, written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'] },
+      targets: 'row:controls/4,row:controls/5',
+    });
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+    assert.match(written, /!\[pr-2413 Library · 3-0-stepper\]/);
+    assert.match(librarySection(written), /\*\*Not captured\*\*\n\n- the library manifest is missing.*2 selected unit\(s\)/);
+  });
+
+  it('catches an unparseable manifest rather than failing the publish', async () => {
+    const { result, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: '{ not json' },
+      targets: 'row:controls/4',
+    });
+    assert.equal(result.skipped, false);
+    assert.match(written, /manager-tools\.png/);
+    assert.match(librarySection(written), /the library manifest is unreadable/);
+  });
+
+  it('rewrites the block when units were selected but no file arrived, so no stale Library frame survives', async () => {
+    const stale = upsertScreenshotsBlock(
+      'Body.',
+      `### Library\n\n![pr-${PR} Library · Old](https://b.example/pr-screenshots/${PR}/0ld/library/1-0-old.png)`,
+    );
+    const { result, puts, written } = await publishLibrary({ targets: 'row:controls/4', body: stale });
+    assert.equal(result.skipped, false);
+    assert.equal(puts.length, 0);
+    assert.doesNotMatch(written, /1-0-old/);
+    assert.match(librarySection(written), /library capture produced no frames; see the run log/);
+    assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
+  });
+
+  it('skips only when there are no images and no selected units', async () => {
+    const { result, edits } = await publishLibrary({ library: { manifest: manifestOf({ frames: [] }) } });
+    assert.equal(result.skipped, true);
+    assert.equal(edits.length, 0);
+  });
+
+  it('keeps the app frames when every library upload throws', async () => {
+    const puts = [];
+    const putObject = async (object) => {
+      if (object.key.includes('/library/')) throw new Error('AccessDenied <boom>');
+      puts.push(object);
+    };
+    const { result, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+      putObject,
+    });
+    assert.equal(result.skipped, false);
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/manager-tools.png`]);
+    assert.match(written, /!\[pr-2413 manager-tools\]\(https:\/\/b\.example\/pr-screenshots\/2413\/deadbee\/manager-tools\.png\)/);
+    const section = librarySection(written);
+    assert.match(section, /library capture produced no frames/);
+    assert.match(section, /- Library · Stepper · formatted: upload failed: AccessDenied &lt;boom&gt;/);
+  });
+
+  it('reconciles the selection against the manifest, naming every unit not captured', async () => {
+    const manifest = manifestOf({
+      frames: [FRAME, { ...FRAME, id: '4-1-missing', label: 'Library · Gone', targets: ['entry:4'] }],
+      failures: [{ id: 'unit:7.0', reason: 'heading mismatch' }, { id: 'unit:8.1', reason: 'deadline' }],
+      overflow: ['row:actions/2'],
+      labProblems: ['console error: boom'],
+    });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest },
+      targets: 'row:controls/4,entry:4,unit:7.0,unit:8.1,row:actions/2,row:actions/9,unlocated:openspec/specs/design-system/library.html:2',
+    });
+    const section = librarySection(written);
+    for (const line of [
+      '- could not locate 2 hunk(s) in openspec/specs/design-system/library.html; touched units may be missing',
+      '- unit:7.0: heading mismatch',
+      '- unit:8.1: deadline',
+      '- row:actions/2: over the library unit cap',
+      '- row:actions/9: no record in the library manifest',
+      '- Library · Gone: image missing from the artifact',
+      '- Primitive Lab reported: console error: boom',
+    ]) {
+      assert.ok(section.includes(line), `${line}\n---\n${section}`);
+    }
+    assert.ok(!section.includes('- row:controls/4'), 'a captured unit is not listed');
+    assert.ok(!section.includes('- entry:4:'), 'a unit whose frame was recorded is accounted for');
+  });
+
+  it('escapes and cuts every manifest-sourced string', async () => {
+    const hostile = String.raw`<script>x</script>](javascript:alert(1)) \ <!-- fabricate:screenshots:end -->` + 'y'.repeat(400);
+    const manifest = manifestOf({
+      frames: [{ ...FRAME, label: hostile, note: hostile }],
+      failures: [{ id: hostile, reason: hostile }],
+    });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest },
+      targets: 'row:controls/4',
+    });
+    assert.equal((written.match(/fabricate:screenshots:end/g) || []).length, 1, written);
+    const section = librarySection(written);
+    assert.doesNotMatch(section, /<script|<!--/);
+    assert.match(section, /&lt;script&gt;x&lt;\/script&gt;\\\]\(javascript:alert\(1\)\) \\\\ /);
+    assert.doesNotMatch(section, /y{201}/);
+    assert.match(section, /y{100}/);
+  });
+
+  it('lists at most 20 entries under Not captured, then points at the run log', async () => {
+    const failures = Array.from({ length: 30 }, (_, index) => ({ id: `unit:${index}.0`, reason: 'deadline' }));
+    const { written } = await publishLibrary({
+      library: { manifest: manifestOf({ frames: [], failures }) },
+      targets: failures.map(failure => failure.id).join(','),
+    });
+    const section = librarySection(written);
+    assert.equal((section.match(/^- unit:/gm) || []).length, 20);
+    assert.match(section, /^- and 10 more; see the run log$/m);
+  });
+
+  it('caps the Library section at 20,000 characters', async () => {
+    const frames = Array.from({ length: 60 }, (_, index) => ({
+      ...FRAME,
+      id: `${index}-0-wide`,
+      label: '<'.repeat(200),
+      note: '>'.repeat(200),
+      targets: [`entry:${index}`],
+    }));
+    const { written } = await publishLibrary({
+      library: { files: frames.map(frame => `${frame.id}.png`), manifest: manifestOf({ frames }) },
+      targets: frames.map(frame => frame.targets[0]).join(','),
+    });
+    const section = librarySection(written);
+    assert.ok(section.length <= 20_000, `the Library section is ${section.length} characters`);
+    assert.match(section, /\d+ more frame\(s\) omitted to keep this section under 20,000 characters; see the run log/);
+  });
+
+  it('wires --library-dir and --library-targets through the publish command', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-library-cli-'));
+    try {
+      const libraryDir = join(root, 'library');
+      mkdirSync(libraryDir, { recursive: true });
+      writeFileSync(join(libraryDir, '3-0-stepper.png'), 'png');
+      writeFileSync(join(libraryDir, 'manifest.json'), JSON.stringify(manifestOf()));
+      const puts = [];
+      const runGh = (args) => ({ status: 0, stdout: args[0] === 'auth' ? 'ok' : 'Body.', stderr: '' });
+      const lines = await captureLog(() => main(
+        ['publish', '--pr', String(PR), '--output-dir', join(root, 'apps'), '--head-sha', HEAD,
+          '--library-dir', libraryDir, '--library-targets', 'row:controls/4,row:controls/9'],
+        { runGh, putObject: async (object) => { puts.push(object); }, config: CONFIG },
+      ));
+      assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+      assert.ok(lines.some(line => /library\/3-0-stepper\.png$/.test(line)), lines.join('\n'));
+      assert.ok(lines.includes('Library not captured: row:controls/9: no record in the library manifest'), lines.join('\n'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
