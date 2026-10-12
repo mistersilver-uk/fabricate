@@ -64,6 +64,8 @@ Tags are assigned to components in the component editor only.
 They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
 
 A tag's reference count on this screen includes both the components that carry it and the recipe ingredients that filter on it.
+The count beside a tag in a recipe's or Tool's tag adder is narrower than this screen's reference count.
+It counts only the components carrying that exact tag, not the recipe ingredients that filter on it, and it does not merge spellings that differ only in case.
 Removing a tag is reference-safe.
 A tag with no references deletes in one click, and a referenced tag opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many references will lose the tag.

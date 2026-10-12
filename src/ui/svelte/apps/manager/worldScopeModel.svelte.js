@@ -4,6 +4,7 @@
  * Every root value is a thunk read at call time; a record opens through the root's
  * `openWorldScopedEntry`.
  */
+import { countComponentsByTag } from '../../../model/vocabularyUsage.js';
 import { resolveDropUuid } from '../../util/dropUtils.js';
 import { notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
 
@@ -88,6 +89,12 @@ function createCorpus({ viewState, selectedSystemId, selectedEssenceForInspector
       ),
     ].sort((left, right) => String(left).localeCompare(String(right)))
   );
+  // The world Tool repair adder's count: world catalogue components authoring each tag as a default.
+  const worldComponentTagCounts = $derived(
+    countComponentsByTag(
+      (worldScopeState.component?.entries ?? []).map((entry) => ({ tags: entry.defaults?.tags }))
+    )
+  );
   const inspectedEssenceWorldEntry = $derived(
     (worldScopeState.essence?.entries ?? []).find(
       (candidate) => candidate?.id === selectedEssenceForInspector()?.id
@@ -120,6 +127,9 @@ function createCorpus({ viewState, selectedSystemId, selectedEssenceForInspector
     },
     get worldComponentTags() {
       return worldComponentTags;
+    },
+    get worldComponentTagCounts() {
+      return worldComponentTagCounts;
     },
     get inspectedEssenceWorldEntry() {
       return inspectedEssenceWorldEntry;

@@ -191,6 +191,7 @@ function createStore(calls = [], options = {}) {
       // precedence cases resolve `componentId` against their own fixtures); defaults to
       // the alchemy list every other test relies on.
       managedItemOptions: options.managedItemOptions ?? alchemyManagedItemOptions,
+      componentTagOptions: options.componentTagOptions,
       // System-level recipe visibility config (issue 511).
       recipeVisibility: options.recipeVisibility,
       // Recipe items (cook books / scrolls) surfaced by the Books & Scrolls management surface

@@ -60,6 +60,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     currencyUnits = [],
     // THE `PREVIEW AS` SEAM: `{id, name, img}` per actor and a reader for one actor's prepared
     // roll data, both the SHELL'S, because resolving an Actor is a Foundry read and this is a leaf.
@@ -138,8 +139,6 @@
     return result;
   }
 
-  /**
-   */
   function sectionLabel(section) {
     return scopedSectionLabel(section, text);
   }
@@ -1166,6 +1165,7 @@
                 groups={repairGroups}
                 {componentOptions}
                 {itemTags}
+                {tagComponentCounts}
                 {essenceOptions}
                 {currencyUnits}
                 currencyEnabled={true}
