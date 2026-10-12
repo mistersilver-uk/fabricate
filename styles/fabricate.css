@@ -13057,9 +13057,9 @@
   grid-template-columns: 38px minmax(0, 1fr) max-content max-content;
 }
 
-/* The fallback note keeps the bar's footprint: the 13px dot lane, the 46px track and the 24px rail. */
+/* The fallback note keeps the bar's footprint, so stepping a pill through a duplicate hour does not shift the form. */
 .fabricate-manager .manager-time-of-day-bar.fab-band-strip-fallback {
-  min-height: calc(13px + 46px + var(--fab-space-2xs) + 24px);
+  min-height: 85px; /* 13px dot lane + 46px track + 2px rail gap + 24px rail */
 }
 
 /* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the sibling input at `.manager-condition-add input` below and is the only reason the row's controls line up. */
