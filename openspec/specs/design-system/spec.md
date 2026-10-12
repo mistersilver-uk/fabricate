@@ -1571,6 +1571,7 @@ That number is how many of the site's components carry the tag exactly, the comp
 A tag already on the row that the vocabulary holds is listed SELECTED — the shared picker's multi-select state, announced as selected and marked with a check — so the panel doubles as the row's current state, and choosing a selected tag takes it off the row exactly as its chip's remove does.
 Each choice writes at once, and the list keeps vocabulary order, so a choice moves no row.
 The panel stays open across choices.
+The panel opens at a 300px minimum rather than the picker's 240px floor, so a held tag's name, its count and its check read whole at ordinary tag lengths; a longer name ellipsizes and keeps its full spelling as the row's title.
 Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
 The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
 Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.

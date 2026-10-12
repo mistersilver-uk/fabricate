@@ -312,6 +312,7 @@
         multiple
         value={tags}
         pickerClass="manager-recipe-tag-picker"
+        minWidth={300}
         triggerClass="manager-recipe-tag-trigger"
         triggerIcon="fa-solid fa-plus"
         triggerLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
