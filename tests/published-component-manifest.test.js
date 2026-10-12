@@ -1,8 +1,9 @@
 /**
  * The published component manifest (issue 2426) against each component's parsed declaration: its
- * props, rest and data-only kinds, and a stylesheet and template that need no Fabricate ancestor,
- * its own and every component it imports. The test-only probe runs beside the shipped entries; the
- * adapter's binding of each path is the mounted suite's.
+ * props, rest and data-only kinds, then its import closure, every `.svelte` and `.js` file it
+ * reaches: a stylesheet and template that need no Fabricate ancestor, and no read of a Foundry
+ * global. The test-only probe runs beside the shipped entries; the adapter's binding of each path
+ * is the mounted suite's.
  */
 import assert from 'node:assert/strict';
 import { posix } from 'node:path';
@@ -12,13 +13,51 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
-import { walkNodes } from './helpers/moduleAst.js';
-import { componentAstOf } from './helpers/parsedSource.js';
+import {
+  importedModules,
+  lazilyImportedModules,
+  parseModule,
+  walkNodes,
+} from './helpers/moduleAst.js';
+import { componentAstOf, componentScopeOf, moduleAstOf } from './helpers/parsedSource.js';
+import { parseComponentScope, readsGlobal } from './helpers/svelteStructureContract.js';
 
 const byName = (a, b) => a.localeCompare(b);
 
 const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
-const APP_TOKENS = ['var(--fab-manager-', 'var(--font-primary'];
+const APP_TOKENS = ['var(--fab-manager-'];
+// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
+const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
+const FOUNDRY_GLOBALS = [
+  'game',
+  'foundry',
+  'Hooks',
+  'CONFIG',
+  'CONST',
+  'ui',
+  'canvas',
+  'fromUuid',
+  'fromUuidSync',
+  'getDocumentClass',
+];
+
+/** The three parses the gate reads of a file: a component, its scopes, and a plain module. */
+const SHIPPED = Object.freeze({
+  component: componentAstOf,
+  componentScope: componentScopeOf,
+  module: moduleAstOf,
+});
+
+/** The same three parses over `sources`, a map of path to text. */
+function syntheticReader(sources) {
+  return {
+    component: (file) => templateOf(file, sources[file]).ast,
+    componentScope: (file) => parseComponentScope(sources[file]),
+    module: (file) => parseModule(sources[file]),
+  };
+}
+
+const isComponent = (file) => file.endsWith('.svelte');
 
 /** Each `$props()` key with its local name and whether it is `$bindable`. */
 function propLocals(ast) {
@@ -57,6 +96,9 @@ function ancestorDependencies(ast) {
     if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
     if (node.type !== 'Declaration') continue;
     for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
+    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
+      found.add('unguarded var(--font-primary)');
+    }
   }
   for (const node of walkNodes(ast.fragment)) {
     if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
@@ -64,25 +106,34 @@ function ancestorDependencies(ast) {
   return [...found].sort(byName);
 }
 
-/** The component at `path` and every relative `.svelte` file it reaches by static import. */
-function componentClosure(path, astOf, seen = new Set()) {
+/**
+ * The file at `path` and every relative `.svelte` or `.js` file it reaches by `import`,
+ * `export … from`, `export * from` or a literal `import()`, so a re-export-only barrel is walked.
+ */
+function importClosure(path, reader, seen = new Set()) {
   if (seen.has(path)) return seen;
   seen.add(path);
-  const ast = astOf(path);
-  for (const script of [ast.module, ast.instance]) {
-    for (const node of script?.content.body ?? []) {
-      const specifier = node.type === 'ImportDeclaration' ? node.source.value : '';
-      if (!specifier.startsWith('.') || !specifier.endsWith('.svelte')) continue;
-      componentClosure(posix.join(posix.dirname(path), specifier), astOf, seen);
-    }
+  const ast = isComponent(path) ? reader.component(path) : reader.module(path).ast;
+  for (const specifier of [...importedModules(ast), ...lazilyImportedModules(ast)]) {
+    if (!specifier.startsWith('.') || !/\.(?:svelte|js)$/.test(specifier)) continue;
+    importClosure(posix.join(posix.dirname(path), specifier), reader, seen);
   }
   return seen;
 }
 
-/** Each ancestor dependency in a component's closure, as `<file>: <rule>`. */
-function closureDependencies(path, astOf = componentAstOf) {
-  return [...componentClosure(path, astOf)].flatMap((file) =>
-    ancestorDependencies(astOf(file)).map((rule) => `${file}: ${rule}`)
+/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
+function foundryReads(file, reader) {
+  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
+  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
+}
+
+/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
+function closureDependencies(path, reader = SHIPPED) {
+  return [...importClosure(path, reader)].flatMap((file) =>
+    [
+      ...(isComponent(file) ? ancestorDependencies(reader.component(file)) : []),
+      ...foundryReads(file, reader),
+    ].map((rule) => `${file}: ${rule}`)
   );
 }
 
@@ -135,7 +186,7 @@ describe('each entry matches its component declaration', () => {
       }
     });
 
-    it(`${entry.name} styles itself without a Fabricate ancestor`, () => {
+    it(`${entry.name} needs no Fabricate ancestor and reads no Foundry global, closure included`, () => {
       assert.deepEqual(closureDependencies(entry.path), []);
     });
   }
@@ -161,8 +212,7 @@ describe('each entry matches its component declaration', () => {
         "<script module>import Deep from '../deep/Deep.svelte';</script><script>import Cycle from './Cycle.svelte';</script><Deep /><Cycle />",
       'src/deep/Deep.svelte': '<style>:global(.fabricate-app) .a { color: red; }</style>',
     };
-    const astOf = (file) => templateOf(file, sources[file]).ast;
-    assert.deepEqual(closureDependencies('src/Entry.svelte', astOf), [
+    assert.deepEqual(closureDependencies('src/Entry.svelte', syntheticReader(sources)), [
       'src/Entry.svelte: .visually-hidden',
       'src/deep/Deep.svelte: app-root selector',
     ]);
@@ -181,12 +231,72 @@ describe('each entry matches its component declaration', () => {
       '.visually-hidden',
       '@container',
       'app-root selector',
+      'unguarded var(--font-primary)',
       'var(--fab-manager-',
-      'var(--font-primary',
     ]);
     for (const root of ['.fabricate', '.fabricate-app']) {
       const scoped = templateOf('Root.svelte', `<style>:global ${root} .a { color: red; }</style>`);
       assert.deepEqual(ancestorDependencies(scoped.ast), ['app-root selector'], root);
     }
+  });
+
+  const faceRule = (value) =>
+    ancestorDependencies(
+      templateOf('Face.svelte', `<style>.a { font-family: ${value}; }</style>`).ast
+    );
+
+  for (const value of [
+    'var(--font-primary)',
+    'var(--font-primary, )',
+    'var(--font-primary, var(--x))',
+    'var(--font-body, var(--font-primary))',
+  ]) {
+    it(`refuses ${value}, which can go invalid with no Foundry variable`, () => {
+      assert.deepEqual(faceRule(value), ['unguarded var(--font-primary)']);
+    });
+  }
+
+  it('admits a --font-primary read whose fallback ends in a literal', () => {
+    assert.deepEqual(faceRule('var(--font-body, var(--font-primary, sans-serif))'), []);
+  });
+
+  it('follows a re-export and a lazy import to a plain module that reads a Foundry global', () => {
+    const reader = syntheticReader({
+      'src/Entry.svelte':
+        "<script>import { localize } from './bridge.js'; const lazy = () => import('./lazy.js');</script>{localize('a')}{lazy}",
+      'src/bridge.js': "export { localize } from './localize.js'; export * from './star.js';",
+      'src/localize.js': 'export const localize = (key) => globalThis.game?.i18n.localize(key);',
+      'src/star.js': 'export const settle = () => Hooks.callAll("settle");',
+      'src/lazy.js': 'export default () => window["canvas"].ready;',
+    });
+    assert.deepEqual(closureDependencies('src/Entry.svelte', reader), [
+      'src/localize.js: reads game',
+      'src/star.js: reads Hooks',
+      'src/lazy.js: reads canvas',
+    ]);
+  });
+
+  it('reports a Foundry global a component reads in its template or its script', () => {
+    const reader = syntheticReader({
+      'src/Template.svelte': "<p>{game.i18n.localize('a')}</p>",
+      'src/Script.svelte':
+        '<script>const id = foundry.utils.randomID(); ui.notifications.info(id);</script>',
+    });
+    assert.deepEqual(closureDependencies('src/Template.svelte', reader), [
+      'src/Template.svelte: reads game',
+    ]);
+    assert.deepEqual(closureDependencies('src/Script.svelte', reader), [
+      'src/Script.svelte: reads foundry',
+      'src/Script.svelte: reads ui',
+    ]);
+  });
+
+  it('reads a local binding and a member of the same name as no global', () => {
+    const reader = syntheticReader({
+      'src/Local.svelte':
+        "<script>import { ui } from './local.js'; const game = { user: 1 };</script>{game.user}{ui.canvas}",
+      'src/local.js': 'const game = { user: 1 }; export const ui = { canvas: game.user };',
+    });
+    assert.deepEqual(closureDependencies('src/Local.svelte', reader), []);
   });
 });
