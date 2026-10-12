@@ -558,6 +558,7 @@ ConditionOption = {
   id: string,
   label: string,
   icon: string,
+  startHour?: number, // time-of-day options only (requirement 25)
 }
 ```
 
@@ -577,7 +578,7 @@ GM-authored option metadata lives in the per-system `conditions[kind].values` an
 An entry whose normalized id is the lower-cased stringification of a plain object — `[object object]`, or `object-object` once condition-id normalization has stripped the brackets — is not a tag and is discarded.
 `weather` and `timeOfDay` ids are condition-option ids and are kebab-cased; `biomes` and `danger` ids are tags and are lower-cased only.
 7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day condition settings with `enabled`, `current`, and `values` fields. `current` stores a condition option id.
-8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes.
+8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes, and a time-of-day option may also store a start hour (requirement 25).
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
 10. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night` as option records.
 11. Legacy top-level `conditions`, per-system string condition values, and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
@@ -597,6 +598,19 @@ A crafting system with no persisted `conditions` block continues to inherit the 
 22. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
 23. Player-facing UI may show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
 24. Changing current global conditions must not retroactively rewrite completed gathering history.
+25. Each time-of-day option names a period of the day and may carry a `startHour`, the whole hour of the world calendar's day at which that period begins.
+The normalizers keep a `startHour` only when it is a whole number at or above zero, given as a number or a digit-only string; `0` is midnight and is kept.
+They treat an absent, `null`, empty-string, boolean or any other value as not set, never as `0`.
+Weather options never carry one.
+An option with no start hour of its own stores none.
+Wherever a start hour is read, an option whose id is a default id takes that id's default (`dawn` 4, `day` 8, `dusk` 17, `night` 21), and any other option has none.
+Normalization never writes a default back.
+26. Start hours are descriptive: they place each period on the day and never gate, match or change the current time of day, which stays GM-selected (requirement 17).
+Day order is ascending start hour.
+Each period runs from its start hour to the next period's in day order, and the latest wraps past the day's end to the earliest.
+The periods tile the day when every period has a start hour and the start hours are distinct and below the calendar's hours per day, which is 24 when the world calendar defines none.
+Otherwise they do not tile, and no surface infers the missing hours.
+27. Adding, deleting or relabelling a time-of-day value leaves every other value's start hour unchanged, so a deleted period's hours pass to the period before it in day order, wrapping.
 
 ## Gathering Task Library
 

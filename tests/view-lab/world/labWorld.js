@@ -10,6 +10,7 @@ import {
   ICON_BASE,
   LAB_SYSTEM_IDS,
   seedJournalNoCheckFixture,
+  seedTimeOfDayBar,
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
@@ -696,6 +697,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
+ * @param {string} [options.timeOfDayBar] `'1'` or `'fallback'`: the time-of-day bar's periods,
+ *   and the world clock at 14:34. See {@link seedTimeOfDayBar}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -719,6 +722,7 @@ export async function buildLabWorld({
   systemBlocked = false,
   depletedImage = false,
   tagStacks = false,
+  timeOfDayBar = '',
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -735,6 +739,7 @@ export async function buildLabWorld({
   if (systemBlocked) blockHerbalism(content);
   if (depletedImage) seedDepletedImage(content);
   if (tagStacks) seedTagStacks(content);
+  seedTimeOfDayBar(content, timeOfDayBar);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
@@ -777,7 +782,8 @@ export async function buildLabWorld({
             ],
       },
     ],
-    worldTime: LAB_WORLD_TIME,
+    // 14:34 on the same day, for the time-of-day bar's clock line alone (issue 2431).
+    worldTime: timeOfDayBar ? LAB_WORLD_TIME + 52_440 : LAB_WORLD_TIME,
     i18n: toI18nStub(localize),
     localize,
   };

@@ -109,13 +109,25 @@ export function markerBandStep(key, position, count, page = 1) {
 export const bandEnd = (rows, index, trackMax) =>
   index === rows.length - 1 ? trackMax : rows[index + 1].from;
 
-/** Each band at least two steps wide, with its midpoint rounded down to the step. */
-export function railSeeds(rows, trackMax, step) {
-  return rows.flatMap((band, index) => {
+/** The 24px rail button's width, the least distance between two seeds' centres. */
+const RAIL_BUTTON_PX = 24;
+
+/**
+ * Each band at least two steps wide, with its midpoint rounded down to the step; with a measured
+ * `pixelsPerUnit`, a seed closer than one button to the last kept one is skipped.
+ */
+export function railSeeds(rows, trackMax, step, pixelsPerUnit = 0) {
+  const seeds = rows.flatMap((band, index) => {
     const width = bandEnd(rows, index, trackMax) - band.from;
     if (width < 2 * step) return [];
     return [{ band, value: band.from + Math.floor(width / 2 / step) * step }];
   });
+  if (!(pixelsPerUnit > 0)) return seeds;
+  return seeds.reduce((kept, seed) => {
+    const last = kept.at(-1);
+    if (!last || (seed.value - last.value) * pixelsPerUnit >= RAIL_BUTTON_PX) kept.push(seed);
+    return kept;
+  }, []);
 }
 
 /** A draggable marker's stops: each band's centre under `snap: 'band'`, else each grid value. */

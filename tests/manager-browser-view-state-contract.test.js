@@ -142,11 +142,10 @@ const SESSION_SCOPED_STATE = [
   ['GatheringTaskEditView', 'componentTagSearchTerm', 'the tag picker, same session, same rule'],
   ['GatheringTaskEditView', 'toolSearchTerm', 'the tool picker, same session, same rule'],
   [
-    'EnvironmentsBrowserView',
-    'weatherInput',
-    'a half-typed vocabulary entry on the add form, not a filter over anything',
+    'environment/GatheringConditionPanel',
+    'input',
+    'a half-typed condition entry on the add form, not a filter over anything',
   ],
-  ['EnvironmentsBrowserView', 'timeOfDayInput', 'the same add form, the same half-typed entry'],
   ['EnvironmentsBrowserView', 'biomeInput', 'the same add form, the same half-typed entry'],
   [
     'VocabularyPanel',

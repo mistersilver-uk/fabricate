@@ -186,6 +186,34 @@ describe('rangeBarGeometry: the rail seeds', () => {
       [6]
     );
   });
+
+  it('skips a seed whose 24px button would overlap the last kept one at a measured width', () => {
+    const rows = resolveBands([
+      { id: 'a', from: 0 },
+      { id: 'b', from: 2 },
+      { id: 'c', from: 4 },
+      { id: 'd', from: 8 },
+    ]);
+    const seeds = (pixelsPerUnit) =>
+      railSeeds(rows, 24, 1, pixelsPerUnit).map(({ band }) => band.id);
+    assert.deepEqual(seeds(0), ['a', 'b', 'c', 'd'], 'an unmeasured track keeps every seed');
+    assert.deepEqual(seeds(12), ['a', 'b', 'c', 'd'], 'two hours at 12px are exactly 24px apart');
+    assert.deepEqual(seeds(10), ['a', 'c', 'd'], 'at 10px b sits 20px from a and is skipped');
+  });
+
+  it('measures each seed against the last one kept, not the last one skipped', () => {
+    const rows = resolveBands([
+      { id: 'a', from: 0 },
+      { id: 'b', from: 2 },
+      { id: 'c', from: 4 },
+      { id: 'd', from: 6 },
+    ]);
+    assert.deepEqual(
+      railSeeds(rows, 24, 1, 7).map(({ band }) => band.id),
+      ['a', 'c', 'd'],
+      'c sits 14px from the skipped b but 28px from a'
+    );
+  });
 });
 
 describe('rangeBarGeometry: patches, pointer values and marker layout', () => {

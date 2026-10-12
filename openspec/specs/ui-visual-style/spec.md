@@ -273,7 +273,9 @@ The strip's `onChange` and `onMarkerChange` take a second argument `{ phase: 'dr
 The check strips ignore it.
 The strip may carry an add rail: a `role="toolbar"` row beneath the track with one 24x24 `IconButton` per band, named by the caller, in a single tab stop with roving tabindex, emitting `onAdd` with the band's authored index and its midpoint rounded down to the step.
 It creates nothing itself, and a band narrower than two steps renders no rail button.
+At the track's measured width, a rail button closer than its own 24px to the last one kept is skipped, so no two rail buttons overlap.
 `formatValue` formats every tick and value text, reducing as the caller needs so announced hours are clock hours; `rangeSublabels` draws each band's caller-formatted range under its name inside the fixed 46px track, in the band's ink (`--fab-text`), mono 8.5px at weight 500, which never grows; `ticks={false}` omits the tick row.
+The gathering time-of-day bar takes its band fills from the tag palette by position, so each period keeps its own identity, and each fill reaches at least 4.5:1 against `--fab-text`, the sublabel included, in every shipped theme; the world-clock line and current dot reach 3:1.
 
 Click handlers on bare non-interactive elements are forbidden, and a `role="button"` wrapper is never converted into a `<button>`.
 

@@ -289,6 +289,8 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
       // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the
       // root: this is the case that has to fire when its ten selects change.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
@@ -296,6 +298,96 @@ export const CASES = Object.freeze([
       // ruling this frame now asks for one when the chain changes, since it is the only case that
       // photographs the settings arm at all.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+    ],
+  }),
+  // The time-of-day bar (issue 2431): the four default periods, the world clock at 14:34 and the
+  // current-time dot, from the `timeOfDayBar` lab flag.
+  managerCase({
+    id: 'manager-gathering-time-of-day-bar',
+    label: 'Manager — Gathering settings time-of-day bar',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: '1' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+    ],
+    expectView: 'environments',
+    // The clock line proves the view hands the panel its services; the dot rests on Day.
+    expectSelector:
+      '.fabricate-manager [data-time-of-day-bar]:has([data-band-strip-marker-line="clock"]) [data-band-strip-marker="current"]',
+    expectAttributes: [
+      {
+        selector: '[data-time-of-day-bar] [data-band-strip-marker="current"]',
+        name: 'aria-valuetext',
+        value: 'Day',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
+      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|worldTimeLabel)\.js$/,
+    ],
+  }),
+  // A rail "+" activated: Dusk's midpoint seeds the add form's Starts at, and its name takes focus.
+  managerCase({
+    id: 'manager-gathering-time-of-day-rail-seeded',
+    label: 'Manager — Gathering settings time-of-day rail seeds the add form',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: '1' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+      { selector: '[data-time-of-day-bar] [data-band-strip-add="dusk"]' },
+    ],
+    expectView: 'environments',
+    expectSelector: '.fabricate-manager .manager-time-of-day-add input[placeholder]:focus',
+    expectAttributes: [
+      {
+        selector: '.manager-time-of-day-add [role="spinbutton"]',
+        name: 'aria-valuenow',
+        value: '19',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
+    ],
+  }),
+  // Non-tiling hours: Night starts at Day's hour, so the note names both.
+  managerCase({
+    id: 'manager-gathering-time-of-day-fallback',
+    label: 'Manager — Gathering settings time-of-day fallback note',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: 'fallback' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager [data-gathering-condition-panel="timeOfDay"] [data-time-of-day-fallback]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
     ],
   }),
   // The New-biome colour palette open (issue 2257): the shared palette as a popover, its default

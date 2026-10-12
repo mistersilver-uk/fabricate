@@ -1,5 +1,5 @@
 /**
- * The manager shell's Foundry-facing service bag, composed from eight group factories.
+ * The manager shell's Foundry-facing service bag, composed from nine group factories.
  *
  * `io` carries the shell's own collaborators as call-time thunks, and the bag is rebuilt on every
  * `_buildServices()` call: `_adminStore` is null while the bag is built, so the store is reached
@@ -625,6 +625,24 @@ function knowledgeServices(io) {
   };
 }
 
+/** The world clock's calendar components, called as a facade method so its default reads `this`. */
+function worldTimeServices() {
+  return {
+    getWorldTimeComponents: (worldTime) =>
+      game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
+  };
+}
+
+/** The bag keys `_prepareSvelteProps` forwards unchanged into the manager's Svelte services. */
+export const COMPONENT_SERVICE_KEYS = Object.freeze([
+  'pickImagePath',
+  'getSetting',
+  'setSetting',
+  'getWorldItemOptions',
+  'resolveToolSource',
+  'getWorldTimeComponents',
+]);
+
 /**
  * The manager's whole service bag.
  *
@@ -641,5 +659,6 @@ export function createManagerServices(io) {
     ...knowledgeServices(io),
     ...dialogServices(),
     ...importServices(io),
+    ...worldTimeServices(),
   };
 }

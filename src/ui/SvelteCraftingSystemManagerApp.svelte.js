@@ -3,7 +3,7 @@ import CraftingSystemManagerRoot from './svelte/apps/manager/CraftingSystemManag
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { confirmDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
-import { createManagerServices } from './managerServices.js';
+import { COMPONENT_SERVICE_KEYS, createManagerServices } from './managerServices.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import { localize } from './svelte/util/foundryBridge.js';
@@ -232,11 +232,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       playerExtensions,
       services: {
         importSingleManagedItemFromDrop,
-        pickImagePath: this._services.pickImagePath,
-        getSetting: this._services.getSetting,
-        setSetting: this._services.setSetting,
-        getWorldItemOptions: this._services.getWorldItemOptions,
-        resolveToolSource: this._services.resolveToolSource,
+        ...Object.fromEntries(COMPONENT_SERVICE_KEYS.map((key) => [key, this._services[key]])),
         // Folder-aware bulk-import (issue 771): resolve a folder / whole-pack drop into
         // per-folder groups the mapping modal seeds from. Returns null for every drop
         // that should keep today's one-shot behavior (single item, no real folders, an

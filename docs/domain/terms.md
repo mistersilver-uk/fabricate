@@ -2091,6 +2091,19 @@ An accrual-anchor absent-check must consume the `null`-preserving one: the lax (
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md (## World-Time Anchors and Rewind Policy; Gathering Resource Nodes Requirement 14; Gathering Economy and Stamina Requirement 27), openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md
 
+## Time-of-Day Start Hour
+
+Each time-of-day value names a **period** of the day; `startHour` places it on the world calendar's day, and periods run in day order (ascending start hour), the latest wrapping past the day's end.
+The UI labels it **Starts at**; the manager's time-of-day bar draws the periods and edits start hours through its dividers, and the steppers on the value pills are the authoritative editor.
+**Descriptive, not a gate.** Nothing gates, matches or selects on a start hour: the current time of day stays GM-selected or provider-supplied, so the world-clock line and the current-time dot may legitimately sit in different periods; following the world clock is issue 2434.
+**Not a world-time anchor.** It is a position within one calendar day, not a world-time instant, so a world-time rewind never adjusts it.
+**Defaults are resolved, not stored.** `dawn` 4, `day` 8, `dusk` 17 and `night` 21 apply only where an option of that id has none authored; normalization never writes them back, so untouched worlds and their exports are unchanged.
+**Trap:** `0` is midnight and is authored data; an absence test must not coerce, because `Number(null)` and `Number('')` are `0`.
+
+Canonical mapping: `normalizeTimeOfDayStartHour` and the default resolver in `src/systems/normalize/gatheringConditionOptions.js`, consumed by both the service and manager-store normalizers; `src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js` (rotation, tiling verdict).
+
+Spec reference: openspec/specs/gathering-and-harvesting/spec.md (## Global Gathering Conditions, Requirements 25–27), openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-visual-style/spec.md (#### Threshold band strip)
+
 ## Valid Id Basis
 
 The rule is one line: **a destructive pass runs only when its Valid Id Basis is known-complete**, because a pass that cannot see a live record concludes the thing naming it is stale and deletes durable state that never was.

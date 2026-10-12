@@ -643,7 +643,7 @@ export function registerEnvironmentsCases() {
       `[data-gathering-condition-panel="${kind}"] .manager-condition-current .fabricate-select-trigger`;
     // The caption names the trigger through its id, and the field is a `<div>` rather than the
     // `<label>` it was (issue 1510).
-    assert.equal(assertSelectHasResolvedName(target, picker('timeOfDay')), 'Current time');
+    assert.equal(assertSelectHasResolvedName(target, picker('timeOfDay')), 'Current time of day');
     assert.equal(assertSelectHasResolvedName(target, picker('weather')), 'Current weather');
     assert.ok(!target.querySelector('label.manager-condition-current'));
     assert.equal(selectTriggerText(target, picker('timeOfDay')), 'High Day');
@@ -1771,7 +1771,7 @@ export function registerEnvironmentsCases() {
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(
       target.textContent.includes(
-        'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'
+        'These values control time-of-day matching for gathering tasks and events. Click the name of a time of day to edit it.'
       )
     );
     assert.ok(
@@ -1784,7 +1784,28 @@ export function registerEnvironmentsCases() {
         'Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.'
       )
     );
-    assert.equal(target.querySelectorAll('.manager-condition-add input').length, 3);
+    // Three name fields, and the time-of-day form's start-hour stepper beside its own (issue 2431).
+    assert.equal(
+      target.querySelectorAll(':scope .manager-condition-add input:not([role="spinbutton"])')
+        .length,
+      3
+    );
+    assert.equal(
+      target.querySelectorAll(':scope .manager-time-of-day-add [role="spinbutton"]').length,
+      1
+    );
+    assert.ok(
+      target.querySelector(
+        ':scope [data-gathering-condition-panel="timeOfDay"] [data-time-of-day-bar]'
+      ),
+      'the Times of day panel draws the time-of-day bar'
+    );
+    assert.ok(
+      !target.querySelector(
+        ':scope [data-gathering-condition-panel="weather"] [data-band-strip-track]'
+      ),
+      'and the weather panel draws none'
+    );
     assert.equal(
       target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only')
         .length,

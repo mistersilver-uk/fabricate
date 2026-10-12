@@ -21,7 +21,7 @@
   | `rangeSublabels` | boolean | `false` | Draws `bands[].range` under each name, inside the fixed 46px track. |
   | `markers` | `{ id, value, label, valueText?, draggable?, snap? }[]` | `[]` | A fixed marker is a reading: a line, stated in the hidden description. A draggable one is a slider in a 13px lane above the track, over each grid value or, with `snap: 'band'`, each band's centre. |
   | `onMarkerChange({ id, value, index }, { phase })` | function | no-op | A draggable marker's stop, with the authored `index` of its band, in the phases above. |
-  | `addable` / `railLabel` / `addLabel(band)` | boolean / string / function | `false` / `''` / name | A toolbar under the track with one 24px add per band at least two steps wide, named by `addLabel`. |
+  | `addable` / `railLabel` / `addLabel(band)` | boolean / string / function | `false` / `''` / name | A toolbar under the track with one 24px add per band at least two steps wide, named by `addLabel`, skipping one that would overlap its neighbour at the measured width. |
   | `onAdd({ index, value })` | function | no-op | The band's authored index and its midpoint, rounded down to the step; the strip creates nothing. |
 
   Rest spread:
@@ -102,6 +102,7 @@
   const bandListId = `${instanceId}-bands`;
 
   let trackElement = $state(null);
+  let trackWidth = $state(0);
   let dragIndex = $state(-1);
   let railStop = $state(0);
 
@@ -112,12 +113,11 @@
   const span = $derived(Math.max(trackMax - domain.min, Number.EPSILON));
   const percentOf = (value) => ((value - domain.min) / span) * 100;
   const geometry = $derived({ boundaries, domainMin: domain.min, trackMax, step });
-
   const layout = $derived(markerLayout(markers, resolved, geometry, formatValue));
   const draggable = $derived(readonly ? [] : layout.draggable);
   const described = $derived(readonly || layout.fixed.length > 0);
   const seeds = $derived(
-    addable && !readonly && resolved ? railSeeds(resolved, trackMax, step) : []
+    addable && !readonly && resolved ? railSeeds(resolved, trackMax, step, trackWidth / span) : []
   );
   const railAt = $derived(Math.min(railStop, seeds.length - 1));
 
@@ -225,6 +225,7 @@
       class="fab-band-strip-track"
       class:is-disabled={disabled}
       bind:this={trackElement}
+      bind:clientWidth={trackWidth}
       role="group"
       aria-label={previewLabel ? `${ariaLabel} — ${previewLabel}` : ariaLabel}
       aria-describedby={described ? bandListId : undefined}
