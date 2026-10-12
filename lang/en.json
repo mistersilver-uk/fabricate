@@ -4976,7 +4976,7 @@
           "Conditions": {
             "TimeOfDayTitle": "Times of day",
             "WeatherTitle": "Weather conditions",
-            "TimeOfDayHint": "These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.",
+            "TimeOfDayHint": "These values control time-of-day matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.",
             "WeatherHint": "These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.",
             "CurrentTimeOfDay": "Current time of day",
             "CurrentWeather": "Current weather",

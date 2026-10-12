@@ -108,7 +108,7 @@
     return kind === 'timeOfDay'
       ? text(
           'FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint',
-          'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.'
+          'These values control time-of-day matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.'
         )
       : text(
           'FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint',

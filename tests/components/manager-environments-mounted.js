@@ -1771,7 +1771,7 @@ export function registerEnvironmentsCases() {
     assert.ok(target.textContent.includes('Biomes'));
     assert.ok(
       target.textContent.includes(
-        'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'
+        'These values control time-of-day matching for gathering tasks and events. Click the name of a time of day to edit it.'
       )
     );
     assert.ok(
