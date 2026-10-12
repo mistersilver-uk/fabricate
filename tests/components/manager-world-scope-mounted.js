@@ -3352,7 +3352,9 @@ export function registerWorldScopeCases() {
         await openMountedEntry(ENTRY_ROWS[1]);
         target.querySelector('[data-world-tool-entry-tab="breakage"]').click();
         await settleWiring();
-        target.querySelector('[data-tool-repair-requirements] [data-recipe-add-tag]').click();
+        target
+          .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]')
+          .click();
         await settleWiring();
         const panel = () => document.querySelector('.fabricate-picker-popover');
         const options = () =>

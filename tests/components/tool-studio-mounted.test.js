@@ -1304,7 +1304,7 @@ describe('Tool Studio editor (mounted)', () => {
         ],
       })
     );
-    root.querySelector('[data-tool-repair-requirements] [data-recipe-add-tag]').click();
+    root.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
     await tick();
     await settle();
     assert.deepEqual(

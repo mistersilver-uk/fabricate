@@ -1694,9 +1694,11 @@ describe('the world Tool entry (issue 1373)', () => {
       await tick();
       await settle();
       assert.deepEqual(
-        [...target.ownerDocument.querySelectorAll('.fabricate-picker-popover [role="option"]')].map(
-          (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()
-        ),
+        [
+          ...target.ownerDocument
+            .querySelector('.fabricate-picker-popover')
+            .querySelectorAll('[role="option"]'),
+        ].map((node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()),
         ['oak 1 component', 'wood 2 components']
       );
     });
