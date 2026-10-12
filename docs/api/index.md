@@ -1979,7 +1979,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) publishes more data-only leaves; text and slot content, callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam, in two parts; slot content, callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2037,10 +2037,12 @@ The published components, in publication order:
 | `BandedBar` | 1 | `rows` (required), `direction`, `density` | yes |
 | `StatBox` | 1 | `value` (required), `label` (required), `icon`, `tone` | yes |
 | `InfoStrip` | 1 | `label` (required), `facts` (required), `badge` | yes |
+| `Kicker` | 1 | `as`, `tone`, `children` (text, required) | yes |
+| `Chip` | 1 | `tone`, `density`, `children` (text, required) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Each row lists the component's published props, marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+Each row lists the component's published props, noting a prop's kind when it is not plain data and marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
@@ -2141,23 +2143,68 @@ The glyph is hidden from assistive technology and the tone is colour alone, so `
 `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
 `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
+### Kicker
+
+`Kicker` draws the small upper-case label that heads a block, the component the design system calls a kicker.
+`children` is required and is the label, final display text; the component draws it in upper case.
+`as` is `p`, `span` or `h3`, and defaults to `p`.
+An `update` that changes `as` replaces the kicker's root element; the mount, its handle and its claim on `target` are unchanged.
+`tone` is `default` or `accent`.
+Its text is its whole name, announced as written, so pass sentence case and never an upper-case literal.
+`h3` makes it a level-3 heading, so pass it only where the kicker heads the content beneath it.
+It takes no `id`: to name a control or group with it, put the `id` on `target` and point `aria-labelledby` there.
+`accent` is colour alone and says nothing.
+It clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or a light fill over `--fab-bg-2`, so draw it on those four grounds.
+Drawn as `span` it is an inline mark: give its `target` `display: flex`, so the mark is a flex item as every Fabricate site draws it and `target` is exactly as tall as the mark.
+Rest `data-*` is for your own hooks.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element with no role and no focus.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the label does not.
+
+### Chip
+
+`Chip` draws a short, fully rounded badge that states a count, a state or a category.
+`children` is required and is the chip's label, final display text.
+`tone` is `positive`, `warning`, `danger`, `info`, `neutral` or `accent`; absent, the chip is drawn in the default ink.
+This is `InfoStrip`'s badge set.
+`neutral` is the recessive tone and clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface` only.
+`density` is `default` or `list`; this is the chip's own set, not `FillBar`'s.
+At `list` the label is one line and is never wrapped or clipped, so a label wider than `target` overflows the chip: keep a `list` label short.
+At `default` a long label wraps inside the chip.
+It is a statement, never a control: it has no role, takes no focus, and its label is read as inline text.
+`tone` is colour alone, so the label says the state.
+A label changed through `update` is not announced; a live region is yours to provide.
+Every other tone, emphasis and density the component draws is private.
+The chip is an inline mark: give its `target` `display: flex`, so the mark is a flex item as every Fabricate site draws it and `target` is exactly as tall as the mark.
+Rest `data-*` is for your own hooks.
+`data-chip-*` names are the chip's own.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element with no role and no focus.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the label does not.
+
 ### The descriptor
 
-`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount }`.
+`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
-`describe(name)` returns a frozen `{ version, props, rest }`, where each prop is `{ kind: 'data', required }` and `rest` says whether the component takes `data-*` attributes; it returns `null` for a name that is not published.
+`describe(name)` returns a frozen `{ version, props, rest }`, where each prop is `{ kind, required }` and `rest` says whether the component takes `data-*` attributes; it returns `null` for a name that is not published.
+A prop's `kind` is `data` or `text`.
+A `data` prop takes plain data, and the component receives a copy.
+A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
+A `text` prop that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a required one refuses `''`.
+`mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+`typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member or prop kind as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind is additive.
 A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
 
 ### Mounting, updating and destroying
 
-`mount(name, { target, props = {} })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
+`mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
 It returns a frozen `{ update(props), destroy() }`.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
 - `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with no function at any depth and no cycle.
+  A `text` prop holds a string, and anything else there throws `"<key>" must be a string`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean.
+- `onFault` is optional, and is described with faults below.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
 - `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
   It is atomic: when it throws, the previous props stay rendered.
@@ -2175,11 +2222,57 @@ If the component faults while rendering, updating or in an effect, Fabricate log
 The report, and `update` answering `false`, arrive after a microtask, never inside the `mount` or `update` call that caused the fault.
 Any fallback copy is yours to draw.
 
+Pass `onFault(error)` to `mount` to be told of that fault.
+It is called once, in a microtask after Fabricate has torn its own content down, and never inside `mount`, `update` or `destroy`.
+By then the claim is released and `target` is empty, so you may mount into it from `onFault`.
+Do not mount the same input again unconditionally: a fault that repeats calls `onFault` again one microtask later, and the page cannot paint in between.
+A throw from `onFault` is reported as a render failure under the component's name and goes no further; a Promise it returns is ignored.
+Without `onFault`, a fault is discovered only when `update` answers `false`.
+
+```javascript
+const handle = fabUi.mount('Kicker', {
+  target,
+  props: { children: 'Standing' },
+  onFault: () => {
+    target.textContent = 'Standing'; // Your own fallback, drawn into the emptied target.
+  },
+});
+```
+
+`load(names)` takes an array of published names and returns a Promise.
+It never throws synchronously, and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
+`api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
+It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
+It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker` and `Chip` were published with `load`, so call it for them before mounting.
+Call `load` once, keep the promise, and mount only after it has settled and Fabricate is ready:
+
+```javascript
+let published = null;
+
+Hooks.once('setup', () => {
+  const fabUi = game.fabricate?.api?.ui;
+  // Absent on a Fabricate that predates `load`, where `mount` also ignores `onFault`.
+  published = fabUi?.load?.(['Kicker', 'Chip']) ?? null;
+});
+
+// In your ApplicationV2, once `fabricate.ready` has fired:
+async _onRender(context, options) {
+  await super._onRender(context, options);
+  if (!published) return;
+  await published;
+  // Mount here, destroying any earlier handle first.
+}
+```
+
+An ApplicationV2 `_onRender` may await the promise.
+A navigation provider's `mount` callback may not, because it returns synchronously, so content drawn there mounts its published components when the kept promise settles.
+
 ### Ownership and theme
 
 You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
 A published component inherits from `target` every inherited text property its own rules do not state, so set none on `target`.
-`.fab-*` classes and `svelte-*` hashes are private and may change in any release.
+`.fab-*` and `manager-*` classes and `svelte-*` hashes are private and may change in any release: select none of them, and write no `manager-*` class on an element you own, `target` included.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
 Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
 A published component resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor; mount it after `target` is attached to its final document.
@@ -2189,7 +2282,7 @@ A later move between windows is not carried to a mount, and a theme change made 
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-- Data-only components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
+- A component whose props are all `data` or `text` is non-interactive: it takes no focus and has no accessible name beyond what you pass.
 - A required label is yours to localise.
 - Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 

@@ -1,7 +1,8 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is
- * `{ name, path, version, props: { <key>: { kind: 'data', required? } }, rest }`, frozen. An entry
- * is appended, never interleaved; a breaking change to one bumps its own `version` (issue 2426).
+ * `{ name, path, version, props: { <key>: { kind: 'data' | 'text', required? } }, rest }`, frozen.
+ * An entry is appended, never interleaved; a breaking change to one bumps its own `version`
+ * (issue 2426). A `text` key is a snippet the component draws bare; the caller passes a string.
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({
@@ -108,6 +109,28 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       label: Object.freeze({ kind: 'data', required: true }),
       facts: Object.freeze({ kind: 'data', required: true }),
       badge: Object.freeze({ kind: 'data' }),
+    }),
+    rest: true,
+  }),
+  Object.freeze({
+    name: 'Kicker',
+    path: 'src/ui/svelte/components/Kicker.svelte',
+    version: 1,
+    props: Object.freeze({
+      as: Object.freeze({ kind: 'data' }),
+      tone: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
+    }),
+    rest: true,
+  }),
+  Object.freeze({
+    name: 'Chip',
+    path: 'src/ui/svelte/components/Chip.svelte',
+    version: 1,
+    props: Object.freeze({
+      tone: Object.freeze({ kind: 'data' }),
+      density: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
     }),
     rest: true,
   }),

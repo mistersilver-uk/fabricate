@@ -1,8 +1,9 @@
 /**
- * Issue 2448's seven published leaves on Fabricate's real Svelte runtime, each through a fresh seam
- * registered with the adapter's own table, into a bare companion target: mount, update on one root
- * and destroy; the seam's refusal of an unpublished or missing prop; and what each leaf draws from
- * its own stylesheet under no Fabricate ancestor.
+ * Issue 2448's seven published leaves, and issue 2451's `Kicker` and `Chip`, on Fabricate's real
+ * Svelte runtime, each through a fresh seam registered with the adapter's own table, into a bare
+ * companion target: mount, update on one root and destroy; the seam's refusal of an unpublished or
+ * missing prop; a `text` key drawn as text; and what each leaf draws from its own stylesheet under
+ * no Fabricate ancestor.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -135,6 +136,22 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('.fabricate-info-strip-value').textContent,
     drawn: ['Clear', 'Storm'],
   },
+  {
+    name: 'Kicker',
+    root: '.fab-kicker',
+    props: { children: 'Standing' },
+    next: { children: 'Renown', tone: 'accent' },
+    read: (root) => root.textContent,
+    drawn: ['Standing', 'Renown'],
+  },
+  {
+    name: 'Chip',
+    root: '.manager-chip',
+    props: { children: 'Locked', tone: 'neutral', density: 'list' },
+    next: { children: 'Open', tone: 'positive', density: 'list' },
+    read: (root) => root.textContent,
+    drawn: ['Locked', 'Open'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -178,6 +195,11 @@ describe('a key a leaf does not publish', () => {
     ['Meter', 'aria-label', 'is not a data attribute'],
     ['Meter', 'labelId', 'is not a data attribute'],
     ['InfoStrip', 'ariaLabel', 'is not a data attribute'],
+    ['Kicker', 'class', 'is not a data attribute'],
+    ['Chip', 'class', 'is not a data attribute'],
+    ['Chip', 'tag', 'is not a data attribute'],
+    ['Chip', 'removable', 'is not a data attribute'],
+    ['Chip', 'element', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -209,6 +231,155 @@ describe('a required prop', () => {
       }
     }
   }
+});
+
+const TEXT_LEAVES = [
+  ['Kicker', '.fab-kicker'],
+  ['Chip', '.manager-chip'],
+];
+
+describe('a text key through the shipped seam', () => {
+  for (const [name, root] of TEXT_LEAVES) {
+    it(`${name} draws its label as text in one element, in place when mount returns`, () => {
+      const { target, handle } = mountLeaf(name, { children: '<b>x</b>' });
+      const node = target.querySelector(root);
+      assert.equal(node.textContent, '<b>x</b>', 'drawn as written');
+      assert.equal(node.children.length, 1, 'one element holds the label');
+      const [span] = node.children;
+      assert.equal(span.localName, 'span');
+      assert.equal(span.attributes.length, 0);
+      assert.equal(span.children.length, 0, 'the string is never parsed as markup');
+      assert.ok(!target.querySelector('b'), 'no <b>');
+      handle.destroy();
+      assert.deepEqual(reports, []);
+    });
+
+    it(`${name} keeps its root, its label element and an unchanged text node across updates`, async () => {
+      const { target, handle } = mountLeaf(name, { children: 'Rank', tone: 'accent' });
+      const node = target.querySelector(root);
+      const [span] = node.children;
+      const textNode = span.firstChild;
+      assert.equal(handle.update({ children: 'Rank' }), true);
+      await settle();
+      assert.ok(target.querySelector(root) === node, 'the same root');
+      assert.ok(node.children[0] === span, 'the same label element');
+      assert.ok(span.firstChild === textNode, 'a tone-only update rewrites no text');
+      assert.equal(handle.update({ children: 'Standing' }), true);
+      await settle();
+      assert.ok(node.children[0] === span, 'a new label is written into the same element');
+      assert.equal(node.textContent, 'Standing');
+      handle.destroy();
+    });
+
+    for (const [value, what] of [
+      [7, 'a number'],
+      [null, 'null'],
+      [['x'], 'an array'],
+    ]) {
+      it(`${name} refuses ${what} as its label (M14), and renders nothing`, () => {
+        const target = companionTarget(targets);
+        assert.throws(() => ui().mount(name, { target, props: { children: value } }), {
+          name: 'TypeError',
+          message: `${REFUSAL}"children" must be a string`,
+        });
+        assert.equal(target.childNodes.length, 0);
+      });
+    }
+  }
+
+  it('Chip refuses a function for onRemove (M10), so no published input draws a control', () => {
+    const target = companionTarget(targets);
+    const props = { children: 'Locked', onRemove: () => {} };
+    assert.throws(() => ui().mount('Chip', { target, props }), {
+      name: 'TypeError',
+      message: `${REFUSAL}functions are phase 2 (issue 2427)`,
+    });
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('Chip draws a span that is no control, whatever its published keys', () => {
+    const { target, handle } = mountLeaf('Chip', {
+      children: 'Locked',
+      tone: 'warning',
+      density: 'list',
+    });
+    const chip = target.querySelector('.manager-chip');
+    assert.equal(chip.localName, 'span');
+    assert.deepEqual(
+      [...chip.classList].filter((name) => !name.startsWith('svelte-')),
+      ['manager-chip', 'is-warning', 'is-list'],
+      'the root class, then only what the published keys write'
+    );
+    assert.ok(!chip.hasAttribute('role') && !chip.hasAttribute('tabindex'), 'no role, no focus');
+    assert.ok(!target.querySelector('button, a, input, [tabindex]'), 'nothing focusable');
+    handle.destroy();
+  });
+});
+
+describe("Kicker's host element", () => {
+  it('replaces its root when as changes, on the same mount, handle and claim', async () => {
+    const seam = ui();
+    const target = companionTarget(targets);
+    const handle = seam.mount('Kicker', { target, props: { children: 'Standing' } });
+    const paragraph = target.querySelector('p.fab-kicker');
+    assert.ok(Boolean(paragraph), 'a <p> by default');
+    assert.equal(handle.update({ as: 'h3', children: 'Renown' }), true);
+    await settle();
+    assert.ok(!target.contains(paragraph), 'the <p> is gone');
+    assert.equal(target.children.length, 1, 'one root');
+    const [heading] = target.children;
+    assert.equal(heading.localName, 'h3');
+    assert.equal(heading.children.length, 1, 'holding one label element');
+    assert.equal(heading.children[0].localName, 'span');
+    assert.equal(heading.textContent, 'Renown', 'reading the current text');
+    assert.throws(() => seam.mount('Kicker', { target, props: { children: 'Second' } }), {
+      name: 'TypeError',
+      message: `${REFUSAL}target already holds a published component`,
+    });
+    assert.equal(handle.update({ as: 'h3', children: 'Still live' }), true);
+    await settle();
+    assert.equal(heading.textContent, 'Still live');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+    assert.deepEqual(reports, []);
+  });
+
+  it('draws 8.5px upper case in a literal face, with no Foundry variable defined', async () => {
+    const { target, handle } = mountLeaf('Kicker', { children: 'Standing' });
+    await settle();
+    const style = getComputedStyle(target.querySelector('.fab-kicker'));
+    assert.equal(style.fontFamily, 'sans-serif');
+    assert.equal(style.fontSize, '8.5px');
+    assert.equal(style.textTransform, 'uppercase');
+    handle.destroy();
+  });
+
+  it('resolves its accent ink from :root[data-fabricate-theme]', async () => {
+    await underSheet(':root[data-fabricate-theme] { --fab-accent: rgb(1, 2, 3); }', async () => {
+      const { target, handle } = mountLeaf('Kicker', { children: 'Standing', tone: 'accent' });
+      await settle();
+      assert.equal(getComputedStyle(target.querySelector('.fab-kicker')).color, 'rgb(1, 2, 3)');
+      handle.destroy();
+    });
+  });
+});
+
+describe('Chip under a bare ancestor', () => {
+  it('resolves its warning ink from :root[data-fabricate-theme]', async () => {
+    const theme = ':root[data-fabricate-theme] { --fab-warning-text: rgb(4, 5, 6); }';
+    await underSheet(theme, async () => {
+      const { target, handle } = mountLeaf('Chip', {
+        children: 'Preview',
+        tone: 'warning',
+        density: 'list',
+      });
+      await settle();
+      const style = getComputedStyle(target.querySelector('.manager-chip'));
+      assert.equal(style.color, 'rgb(4, 5, 6)');
+      assert.equal(style.fontSize, '9px', 'the list density, from its own stylesheet');
+      handle.destroy();
+    });
+  });
 });
 
 describe('Meter under a bare ancestor', () => {
