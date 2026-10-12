@@ -148,3 +148,44 @@ describe('ManagerTitleBar', () => {
     );
   });
 });
+
+/** The band's rendered markup per state, comments removed, so a re-derivation draws no visible change (issue 2420). */
+const BAR_OPEN = '<div class="manager-titlebar" data-manager-titlebar="">';
+const PREMIUM_MARK =
+  '<span class="manager-titlebar-badge" data-manager-titlebar-premium="" title="Fabricate Premium is installed and connected">' +
+  '<span aria-hidden="true">PREMIUM</span>' +
+  '<span class="visually-hidden">Fabricate Premium is installed and connected</span></span>';
+const statusLine = (caption) =>
+  `<span class="manager-titlebar-status" data-manager-titlebar-status="" title="${caption}">` +
+  '<span class="visually-hidden">Selected system resolution</span> ' +
+  '<i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i> ' +
+  `<span class="manager-titlebar-status-text">${caption}</span></span>`;
+
+const MARKUP_PINS = [
+  ['nothing installed or selected', {}, `${BAR_OPEN} </div>`],
+  ['premium only', { premiumInstalled: true }, `${BAR_OPEN}${PREMIUM_MARK} </div>`],
+  [
+    'a mode with no tiers',
+    { modeLabel: 'Routed by check', outcomeTierCount: 0 },
+    `${BAR_OPEN} ${statusLine('Routed by check')}</div>`,
+  ],
+  [
+    'premium with a mode and tiers',
+    { premiumInstalled: true, modeLabel: 'Simple', outcomeTierCount: 3 },
+    `${BAR_OPEN}${PREMIUM_MARK} ${statusLine('Simple · 3 outcome tiers')}</div>`,
+  ],
+  ['tiers with no mode', { modeLabel: '', outcomeTierCount: 3 }, `${BAR_OPEN} </div>`],
+];
+
+describe('ManagerTitleBar markup pin', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+  afterEach(() => harness.remount());
+
+  for (const [state, props, markup] of MARKUP_PINS) {
+    it(`draws the pinned markup: ${state}`, async () => {
+      const root = await harness.mount({ text, ...props });
+      assert.equal(root.innerHTML.replaceAll(/<!--[\s\S]*?-->/g, ''), markup);
+    });
+  }
+});
