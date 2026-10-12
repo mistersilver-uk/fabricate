@@ -625,7 +625,7 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 
 #### Scenario: UI files changed
 
-- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
+- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css` other than the Primitive Lab's own (`tests/view-lab/primitives.html` and `tests/view-lab/primitives/`), or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
 - **AND** a view the registry covers IS captured by the Foundry-free renderer, which is the DEFAULT producer: it renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
 - **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which is the fallback producer rather than the routine one
@@ -722,8 +722,18 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
 - **AND** widening happens on an input the registry does not narrow, a diff it cannot parse, a hunk with no anchor or an empty sequence to anchor by, or a changed line landing outside every attributed region — and not merely because a recurring anchor's candidate locations disagree, since disagreement is answered by their union
 - **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the corpus
+- **AND** the table of per-file overrides for broad shared signals is narrowed by entry: a diff confined to that table's entries selects, for each entry it adds, removes or changes, the cases that entry names together with the representative set a broad signal selects, an edit to nothing but comments or blank lines inside the table selects nothing from that file, and any other change to the file that holds the table selects the surface set
+- **AND** the cases of the entries and ids a diff removes from that table are read from the lines it removes, because the file the selector loads no longer contains them, and a removal narrows only where the hunk carrying it is located by its remaining content inside the table
+- **AND** that table narrows only while its parsed entries agree exactly with the table the selector loads, so a table the parser cannot read widens to the surface set rather than selecting less
 - **AND** widening is a UNION at every level and never a replacement: a change whose reach is partly attributable and partly not selects what was attributed TOGETHER WITH the surface set, whether the unattributable part is another hunk of the same patch, another shared input in the same change, or a co-changed render file
 - **AND** the reason that has to hold at every level is that the surface set contains no detailed state, so replacing an attributed selection with it would publish a capture of everything except the thing the change altered
+
+#### Scenario: only the Primitive Lab changes
+
+- **WHEN** a PR changes only the Primitive Lab's page or files under its directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`)
+- **THEN** those files are not render files: they do not arm the evidence gate, and the automated producer selects, renders and publishes no application frame for them, because no application window draws them and a local `npm run lab:check` verifies them
+- **AND** a PR that changes them alongside any other render file is armed by that other file, and its selection is exactly what that file selects
+- **AND** the gate and the automated producer apply the same exclusion, so neither arms on a file the other ignores
 
 #### Scenario: screenshot capture is blocked
 

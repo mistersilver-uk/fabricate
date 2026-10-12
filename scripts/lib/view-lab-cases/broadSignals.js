@@ -20,7 +20,11 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
   ].join('|')
 );
 
-/** Deliberate visible states that a broad primitive's representative pair does not contain. */
+/**
+ * Deliberate visible states that a broad primitive's representative pair does not contain. Each
+ * entry is attributed on its own, so keep one key per Prettier entry; an edit outside this map
+ * selects surface coverage.
+ */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The tint palette's pressed cell (issue 2257): the New-biome popover its trigger opens, and the
   // world essence entry's inline palette, which draws no trigger.

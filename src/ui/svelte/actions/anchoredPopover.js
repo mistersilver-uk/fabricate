@@ -47,6 +47,27 @@ export function hostRelativePopoverLayout(compute) {
     );
 }
 
+// THE TARGET IS NOT ALWAYS A NODE: `resize` fires on `window` and `Node.contains()` takes a
+// `Node?`, so `node.contains(window)` THROWS rather than answering false — which is how a resize
+// used to throw out of the listener and skip the reposition it was meant to trigger. A non-`Node`
+// target did not start inside the panel, so a resize RE-MEASURES (issue 1500).
+function startedInsidePanel(node, event) {
+  const target = event?.target;
+  if (!target) return false;
+  if (target === node) return true;
+  if (!(target instanceof Node)) return false;
+  return node.contains(target) === true;
+}
+
+// The first pass measures the panel in whatever face the page has loaded so far, and a fallback face
+// is wider than the real one, so a panel that sizes to its content is placed by a width it then
+// loses: an end-aligned or start-aligned edge lands off its trigger by the difference. Fonts still
+// loading settle the width, so one more pass follows them; with none loading it is a no-op repeat.
+function afterFontsLoad(run) {
+  // The chain rejects only if a measure throws, which surfaces as an unhandled rejection.
+  void document.fonts?.ready?.then?.(run);
+}
+
 // This action writes `node`'s inline `style`, so the component must NOT also bind `style` on it.
 // `component` is REQUIRED because `resolveOverlayHost` deduplicates its missing-host report per
 // name, so a shared default would let the first mis-mounted overlay silence every other one.
@@ -67,6 +88,9 @@ export function anchoredPopover(node, params = {}) {
   let options = params ?? {};
   let portalHandle = null;
   let listening = false;
+  let destroyed = false;
+  // One font-load re-measure per open: an `update` while open queues no second one.
+  let fontsQueued = false;
 
   function validate() {
     if (!options.component) {
@@ -179,20 +203,8 @@ export function anchoredPopover(node, params = {}) {
     );
   }
 
-  // THE TARGET IS NOT ALWAYS A NODE: `resize` fires on `window` and `Node.contains()` takes a
-  // `Node?`, so `node.contains(window)` THROWS rather than answering false — which is how a resize
-  // used to throw out of the listener and skip the reposition it was meant to trigger. A non-`Node`
-  // target did not start inside the panel, so a resize RE-MEASURES (issue 1500).
-  function startedInsidePanel(event) {
-    const target = event?.target;
-    if (!target) return false;
-    if (target === node) return true;
-    if (!(target instanceof Node)) return false;
-    return node.contains(target) === true;
-  }
-
   function onViewportChange(event) {
-    if (options.ignoreScrollWithin && startedInsidePanel(event)) return;
+    if (options.ignoreScrollWithin && startedInsidePanel(node, event)) return;
     measure();
   }
 
@@ -220,6 +232,7 @@ export function anchoredPopover(node, params = {}) {
   function sync() {
     validate();
     if (!isOpen()) {
+      fontsQueued = false;
       detach();
       clear();
       return;
@@ -227,6 +240,9 @@ export function anchoredPopover(node, params = {}) {
     portalToHost();
     measure();
     attach();
+    if (fontsQueued) return;
+    fontsQueued = true;
+    afterFontsLoad(() => !destroyed && measure());
   }
 
   sync();
@@ -238,6 +254,7 @@ export function anchoredPopover(node, params = {}) {
     },
 
     destroy() {
+      destroyed = true;
       detach();
       portalHandle?.destroy();
       portalHandle = null;

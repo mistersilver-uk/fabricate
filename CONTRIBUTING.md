@@ -757,18 +757,20 @@ It deliberately does not re-photograph every state of every screen: a state is e
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
 Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
 Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
-Five inputs narrow below coverage.
-A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
+These inputs narrow below coverage.
+A patch to a case file in `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
+A patch to `scripts/lib/view-lab-cases/broadSignals.js` selects only what the override entries it touches name, plus the representative set, when it is confined to `BROAD_SIGNAL_CASE_OVERRIDES`; an edit anywhere else in that file keeps the coverage default.
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.
 A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, selects every player-window case, as it did before run-state attribution.
-The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+The patch-narrowed inputs — the case registry, the broad-signal override table, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
-The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because `npm run lab:check` verifies them, so a change there alone selects no frame — except that a `.svelte` or `.css` file there still arms the evidence gate and selects the fallback frame.
+The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because a local `npm run lab:check` verifies them, so a change there alone selects no frame.
+Nor are they render files, because no application window draws them: a change there alone does not arm the evidence gate, its `.svelte` and `.css` files included.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
 true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
@@ -851,6 +853,7 @@ Do not commit PR-scoped screenshots under docs or other asset directories.
 
 The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
 A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
+A Primitive Lab file (`tests/view-lab/primitives.html`, or anything under `tests/view-lab/primitives/`) is not a render file whatever its extension; a local `npm run lab:check` verifies it, and a PR that changes one beside a real render file is still armed by that file.
 
 ### Prerequisites
 

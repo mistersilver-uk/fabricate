@@ -746,6 +746,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   // Issue 2005's executed check evidence rows: no specimen names a key-and-value evidence list.
   'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+  // Issue 2381's player stage row and band, drawn by `<SortableList>`'s player unit.
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
+  'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',

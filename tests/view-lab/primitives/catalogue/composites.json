@@ -981,7 +981,9 @@
           "fallback": "Severe"
         }
       ],
-      "shownHint": "They see the complication when it fires."
+      "shownHint": "They see the complication when it fires.",
+      "wellStyle": "display: grid; gap: var(--fab-space-3)",
+      "severityStyle": "justify-self: start"
     },
     "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The adder beneath stays drawn."
   },
@@ -1012,6 +1014,66 @@
       "bodyLabel": "Results"
     },
     "note": "Wired as `RecipeStepAccordion` wires `alwaysOpen`, without the delete the drawing omits, on a tab whose subject is the body: every row open, no disclosure. The trailing badge is a bare `Chip`, its placement the caller's scoped style."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "player — progressive stages, reorderable, one stage with a forecast band",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "window": "player",
+    "fixture": "SortableListPlayerStages",
+    "props": {
+      "numbered": true,
+      "reorderable": true,
+      "alwaysOpen": true,
+      "items": [
+        {
+          "id": "vial",
+          "name": "Empty Vial",
+          "img": "icons/consumables/potions/bottle-bulb-empty-glass.webp",
+          "difficulty": 1,
+          "threshold": 1
+        },
+        {
+          "id": "reagent",
+          "name": "Ground Reagent",
+          "img": "icons/commodities/materials/bowl-powder-grey.webp",
+          "difficulty": 2,
+          "threshold": 3,
+          "complications": [
+            {
+              "id": "dust-cloud",
+              "name": "Choking dust",
+              "severity": "severe",
+              "description": "The reagent goes up in a fine bitter cloud. Everyone at the bench coughs through the next exchange."
+            },
+            {
+              "id": "dust-spoiled",
+              "name": "Spoiled batch",
+              "severity": "minor"
+            }
+          ]
+        },
+        {
+          "id": "frostcap",
+          "name": "Frostcap Mushroom",
+          "img": "icons/consumables/mushrooms/campanulate-bell-shiny-blue.webp",
+          "difficulty": 4,
+          "threshold": 7
+        }
+      ]
+    },
+    "data": {
+      "tense": "forecast"
+    },
+    "undrawn": {
+      "icons/consumables/potions/bottle-bulb-empty-glass.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "icons/commodities/materials/bowl-powder-grey.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "icons/consumables/mushrooms/campanulate-bell-shiny-blue.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "severe": "the lead complication's severity value, drawn as its label",
+      "minor": "the second complication's severity value; the band draws only its lead and a count"
+    },
+    "note": "Wired as `ProgressiveBody` wires its stage list: the row's module helpers, `ProgressiveStageRow` in `row` and `ProgressiveStageBand` in the forecast tense in `body`, standing in the player window. The stages are the lab world's Stillroom batch."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",
