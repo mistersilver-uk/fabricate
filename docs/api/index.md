@@ -2003,12 +2003,19 @@ The published components, in publication order:
 
 | Component | Version | Props | Rest |
 | --- | --- | --- | --- |
+| `TierTrack` | 1 | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-None yet.
-Phase 1 ships the seam over an empty manifest.
 Each row lists the component's published props, marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+
+### TierTrack
+
+`TierTrack` states where a record stands on an ordered set of named tiers.
+`tiers` lists each tier as `{ id?, name, figure?, notes?, valence? }` in drawn order: `name` and `figure` are final display text, `notes` is a list of strings drawn in the `column` layout only, and `valence` is `positive` (the default), `negative` or `neutral` and colours only a reached tier.
+`currentIndex` is the tier the record sits at, and `-1` reaches nothing; `direction` is `ascending` or `descending` (highest first), and `layout` is `row` (badges) or `column` (a ladder).
+`ariaLabel` names the list, `currentLabel` marks the current tier, and `reachedLabel` and `aheadLabel` are the hidden state text on every other tier; all four are required and already localized, and `hint` is an optional sentence beneath the track.
+The current tier keeps its valence colour and is marked by a location-dot glyph in `row` and by the visible `currentLabel` in `column`.
 
 ### The descriptor
 
