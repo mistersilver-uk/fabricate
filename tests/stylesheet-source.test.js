@@ -1,7 +1,7 @@
 /**
  * The module-sheet loader (issue 1711): its contract over a single and a split sheet, the
  * cross-file Stylelint rules over the joined text, and byte identity with the base when a change
- * first splits the sheet.
+ * alters the import list.
  */
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -149,7 +149,7 @@ test('the cross-file pass catches a repeat that only the joined text holds', asy
   assert.ok(warnings.some((text) => /@keyframes fab-spin is declared twice/u.test(text)));
 });
 
-test('a change that first splits the sheet joins to the base sheet byte for byte', (t) => {
+test('a change to the import list joins to the base sheet byte for byte', (t) => {
   const base = resolveRatchetBase();
   if (base.skipped) {
     t.diagnostic(`skipped (${base.skipped}): ${base.reason}`);
@@ -158,9 +158,11 @@ test('a change that first splits the sheet joins to the base sheet byte for byte
   const readBase = (file) => readBaseFiles(base, [file]).get(file);
   const baseEntry = readBase(STYLESHEET_ENTRY);
   const head = checkoutReader();
-  const splitHere = stylesheetSources(head).parts.length > 0;
-  if (baseEntry === undefined || stylesheetImports(baseEntry).length > 0 || !splitHere) {
-    t.diagnostic('the base is already split or the head is not, so there is no first split');
+  const headImports = stylesheetSources(head).parts.map(({ file }) => file);
+  const sameImports =
+    baseEntry !== undefined && stylesheetImports(baseEntry).join('\n') === headImports.join('\n');
+  if (baseEntry === undefined || headImports.length === 0 || sameImports) {
+    t.diagnostic('the base has no sheet, the head is not split, or the import list is unchanged');
     return;
   }
   assert.ok(

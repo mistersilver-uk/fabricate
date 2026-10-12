@@ -407,8 +407,8 @@ No Jest, Vitest, or Playwright.
 Each import is preceded by a comment naming the surfaces and shared families its partial holds, including a family kept there only to preserve its cascade position.
 A rule that extends an existing family is written beside that family's rules, in the partial that already holds them.
 A new family is written at the end of the partial whose entry comment names its surface, the later partial when two name it, and that comment gains the family when it is shared or belongs to another surface.
-A partial that would pass 4,000 lines is first split in two, in a commit of its own, at a top-level boundary between two families, with the new partial imported immediately after the old one and each import's comment naming what its partial now holds.
-That commit leaves the joined text of the module sheet byte-identical, so no rule moves.
+A partial that would pass 4,000 lines is first split in two, in a pull request of its own, at a top-level boundary between two families, with the new partial imported immediately after the old one and each import's comment naming what its partial now holds.
+That pull request leaves the joined text of the module sheet byte-identical, so no rule moves.
 - Foundry core CSS classes (`flexrow`, `flexcol`) are used where appropriate.
 
 ### Foundry vs Fabricate CSS overrides
