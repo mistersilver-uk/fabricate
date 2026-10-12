@@ -23,6 +23,7 @@ import {
   readSpecimenSizes,
 } from './lib/primitiveLabBrowser.js';
 import {
+  CAPTURE_DEVICE_SCALE_FACTOR,
   CAPTURE_READY_TIMEOUT_MS,
   OUTPUT_DIRECTORY,
   captureManifest,
@@ -32,6 +33,7 @@ import {
   frameNote,
   isBootFailure,
   labProblemsOf,
+  panelWidth,
   planRequests,
   problemFor,
   readCatalogueSections,
@@ -181,7 +183,8 @@ async function compose(page, left, right) {
   // eslint-disable-next-line unicorn/prefer-uint8array-base64 -- Node 22 has no Uint8Array#toBase64.
   const source = (png) => `data:image/png;base64,${png.toString('base64')}`;
   const panel = (caption, png) =>
-    `<figure><figcaption>${caption}</figcaption><img alt="" src="${source(png)}"></figure>`;
+    `<figure><figcaption>${caption}</figcaption>` +
+    `<img alt="" width="${panelWidth(png)}" src="${source(png)}"></figure>`;
   await page.setContent(
     `<!doctype html><style>${COMPOSITE_STYLE}</style><div class="pair">` +
       `${panel('library.html', left)}${panel('Primitive Lab', right)}</div>`,
@@ -309,7 +312,10 @@ async function captureInBrowser(requests, state, deadline) {
   const browser = await chromium.launch({ args: LAUNCH_ARGS });
   const watched = [];
   try {
-    const context = await browser.newContext(BROWSER_CONTEXT);
+    const context = await browser.newContext({
+      ...BROWSER_CONTEXT,
+      deviceScaleFactor: CAPTURE_DEVICE_SCALE_FACTOR,
+    });
     context.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
     const pages = {
       reference: await context.newPage(),

@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { BROWSER_CONTEXT } from '../scripts/lib/primitiveLabBrowser.js';
 import {
+  CAPTURE_DEVICE_SCALE_FACTOR,
   TEXT_LIMIT,
   captureManifest,
   createDeadline,
@@ -11,6 +13,7 @@ import {
   frameNote,
   isBootFailure,
   labProblemsOf,
+  panelWidth,
   planRequests,
   problemFor,
   rowsInUnit,
@@ -233,4 +236,14 @@ test('a local diff splits into the files API shape, a rename by its new name', (
     { filename: 'new.svelte', patch: '' },
     { filename: 'gone.js', patch: '@@ -1 +0,0 @@\n-x\n' },
   ]);
+});
+
+test('composites render at double density while lab:check keeps its own context', () => {
+  assert.equal(CAPTURE_DEVICE_SCALE_FACTOR, 2);
+  assert.equal(BROWSER_CONTEXT.deviceScaleFactor, 1);
+  const header = Buffer.alloc(24);
+  header.write('IHDR', 12, 'latin1');
+  header.writeUInt32BE(500, 16);
+  assert.equal(panelWidth(header), 250, 'a panel shows at its CSS size, one image pixel a device pixel');
+  assert.equal(panelWidth(header, 1), 500);
 });

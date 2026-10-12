@@ -24,6 +24,12 @@ export const TEXT_LIMIT = 200;
 
 export const OUTPUT_DIRECTORY = 'ui-screenshot-artifact/library';
 
+/** A unit is a few hundred CSS pixels wide, so the capture renders at this density to stay legible. */
+export const CAPTURE_DEVICE_SCALE_FACTOR = 2;
+
+/** The CSS width that shows a captured PNG one image pixel to a device pixel, read from its IHDR. */
+export const panelWidth = (png, scale = CAPTURE_DEVICE_SCALE_FACTOR) => png.readUInt32BE(16) / scale;
+
 const clip = (text) => (text.length > TEXT_LIMIT ? `${text.slice(0, TEXT_LIMIT - 1)}…` : text);
 const collapse = (text) =>
   String(text ?? '')
