@@ -86,7 +86,7 @@ test('the $props() reader throws on a source with no `let { … } = $props()` de
 test('the $props() reader reports a name for every prop of the components that broke it', () => {
   // The components the old reader mis-parsed that still ship, with the count each one declares.
   const measured = [
-    ['src/ui/svelte/components/ThresholdBandStrip.svelte', 17],
+    ['src/ui/svelte/components/ThresholdBandStrip.svelte', 26],
     ['src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte', 1],
     ['src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte', 2],
     ['src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte', 3],

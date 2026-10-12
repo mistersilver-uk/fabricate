@@ -56,6 +56,102 @@
   },
   {
     "spec": "<RangeBar>",
+    "cap": "with markers and an add rail — hours of the day",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "fixture": "RangeBarHoursOfDay",
+    "undrawn": {
+      "band": "the current marker's snap mode, an enumeration rather than a word",
+      "08:00": "Start of Day's announced value; the drawing shows the hour as Day's range",
+      "17:00": "Start of Dusk's announced value; the drawing shows the hour as Dusk's range",
+      "21:00": "Start of Night's announced value; the drawing shows the hour as Night's range"
+    },
+    "props": {
+      "binding": "start",
+      "min": 4,
+      "max": 28,
+      "step": 1,
+      "ticks": false,
+      "rangeSublabels": true,
+      "addable": true,
+      "ariaLabel": "Times of day across one day",
+      "railLabel": "Add a time of day",
+      "bands": [
+        {
+          "id": "dawn",
+          "name": "Dawn",
+          "range": "04–08",
+          "color": "color-mix(in oklab, var(--fab-tag-mist) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 4,
+          "index": 0
+        },
+        {
+          "id": "day",
+          "name": "Day",
+          "range": "08–17",
+          "color": "color-mix(in oklab, var(--fab-tag-butter) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 8,
+          "index": 1
+        },
+        {
+          "id": "dusk",
+          "name": "Dusk",
+          "range": "17–21",
+          "color": "color-mix(in oklab, var(--fab-tag-peach) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 17,
+          "index": 2
+        },
+        {
+          "id": "night",
+          "name": "Night",
+          "range": "21–04",
+          "color": "color-mix(in oklab, var(--fab-tag-lavender) 24%, var(--fab-bg-0))",
+          "ink": "var(--fab-text)",
+          "from": 21,
+          "index": 3
+        }
+      ],
+      "markers": [
+        {
+          "id": "clock",
+          "value": 14.566666666666666,
+          "label": "World clock",
+          "valueText": "14:34"
+        },
+        {
+          "id": "current",
+          "value": 12.5,
+          "label": "Current time of day",
+          "draggable": true,
+          "snap": "band"
+        }
+      ]
+    },
+    "data": {
+      "hours": {
+        "8": "08:00",
+        "17": "17:00",
+        "21": "21:00"
+      },
+      "boundaryLabels": {
+        "day": "Start of Day",
+        "dusk": "Start of Dusk",
+        "night": "Start of Night"
+      },
+      "addLabels": {
+        "dawn": "Add a time of day at 06:00, within Dawn",
+        "day": "Add a time of day at 12:00, within Day",
+        "dusk": "Add a time of day at 19:00, within Dusk",
+        "night": "Add a time of day at 00:00, within Night"
+      }
+    },
+    "note": "The time-of-day bar as its caller wires it: a day rotated to run from Dawn's 04:00 to 04:00 the next day, the world clock at 14:34 apart from the current time of day resting at Day's centre, and the drawn 326px track."
+  },
+  {
+    "spec": "<RangeBar>",
     "cap": "read-only picture — roll under against 55",
     "draws": "[role=\"group\"]",
     "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",

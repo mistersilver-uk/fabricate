@@ -6,6 +6,8 @@ import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBr
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The ramp `BandedBar` reads its fills from (issue 1782).
   'src/ui/svelte/util/dropRateTier.js',
+  // The range bar's pure geometry (issue 2431).
+  'src/ui/svelte/util/rangeBarGeometry.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -203,6 +205,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RuleRow.svelte',
   'src/ui/svelte/components/RuleSentence.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // The range bar's marker (issue 2431).
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).
   'src/ui/svelte/components/Field.svelte',

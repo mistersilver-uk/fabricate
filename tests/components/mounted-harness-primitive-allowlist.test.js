@@ -44,6 +44,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/BandedBar.svelte',
   'src/ui/svelte/components/StageBars.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // The range bar's marker (issue 2431): every tree holding the strip compiles it.
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   // The rule row and its sentence (issue 1782): every tree holding the Checks Studio's triggers or
   // a gathering inspector's condition modifiers renders both.
   'src/ui/svelte/components/RuleRow.svelte',
