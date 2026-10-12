@@ -204,6 +204,8 @@ async function mountTab({
   componentOptions = [],
   essenceOptions = [],
   itemTags = [],
+  // The repair tag adder's per-tag component counts (issue 2430); `null` supplies none.
+  tagComponentCounts = null,
   // THE WORLD CURRENCY LADDER (issue 1373, maintainer round 5). Units are world scope
   // (issue 1278) and the world Tool entry is a world-scope screen, so the repair set offers
   // a cost here exactly as the recipe editor does for a system that enables one.
@@ -225,6 +227,7 @@ async function mountTab({
     componentOptions,
     essenceOptions,
     itemTags,
+    tagComponentCounts,
     currencyUnits,
     onSourceDrop,
     onUnlinkSource,
@@ -1667,6 +1670,35 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       assert.ok(Boolean(note), 'a two-option group draws the `Any one of` head');
       assert.equal(note.textContent.trim(), 'any one of these mends it');
+    });
+
+    it('counts the world components carrying each tag in the repair tag adder (issue 2430)', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'tags', tags: ['wood'], tagMatch: 'any' } },
+                ],
+              },
+            ],
+          },
+          itemTags: ['oak', 'wood'],
+          tagComponentCounts: { oak: 1, wood: 2 },
+        }
+      );
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await tick();
+      await settle();
+      assert.deepEqual(
+        [...target.ownerDocument.querySelectorAll('.fabricate-picker-popover [role="option"]')].map(
+          (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()
+        ),
+        ['oak 1 component', 'wood 2 components']
+      );
     });
 
     // IMMEDIATE, NOT BUFFERED, and that is forced rather than chosen.

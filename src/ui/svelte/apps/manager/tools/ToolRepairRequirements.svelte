@@ -47,8 +47,21 @@
     );
   }
 
-  const repairSet = $derived({ id: 'tool-repair-materials', ingredientGroups: groups });
-  const groupCount = $derived(Array.isArray(groups) ? groups.length : 0);
+  // A world write republishes `groups` only once its setting lands, so until a write settles the
+  // next edit builds on the list last emitted here; otherwise two quick picks lose the first.
+  let pending = $state.raw(null);
+  const shown = $derived(pending ?? groups);
+  async function write(nextGroups) {
+    pending = nextGroups;
+    try {
+      await onChange(nextGroups);
+    } finally {
+      if (pending === nextGroups) pending = null;
+    }
+  }
+
+  const repairSet = $derived({ id: 'tool-repair-materials', ingredientGroups: shown });
+  const groupCount = $derived(Array.isArray(shown) ? shown.length : 0);
   const countLabel = $derived(
     groupCount === 0
       ? text('FABRICATE.Admin.Manager.Tools.Editor.RepairCountNone', 'none yet')
@@ -102,7 +115,7 @@
   });
   const summary = $derived(
     repairSummarySentence(
-      groups,
+      shown,
       { components: componentOptions, essences: essenceOptions, currencyUnits },
       summaryLabels
     )
@@ -137,7 +150,7 @@
         'FABRICATE.Admin.Manager.Tools.Editor.RepairAnyOneOfHint',
         'any one of these mends it'
       )}
-      onChange={(nextSet) => onChange(nextSet.ingredientGroups || [])}
+      onChange={(nextSet) => write(nextSet.ingredientGroups || [])}
     />
   </fieldset>
   <p class="manager-muted manager-tool-repair-summary" data-tool-repair-summary>{summary}</p>

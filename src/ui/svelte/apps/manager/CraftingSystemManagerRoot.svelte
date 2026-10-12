@@ -4341,6 +4341,7 @@
         componentOptions={worldScope.worldComponentOptions}
         essenceOptions={worldScope.worldEssenceOptions}
         itemTags={worldScope.worldComponentTags}
+        tagComponentCounts={worldScope.worldComponentTagCounts}
         currencyUnits={selectedCurrencyUnits}
         previewActors={worldScope.worldToolPreviewActors}
         getPreviewRollData={worldScope.worldToolPreviewRollData}
