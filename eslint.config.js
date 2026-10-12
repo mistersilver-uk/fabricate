@@ -547,6 +547,9 @@ export default [
       // The Primitive Lab smoke and parity oracle (issue 1487): readiness waits and DOM reads.
       'scripts/primitive-lab-smoke.mjs',
       'scripts/primitive-lab-parity.mjs',
+      // Their shared page reads, and the library capture's element resolution (issue 2413).
+      'scripts/lib/primitiveLabBrowser.js',
+      'scripts/primitive-lab-capture.mjs',
       // The smoke walk's page primitives and its scenario modules (issue #1692), which is where
       // those bodies now live. The rest of `scripts/foundry-smoke/` — the profile, the context, the
       // registry, the loop and the cleanup — is deliberately excluded: it holds no in-page body.
