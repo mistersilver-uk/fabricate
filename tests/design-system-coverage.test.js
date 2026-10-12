@@ -207,9 +207,7 @@ test('every manifest library name resolves to a library entry', () => {
  * The library entries with no shipped implementation (issue 1505), re-derived from the array: an
  * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
-const SPECIFIED_ONLY = [
-  'TierTrack',
-];
+const SPECIFIED_ONLY = [];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
   const shipped = new Set(MANIFEST_NAMES);
@@ -597,7 +595,6 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
 
 test('every entry recorded as specified-but-unbuilt is declared a target', () => {
   // DERIVED from the register above rather than restated.
-  assert.ok(SPECIFIED_ONLY.length > 0, 'the unbuilt register is empty, so this has no domain');
   for (const name of SPECIFIED_ONLY) {
     assert.ok(
       PER_NAME_STATUS.has(name),
@@ -656,6 +653,11 @@ test('ViewToggle, which issue 2412 built, reads shipped in the library', () => {
 test('AppTitleBar, which issue 2420 built, reads shipped in the library', () => {
   // A non-member row: the status clause above reads member rows only, so this one is pinned here.
   assert.equal(PER_NAME_STATUS.get('AppTitleBar'), 'shipped');
+});
+
+test('TierTrack, which issue 2424 built, reads shipped in the library', () => {
+  // A non-member row, pinned here for the reason XrefList's is.
+  assert.equal(PER_NAME_STATUS.get('TierTrack'), 'shipped');
 });
 
 test('every name issue 1782 built reads shipped in the library', () => {

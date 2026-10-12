@@ -6,10 +6,13 @@
 import { mount, unmount, untrack } from 'svelte';
 
 import { publishedComponentSeam } from './publishedComponentSeam.js';
+import TierTrack from './svelte/components/TierTrack.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 
 // Keyed by manifest `path`; `published-components-mounted.test.js` holds the two equal.
-export const COMPONENTS = Object.freeze({});
+export const COMPONENTS = Object.freeze({
+  'src/ui/svelte/components/TierTrack.svelte': TierTrack,
+});
 
 export const publishedComponentRuntime = Object.freeze({
   host: PublishedComponentHost,

@@ -21,4 +21,23 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/],
   }),
+  managerCase({
+    id: 'manager-published-tier-track-specimen',
+    label:
+      'Specimen, mounted through the published seam — Tier track: a descending ladder whose middle rung is current. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+    // Beyond the smoke: no Fabricate screen renders it; a companion mounts it through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-tier-track' },
+    steps: [],
+    expectSelector: '.fab-tier-track > ol[role="list"][aria-label] > li[aria-current="step"]',
+    kinds: ['manager', 'specimen'],
+    // `TierTrack.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: [
+      /^src\/ui\/publishedComponentSeam\.js$/,
+      /^src\/ui\/publishedComponentManifest\.js$/,
+      /^src\/ui\/publishedComponents\.svelte\.js$/,
+      /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
+    ],
+  }),
 ]);

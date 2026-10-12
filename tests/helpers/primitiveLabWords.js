@@ -52,6 +52,7 @@ const VALUE_PROP_NAMES = new Set([
   'activeTab',
   'selectedValue',
   'groupName',
+  'valence',
 ]);
 
 /** A name that ends in an identifier, key, icon or style suffix: `slotId`, `openKey`, `stateIcon`, `wellStyle`. */

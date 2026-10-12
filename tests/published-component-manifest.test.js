@@ -1,10 +1,11 @@
 /**
  * The published component manifest (issue 2426) against each component's parsed declaration: its
- * props, rest and data-only kinds, and a stylesheet and template that need no Fabricate ancestor.
- * The test-only probe gives the gate a domain while the shipped manifest is empty; the adapter's
- * binding of each path is the mounted suite's.
+ * props, rest and data-only kinds, and a stylesheet and template that need no Fabricate ancestor,
+ * its own and every component it imports. The test-only probe runs beside the shipped entries; the
+ * adapter's binding of each path is the mounted suite's.
  */
 import assert from 'node:assert/strict';
+import { posix } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
@@ -63,6 +64,28 @@ function ancestorDependencies(ast) {
   return [...found].sort(byName);
 }
 
+/** The component at `path` and every relative `.svelte` file it reaches by static import. */
+function componentClosure(path, astOf, seen = new Set()) {
+  if (seen.has(path)) return seen;
+  seen.add(path);
+  const ast = astOf(path);
+  for (const script of [ast.module, ast.instance]) {
+    for (const node of script?.content.body ?? []) {
+      const specifier = node.type === 'ImportDeclaration' ? node.source.value : '';
+      if (!specifier.startsWith('.') || !specifier.endsWith('.svelte')) continue;
+      componentClosure(posix.join(posix.dirname(path), specifier), astOf, seen);
+    }
+  }
+  return seen;
+}
+
+/** Each ancestor dependency in a component's closure, as `<file>: <rule>`. */
+function closureDependencies(path, astOf = componentAstOf) {
+  return [...componentClosure(path, astOf)].flatMap((file) =>
+    ancestorDependencies(astOf(file)).map((rule) => `${file}: ${rule}`)
+  );
+}
+
 /** The static class names one template node writes, by attribute or directive. */
 function classNames(node) {
   if (node.type === 'ClassDirective') return [node.name];
@@ -113,7 +136,7 @@ describe('each entry matches its component declaration', () => {
     });
 
     it(`${entry.name} styles itself without a Fabricate ancestor`, () => {
-      assert.deepEqual(ancestorDependencies(componentAstOf(entry.path)), []);
+      assert.deepEqual(closureDependencies(entry.path), []);
     });
   }
 
@@ -127,6 +150,22 @@ describe('each entry matches its component declaration', () => {
       { key: 'value', local: 'value', bindable: true },
     ]);
     assert.deepEqual([...renderedLocals(ast)], ['body']);
+  });
+
+  it('walks static component imports, so an offender only an imported file carries is named', () => {
+    const sources = {
+      'src/Entry.svelte':
+        '<script>import Leaf from \'./parts/Leaf.svelte\';</script><Leaf /><span class="visually-hidden"></span>',
+      'src/parts/Cycle.svelte': "<script>import Entry from '../Entry.svelte';</script><Entry />",
+      'src/parts/Leaf.svelte':
+        "<script module>import Deep from '../deep/Deep.svelte';</script><script>import Cycle from './Cycle.svelte';</script><Deep /><Cycle />",
+      'src/deep/Deep.svelte': '<style>:global(.fabricate-app) .a { color: red; }</style>',
+    };
+    const astOf = (file) => templateOf(file, sources[file]).ast;
+    assert.deepEqual(closureDependencies('src/Entry.svelte', astOf), [
+      'src/Entry.svelte: .visually-hidden',
+      'src/deep/Deep.svelte: app-root selector',
+    ]);
   });
 
   it('sees every ancestor dependency the published-components spec forbids', () => {

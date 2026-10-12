@@ -545,6 +545,7 @@ const MOUNT_REGIONS = Object.freeze({
   'mount-player-app': rendersInPlayerWindow,
   'canvas-mount-params': rendersInCanvasWindow,
   'mount-canvas-app': rendersInCanvasWindow,
+  'lab-specimens': (viewCase) => Boolean(viewCase.query?.specimen),
 });
 
 /** The line opening a marked region: `// view-lab-region:<key>`, at any indent. */

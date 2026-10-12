@@ -5305,8 +5305,20 @@ const CANVAS_MOUNT_REGION_ANCHORS = [
   ['mount-canvas-app', "    exportName: 'InteractableBrowserApp',"],
 ];
 
+/** The same, for the region only a specimen frame reads (issue 2424). */
+const SPECIMEN_MOUNT_REGION_ANCHORS = [
+  [
+    'lab-specimens',
+    "  'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),",
+  ],
+];
+
 /** Every marked region in the mount page, whatever its readership. */
-const ALL_MOUNT_REGION_ANCHORS = [...MOUNT_REGION_ANCHORS, ...CANVAS_MOUNT_REGION_ANCHORS];
+const ALL_MOUNT_REGION_ANCHORS = [
+  ...MOUNT_REGION_ANCHORS,
+  ...CANVAS_MOUNT_REGION_ANCHORS,
+  ...SPECIMEN_MOUNT_REGION_ANCHORS,
+];
 
 test('a mount.js patch confined to a player region selects every player frame and only those', () => {
   const players = playerCaseIds();
@@ -5401,7 +5413,58 @@ test('a mount.js patch confined to a canvas region selects every canvas frame an
   }
 });
 
-test('the six mount.js regions the selector keys on are still marked in the file', () => {
+test('a mount.js patch confined to the specimen region selects every specimen frame and only those', () => {
+  const specimens = publishableCases()
+    .filter((viewCase) => viewCase.query?.specimen)
+    .map((viewCase) => viewCase.id);
+  assert.ok(specimens.length >= 2, 'the registry must hold specimen cases for this to measure');
+  for (const [region, text] of SPECIMEN_MOUNT_REGION_ANCHORS) {
+    const patches = labMountPatches([labMountLineOf(text)]);
+    assert.deepEqual(
+      selectedIds([LAB_MOUNT_PATH], patches),
+      specimens,
+      `a change inside the "${region}" region must select every specimen frame and no other`
+    );
+    assert.deepEqual(
+      selectedIds(
+        [LAB_MOUNT_PATH],
+        patchesFor(LAB_MOUNT_PATH, shiftHunkHeaders(patches.patches[LAB_MOUNT_PATH], 200))
+      ),
+      specimens,
+      `a shifted "${region}" patch must select the same frames`
+    );
+  }
+});
+
+test('the published component seam selects the tier track specimen it mounts', () => {
+  for (const file of [
+    'src/ui/publishedComponentSeam.js',
+    'src/ui/publishedComponentManifest.js',
+    'src/ui/publishedComponents.svelte.js',
+    'src/ui/svelte/published/PublishedComponentHost.svelte',
+  ]) {
+    assert.ok(
+      selectedIds([file], {}).includes('manager-published-tier-track-specimen'),
+      `a change to ${file} does not select the published tier track specimen`
+    );
+  }
+});
+
+test('every specimen case names a LAB_SPECIMENS key, and every key has a case', () => {
+  const region = parseMountRegions(labMountSource)?.find(
+    (candidate) => candidate.key === 'lab-specimens'
+  );
+  assert.ok(region, 'the specimen region must still parse for this claim to be about it');
+  const keys = labMountSource
+    .slice(region.start - 1, region.end)
+    .map((line) => /^\s*'([a-z0-9-]+)': \(\) => import\(/.exec(line)?.[1])
+    .filter(Boolean);
+  assert.ok(keys.length > 0, 'the specimen table must be non-empty or the claim is vacuous');
+  const named = VIEW_LAB_CASES.filter((c) => c.query?.specimen).map((c) => c.query.specimen);
+  assert.deepEqual([...new Set(named)].sort(byCodePoint), keys.sort(byCodePoint));
+});
+
+test('the seven mount.js regions the selector keys on are still marked in the file', () => {
   // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
   // selected — which is correct and invisible: the only symptom would be a capture job quietly
   // back at twenty minutes. So it has to fail LOUDLY here too.

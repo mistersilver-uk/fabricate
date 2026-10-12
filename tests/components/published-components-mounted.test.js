@@ -2,7 +2,7 @@
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
  * microtask timing, the target claim, three fault paths, destroy on a removed target, ancestor
- * independence, and a companion's own reactive contexts.
+ * independence, and a companion's own reactive contexts; then each shipped entry, `TierTrack` first.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/published/PublishedComponentHost.svelte',
     PROBE,
+    'src/ui/svelte/components/Chip.svelte',
     ...MANIFEST_PATHS,
   ],
   componentPath: PROBE,
@@ -189,6 +190,171 @@ describe('the adapter', () => {
     for (const path of MANIFEST_PATHS) {
       const { default: component } = await harness.loadRuneModule(path);
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
+    }
+  });
+});
+
+const TIER_LABELS = Object.freeze({
+  ariaLabel: 'Standing with the Guild',
+  currentLabel: 'You are here',
+  reachedLabel: 'Reached',
+  aheadLabel: 'Ahead',
+});
+
+const LADDER = Object.freeze(
+  ['Revered', 'Honoured', 'Accepted', 'Wary', 'Hated'].map((name, index) => ({
+    name,
+    figure: String(20 - index * 10),
+    notes: [`${name} note`],
+  }))
+);
+
+/** A fresh seam over the shipped manifest, registered with the adapter's own table. */
+function shippedSeam() {
+  const instance = createPublishedComponents({
+    isReady: () => true,
+    report: (...args) => {
+      reports.push(args);
+    },
+  });
+  instance.register({ ...runtime, components: adapterComponents });
+  return instance.publicApi;
+}
+
+const tierProps = (props = {}) => ({ ...TIER_LABELS, tiers: LADDER, currentIndex: 2, ...props });
+const tierStates = (target) =>
+  [...target.querySelectorAll(':scope .fab-tier-track-list > li')].map(
+    (li) =>
+      li.getAttribute('aria-current') ?? li.querySelector('.fab-tier-track-hidden')?.textContent
+  );
+
+function mountTierTrack(props = {}) {
+  const target = companionTarget();
+  assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
+  return { target, handle: shippedSeam().mount('TierTrack', { target, props: tierProps(props) }) };
+}
+
+function assertClipped(element, what) {
+  const style = getComputedStyle(element);
+  assert.equal(style.position, 'absolute', `${what} is taken out of flow`);
+  assert.equal(style.overflow, 'hidden', what);
+  assert.equal(style.width, '1px', what);
+  assert.equal(style.height, '1px', what);
+  assert.equal(style.clipPath, 'inset(50%)', what);
+}
+
+describe('TierTrack through the seam', () => {
+  it('mounts, and an update moves the current tier and its state text on one root', async () => {
+    const { target, handle } = mountTierTrack();
+    const root = target.querySelector('.fab-tier-track');
+    assert.deepEqual(tierStates(target), ['Reached', 'Reached', 'step', 'Ahead', 'Ahead']);
+    assert.equal(handle.update(tierProps({ currentIndex: 3 })), true);
+    await settle();
+    assert.ok(target.querySelector('.fab-tier-track') === root, 'the same root node');
+    assert.deepEqual(tierStates(target), ['Reached', 'Reached', 'Reached', 'step', 'Ahead']);
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('passes an empty tier list, which draws a named list with no tier', () => {
+    const { target, handle } = mountTierTrack({ tiers: [] });
+    assert.equal(target.querySelector('ol').getAttribute('aria-label'), 'Standing with the Guild');
+    assert.equal(target.querySelectorAll('li').length, 0);
+    handle.destroy();
+  });
+
+  it('refuses class, which it declares but does not publish', () => {
+    assert.throws(
+      () =>
+        shippedSeam().mount('TierTrack', {
+          target: companionTarget(),
+          props: tierProps({ class: 'x' }),
+        }),
+      /^TypeError: Fabricate \| published components: "class" is not a data attribute$/
+    );
+  });
+
+  for (const key of Object.keys(TIER_LABELS)) {
+    for (const value of [undefined, '']) {
+      it(`refuses ${value === '' ? 'an empty' : 'an absent'} ${key}`, () => {
+        const props = tierProps();
+        if (value === undefined) delete props[key];
+        else props[key] = value;
+        assert.throws(
+          () => shippedSeam().mount('TierTrack', { target: companionTarget(), props }),
+          new RegExp(
+            String.raw`^TypeError: Fabricate \| published components: TierTrack requires a non-empty "${key}"$`
+          )
+        );
+      });
+    }
+  }
+
+  it('renders through the page-session seam the adapter registered', async () => {
+    const { publishedComponentSeam } = await harness.loadRawModule(SEAM);
+    globalThis.game.fabricate = { ready: true };
+    try {
+      const target = companionTarget();
+      const handle = publishedComponentSeam.publicApi.mount('TierTrack', {
+        target,
+        props: tierProps(),
+      });
+      assert.equal(target.querySelectorAll(':scope .fab-tier-track-list > li').length, 5);
+      handle.destroy();
+    } finally {
+      delete globalThis.game.fabricate;
+    }
+  });
+
+  it('positions its root to contain its hidden text under a bare ancestor', async () => {
+    const { target, handle } = mountTierTrack();
+    await settle();
+    assert.equal(getComputedStyle(target.querySelector('.fab-tier-track')).position, 'relative');
+    handle.destroy();
+  });
+
+  it('clips the row layout’s current label and both state labels from its own stylesheet', async () => {
+    const { target, handle } = mountTierTrack();
+    await settle();
+    const hidden = [...target.querySelectorAll('.fab-tier-track-hidden')];
+    assert.deepEqual(
+      hidden.map((element) => element.textContent),
+      ['Reached', 'Reached', 'You are here', 'Ahead', 'Ahead']
+    );
+    for (const element of hidden) assertClipped(element, element.textContent);
+    handle.destroy();
+  });
+
+  it('leaves the column layout’s current label visible', async () => {
+    const { target, handle } = mountTierTrack({ layout: 'column' });
+    await settle();
+    const marker = target.querySelector('.fab-tier-track-marker');
+    assert.equal(marker.textContent, 'You are here');
+    const style = getComputedStyle(marker);
+    assert.notEqual(style.position, 'absolute');
+    assert.notEqual(style.clipPath, 'inset(50%)');
+    handle.destroy();
+  });
+
+  it('resolves its figure face and its inks from :root[data-fabricate-theme]', async () => {
+    const root = document.documentElement;
+    const theme = document.createElement('style');
+    theme.textContent =
+      ':root[data-fabricate-theme] { --fab-font-mono: ProbeMono; --fab-text-muted: rgb(1, 2, 3); --fab-text: rgb(4, 5, 6); }';
+    document.head.append(theme);
+    root.setAttribute('data-fabricate-theme', 'probe');
+    try {
+      const { target, handle } = mountTierTrack({ layout: 'column' });
+      await settle();
+      const figure = getComputedStyle(target.querySelector('.fab-tier-track-figure'));
+      assert.equal(figure.fontFamily, 'ProbeMono');
+      assert.equal(figure.color, 'rgb(1, 2, 3)');
+      const current = target.querySelector(':scope [aria-current="step"] .fab-tier-track-name');
+      assert.equal(getComputedStyle(current).color, 'rgb(4, 5, 6)');
+      handle.destroy();
+    } finally {
+      root.removeAttribute('data-fabricate-theme');
+      theme.remove();
     }
   });
 });
