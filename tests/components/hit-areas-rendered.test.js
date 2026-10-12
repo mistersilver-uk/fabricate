@@ -180,6 +180,35 @@ const MOUNTS = Object.freeze({
       ],
     },
   },
+  /**
+   * The Times of day panel's bar at its narrowest two-column width (a 1121px manager), mounted
+   * against that measured track so its rail skips the add that would overlap a neighbour.
+   */
+  rangeBarPanel: {
+    name: 'ThresholdBandStrip',
+    trackWidth: 248,
+    props: {
+      binding: 'start',
+      min: 4,
+      max: 28,
+      ticks: false,
+      rangeSublabels: true,
+      addable: true,
+      railLabel: 'Add',
+      addLabel: (band) => `Add within ${band.name}`,
+      bands: [
+        { id: 'dawn', name: 'Dawn', from: 4, range: '04–06' },
+        { id: 'early', name: 'Early', from: 6, range: '06–08' },
+        { id: 'day', name: 'Day', from: 8, range: '08–17' },
+        { id: 'dusk', name: 'Dusk', from: 17, range: '17–21' },
+        { id: 'night', name: 'Night', from: 21, range: '21–04' },
+      ],
+      markers: [
+        { id: 'clock', value: 14.5, label: 'World clock', valueText: '14:30' },
+        { id: 'current', value: 12.5, label: 'Now', draggable: true, snap: 'band' },
+      ],
+    },
+  },
   componentChip: {
     name: 'Chip',
     props: {
@@ -254,6 +283,7 @@ ${Object.values(PARENTS)
   <div data-case="truncChip" class="row">${markup.truncChip}</div>
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
   <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
+  <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel">${markup.rangeBarPanel}</section><section class="manager-condition-panel"></section></div></div></div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
   <div data-case="decorativeHost" class="row"><div class="host" role="option">${markup.decorative}<span>Text</span></div></div>
   <div data-case="pager" style="width:300px;margin:12px">${scoped(PAGER, PARENTS.inset)}</div>
@@ -272,6 +302,25 @@ ${Object.values(PARENTS)
 let browser;
 let tab;
 
+/** Report `width` as the range bar track's `clientWidth`, which happy-dom lays out as 0. */
+function stubTrackWidth(width) {
+  const prototype = globalThis.HTMLElement.prototype;
+  const own = Object.getOwnPropertyDescriptor(prototype, 'clientWidth');
+  const inherited = Object.getOwnPropertyDescriptor(globalThis.Element.prototype, 'clientWidth');
+  Object.defineProperty(prototype, 'clientWidth', {
+    configurable: true,
+    get() {
+      return this.classList?.contains('fab-band-strip-track')
+        ? width
+        : (inherited?.get?.call(this) ?? 0);
+    },
+  });
+  return () => {
+    if (own) Object.defineProperty(prototype, 'clientWidth', own);
+    else delete prototype.clientWidth;
+  };
+}
+
 before(async () => {
   const markup = {};
   for (const name of new Set(Object.values(MOUNTS).map((mount) => mount.name))) {
@@ -286,7 +335,12 @@ before(async () => {
     try {
       for (const [key, mount] of Object.entries(MOUNTS)) {
         if (mount.name !== name) continue;
-        markup[key] = (await harness.mount(mount.props)).innerHTML;
+        const restore = mount.trackWidth ? stubTrackWidth(mount.trackWidth) : () => {};
+        try {
+          markup[key] = (await harness.mount(mount.props)).innerHTML;
+        } finally {
+          restore();
+        }
         harness.remount();
       }
     } finally {
@@ -782,6 +836,61 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     assert.ok(bar.dotOwnsCentre, 'the dot resolves at its own centre');
     assert.ok(bar.railOwnsCentre, 'the rail button resolves at its own centre');
     assert.deepEqual(bar.dividersOwnCentres, [true, true, true]);
+  });
+
+  it('keeps the Times of day bar`s rail, dot and dividers apart at the panel`s narrowest width', async () => {
+    const bar = await tab.evaluate(() => {
+      const root = document.querySelector('[data-case="rangeBarPanel"]');
+      const rect = (element) => {
+        const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+        return { left, top, right, bottom, width, height };
+      };
+      const owns = (element) => {
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return element.contains(hit);
+      };
+      const rails = [...root.querySelectorAll('[data-band-strip-add]')];
+      const dot = root.querySelector('[data-band-strip-marker="current"]');
+      return {
+        track: rect(root.querySelector('[data-band-strip-track]')),
+        scroller: rect(root.querySelector('.manager-gathering-settings')),
+        panel: rect(root.querySelector('.manager-condition-panel')),
+        rails: rails.map((rail) => ({ id: rail.dataset.bandStripAdd, ...rect(rail) })),
+        railsOwnCentres: rails.map(owns),
+        dot: rect(dot),
+        dotOwnsCentre: owns(dot),
+        dividers: [...root.querySelectorAll('[data-band-strip-handle]')].map(rect),
+      };
+    });
+    assert.ok(Math.abs(bar.track.width - 248) <= 1, `the panel's track is ${bar.track.width}px`);
+    const overlaps = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    assert.deepEqual(
+      bar.rails.map((rail) => rail.id),
+      ['dawn', 'day', 'dusk', 'night'],
+      'the add 20px from Dawn`s is skipped'
+    );
+    for (let index = 1; index < bar.rails.length; index += 1) {
+      assert.ok(
+        !overlaps(bar.rails[index - 1], bar.rails[index]),
+        `${bar.rails[index - 1].id} and ${bar.rails[index].id} adds overlap`
+      );
+    }
+    for (const box of [bar.dot, ...bar.rails]) {
+      assert.ok(box.width >= 24 && box.height >= 24, JSON.stringify(box));
+      for (const divider of bar.dividers) {
+        assert.ok(!overlaps(box, divider), `${JSON.stringify(box)} meets a divider`);
+      }
+    }
+    assert.ok(bar.dotOwnsCentre && bar.railsOwnCentres.every(Boolean));
+    // The dot's inset focus ring sits inside its 24px box, which the panel and its scroller hold.
+    for (const container of [bar.panel, bar.scroller]) {
+      assert.ok(
+        bar.dot.top >= container.top && bar.dot.left >= container.left,
+        `the dot ${JSON.stringify(bar.dot)} leaves ${JSON.stringify(container)}`
+      );
+    }
   });
 
   it('finds the condition label field at 34px, whatever its own 20px declaration says', async () => {
