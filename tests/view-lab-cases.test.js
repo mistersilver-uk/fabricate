@@ -3184,6 +3184,30 @@ test('a change confined to a new checks module selects the frames it determines'
   }
 });
 
+// The time-of-day bar's modules (issue 2431): each selects the bar's frame, and the range bar's
+// pure geometry also selects the two check-strip frames, since a util is not a broad signal.
+const TIME_OF_DAY_BAR_MODULES = [
+  [
+    'src/ui/svelte/util/rangeBarGeometry.js',
+    ['manager-checks-simple-two-band-strip', 'coverage-mode-routed-check-checks'],
+  ],
+  ['src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js', []],
+  ['src/ui/svelte/apps/manager/environment/TimeOfDayBar.svelte', []],
+];
+
+test('a change confined to a time-of-day bar module selects the frames it determines', () => {
+  const ids = (files) => mapChangedFilesToCases(files).map((viewCase) => viewCase.id);
+  for (const [modulePath, alsoDetermined] of TIME_OF_DAY_BAR_MODULES) {
+    assert.ok(sourceFiles.includes(modulePath), `${modulePath} names no file under src/`);
+    const selected = ids([modulePath]);
+    const missing = ['manager-gathering-time-of-day-bar', ...alsoDetermined].filter(
+      (id) => !selected.includes(id)
+    );
+    assert.deepEqual(missing, [], `${modulePath} does not select ${missing.join(', ')}`);
+    assert.ok(!selected.includes(FALLBACK_CASE_ID), `${modulePath} fell through to the fallback`);
+  }
+});
+
 test('the new-module pin is capable of failing, on a path outside every pattern', () => {
   // The capability proof the pin above needs, and the one thing it cannot demonstrate about
   // itself: a path that matches NO `sourceMatches` pattern falls through to the fallback, so

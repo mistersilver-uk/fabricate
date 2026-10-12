@@ -231,10 +231,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'coverage-mode-routed-check-checks',
     'manager-tool-parity-04-requirements-1280x720',
   ]),
-  // Both band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below.
+  // The range bar's marker (issue 2431), drawn only by the time-of-day bar: its clock line and dot.
+  'src/ui/svelte/components/RangeBarMarker.svelte': Object.freeze([
+    'manager-gathering-time-of-day-bar',
+  ]),
+  // Both check-strip frames, for the same two-mode reasoning `SearchablePopover` carries below, and
+  // the time-of-day bar's markers, rail and start binding (issue 2431).
   'src/ui/svelte/components/ThresholdBandStrip.svelte': Object.freeze([
     'manager-checks-simple-two-band-strip',
     'coverage-mode-routed-check-checks',
+    'manager-gathering-time-of-day-bar',
   ]),
   // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
