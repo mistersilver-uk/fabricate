@@ -4976,9 +4976,9 @@
           "Conditions": {
             "TimeOfDayTitle": "Times of day",
             "WeatherTitle": "Weather conditions",
-            "TimeOfDayHint": "These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.",
+            "TimeOfDayHint": "These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.",
             "WeatherHint": "These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.",
-            "CurrentTimeOfDay": "Current time",
+            "CurrentTimeOfDay": "Current time of day",
             "CurrentWeather": "Current weather",
             "AddTimeOfDay": "Add time of day",
             "AddWeather": "Add weather",
@@ -4990,7 +4990,18 @@
             "NewIcon": "New value icon",
             "EditIcon": "Edit icon",
             "EditLabel": "Edit label",
-            "RemoveValue": "Remove {value}"
+            "RemoveValue": "Remove {value}",
+            "StartsAt": "Starts at",
+            "StartHourOf": "Start hour of {value}",
+            "TimeOfDayBar": {
+              "Label": "Times of day across one day",
+              "Boundary": "Start of {value}",
+              "Range": "{start}–{end}",
+              "AddWithin": "Add a time of day at {time}, within {value}",
+              "Rail": "Add a time of day",
+              "WorldClock": "World clock",
+              "Fallback": "Give every time of day its own start hour below {hours} to see the time-of-day bar. Check: {values}."
+            }
           },
           "Vocabularies": {
             "BiomesTitle": "Biomes",

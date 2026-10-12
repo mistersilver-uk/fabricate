@@ -55,6 +55,12 @@ const harness = createMountedComponentHarness({
     // `ActionMenu`'s own import-free leaves (issue 1515).
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/actionMenuLayout.js',
+    // The Times of day panel's time-of-day bar (issue 2431).
+    'src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js',
+    'src/systems/normalize/gatheringConditionOptions.js',
+    'src/utils/scalars.js',
+    'src/ui/svelte/util/worldTimeLabel.js',
+    'src/ui/svelte/util/rangeBarGeometry.js',
   ],
   // The browse-list wiring is a runes composable (issue 1716), reached by this view and by the
   // two gathering browsers it compiles below, so it is compiled rather than copied. An omission
@@ -96,6 +102,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
+    'src/ui/svelte/components/RangeBarMarker.svelte',
+    'src/ui/svelte/components/ThresholdBandStrip.svelte',
+    'src/ui/svelte/apps/manager/environment/TimeOfDayBar.svelte',
     'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
   ],

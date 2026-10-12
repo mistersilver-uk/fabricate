@@ -178,7 +178,7 @@ describe('the time-of-day bar model (issue 2431)', () => {
       [
         ['a', 5],
         ['b', null],
-        ['c', 15],
+        ['c', 17],
       ]
     );
   });

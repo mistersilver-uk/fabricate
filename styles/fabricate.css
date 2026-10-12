@@ -13052,6 +13052,16 @@
   grid-template-columns: 38px 38px minmax(0, 1fr) max-content;
 }
 
+/* The time-of-day add form's start-hour stepper sits between the name and Add (issue 2431). */
+.fabricate-manager .manager-time-of-day-add {
+  grid-template-columns: 38px minmax(0, 1fr) max-content max-content;
+}
+
+/* The fallback note keeps the bar's footprint: the 13px dot lane, the 46px track and the 24px rail. */
+.fabricate-manager .manager-time-of-day-bar.fab-band-strip-fallback {
+  min-height: calc(13px + 46px + var(--fab-space-2xs) + 24px);
+}
+
 /* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the sibling input at `.manager-condition-add input` below and is the only reason the row's controls line up. */
 .fabricate-manager .manager-add-button {
   height: 38px;
@@ -13087,6 +13097,15 @@
   color: var(--fab-text);
   background: var(--fab-bg-1);
   overflow: hidden;
+}
+
+/* One time of day per row, so each pill fits its start-hour stepper (issue 2431). */
+.fabricate-manager .manager-condition-pill-list.is-time-of-day {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-condition-pill.is-time-of-day {
+  grid-template-columns: 30px minmax(0, 1fr) max-content 24px;
 }
 
 .fabricate-manager .manager-vocabulary-pill.is-region {

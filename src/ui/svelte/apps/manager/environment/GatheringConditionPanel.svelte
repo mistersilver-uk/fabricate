@@ -10,6 +10,7 @@
   | `icon` | Font Awesome class | required | The title's glyph. |
   | `setting` | `{ enabled, current, values }` | required | The selected system's condition. |
   | `selectedSystemId` | string | `''` | Every write's system; the caller keys the panel on it. |
+  | `services` | manager services or `null` | `null` | The time-of-day bar's world clock. |
 
   Callbacks:
   - `onUpdateGatheringConditions`, `onToggleGatheringConditionEnabled`,
@@ -17,6 +18,8 @@
     `onDeleteGatheringConditionValue` — the store's writes, forwarded with `kind` and the system.
 
   Invariants:
+  - Times of day only: the time-of-day bar, a start-hour `Stepper` on each pill and on the add
+    form, which the bar's rail seeds; the weather add still forwards exactly `{ label, icon }`.
   - The add form's draft is this panel's own, so the caller's `{#key selectedSystemId}` is what
     clears it on a system switch; `tests/components/gathering-condition-panel-characterization.test.js`.
 -->
@@ -26,13 +29,24 @@
   import IconPicker from '../../../components/IconPicker.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Select from '../../../components/Select.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localizeOr as text } from '../../../util/localizeOr.js';
+  import TimeOfDayBar from './TimeOfDayBar.svelte';
+  import {
+    addStartDefault,
+    hourText,
+    lastHourOf,
+    parseHourText,
+    timeOfDayPeriods,
+  } from './timeOfDayBandModel.js';
 
   let {
     kind,
     icon,
     setting,
     selectedSystemId = '',
+    services = null,
     onUpdateGatheringConditions = () => {},
     onToggleGatheringConditionEnabled = () => {},
     onAddGatheringConditionValue = () => {},
@@ -42,6 +56,30 @@
 
   let input = $state('');
   let addIcon = $state(defaultConditionIcon(kind));
+  let nameInput = $state(null);
+  let components = $state(null);
+  /** The add form's start hour once a GM sets or seeds it; `undefined` follows the default. */
+  let addStartHour = $state(undefined);
+
+  const isTimeOfDay = $derived(kind === 'timeOfDay');
+  const lastHour = $derived(lastHourOf(components));
+  const startHours = $derived(
+    new Map(timeOfDayPeriods(conditionValues(setting)).map((p) => [p.id, p.startHour]))
+  );
+  const addDefault = $derived(addStartDefault({ values: conditionValues(setting), components }));
+  const addStart = $derived(addStartHour === undefined ? addDefault : addStartHour);
+  const startsAtLabels = $derived(
+    stepperLabels(text('FABRICATE.Admin.Manager.Environment.Conditions.StartsAt'))
+  );
+
+  function seedAdd(hour) {
+    addStartHour = hour;
+    nameInput?.focus();
+  }
+
+  function setStartHour(valueId, startHour) {
+    onUpdateGatheringConditionValue?.(kind, valueId, { startHour }, selectedSystemId);
+  }
 
   function conditionTitle(kind) {
     return kind === 'timeOfDay'
@@ -51,7 +89,10 @@
 
   function conditionCurrentLabel(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.CurrentTimeOfDay', 'Current time')
+      ? text(
+          'FABRICATE.Admin.Manager.Environment.Conditions.CurrentTimeOfDay',
+          'Current time of day'
+        )
       : text('FABRICATE.Admin.Manager.Environment.Conditions.CurrentWeather', 'Current weather');
   }
 
@@ -65,7 +106,7 @@
     return kind === 'timeOfDay'
       ? text(
           'FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint',
-          'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'
+          'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it. Start hours place each one on the day; they never change the current time of day. The line marks the world clock; the dot is the current time of day, which you set by hand.'
         )
       : text(
           'FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint',
@@ -83,8 +124,15 @@
     event.preventDefault();
     const value = input.trim();
     if (!value) return;
-    onAddGatheringConditionValue?.(kind, { label: value, icon: addIcon }, selectedSystemId);
+    onAddGatheringConditionValue?.(
+      kind,
+      isTimeOfDay
+        ? { label: value, icon: addIcon, startHour: addStart }
+        : { label: value, icon: addIcon },
+      selectedSystemId
+    );
     input = '';
+    addStartHour = undefined;
   }
 
   function updateCurrentCondition(kind, value) {
@@ -150,6 +198,17 @@
     />
   </header>
   <p class="manager-condition-panel-hint">{conditionHint(kind)}</p>
+  {#if isTimeOfDay}
+    <TimeOfDayBar
+      values={conditionValues(setting)}
+      current={setting.current}
+      {services}
+      bind:components
+      onSetStartHour={setStartHour}
+      onSetCurrent={(id) => updateCurrentCondition(kind, id)}
+      onSeed={seedAdd}
+    />
+  {/if}
 
   <!-- A div host: a label would forward a caption click into the trigger. The caption names
        it through its id, and the panel may grow past the form rung's 340px ceiling to
@@ -166,7 +225,10 @@
     />
   </Field>
 
-  <form class="manager-condition-add" onsubmit={(event) => submitConditionValue(event, kind)}>
+  <form
+    class={['manager-condition-add', isTimeOfDay && 'manager-time-of-day-add']}
+    onsubmit={(event) => submitConditionValue(event, kind)}
+  >
     <IconPicker
       value={addIcon}
       iconOnly={true}
@@ -175,12 +237,28 @@
     />
     <Field as="label">
       <input
+        bind:this={nameInput}
         value={input}
         aria-label={conditionAddLabel(kind)}
         placeholder={conditionInputPlaceholder(kind)}
         oninput={(event) => (input = event.currentTarget.value)}
       />
     </Field>
+    {#if isTimeOfDay}
+      <Stepper
+        value={addStart}
+        min={0}
+        max={lastHour}
+        allowUnset={addDefault === null}
+        placeholder="--:--"
+        formatValue={hourText}
+        parseValue={parseHourText}
+        ariaLabel={startsAtLabels.ariaLabel}
+        decrementLabel={startsAtLabels.decrementLabel}
+        incrementLabel={startsAtLabels.incrementLabel}
+        onChange={(next) => (addStartHour = next)}
+      />
+    {/if}
     <Button
       role="primary"
       type="submit"
@@ -195,12 +273,15 @@
   </form>
 
   <div
-    class="manager-condition-pill-list"
+    class={['manager-condition-pill-list', isTimeOfDay && 'is-time-of-day']}
     aria-label={text('FABRICATE.Admin.Manager.Environment.Conditions.Values', 'Condition values')}
   >
     {#each conditionValues(setting) as option (conditionId(option))}
       {@const valueId = conditionId(option)}
-      <span class="manager-condition-pill" data-gathering-condition-value={valueId}>
+      <span
+        class={['manager-condition-pill', isTimeOfDay && 'is-time-of-day']}
+        data-gathering-condition-value={valueId}
+      >
         <IconPicker
           value={conditionIcon(option, kind)}
           iconOnly={true}
@@ -229,6 +310,26 @@
             }
           }}
         />
+        {#if isTimeOfDay}
+          {@const hourLabels = stepperLabels(
+            text('FABRICATE.Admin.Manager.Environment.Conditions.StartHourOf', undefined, {
+              value: conditionLabel(option),
+            })
+          )}
+          <Stepper
+            value={startHours.get(valueId) ?? null}
+            min={0}
+            max={lastHour}
+            allowUnset
+            placeholder="--:--"
+            formatValue={hourText}
+            parseValue={parseHourText}
+            ariaLabel={hourLabels.ariaLabel}
+            decrementLabel={hourLabels.decrementLabel}
+            incrementLabel={hourLabels.incrementLabel}
+            onChange={(next) => setStartHour(valueId, next)}
+          />
+        {/if}
         <button
           type="button"
           class="manager-condition-remove"

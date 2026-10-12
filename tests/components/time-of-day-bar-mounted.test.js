@@ -280,7 +280,7 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     });
     const divider = handle('Day');
     const pointer = (type, clientX) =>
-      divider.dispatchEvent(new PointerEvent(type, { clientX, pointerId: 1, bubbles: true }));
+      divider.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true }));
     pointer('pointerdown', 40);
     pointer('pointermove', 60);
     flushSync();
