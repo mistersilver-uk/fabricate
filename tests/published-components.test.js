@@ -311,7 +311,7 @@ describe('mount refuses before it can draw', () => {
     ]) {
       assert.throws(
         () => ui.mount('Zeta', { target: new FakeTarget(), props }),
-        refusal('functions are phase 2 (#2427)')
+        refusal('functions are phase 2 (issue 2427)')
       );
     }
   });
@@ -407,7 +407,7 @@ describe('a live mount', () => {
       [null, 'props must be a plain object'],
       [zetaProps({ 'aria-x': 'y' }), '"aria-x" is not a data attribute'],
       [{ items: [] }, 'Zeta requires a non-empty "label"'],
-      [zetaProps({ items: [() => 1] }), 'functions are phase 2 (#2427)'],
+      [zetaProps({ items: [() => 1] }), 'functions are phase 2 (issue 2427)'],
       [zetaProps({ items: new Date() }), '"items" must be data'],
       [zetaProps({ items: loop }), '"items" holds a cycle'],
     ];
@@ -543,7 +543,7 @@ describe('registration', () => {
         assert.equal(error.constructor, Error);
         assert.match(
           error.message,
-          exactly(`${PREFIX}Alpha "body" is a snippet prop; only data props ship before #2427`)
+          exactly(`${PREFIX}Alpha "body" is a snippet prop; only data props ship before issue 2427`)
         );
         return true;
       }
@@ -552,5 +552,28 @@ describe('registration', () => {
       () => seam.publicApi.mount('Alpha', { target: new FakeTarget() }),
       (error) => exactly(`${PREFIX}not registered`).test(error.message)
     );
+  });
+
+  it('refuses a second registration, keeping the first runtime', () => {
+    const { seam, ui, mounts } = seamWith();
+    const second = fakeRuntime();
+    assert.throws(
+      () => seam.register({ ...second.runtime, components: {} }),
+      (error) => {
+        assert.equal(error.constructor, Error);
+        assert.match(error.message, exactly(`${PREFIX}already registered`));
+        return true;
+      }
+    );
+    ui.mount('Alpha', { target: new FakeTarget(), props: { value: 1 } });
+    assert.equal(mounts.length, 1, 'the first runtime still mounts');
+    assert.equal(second.mounts.length, 0);
+  });
+
+  it('treats only a boolean true as required', () => {
+    const loose = { ...ALPHA, props: { value: { kind: 'data', required: 'yes' } } };
+    const { ui } = seamWith({ table: [loose] });
+    assert.deepEqual(ui.describe('Alpha').props.value, { kind: 'data', required: false });
+    ui.mount('Alpha', { target: new FakeTarget(), props: {} });
   });
 });

@@ -17,8 +17,8 @@ const isElementNode = (target) => target?.nodeType === 1;
 const isFabricateReady = () => globalThis.game?.fabricate?.ready === true;
 const reportToConsole = (...args) => console.error(...args);
 
-// One step from a null prototype, so a plain object from another realm (a V14 detached window) passes.
-function isPlainObject(value) {
+// One step from a null prototype, so a null-prototype or cross-realm plain object passes.
+function hasPlainPrototype(value) {
   if (value === null || typeof value !== 'object') return false;
   const proto = Object.getPrototypeOf(value);
   return proto === null || Object.getPrototypeOf(proto) === null;
@@ -26,11 +26,11 @@ function isPlainObject(value) {
 
 /** A deep copy of one prop value, refusing functions (M10), non-data (M11) and cycles (M12). */
 function copyData(value, key, ancestors) {
-  if (typeof value === 'function') throw refuse('functions are phase 2 (#2427)');
+  if (typeof value === 'function') throw refuse('functions are phase 2 (issue 2427)');
   if (value === null || typeof value !== 'object') return value;
   if (ancestors.has(value)) throw refuse(`"${key}" holds a cycle`);
   const isArray = Array.isArray(value);
-  if (!isArray && !isPlainObject(value)) throw refuse(`"${key}" must be data`);
+  if (!isArray && !hasPlainPrototype(value)) throw refuse(`"${key}" must be data`);
   ancestors.add(value);
   const copy = isArray ? value.map((item) => copyData(item, key, ancestors)) : {};
   if (!isArray) {
@@ -45,7 +45,7 @@ function copyData(value, key, ancestors) {
 
 /** The validated copy one mount or update renders: M7, M8, M10-M13, then M9. */
 function copyProps(entry, props) {
-  if (!isPlainObject(props)) throw refuse('props must be a plain object');
+  if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
   const copy = {};
   for (const [key, raw] of Object.entries(props)) {
     const published = Object.hasOwn(entry.props, key);
@@ -57,7 +57,7 @@ function copyProps(entry, props) {
     Object.defineProperty(copy, key, { value, enumerable: true, writable: true });
   }
   for (const [key, spec] of Object.entries(entry.props)) {
-    if (spec.required && (copy[key] === undefined || copy[key] === '')) {
+    if (spec.required === true && (copy[key] === undefined || copy[key] === '')) {
       throw refuse(`${entry.name} requires a non-empty "${key}"`);
     }
   }
@@ -80,31 +80,20 @@ function assertDataKinds(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (spec.kind !== 'data') {
       throw new Error(
-        `${PREFIX}${entry.name} "${key}" is a ${spec.kind} prop; only data props ship before #2427`
+        `${PREFIX}${entry.name} "${key}" is a ${spec.kind} prop; only data props ship before issue 2427`
       );
     }
   }
 }
 
 /**
- * One seam over `table` (the manifest by default). Passing `mount` registers the runtime at once,
- * binding each entry's own `component`; otherwise the adapter calls `register`.
+ * The claim and lifecycle of every mount on one seam: `runtime()` reads the registered runtime and
+ * `report` receives each fault.
  */
-export function createPublishedComponents({
-  table = PUBLISHED_COMPONENT_MANIFEST,
-  host,
-  mount,
-  unmount,
-  report = reportToConsole,
-  isElement = isElementNode,
-  isReady = isFabricateReady,
-} = {}) {
-  const entries = new Map(table.map((entry) => [entry.name, entry]));
-  const descriptions = new Map(table.map((entry) => [entry.name, describeEntry(entry)]));
+function createMountLifecycle({ runtime, report }) {
   // A target's claim; `live` holds every mount not yet destroyed or faulted.
   const claims = new WeakMap();
   const live = new Set();
-  let runtime = null;
 
   function retire(record) {
     record.live = false;
@@ -114,7 +103,7 @@ export function createPublishedComponents({
 
   function unmountQuietly(record) {
     try {
-      runtime.unmount(record.instance);
+      runtime().unmount(record.instance);
     } catch (error) {
       report(FAULT_REPORT, record.name, error);
     }
@@ -127,6 +116,7 @@ export function createPublishedComponents({
   }
 
   // A fault inside the runtime call precedes its instance, so that unmount waits a microtask.
+  // Defensive: Svelte 5.56 delivers no fault before its `mount` returns.
   function fault(record, error) {
     if (!record.live) return;
     retire(record);
@@ -150,13 +140,10 @@ export function createPublishedComponents({
     const record = { name: entry.name, target, live: true, instance: null, root: null };
     claims.set(target, record);
     live.add(record);
-    const props = {
-      component: runtime.components[entry.path],
-      initial,
-      onfault: (error) => fault(record, error),
-    };
+    const { components, host, mount } = runtime();
+    const props = { component: components[entry.path], initial, onfault: (e) => fault(record, e) };
     try {
-      record.instance = runtime.mount(runtime.host, { target, props });
+      record.instance = mount(host, { target, props });
     } catch (error) {
       retire(record);
       report(FAULT_REPORT, entry.name, error);
@@ -178,6 +165,27 @@ export function createPublishedComponents({
     if (target.firstChild) throw refuse('target must be empty');
   }
 
+  return { start, claimTarget, liveCount: () => live.size };
+}
+
+/**
+ * One seam over `table` (the manifest by default). Passing `mount` registers the runtime at once,
+ * binding each entry's own `component`; otherwise the adapter calls `register`, once.
+ */
+export function createPublishedComponents({
+  table = PUBLISHED_COMPONENT_MANIFEST,
+  host,
+  mount,
+  unmount,
+  report = reportToConsole,
+  isElement = isElementNode,
+  isReady = isFabricateReady,
+} = {}) {
+  const entries = new Map(table.map((entry) => [entry.name, entry]));
+  const descriptions = new Map(table.map((entry) => [entry.name, describeEntry(entry)]));
+  let runtime = null;
+  const lifecycle = createMountLifecycle({ runtime: () => runtime, report });
+
   function mountPublished(name, options) {
     if (!runtime) throw new Error(`${PREFIX}not registered`);
     if (!isReady()) throw refuse('mount before ready');
@@ -185,11 +193,12 @@ export function createPublishedComponents({
     if (!entry) throw refuse(`"${String(name)}" is not published`);
     const { target, props = {} } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
-    claimTarget(target);
-    return start(entry, target, copyProps(entry, props));
+    lifecycle.claimTarget(target);
+    return lifecycle.start(entry, target, copyProps(entry, props));
   }
 
   function register(adapter) {
+    if (runtime) throw new Error(`${PREFIX}already registered`);
     for (const entry of table) assertDataKinds(entry);
     const { components, host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
     runtime = Object.freeze({
@@ -219,7 +228,7 @@ export function createPublishedComponents({
       api.ui = publicApi;
       return api;
     },
-    liveMountCount: () => live.size,
+    liveMountCount: lifecycle.liveCount,
   });
 }
 
