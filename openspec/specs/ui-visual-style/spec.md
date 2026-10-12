@@ -221,10 +221,10 @@ Eight bullets follow: the `FillBar` and `CollapsibleGroupHeader` ones state whic
 #### Threshold band strip
 
 A shared primitive rendering N ordered, named bands over a value track with draggable boundaries, at `src/ui/svelte/components/ThresholdBandStrip.svelte`.
-The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visualisation bound to the same state.
+The caller's numeric steppers remain AUTHORITATIVE — the tier rows' at a check editor, the start-hour steppers on the value pills at the time-of-day bar; the strip is a visualisation bound to the same state.
 
-Handles, `role="slider"` and the "DC" `aria-valuetext` remain only on the strip of a summed check graded over a fixed target.
-Every other strip — roll under, a character-value target, or a count — is a READ-ONLY derived picture drawn through the primitive's `readonly` mode: it renders no handle, so no slider role, tabindex or drag cursor, and its group's `aria-describedby` names a visually hidden list stating each band and its range.
+Among the check strips, handles, `role="slider"` and the "DC" `aria-valuetext` remain only on the strip of a summed check graded over a fixed target.
+Every other check strip — roll under, a character-value target, or a count — is a READ-ONLY derived picture drawn through the primitive's `readonly` mode: it renders no handle, so no slider role, tabindex or drag cursor, and its group's `aria-describedby` names a visually hidden list stating each band and its range.
 The caller derives those bands and formats each range; the strip derives nothing, and the tier steppers are its only editor.
 A count strip is built by `checkBandModel.js` in net successes: each band starts at the required count plus the band's extra successes, the best band met wins, and a first `Botch` band below zero is drawn only while cancelling is enabled, with a `<0` tick under the track's start (the strip's `leadingTick`).
 Its scale reads `Measured in successes. The count must reach {T}`, then `; this pool is reduced to zero, so the check fails automatically.` for a pool that is reduced to zero and fails, or a full stop otherwise, then `A net below zero is a botch.` as its own sentence while cancelling is enabled.
@@ -248,9 +248,11 @@ Every handle is keyboard-operable: `role="slider"` with `aria-valuenow`, `aria-v
 
 N bands yield N-1 handles, so the band-to-boundary mapping is stated rather than inferred.
 In `relative` mode handle _i_ writes `outcomes[i+1].dc`; in `fixed` mode handle _i_ writes the coupled pair `outcomes[i].end` and `outcomes[i+1].start` as ONE update; in the two-band `simple` binding the single handle writes `simple.dc`.
+In the `start` binding handle _i_ writes the start of the band beginning at that boundary, and each band's end is the next band's start.
+In `start`, the first band's start is the only authored value with no handle, and the track's end is the caller's `max`, not an authored value.
 The outermost authored values carry no handle and are edited by `Stepper` only — the first band's lower bound and the last band's upper bound.
 Bands are DRAWN in value order and WRITTEN through each band's authored index, because a routed tier list authored high-to-low is valid data and sorting the authored array instead would reorder a GM's rows from a drag.
-`aria-valuemin` and `aria-valuemax` are ONE STEP INSIDE the neighbouring boundaries, and at the outermost handles one step inside the TRACK: the authored range extended one TIER interval past the outermost tier in `relative`, the authored `[min(start), max(end) + 1]` span in `fixed`, and the DC field's own stepper range in `simple`.
+`aria-valuemin` and `aria-valuemax` are ONE STEP INSIDE the neighbouring boundaries, and at the outermost handles one step inside the TRACK: the authored range extended one TIER interval past the outermost tier in `relative`, the authored `[min(start), max(end) + 1]` span in `fixed`, and the DC field's own stepper range in `simple`, and the caller's `[min, max]` in `start`.
 The step of clearance means NO DRAG CAN COLLAPSE A BAND to zero width, including the first and last, whose outer edges carry no handle to be pushed back by; a collapsed band's focus ring is clipped by the track's `overflow: hidden`, so the GM could neither see nor re-aim at the tier they had erased.
 A tier interval narrower than `step` is authored data the strip must still describe, and it reports the handle's own value as both bounds rather than an inverted range no assistive technology can read.
 A `fixed` band's range is INCLUSIVE, so the last band is drawn to `max(end) + 1` — the same rule every interior seam obeys, since band _i_ ends where band _i+1_ starts, which is `end + 1`.
@@ -260,8 +262,18 @@ In `relative` mode the strip renders and announces ABSOLUTE values against the P
 Since that absolute number is a function of the previewed record and changes with no data change when the GM switches records, `aria-valuetext` carries BOTH readings ("17 — DC +5 against Uncommon Craft") and the previewed record is named in the strip's group label.
 The previewed record is ONE selection shared with the right rail's "Preview as" card and with the simulator that rolls against it, held above both, because two controls each holding their own copy is how two surfaces come to disagree about which record is being previewed.
 
-A gapped, overlapping or inverted authored set is reachable and a contiguous strip cannot render it, so the strip falls back to the tier rows alone with a stated note.
+A gapped, overlapping or inverted authored set is reachable and a contiguous strip cannot render it, so the strip falls back to the caller's steppers alone with a stated note.
 An ABSENT upper edge is distinguished from an authored zero: `Number(null)` is `0` and finite, so a bare coercion reads every omitted edge as an authored `0` and reports a perfectly contiguous set as gapped.
+
+The strip may carry markers.
+A fixed marker is a reading, drawn as a 1px full-height line in solid `--fab-text-muted` hidden from assistive technology, with its label and caller-formatted value stated in the group's visually hidden description, and it takes no tab stop.
+A draggable marker is a `role="slider"` with a hit area of at least 24x24 CSS pixels over a 9px accent dot, keyboard-operable, written through `onMarkerChange`.
+Under `snap: 'band'` the dot rests at its band's centre, straddling the track's top edge in a fixed 13px lane the strip reserves above the track, so it never overlaps a divider's hit area at any band width; it moves between bands rather than steps and announces the band's name.
+The strip's `onChange` and `onMarkerChange` take a second argument `{ phase: 'drag' | 'commit' }`: pointer moves emit `drag`, pointerup re-emits the last patch as `commit`, and every keyboard step emits `commit`.
+The check strips ignore it.
+The strip may carry an add rail: a `role="toolbar"` row beneath the track with one 24x24 `IconButton` per band, named by the caller, in a single tab stop with roving tabindex, emitting `onAdd` with the band's authored index and its midpoint rounded down to the step.
+It creates nothing itself, and a band narrower than two steps renders no rail button.
+`formatValue` formats every tick and value text, reducing as the caller needs so announced hours are clock hours; `rangeSublabels` draws each band's caller-formatted range under its name inside the fixed 46px track, in the band's ink (`--fab-text`), mono 8.5px at weight 500, which never grows; `ticks={false}` omits the tick row.
 
 Click handlers on bare non-interactive elements are forbidden, and a `role="button"` wrapper is never converted into a `<button>`.
 
