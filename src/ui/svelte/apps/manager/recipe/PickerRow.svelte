@@ -9,7 +9,7 @@
   | --- | --- | --- | --- |
   | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula, label, reason }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
   | `kinds` | kinds | the four match types | What the kind select offers; the row's own kind is always listed too. |
-  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary. |
+  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. |
   | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face, `READONLY_FACES` in `pickerRowKinds.js`: a `currency` row while currency is off, and a `knowledge` row while learning is not observable. |
   | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
@@ -120,11 +120,25 @@
   // A taught recipe its system no longer holds: named as missing rather than drawn unnamed.
   const missing = $derived(!readonly && matchType === 'knowledge' && Boolean(value?.id) && !chosen);
 
-  // The tag picker offers system tags not already on this option.
+  const countWord = (count) =>
+    count === 1
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.TagComponentCountOne', '1 component')
+      : localizeOr('FABRICATE.Admin.Manager.Recipe.TagComponentCount', '{count} components', {
+          count,
+        });
+  const countChip = (count) => ({ tone: count === 0 ? 'warning' : 'secondary', mono: true });
+
+  // Every vocabulary tag in vocabulary order, a held one checked; a zero count marks a likely typo.
   const tagPickerOptions = $derived(
-    entries
-      .filter((entry) => !tags.includes(entry.id))
-      .map(({ id, label, icon }) => ({ id, label, icon }))
+    entries.map(({ id, label, icon, count }) => ({
+      id,
+      label,
+      icon,
+      ...(Number.isFinite(count)
+        ? { trailing: countWord(count), trailingChip: countChip(count) }
+        : {}),
+      trailingIcon: tags.includes(id) ? 'fas fa-check' : undefined,
+    }))
   );
 
   const kindWord = (kind) => wordOfKind(kind, localizeOr);
@@ -171,6 +185,11 @@
 
   function removeTag(tag) {
     emit({ tags: tags.filter((t) => t !== tag) });
+  }
+
+  function toggleTag(tag) {
+    if (tags.includes(tag)) removeTag(tag);
+    else addTag(tag);
   }
 
   // The kind's own tint, on the glyph and never the tile; a misconfigured row draws a warning
@@ -290,6 +309,8 @@
       {/each}
       <SearchablePopover
         options={tagPickerOptions}
+        multiple
+        value={tags}
         pickerClass="manager-recipe-tag-picker"
         triggerClass="manager-recipe-tag-trigger"
         triggerIcon="fa-solid fa-plus"
@@ -297,13 +318,18 @@
         triggerProps={{ 'data-recipe-add-tag': '' }}
         ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         triggerTitle={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.TagPanel', 'Tags')}
+        showFilteredCount
+        filteredCountTemplate={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.TagPanelCount',
+          '{matched} of {total}'
+        )}
         searchPlaceholder={searchTagsWord}
         searchLabel={searchTagsWord}
         emptyHint={localizeOr('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
         {disabled}
-        onSelect={(tag) => addTag(tag)}
+        onSelect={toggleTag}
       />
     </span>
     <!-- `tone="tag"` and NO `density`: the tone carries this control's scale as well as its

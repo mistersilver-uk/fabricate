@@ -142,6 +142,9 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
   // The Journal's run-type filter (issue 1644): a multi-select over the four kinds by maintainer
   // ruling 2026-10-05, applying each choice as it is made with no query field.
   'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
+  // The requirement row's tag adder (issue 2430): each choice writes one add or one remove at
+  // once, so its held tags are announced selected through `multiple` rather than `SetPicker`.
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
 ]);
 
 // The reader is probed rather than trusted: a pattern matching nothing makes the set-equality
