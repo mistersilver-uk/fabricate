@@ -10,7 +10,7 @@
   | `stops` / `at` | `{ from, value, now, text, index }[]` / number | `[]` / `0` | A draggable marker's stops, from `markerStops`, and the one it rests at. |
   | `pageStep` / `disabled` | number / boolean | `1` / `false` | The page keys' stride over grid stops; inert when disabled. |
   | `measure()` | function | `() => null` | The track's scale, `{ left, width, min, span }`, read once per gesture. |
-  | `onMarkerChange({ id, value, index }, { phase })` | function | no-op | A stop reached: `'drag'` per pointer move, the last re-emitted as `'commit'` on release, `'commit'` per key. |
+  | `onMarkerChange({ id, value, index }, { phase })` | function | no-op | A stop reached: `'drag'` per pointer move, the last re-emitted as `'commit'` on release or cancel, `'commit'` per key. |
 
   Invariants:
   - A FIXED MARKER IS A READING: a solid `--fab-text-muted` line, `aria-hidden`, with no tab stop,
@@ -104,6 +104,7 @@
     {onpointermove}
     {onpointerup}
     onpointercancel={onpointerup}
+    onlostpointercapture={onpointerup}
   >
     <span class="fab-band-strip-dot" aria-hidden="true"></span>
   </span>
@@ -145,7 +146,7 @@
 
   .fab-band-strip-marker:focus-visible {
     outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
+    outline-offset: -2px;
   }
 
   .fab-band-strip-dot {

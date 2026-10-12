@@ -7,7 +7,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `binding` | `'relative'` \| `'fixed'` \| `'simple'` \| `'start'` | `'relative'` | Which authored field a handle writes, emitted as a PATCH rather than a raw index so a caller cannot get the mapping wrong. `relative` writes `{ binding, index: i + 1, dc }`; `fixed` writes the coupled pair as ONE update, `{ binding, index: i, end: v - 1, nextIndex: i + 1, start: v }`, because ranges are inclusive on both ends and the boundary value IS the next band's start; `simple` writes `{ binding, dc: v }`; `start` writes `{ binding, index: i + 1, start: v }`, the start of the band beginning there, and draws a single band. |
+  | `binding` | `'relative'` \| `'fixed'` \| `'simple'` \| `'start'` | `'relative'` | Which authored field a handle writes, emitted as a PATCH rather than a raw index so a caller cannot get the mapping wrong. `relative` writes `{ binding, index: i + 1, dc }`; `fixed` writes the coupled pair as ONE update, `{ binding, index: i, end: v - 1, nextIndex: i + 1, start: v }`, because ranges are inclusive on both ends and the boundary value IS the next band's start; `simple` writes `{ binding, dc: v }`; `start` writes `{ binding, index: i + 1, start: v }`, the start of the band beginning there; unlike the other bindings it may draw a single band. |
   | `bands` | `{ id, name, color, ink, from, to?, index? }[]` | `[]` | ABSOLUTE track values, whatever the binding underneath. `to` is derived from the next band's `from` when omitted. `ink` travels with `color` because the two are ONE decision: the name is drawn ON the fill, so whoever picks the fill is the only party that can know what stays readable on it. Bands are DRAWN in value order and WRITTEN through `index`, the position in the caller's own AUTHORED array; the two differ for a descending tier list, and sorting the authored array instead would reorder the tier rows from a drag. |
   | `previewDc` / `previewLabel` | number / string | `0` / `''` | The previewed record. Only `relative` reads the DC, to convert absolute ↔ offset. |
   | `step` / `pageStep` / `min` / `max` | numbers or `null` | `1` / `5` / `null` / `null` | The keyboard increments and snap grid, and the track domain overrides `simple` passes the DC stepper's own range through. |
@@ -16,7 +16,7 @@
   | `disabled` / `class` | boolean / class string | `false` / `''` | The handles go inert, and an extra class appended to the root's own. |
   | `leadingTick` | string | `''` | A label under the track's start, before the boundary ticks: a count strip passes `<0` under its Botch band. |
   | `readonly` | boolean | `false` | A derived band PICTURE: no handles, so no slider role, tabindex or drag cursor, and the group is described by a visually hidden list of each band's `name` and caller-formatted `range` (`bands[].range`). |
-  | `onChange(patch, { phase })` | function | no-op | The authored patch, per binding above. A pointer move emits `phase: 'drag'`, its release re-emits the last patch as `'commit'`, and every key emits `'commit'`. |
+  | `onChange(patch, { phase })` | function | no-op | The authored patch, per binding above. A pointer move emits `phase: 'drag'`, its release or cancel re-emits the last patch as `'commit'`, and every key emits `'commit'`. |
   | `formatValue(value)` / `ticks` | function / boolean | `String` / `true` | Formats every tick and value text; `ticks={false}` omits the tick row. |
   | `rangeSublabels` | boolean | `false` | Draws `bands[].range` under each name, inside the fixed 46px track. |
   | `markers` | `{ id, value, label, valueText?, draggable?, snap? }[]` | `[]` | A fixed marker is a reading: a line, stated in the hidden description. A draggable one is a slider in a 13px lane above the track, over each grid value or, with `snap: 'band'`, each band's centre. |
@@ -44,7 +44,8 @@
   - A HANDLE DRAGGED OR KEYED PAST A NEIGHBOUR CLAMPS. It never swaps and never reorders: reordering
     a tier list from a drag is a data change no undo on this surface can express.
   - THE CHECK STRIPS PASS NONE OF THE OPT-IN PROPS, and their markup is frozen by
-    `tests/fixtures/threshold-band-strip/checkCallerStrips.js`.
+    `tests/fixtures/threshold-band-strip/checkCallerStrips.js`; a drag's release re-sends its last
+    patch to them once, an identical write.
   - EVERY HANDLE IS A REAL ARIA WIDGET: `role="slider"`, focusable, with a hit area of at least
     24×24 CSS pixels (WCAG 2.5.8), because the ~2px seam is not a target. A `role="button"` wrapper
     is never converted into a `<button>`, which would nest buttons and land invalid DOM.
@@ -105,42 +106,35 @@
   let railStop = $state(0);
 
   const resolved = $derived(resolveBands(bands, binding === 'start' ? 1 : 2));
-
   const boundaries = $derived(resolved ? resolved.slice(1).map((row) => row.from) : []);
-
   const domain = $derived(bandDomain({ rows: resolved, boundaries, min, max, binding, step }));
-
   const trackMax = $derived(trackMaxOf({ rows: resolved, binding, max, domain }));
-
   const span = $derived(Math.max(trackMax - domain.min, Number.EPSILON));
-
   const percentOf = (value) => ((value - domain.min) / span) * 100;
-
   const geometry = $derived({ boundaries, domainMin: domain.min, trackMax, step });
 
   const layout = $derived(markerLayout(markers, resolved, geometry, formatValue));
+  const draggable = $derived(readonly ? [] : layout.draggable);
   const described = $derived(readonly || layout.fixed.length > 0);
-  const seeds = $derived(addable && resolved ? railSeeds(resolved, trackMax, step) : []);
+  const seeds = $derived(
+    addable && !readonly && resolved ? railSeeds(resolved, trackMax, step) : []
+  );
   const railAt = $derived(Math.min(railStop, seeds.length - 1));
 
-  /** Re-emits a gesture's last drag as its commit on release (issue 2431). */
+  /** A gesture's last drag, re-emitted as its commit on release (issue 2431). */
   let pendingCommit = null;
 
   function commit(index, rawValue, phase = 'commit') {
     if (disabled) return;
     const next = clampTo(index, snapTo(rawValue, domain.min, step), geometry);
-    if (next === boundaries[index]) return;
+    const from = phase === 'drag' && pendingCommit ? pendingCommit.next : boundaries[index];
+    if (next === from) return;
     const patch = boundaryPatch({ binding, rows: resolved, index, next, previewDc });
-    if (phase === 'drag') pendingCommit = () => onChange(patch, { phase: 'commit' });
+    if (phase === 'drag') pendingCommit = { next, patch };
     onChange(patch, { phase });
   }
 
-  const KEY_DELTAS = {
-    ArrowRight: 1,
-    ArrowUp: 1,
-    ArrowLeft: -1,
-    ArrowDown: -1,
-  };
+  const KEY_DELTAS = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
 
   function onHandleKeydown(event, index) {
     if (disabled) return;
@@ -184,7 +178,7 @@
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     dragIndex = -1;
     dragScale = null;
-    pendingCommit?.();
+    if (pendingCommit) onChange(pendingCommit.patch, { phase: 'commit' });
     pendingCommit = null;
   }
 
@@ -214,13 +208,18 @@
     {fallbackNote}
   </p>
 {:else}
-  <div
-    class={['fab-band-strip', layout.draggable.length > 0 && 'has-marker-lane', extraClass]}
-    {...rest}
-  >
-    {#each layout.draggable as view (view.marker.id)}
-      <!-- ratchet-exempt(design-system): the spread is markerLayout's own view, keyed by the marker's props -->
-      <RangeBarMarker {...view} {pageStep} {disabled} {measure} {onMarkerChange} />
+  <div class={['fab-band-strip', draggable.length > 0 && 'has-marker-lane', extraClass]} {...rest}>
+    {#each draggable as { marker, stops, at, left } (marker.id)}
+      <RangeBarMarker
+        {marker}
+        {stops}
+        {at}
+        {left}
+        {pageStep}
+        {disabled}
+        {measure}
+        {onMarkerChange}
+      />
     {/each}
     <div
       class="fab-band-strip-track"
@@ -251,9 +250,8 @@
         </span>
       {/each}
 
-      {#each layout.fixed as view (view.marker.id)}
-        <!-- ratchet-exempt(design-system): the spread is markerLayout's own view, keyed by the marker's props -->
-        <RangeBarMarker {...view} />
+      {#each layout.fixed as { marker, left } (marker.id)}
+        <RangeBarMarker {marker} {left} />
       {/each}
 
       {#each readonly ? [] : boundaries as boundary, index (index)}
@@ -278,6 +276,7 @@
           onpointermove={onHandlePointermove}
           onpointerup={onHandlePointerup}
           onpointercancel={onHandlePointerup}
+          onlostpointercapture={onHandlePointerup}
         >
           <span class="fab-band-strip-grip" aria-hidden="true"></span>
         </span>
