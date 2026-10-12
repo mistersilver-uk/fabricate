@@ -258,6 +258,41 @@
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "adding a tag — the adder opens the catalogue",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "fixture": "TagAdderOpen",
+    "slot": { "width": 745, "height": 287 },
+    "data": { "typed": "wood" },
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone. A boxed slot, because the panel is portalled to the window. Measured: at 745 by 287 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 240 by 231, unclamped and unflipped; below 745 the stepper, `or…` and remove wrap to a second line, and 287 is the least height that holds the whole panel (286 clips it to 230). The panel keeps its 240px minimum, so the held `#Hardwood` and `#Seasoned-Heartwood-Planks` ellipsize beside their count chips.",
+    "props": {
+      "value": {
+        "kind": "tags",
+        "tags": ["#Hardwood", "#Seasoned"],
+        "tagMatch": "any",
+        "quantity": 1
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "tags": [
+          { "id": "#Hardwood", "label": "#Hardwood", "icon": "fas fa-tag", "count": 24 },
+          { "id": "#Seasoned", "label": "#Seasoned", "icon": "fas fa-tag", "count": 11 },
+          { "id": "#Softwood", "label": "#Softwood", "icon": "fas fa-tag", "count": 9 },
+          { "id": "#Driftwood", "label": "#Driftwood", "icon": "fas fa-tag", "count": 3 },
+          { "id": "#Dirftwood", "label": "#Dirftwood", "icon": "fas fa-tag", "count": 0 },
+          {
+            "id": "#Seasoned-Heartwood-Planks",
+            "label": "#Seasoned-Heartwood-Planks",
+            "icon": "fas fa-tag",
+            "count": 1
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the only route in — a standalone result row’s inline convert control",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
