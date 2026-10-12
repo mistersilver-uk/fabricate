@@ -36,7 +36,7 @@ function entryFailures(entry) {
 
 function partFailures(file, text) {
   const failures = [];
-  if (/@import\b/u.test(text.replaceAll(COMMENT, ''))) failures.push(`${file} holds an @import`);
+  if (/@import\b/iu.test(text.replaceAll(COMMENT, ''))) failures.push(`${file} holds an @import`);
   if (text.includes('\r')) failures.push(`${file} holds a carriage return`);
   if (!text.endsWith('\n')) failures.push(`${file} does not end with a newline`);
   const lines = text.split('\n').length - 1;

@@ -158,7 +158,7 @@ test('(f) a fabricate-*.css the entry does not import fails the integrity check,
 test('the integrity check holds the entry to imports and each partial to its shape', () => {
   const files = {
     ...splitSheet(
-      { one: '.fabricate .a {}\n', two: '.fabricate .b {}' },
+      { one: '.fabricate .a {}\n', two: '.fabricate .b {}', four: '@IMPORT url("x.css");\n' },
       {
         entryPrefix: '/* ratchet-exempt(lint): nothing reads this */\n',
       }
@@ -170,6 +170,7 @@ test('the integrity check holds the entry to imports and each partial to its sha
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(files), Object.keys(files)), [
     'styles/fabricate.css carries a marker or stylelint directive, which no rule sees',
     'styles/fabricate-two.css does not end with a newline',
+    'styles/fabricate-four.css holds an @import',
     'styles/fabricate-three.css holds an @import',
     'styles/fabricate-three.css holds a carriage return',
     'styles/fabricate-three.css is 4002 lines, over 4000',
