@@ -65,7 +65,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-leaves-specimen',
     label:
-      'Specimen, mounted through the published seam — the seven data-only leaves: portrait and art tiles, fill bars, a meter, banded bars, stat boxes and an info strip. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+      'Specimen, mounted through the published seam — the seven data-only leaves, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
     // Beyond the smoke: a companion mounts each through `api.ui`, in states no one screen draws together.
     reaches: 'beyond',
     smokeLabels: [],
@@ -81,6 +81,7 @@ export const CASES = Object.freeze([
     expectLayout: {
       controls: [
         { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
+        { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
         { selector: '.fab-avatar[data-avatar="initials"]:not(.is-square)', styles: PORTRAIT_BOX },
         {
           selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',
@@ -93,6 +94,8 @@ export const CASES = Object.freeze([
         },
       ],
     },
+    // Sized to the fixture's 880px ground.
+    position: { width: 1024, height: 640 },
     kinds: ['manager', 'specimen'],
     // The seven leaves, `Kicker` and `Chip` are broad signals, each routed here by its override.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

@@ -960,9 +960,11 @@ const NON_VERB_CONTROLS = Object.freeze({
     shortStackPart('.fab-choice-option-reading'),
   ],
   // The published leaves (issue 2448): both portrait states and the 26px art rung on their ladder
-  // boxes, the meter's clipped label, and a stat box's kicker in its own ink on a danger ground.
+  // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
+  // its own ink on a danger ground.
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
+    { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
     { selector: '.fab-avatar[data-avatar="initials"]:not(.is-square)', styles: PORTRAIT_BOX },
     {
       selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',

@@ -31,7 +31,7 @@
     ['FillBar', { value: 0 }],
     ['FillBar', { value: 64 }],
     ['FillBar', { value: 100, density: 'compact' }],
-    ['Meter', { value: 7, max: 11, label: 'Labourers', valueText: '7 of 11 labourers' }],
+    ['Meter', { value: 3, max: 11, label: 'Labourers', valueText: '3 of 11 labourers' }],
     ['BandedBar', { rows: [{ name: 'Event chance', percent: 62 }] }],
     [
       'BandedBar',
