@@ -41,6 +41,7 @@ import {
 } from '../ui/appFactory.js';
 import { managerExtensions } from '../ui/managerExtensions.js';
 import { playerExtensions } from '../ui/playerExtensions.js';
+import { publishedComponentSeam } from '../ui/publishedComponentSeam.js';
 import { openDeferredAppRethrowing } from '../utils/deferredEntryNotice.js';
 
 import { deprecate } from './gatheringRuntime.js';
@@ -215,6 +216,7 @@ export function bindFabricateGlobal(fabricate, io) {
   // Page-session singletons, so the `ready` replay re-publishes the registry a companion
   // registered into during its own `init`.
   playerExtensions.bindPublicApi(game.fabricate.api);
+  publishedComponentSeam.bindPublicApi(game.fabricate.api);
 
   game.fabricate.importFromPack = (packData, options) =>
     fabricate.compendiumImporter?.importFromPackData(packData, options);

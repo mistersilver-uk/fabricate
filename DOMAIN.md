@@ -307,6 +307,13 @@ A PLAYER window presentation seam, and the structural counterpart of the row abo
 
 [Notes](docs/domain/records.md#player-navigation-surface--provider-seam)
 
+#### Published UI Component
+
+A Fabricate primitive a companion renders into an element it owns, through `game.fabricate.api.ui`: the other direction from the two navigation seams, which put a companion's content into Fabricate's windows.
+The **target** is that element, and the **seam** names only the mount function, never the target or the component.
+
+[Notes](docs/domain/records.md#published-ui-component)
+
 #### Rail Marker Family
 
 The Manager rail's trailing-track marker vocabulary is one FAMILY, not four unrelated ad-hoc pills, and it is not a taxonomy the canonical text has ever named before this issue — until now it lived only in CSS comments, split across two rules.
