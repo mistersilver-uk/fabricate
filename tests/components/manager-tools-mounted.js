@@ -1446,6 +1446,12 @@ export function registerToolsCases() {
             ],
           },
         ],
+        // herb on two components and ore on none, so the adder reads a plural count and the zero
+        componentTagOptions: [
+          { id: 'c1', tags: ['metal'] },
+          { id: 'c3', tags: ['herb', 'night'] },
+          { id: 'c4', tags: ['herb', 'fuel'] },
+        ],
       },
     });
     await openFixtureToolEditor(calls);

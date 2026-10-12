@@ -191,13 +191,7 @@ function createStore(calls = [], options = {}) {
       // precedence cases resolve `componentId` against their own fixtures); defaults to
       // the alchemy list every other test relies on.
       managedItemOptions: options.managedItemOptions ?? alchemyManagedItemOptions,
-      // The `{ id, tags }` projection the tag adder counts (issue 2430): `herb` on two components
-      // and `ore` on none, so a Root case reads both a plural count and the zero.
-      componentTagOptions: options.componentTagOptions ?? [
-        { id: 'c1', tags: ['metal'] },
-        { id: 'c3', tags: ['herb', 'night'] },
-        { id: 'c4', tags: ['herb', 'fuel'] },
-      ],
+      componentTagOptions: options.componentTagOptions,
       // System-level recipe visibility config (issue 511).
       recipeVisibility: options.recipeVisibility,
       // Recipe items (cook books / scrolls) surfaced by the Books & Scrolls management surface

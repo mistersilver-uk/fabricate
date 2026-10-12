@@ -135,9 +135,9 @@ function snippetTriggerName(site) {
 
 /** ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION. */
 const MULTI_SELECT_ADOPTERS = Object.freeze([
-  // `SetPicker` (issue 1782) is the one adopter: the crafting sources bar and the recipe-item
-  // contents tab, the two files issue 1513 converted onto `multiple` and `stayOpen`, reach the
-  // panel through it. No caller passes the gate ALONE since the contents tab became staged.
+  // `SetPicker` (issue 1782) is the set-picking adopter: the crafting sources bar and the
+  // recipe-item contents tab, the two files issue 1513 converted onto `multiple` and `stayOpen`,
+  // reach the panel through it rather than passing either prop themselves.
   'src/ui/svelte/components/SetPicker.svelte',
   // The Journal's run-type filter (issue 1644): a multi-select over the four kinds by maintainer
   // ruling 2026-10-05, applying each choice as it is made with no query field.
@@ -189,8 +189,8 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
   // NON-VACUITY, on the reader rather than on the result.
   assert.ok(
     popover.callSites.some((site) => site.file === MULTIPLE_ADOPTER && site.attribute('multiple')),
-    'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
-      'it, or it is finding nothing anywhere and this clause is decorative'
+    'the reader must find a `multiple` ATTRIBUTE on the call site in the set-picking adopter, ' +
+      'or it is finding nothing anywhere and this clause is decorative'
   );
 });
 

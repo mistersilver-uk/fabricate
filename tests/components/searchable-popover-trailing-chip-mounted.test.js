@@ -68,6 +68,10 @@ describe('2430 SearchablePopover — the per-option trailing chip', () => {
     const herb = chipClasses(rows.herb);
     assert.ok(herb.includes('is-secondary'), `secondary tone, saw ${herb.join(' ')}`);
     assert.ok(herb.includes('is-mono'), 'and the mono face');
+    assert.ok(
+      herb.includes('manager-travel-option-trailing'),
+      'and the layout class its rule addresses'
+    );
     assert.ok(!herb.includes('is-disabled'), 'and not the default disabled tone');
     const typo = chipClasses(rows.typo);
     assert.ok(typo.includes('is-warning') && typo.includes('is-mono'), typo.join(' '));
