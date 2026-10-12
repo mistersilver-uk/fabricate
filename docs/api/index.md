@@ -1979,7 +1979,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-Phase 1 publishes data-only leaf primitives; text and slot content, callbacks, bindables and overlays arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) publishes more data-only leaves; text and slot content, callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -1997,6 +1997,32 @@ handle.update(nextProps); // Replaces every prop; it never merges.
 handle.destroy(); // Required on every path that ends the mount.
 ```
 
+A worked mount, in an ApplicationV2 of your own, names a `Meter` and keeps its handle:
+
+```javascript
+#meter = null;
+
+_onRender(context, options) {
+  super._onRender(context, options);
+  const fabUi = game.fabricate?.api?.ui;
+  if (fabUi?.schemaVersion !== 1 || !fabUi.components.includes('Meter')) return;
+  const target = this.element.querySelector('[data-hp-meter]'); // An empty element you own.
+  this.#meter?.destroy(); // A re-render replaced the old target.
+  this.#meter = fabUi.mount('Meter', {
+    target,
+    props: { label: 'Hit points', value: 14, max: 20, valueText: '14 of 20 hit points' },
+  });
+}
+
+async _preClose(options) {
+  this.#meter?.destroy();
+  await super._preClose(options);
+}
+```
+
+Draw the visible reading yourself, because `Meter` draws no figure.
+A later change goes through `this.#meter.update({ ... })` with every prop again.
+
 The published components, in publication order:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -2004,18 +2030,116 @@ The published components, in publication order:
 | Component | Version | Props | Rest |
 | --- | --- | --- | --- |
 | `TierTrack` | 1 | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
+| `Avatar` | 1 | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
+| `Medallion` | 1 | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
+| `FillBar` | 1 | `value`, `tone`, `color`, `density` | yes |
+| `Meter` | 1 | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
+| `BandedBar` | 1 | `rows` (required), `direction`, `density` | yes |
+| `StatBox` | 1 | `value` (required), `label` (required), `icon`, `tone` | yes |
+| `InfoStrip` | 1 | `label` (required), `facts` (required), `badge` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
+A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
+Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
+Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
+A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
 
 ### TierTrack
 
 `TierTrack` states where a record stands on an ordered set of named tiers.
 `tiers` lists each tier as `{ id?, name, figure?, notes?, valence? }` in drawn order: `name` and `figure` are final display text, `notes` is a list of strings drawn in the `column` layout only, and `valence` is `positive` (the default), `negative` or `neutral` and colours only a reached tier.
-`currentIndex` is the tier the record sits at, and `-1` reaches nothing; `direction` is `ascending` or `descending` (highest first), and `layout` is `row` (badges) or `column` (a ladder).
-`ariaLabel` names the list, `currentLabel` marks the current tier, and `reachedLabel` and `aheadLabel` are the hidden state text on every other tier; all four are required and already localized, and `hint` is an optional sentence beneath the track.
+`currentIndex` is the tier the record sits at, and `-1` reaches nothing.
+`direction` is `ascending` or `descending` (highest first).
+`layout` is `row` (badges) or `column` (a ladder).
+`ariaLabel` names the list.
+`currentLabel` marks the current tier.
+`reachedLabel` and `aheadLabel` are the hidden state text on every other tier.
+All four labels are required and already localized.
+`hint` is an optional sentence beneath the track.
 The current tier keeps its valence colour and is marked by a location-dot glyph in `row` and by the visible `currentLabel` in `column`.
+
+### Avatar
+
+`Avatar` draws an actor's portrait as a fixed-size tile: the artwork, or the initials of the name.
+`art` is an image path, and a falsy one draws the initials of `name`; a path that fails to load draws the browser's broken image, never the initials.
+That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
+Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
+`name` is required and is the only source of the initials.
+`alt` is read only when `art` is set, and `''` marks the image decorative.
+`size` is `26` or `32`, the portrait ladder, and defaults to `32`.
+`shape` is `round` or `square`.
+`tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
+`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
+The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
+
+### Medallion
+
+`Medallion` draws a record's identity tile: the artwork, or a glyph.
+`art` is an image path, and a falsy one draws `icon`, whose default is `fas fa-scroll`.
+That path is as Foundry stores it on a document (`actor.img`, `item.img`): relative to the Foundry root, or an absolute URL.
+Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.getRoute`.
+`icon` takes Font Awesome classes from the sheet the running Foundry ships (6 Pro on Foundry 13, 7 Pro on Foundry 14); a class absent from that build draws an empty box.
+`size` is required and is `22`, `26`, `30` or `38`, the art ladder.
+`glyph` is the ladder's glyph size for that rung: `10`, `11`, `12` or `15`.
+`alt` is as for `Avatar`.
+`tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
+`variant` is `''` or `glyph-chip`.
+`tone` and `ink` are each `''`, `success` or `danger`: both outrank `tint`, and `ink` outranks `tone` on the glyph.
+The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
+The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
+
+### FillBar
+
+`FillBar` draws a rounded track with a fill as wide as its value.
+`value` is 0–100 and is clamped.
+`tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
+`color` is a `var(--fab-…)` colour token reference, and it overrides `tone`.
+`density` is `default` or `compact`.
+It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
+A value that must be announced is a `Meter`.
+
+### Meter
+
+`Meter` states a value against a maximum to assistive technology, over a `FillBar` track.
+`value` is read against `max`.
+`max` defaults to 100, and a `max` of zero or less reads full.
+`segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s, and an empty array draws `success`.
+A second or later entry is reserved and is not drawn.
+`valueText` is the reading, announced in place of the bare number.
+Pass `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
+`label` is required and is the meter's name, drawn visually hidden.
+It draws no figure, so the visible reading is yours to draw.
+
+### BandedBar
+
+`BandedBar` draws percentages as bars whose whole fill takes one hue from a fixed ramp.
+`rows` is required and is `{ id?, name, percent, fill? }[]`.
+`name` is required in every row, `percent` is a whole number 0–100 printed as `<percent>%`, and every `id` is unique.
+One row is a meter named by its `name`, which is also its visible caption; several rows are a histogram; an empty `rows` draws nothing.
+`fill` is a `FillBar` tone, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
+Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
+`direction` is `ascending` or `descending`.
+`density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.
+In a histogram the bars are hidden from assistive technology and each row is read as its name and its percentage; the list carries no name, so head it with your own text.
+
+### StatBox
+
+`StatBox` draws one figure over a micro-label in a bordered box.
+`value` is required and is the formatted figure.
+`label` is required.
+`icon` is optional Font Awesome classes for a glyph.
+`tone` is `default`, `info` or `danger`.
+The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+
+### InfoStrip
+
+`InfoStrip` draws a read-only strip of current values under a kicker.
+`label` is required and is the kicker, which names the group.
+`facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+`badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
 ### The descriptor
 
@@ -2044,6 +2168,7 @@ It returns a frozen `{ update(props), destroy() }`.
   A mount that is never destroyed leaks for the life of the page.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent or `''` throws `<name> requires a non-empty "<key>"`.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 If the component faults while rendering, updating or in an effect, Fabricate logs `Fabricate | Published component render failed:` with the name and the error, empties `target`, and the handle goes inert.
@@ -2053,16 +2178,18 @@ Any fallback copy is yours to draw.
 ### Ownership and theme
 
 You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
+A published component inherits from `target` every inherited text property its own rules do not state, so set none on `target`.
 `.fab-*` classes and `svelte-*` hashes are private and may change in any release.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
 Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
 A published component resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor; mount it after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
-A later move between windows, or a theme change after a window detached, is not carried to the mount, so re-mount in `_onDetach` and `_onAttach` when that matters.
+A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window (issue 2432).
+A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-- Phase-1 components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
+- Data-only components are non-interactive: they take no focus and have no accessible name beyond the data you pass.
 - A required label is yours to localise.
 - Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 

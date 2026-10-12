@@ -38,6 +38,7 @@ manager-tool-stress-long-name
 manager-knowledge-owned-copies
 manager-bulk-edit-panel-shell-specimen
 manager-published-tier-track-specimen
+manager-published-leaves-specimen
 player-gathering-environments
 fabricate-app-shell
 player-inventory

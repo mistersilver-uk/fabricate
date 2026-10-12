@@ -577,6 +577,7 @@ And a duplicate-selector lint configured to skip list members begins comparing a
 A class that carries no meaning beyond a repeated declaration set — visually-hidden, truncation, a column stack, a wrapping cluster — is a UTILITY.
 A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
 A published component restates the visually hidden declaration set in its own scoped stylesheet, recorded with the reason that it renders under a companion's ancestor, so the `.fabricate` ancestor is not guaranteed (`ui-extension-points` § Ownership, strings and theme); `TierTrack`'s `.fab-tier-track-hidden` is the first (issue 2424).
+`Meter`'s `.fab-meter-hidden` is the next (issue 2448).
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
@@ -665,6 +666,7 @@ That is the same `reuse, then extend, then add` order this capability already st
 A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
 Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
 `Kicker` MUST state the UI face itself, as `var(--font-body, var(--font-primary, sans-serif))`, rather than inherit its parent's, so a kicker under a mono evidence band still draws the UI face (issue 2257 D21, with #2312).
+That expression names `--font-primary` only inside a fallback that ends in a literal, so it is not the bare read issue 2312 tracks, and the published manifest's ancestor gate admits it.
 
 Where the module sheet must supply a BASELINE for a bare element a component may re-declare, it is written at a specificity deliberately BELOW a Svelte scoped compound's (0,2,0), so the sheet is a floor components override rather than a rule that overrides them; `:where()` is how the scoping is bought without paying specificity for it.
 The same arithmetic runs in the other direction for a module-root rule that must NOT be beaten: a flat `.fabricate a:focus` list is (0,2,1), while the `:is()` form of the same list takes its most specific argument — `[tabindex]`, at (0,3,0) — and would newly outrank every per-component ring in the sheet, so the flat spelling is prescribed rather than stylistic.

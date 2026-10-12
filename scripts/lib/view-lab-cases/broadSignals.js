@@ -116,6 +116,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Meter.svelte': Object.freeze([
     'player-crafting-essence-pool',
     'fabricate-journal-lifecycle-essence-shared',
+    'manager-published-leaves-specimen',
   ]),
   // One chance bar of each scale, and the Checks Studio's odds histogram and one-outcome chart.
   'src/ui/svelte/components/BandedBar.svelte': Object.freeze([
@@ -123,6 +124,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-gathering-events',
     'manager-checks-crafting-odds-enumerable',
     'manager-checks-count-botch-odds',
+    'manager-published-leaves-specimen',
   ]),
   // The rule row (issue 1782): an opened trigger, a counting check's presets, an attached drop modifier.
   'src/ui/svelte/components/RuleRow.svelte': Object.freeze([
@@ -140,6 +142,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'player-crafting-essence-pool',
     'player-gathering-task-ready',
+    'manager-published-leaves-specimen',
   ]),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
@@ -228,7 +231,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-prerequisites-selected-1280x720',
   ]),
   // The app's one art tile (issue 1506), which is the change that earned it an entry.
-  'src/ui/svelte/components/Medallion.svelte': Object.freeze(['world-component-entry-essences']),
+  'src/ui/svelte/components/Medallion.svelte': Object.freeze([
+    'world-component-entry-essences',
+    'manager-published-leaves-specimen',
+  ]),
   // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per state.
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
@@ -283,7 +289,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
   // An actor's portrait (issue 1506), the first entry gained by a primitive arriving rather than an extraction leaving.
-  'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
+  'src/ui/svelte/components/Avatar.svelte': Object.freeze([
+    'manager-knowledge-owned-copies',
+    'manager-published-leaves-specimen',
+  ]),
   // The editor tab strip (issue 1509), the first key gained because a component moved rather than acquired a state.
   'src/ui/svelte/components/EditorTabs.svelte': Object.freeze([
     'manager-system-edit-normal',
@@ -459,11 +468,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Kicker.svelte': Object.freeze([
     'player-crafting-slot-rail',
     'manager-recipe-item-overview',
+    'manager-published-leaves-specimen',
   ]),
   // The at-a-glance figure (issue 1505).
   'src/ui/svelte/components/StatBox.svelte': Object.freeze([
     'player-crafting-essence-shopping',
     'manager-books-scrolls-item',
+    'manager-published-leaves-specimen',
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
@@ -473,6 +484,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-check-descriptor-under-resolved',
     'player-crafting-check-formula-unresolved',
     'player-gathering-economy-strip',
+    'manager-published-leaves-specimen',
   ]),
   // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing files.
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
@@ -511,7 +523,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-roll-prompt-count-additional',
   ]),
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
-  'src/ui/svelte/components/Chip.svelte': Object.freeze(['player-crafting-simple']),
+  'src/ui/svelte/components/Chip.svelte': Object.freeze([
+    'player-crafting-simple',
+    'manager-published-leaves-specimen',
+  ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and neutral pair.
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',

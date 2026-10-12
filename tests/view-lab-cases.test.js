@@ -51,6 +51,7 @@ import {
   buildChecksNavItems,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
@@ -799,6 +800,7 @@ const runKicker = (selector) => ({
   styles: 'font-size: 8.5px; letter-spacing: 0.935px; color: var(--fab-text-muted)',
 });
 const RUN_HEADING = '[data-journal-detail] .fab-run-progress-heading';
+const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -956,6 +958,23 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '[data-recipe-section="stacks"] [role="radio"].is-short', styles: 'opacity: 1' },
     shortStackPart('.fab-choice-option-copy'),
     shortStackPart('.fab-choice-option-reading'),
+  ],
+  // The published leaves (issue 2448): both portrait states and the 26px art rung on their ladder
+  // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
+  // its own ink on a danger ground.
+  'manager-published-leaves-specimen': [
+    { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
+    { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
+    { selector: '.fab-avatar[data-avatar="initials"]:not(.is-square)', styles: PORTRAIT_BOX },
+    {
+      selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',
+      styles: 'width: 26px; height: 26px; border-radius: 7px',
+    },
+    { selector: '.fab-meter-hidden', styles: 'position: absolute; width: 1px; height: 1px' },
+    {
+      selector: '.fab-stat-box:has(.has-icon) .fab-kicker',
+      styles: 'font-size: 8.5px; color: var(--fab-text-muted)',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5436,18 +5455,42 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('the published component seam selects the tier track specimen it mounts', () => {
+test('the published component seam selects both specimens it mounts', () => {
   for (const file of [
     'src/ui/publishedComponentSeam.js',
     'src/ui/publishedComponentManifest.js',
     'src/ui/publishedComponents.svelte.js',
     'src/ui/svelte/published/PublishedComponentHost.svelte',
   ]) {
-    assert.ok(
-      selectedIds([file], {}).includes('manager-published-tier-track-specimen'),
-      `a change to ${file} does not select the published tier track specimen`
-    );
+    const selected = selectedIds([file], {});
+    for (const id of [
+      'manager-published-tier-track-specimen',
+      'manager-published-leaves-specimen',
+    ]) {
+      assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
+    }
   }
+});
+
+test('the leaves specimen mounts every issue 2448 leaf and checks the containment of each mount', () => {
+  const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
+  const mounts = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'MOUNTS');
+  const mounted = mounts.init.arguments[0].elements.map((mount) => mount.elements[0].value);
+  assert.deepEqual(
+    [...new Set(mounted)].sort(byCodePoint),
+    PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
+      .filter((name) => name !== 'TierTrack')
+      .sort(byCodePoint),
+    'every published component but TierTrack, which has its own specimen, and no other'
+  );
+  const { expectContained } = getCaseById('manager-published-leaves-specimen');
+  assert.deepEqual(
+    expectContained.map(({ target }) => /:nth-child\((\d+)\)/.exec(target)[1]),
+    Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
+    'one containment check per section, in fixture order'
+  );
 });
 
 test('every specimen case names a LAB_SPECIMENS key, and every key has a case', () => {

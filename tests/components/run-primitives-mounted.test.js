@@ -928,7 +928,7 @@ describe('run primitives mounted behavior', () => {
     const radiantMeter = radiant.querySelector('[role="meter"]');
     assert.ok(head.id, 'the drawn essence name carries an id');
     assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
-    assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
+    assert.ok(!radiantMeter.querySelector('.fab-meter-hidden'), 'no second copy of the name');
     assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
     const overshoot = target.querySelector('.fab-essence-overshoots');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);

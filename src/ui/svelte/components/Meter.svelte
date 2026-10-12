@@ -16,6 +16,10 @@
   Invariants:
   - The track is `FillBar` at `compact` density — pinned by
     `tests/components/instruments-mounted.test.js`.
+  - `.fab-meter-hidden` restates the module's visually hidden set, because a companion's
+    ancestor is not `.fabricate` — its clip is pinned by
+    `tests/components/published-leaves-mounted.test.js`, and the absence of `.visually-hidden` by
+    `tests/published-component-manifest.test.js`.
 -->
 <script>
   import FillBar from './FillBar.svelte';
@@ -49,14 +53,27 @@
   aria-labelledby={labelId || (label ? hiddenLabelId : undefined)}
   {...rest}
 >
-  {#if !labelId && label}<span class="visually-hidden" id={hiddenLabelId}>{label}</span>{/if}
+  {#if !labelId && label}<span class="fab-meter-hidden" id={hiddenLabelId}>{label}</span>{/if}
   <FillBar value={percent} density="compact" tone={fill.tone} color={fill.color} />
 </span>
 
 <style>
   .fab-meter {
+    position: relative;
     display: flex;
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .fab-meter-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 </style>

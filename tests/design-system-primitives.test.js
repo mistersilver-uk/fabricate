@@ -515,8 +515,13 @@ test('(a) the older overrides still name the frame that renders their state', ()
 test('(a) the three player-window overrides name a frame that draws the primitive', () => {
   // Each expected id is a player frame outside the representative pair, so repointing an entry
   // at the pair, or at a manager frame, reds here rather than passing as an unchanged selection.
+  // A third member lists the specimens a published primitive also names (issue 2448).
   const expectations = [
-    ['src/ui/svelte/components/Chip.svelte', ['player-crafting-simple']],
+    [
+      'src/ui/svelte/components/Chip.svelte',
+      ['player-crafting-simple'],
+      ['manager-published-leaves-specimen'],
+    ],
     [
       'src/ui/svelte/components/Button.svelte',
       [
@@ -526,8 +531,12 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
     ],
     ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
   ];
-  for (const [file, caseIds] of expectations) {
-    assert.deepEqual([...BROAD_SIGNAL_CASE_OVERRIDES[file]], caseIds, `${file} names its frames`);
+  for (const [file, caseIds, specimens = []] of expectations) {
+    assert.deepEqual(
+      [...BROAD_SIGNAL_CASE_OVERRIDES[file]],
+      [...caseIds, ...specimens],
+      `${file} names its frames`
+    );
     const selected = mapChangedFilesToCases([file]);
     for (const caseId of caseIds) {
       const viewCase = selected.find((candidate) => candidate.id === caseId);
@@ -609,6 +618,28 @@ test('(a) a TierTrack change publishes its specimen mounted through the seam', (
     selected.includes('manager-published-tier-track-specimen'),
     'a TierTrack change does not select its specimen'
   );
+});
+
+test('(a) a change to each leaf issue 2448 published, or to a primitive one draws, selects the leaves specimen', () => {
+  for (const name of [
+    'Avatar',
+    'Medallion',
+    'FillBar',
+    'Meter',
+    'BandedBar',
+    'StatBox',
+    'InfoStrip',
+    'Kicker',
+    'Chip',
+  ]) {
+    const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
+      (viewCase) => viewCase.id
+    );
+    assert.ok(
+      selected.includes('manager-published-leaves-specimen'),
+      `a ${name} change does not select the published leaves specimen`
+    );
+  }
 });
 
 test('(a) a ViewToggle change publishes the essence browser in both arrangements', () => {

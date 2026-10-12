@@ -360,7 +360,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and data-only leaf primitives; text and slot content, bindables, callbacks, the overlay host, keyboard handling and the standalone style root for interactive primitives are phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; text and slot content, bindables, callbacks, the overlay host, keyboard handling and the standalone style root for interactive primitives are the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -376,12 +376,84 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 - **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data', required? } }, rest }`, and Fabricate's runtime adapter binds each `path` to its component.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
+- The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
+- A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
+- A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
+- A component may declare props it does not publish: `class`, a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
+- A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`: they were published before `load` (issue 2427), so `mount` never needs it for them.
 - Registration refuses any prop `kind` other than `'data'` with an `Error` naming issue 2427.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, or narrowing a prop's accepted values — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
 - Adding a component, an optional prop, a descriptor member, a handle method or a prop `kind` is additive.
 - A companion treats an unknown name, member or kind as absent, and never assumes the list is closed.
+
+### The issue 2448 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`Avatar`.**
+  - `art` is an image path; a falsy one draws the initials of `name`.
+    A path that fails to load draws the browser's broken image, never the initials.
+  - `name` is required and is the only source of the initials.
+  - `alt` is read only when `art` is set, and `''` marks the image decorative.
+  - `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
+  - `shape` is `round` or `square`.
+  - `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
+  - `name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
+- **`Medallion`.**
+  - `art` is an image path; a falsy one draws `icon`, Font Awesome classes whose default is `fas fa-scroll`.
+  - `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
+  - `glyph` is the ladder's glyph for that rung: `10`, `11`, `12` or `15`.
+  - `alt` is as for `Avatar`.
+  - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
+  - `variant` is `''` or `glyph-chip`.
+  - `tone` and `ink` are each `''`, `success` or `danger`; both outrank `tint`, and `ink` outranks `tone` on the glyph.
+  - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
+- **`FillBar`.**
+  - `value` is 0–100, clamped.
+  - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
+  - `color` is a `var(--fab-…)` colour token reference, which overrides `tone`.
+  - `density` is `default` or `compact`.
+  - It is decorative: it has no role and no name and reaches no assistive technology, so the companion states the reading as text beside it.
+    A value that must be announced is a `Meter`.
+- **`Meter`.**
+  - `value` is read against `max`, which defaults to 100; a `max` of zero or less reads full.
+  - `segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s; an empty array draws `success`.
+    A second or later entry is reserved and is not drawn.
+  - `valueText` is the reading, announced in place of the bare number.
+  - The companion passes `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
+  - `label` is required and is the meter's name, drawn visually hidden.
+  - It draws no figure; the visible reading is the companion's.
+- **`BandedBar`.**
+  - `rows` is required and is `{ id?, name, percent, fill? }[]`.
+    `name` is required in every row, and `percent` is a whole number 0–100, printed as `<percent>%`.
+  - One row is a meter named by its `name`, which is also its visible caption; several are a histogram; none draws nothing.
+  - `fill` is a `FillBar` tone, or a chance-ramp key, from certain to impossible: `guaranteed`, `common`, `uncommon`, `rare`, `very-rare`, `legendary` and `none` (the zero-chance step).
+    Absent, the row takes the ramp's hue at its `percent` when `direction` is `ascending`, and the risk scale's when it is `descending`.
+  - Every `id` is unique.
+  - `direction` is `ascending` or `descending`.
+  - `density` is `default` or `compact`; at `compact` a single row draws the histogram's band row.
+  - In a histogram the bars are hidden from assistive technology and each row is read as its name and its percentage; the list carries no name, so the companion heads it with its own text.
+- **`StatBox`.**
+  - `value` is required and is the formatted figure.
+  - `label` is required.
+  - `icon` is optional Font Awesome classes.
+  - `tone` is `default`, `info` or `danger`.
+  - The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
+- **`InfoStrip`.**
+  - `label` is required and is the kicker, which names the group.
+  - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+  - `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
+- **Tones.**
+  Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
+- **Colour.**
+  Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
+- **Private and undocumented:** every per-item `props` spread; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Wrong-typed collections.**
+  A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
+  It is not a refusal.
 
 ### Mounting and its refusals
 
@@ -435,16 +507,23 @@ This is defensive: Svelte 5.56 delivers no fault before its `mount` returns.
 
 - **The companion owns the placement of `target`**, sizes it as a block-level container, writes nothing inside it while mounted, and styles only the target's own box.
 - `.fab-*` classes and `svelte-*` hashes are private.
-- A phase-1 published component draws only its declared content and adds no premium signal.
-It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus and makes no network request.
-- **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a phase-1 published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
+- A data-only published component draws only its declared content and adds no premium signal.
+It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus, and makes no network request except to load an image path the companion passes.
+- **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a data-only published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
 - Tokens resolve from `:root[data-fabricate-theme]`, which Fabricate's theme sets on `documentElement`.
-- **A published component's own `<style>` states everything it needs**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or `--font-primary`.
+- **A published component's own `<style>` states everything it needs**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or a `--font-primary` read whose fallback does not end in a literal.
+- A published component that states the UI face MUST state it as `var(--font-body, var(--font-primary, sans-serif))` or another expression whose last fallback is a literal, so it resolves with no Foundry variable.
+- A published component's import closure MUST NOT read `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` or `getDocumentClass`.
+- A published component's rest keys are `data-*` attributes (M13), so a published `Meter` and `InfoStrip` are each named by their required `label`, and a single-row `BandedBar` by its row's `name`, which its docs section states as required.
+- A published component relies on one host baseline, Foundry core's element reset (universal `box-sizing: border-box`), which every document that holds `api.ui` carries; `Avatar` and `Medallion` take their edge length's box model from it.
+- A published component inherits from `target` every inherited text property its own rules do not state, so the companion sets none on `target`.
+- `Avatar` and `Medallion` are inline tiles: the companion gives their `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 - Svelte's scoped CSS is unlayered and so beats module sheets, which Foundry loads in `layer(modules)`.
 - The companion mounts after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 - Svelte injects a component's scoped stylesheet into the target's own document head, so a mount into an attached target in its final document is styled, a Foundry 14 detached window included.
-A later move between windows, or a theme change after a window detached, is not carried to the mount; the companion re-mounts in `_onDetach` and `_onAttach` when that matters.
+A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window (issue 2432).
+A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 - Mount at the composite level, on stable keyed elements, and reuse a mount through `update`.
 
 #### Scenario: A companion draws a published primitive
@@ -472,6 +551,12 @@ A later move between windows, or a theme change after a window detached, is not 
 
 - **WHEN** the primitive throws while rendering
 - **THEN** Fabricate reports it, empties `target`, and every later `update` answers `false`
+
+#### Scenario: A declared prop that is not published
+
+- **WHEN** a companion passes a prop the component declares but the manifest does not list: `src` to `Medallion`, or `class` to `FillBar`
+- **THEN** `mount` throws M8 (`"src" is not a prop of Medallion`) for a component without a rest spread, or M13 (`"class" is not a data attribute`) for one with it
+- **AND** nothing is rendered
 
 #### Scenario: A bare ancestor
 

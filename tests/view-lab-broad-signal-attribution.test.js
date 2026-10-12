@@ -24,11 +24,11 @@ const COVERAGE = [...LAB_SURFACE_CASE_IDS];
 
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const SELECT = component('Select');
-const MEDALLION = component('Medallion');
+const CHANCE_SLIDER = component('ChanceSlider');
+const AVATAR = component('Avatar');
 const LIST_ROW = component('ListRow');
 const TINT_PICKER = component('TintPicker');
 const TINT_PICKER_BUTTON = component('TintPickerButton');
-const STATUS_TOGGLE = component('StatusToggle');
 const RUN_ACTION_BAR = component('RunActionBar');
 const SLOT_TILE = component('SlotTile');
 const REQUIREMENT_CHOOSER = component('RequirementChooser');
@@ -118,16 +118,17 @@ test('the cases these patches lean on exist, so a rename cannot pass the tests v
     VIEW_LAB_CASES.some((viewCase) => viewCase.id === REMOVED_ID && viewCase.publish),
     `${REMOVED_ID} must be a publishable case`
   );
-  const keys = [SELECT, MEDALLION, LIST_ROW, TINT_PICKER, TINT_PICKER_BUTTON, STATUS_TOGGLE];
+  const keys = [SELECT, CHANCE_SLIDER, AVATAR, LIST_ROW, TINT_PICKER, TINT_PICKER_BUTTON];
   for (const key of [...keys, RUN_ACTION_BAR, SLOT_TILE, REQUIREMENT_CHOOSER]) {
     assert.ok(KEYS.includes(key), `${key} must be an override key`);
     assert.ok(!BROAD_SIGNAL_CASE_OVERRIDES[key].includes(REMOVED_ID));
   }
-  assert.deepEqual(entryLines(MEDALLION).start, entryLines(MEDALLION).end, 'a one-line entry');
+  const oneLine = entryLines(CHANCE_SLIDER);
+  assert.deepEqual(oneLine.start, oneLine.end, 'a one-line entry');
 });
 
 test('adding a whole entry selects exactly what that override key selects', () => {
-  for (const key of [SELECT, MEDALLION]) {
+  for (const key of [SELECT, CHANCE_SLIDER]) {
     const { start, end } = entryLines(key);
     assert.deepEqual(selected(adding(...range(start, end))), oracle(key), key);
   }
@@ -150,15 +151,15 @@ test('an id deep in a long entry, with its opener outside the hunk, selects that
 });
 
 test('removing a whole entry selects its removed id and the pair, and neither neighbour', () => {
-  const medallion = entryLines(MEDALLION).end;
+  const chanceSlider = entryLines(CHANCE_SLIDER).end;
   const between = hunk(
-    real(medallion - 2, medallion),
+    real(chanceSlider - 2, chanceSlider),
     removed(SYNTHETIC_ENTRY),
-    real(medallion + 1, medallion + 3)
+    real(chanceSlider + 1, chanceSlider + 3)
   );
   const ids = selected(between);
   assert.deepEqual(ids, withPair([REMOVED_ID]));
-  assertNeitherNeighbour(ids, [MEDALLION, STATUS_TOGGLE]);
+  assertNeitherNeighbour(ids, [CHANCE_SLIDER, AVATAR]);
 
   const trailing = hunk(
     real(MAP_CLOSE - 3, MAP_CLOSE - 1),
@@ -347,7 +348,7 @@ test('the parser fails closed on any table it cannot read exactly', () => {
   const parse = viewLabCases.parseBroadSignalOverrideRegions;
   const opener = LINES[entryLines(SELECT).start - 1];
   const firstSelectId = LINES[entryLines(SELECT).start];
-  const medallion = LINES[entryLines(MEDALLION).start - 1];
+  const oneLine = LINES[entryLines(CHANCE_SLIDER).start - 1];
 
   /** A copy with one edit applied, asserted to have applied. */
   const edited = (line, replacement) => {
@@ -365,13 +366,13 @@ test('the parser fails closed on any table it cannot read exactly', () => {
       copy.splice(entryLines(SELECT).end - 1, 1);
       return copy;
     })(),
-    'a duplicate key': edited(medallion, [medallion, medallion]),
+    'a duplicate key': edited(oneLine, [oneLine, oneLine]),
     'an id that disagrees with the module': edited(firstSelectId, ["    'not-the-module-id',"]),
     'a block comment': edited(opener, ['  /* a block comment */', opener]),
     'a trailing comment on an id line': edited(firstSelectId, [`${firstSelectId} // note`]),
     'a missing close': edited('});', []),
-    'an entry the module lacks': edited(medallion, [
-      medallion,
+    'an entry the module lacks': edited(oneLine, [
+      oneLine,
       `  '${component('Extra')}': Object.freeze(['${REMOVED_ID}']),`,
     ]),
   };
