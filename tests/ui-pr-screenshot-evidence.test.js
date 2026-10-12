@@ -2896,6 +2896,27 @@ describe('publishing design-library frames (issue 2413)', () => {
     assert.match(section, /- Library · Stepper · formatted: upload failed: AccessDenied &lt;boom&gt;/);
   });
 
+  it('publishes a sibling library frame when one library object alone fails to upload', async () => {
+    const sibling = { ...FRAME, id: '5-0-chip', label: 'Library · Chip · filter', targets: ['unit:5.0'] };
+    const puts = [];
+    const putObject = async (object) => {
+      if (object.key.endsWith('/library/3-0-stepper.png')) throw new Error('SlowDown');
+      puts.push(object);
+    };
+    const manifest = manifestOf({ frames: [FRAME, sibling] });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png', '5-0-chip.png'], manifest },
+      targets: 'row:controls/4,unit:5.0',
+      putObject,
+    });
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/5-0-chip.png`]);
+    const section = librarySection(written);
+    assert.ok(section.includes(`(https://b.example/pr-screenshots/${PR}/${HEAD}/library/5-0-chip.png)`), section);
+    assert.ok(!section.includes('3-0-stepper.png'), section);
+    assert.match(section, /- Library · Stepper · formatted: upload failed: SlowDown/);
+    assert.doesNotMatch(section, /library capture produced no frames/);
+  });
+
   it('reconciles the selection against the manifest, naming every unit not captured', async () => {
     const manifest = manifestOf({
       frames: [FRAME, { ...FRAME, id: '4-1-missing', label: 'Library · Gone', targets: ['entry:4'] }],

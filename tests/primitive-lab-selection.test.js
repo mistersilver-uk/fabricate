@@ -185,6 +185,24 @@ test('a hunk whose context recurs in two entries stays at entry level in both', 
   ]);
 });
 
+test('a hunk the unit pass cannot wholly place stays at its entry, though it names one unit', () => {
+  const status = editLine(LIBRARY_LINES, 6, LIBRARY_LINES[6].replace('>shipped<', '>target<'));
+  const after = libraryWith(editLine(status, 8, LIBRARY_LINES[8].replace('>A<', '>A2<')));
+  assert.deepEqual(selectEdit(LIBRARY_PATH, LIBRARY, after), [
+    { key: 'entry:0', signal: 'library', heading: '&lt;Chip&gt;' },
+  ]);
+});
+
+test('a section-head edit sits outside every entry, so it widens and is named', () => {
+  const after = libraryWith(
+    editLine(LIBRARY_LINES, 4, LIBRARY_LINES[4].replace('Marks', 'Marks 2'))
+  );
+  assert.deepEqual(keysOf(selectEdit(LIBRARY_PATH, LIBRARY, after)), [
+    'coverage',
+    `unlocated:${LIBRARY_PATH}:1`,
+  ]);
+});
+
 test('a library hunk outside every entry, or a missing library, widens by coverage', () => {
   const styled = libraryWith(
     editLine(LIBRARY_LINES, 1, '<html><head><style>.unit{gap:6px}</style></head>')
@@ -227,6 +245,38 @@ test('a deleted row still selects the unit it stood in, by its address', () => {
   });
 });
 
+test('the last row owns the closing bracket, so a removal run ending at it lands on a row', () => {
+  const after = json(MARK_ROWS.slice(0, 2));
+  const at = after.split('\n').indexOf('    "fixture": "ChipRemovable"') + 1;
+  const removed = json([MARK_ROWS[2]]).split('\n').slice(1, -2);
+  // Hand-written, as a diff algorithm that keeps the bracket apart from the rewritten close may.
+  const patch = [
+    `@@ -${at},${removed.length + 3} +${at},3 @@`,
+    '     "fixture": "ChipRemovable"',
+    '-  },',
+    '+  }',
+    ...removed.map((line) => `-${line}`),
+    ' ]',
+    '',
+  ].join('\n');
+  const records = selectLibraryTargets([MARKS], {
+    patches: { [MARKS]: patch },
+    source: fakeSource({ [MARKS]: after }),
+  });
+  assert.deepEqual(keysOf(records), ['row:marks/1', addressKey('<Button>', 'primary')]);
+});
+
+test('a catalogue whose rows and row regions disagree in count widens and is named', () => {
+  // The first row on one line: counted by its region, the third row would read as the second.
+  const mixed = (rows) =>
+    ['[', `  ${JSON.stringify(rows[0])},`, ...json(rows.slice(1)).split('\n').slice(1)].join('\n');
+  const after = mixed(MARK_ROWS.with(2, { ...MARK_ROWS[2], draws: '.k-btn-x' }));
+  assert.deepEqual(keysOf(selectEdit(MARKS, mixed(MARK_ROWS), after)), [
+    'coverage',
+    `unlocated:${MARKS}:1`,
+  ]);
+});
+
 test('an inserted row selects the row it adds', () => {
   const inserted = { spec: '<Chip>', cap: 'filter', draws: '.k-chip', path: CHIP, props: {} };
   const keys = keysOf(
@@ -259,6 +309,21 @@ test('a fixture selects the rows it stands up; a renamed one by its new name, a 
   ]);
   assert.deepEqual(keysOf(select(fixturePath('ToggleOn'))), ['row:controls/1']);
   assert.deepEqual(select(fixturePath('RemovedFixture')), []);
+});
+
+test('an unreadable catalogue widens a fixture or manifest change by coverage', () => {
+  const unreadable = fakeSource({ [MARKS]: null });
+  assert.deepEqual(
+    keysOf(selectLibraryTargets([fixturePath('ToggleOn')], { source: unreadable })),
+    ['row:controls/1', 'coverage']
+  );
+  const edited = JSON.parse(MANIFEST);
+  edited.designSystemPrimitives[0].why = 'Chips, re-measured.';
+  const manifest = selectLibraryTargets([MANIFEST_PATH], {
+    patches: { [MANIFEST_PATH]: unifiedPatch(MANIFEST, json(edited)) },
+    source: fakeSource({ [MARKS]: null, [MANIFEST_PATH]: json(edited) }),
+  });
+  assert.deepEqual(keysOf(manifest), ['coverage']);
 });
 
 test('a manifest hunk confined to one entry selects only its path, never a neighbour', () => {
