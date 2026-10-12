@@ -1108,7 +1108,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     expectSelector:
-      '.fabricate-manager .fabricate-sortable-list-row.has-band > .fabricate-sortable-list-body ul[data-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band > .fabricate-sortable-list-body:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) ul[data-stage-complications].fabricate-sortable-list > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
@@ -1131,7 +1131,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipe-edit',
     expectSelector:
-      '.fabricate-manager .fabricate-sortable-list-row.has-band[data-recipe-result-row] > .fabricate-sortable-list-body ul[data-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band[data-recipe-result-row] > .fabricate-sortable-list-body:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) ul[data-stage-complications].fabricate-sortable-list > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'recipes', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
