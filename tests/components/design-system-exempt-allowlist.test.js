@@ -104,12 +104,6 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
-    'the die tiles are promoted to a shared primitive at target, because the player result box ' +
-      'and the salvage roll summary now import them beside the Checks Studio simulator ' +
-      '(issue 2006)',
-    { 'src/ui/svelte/components/DiceTiles.svelte': 1 },
-  ],
-  [
     "the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row " +
       "stays target only until the panel is recomposed onto the search popover's grid form, " +
       'owned by issue 2459 (library.html, the target popover specimen)',
