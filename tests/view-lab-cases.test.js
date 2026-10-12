@@ -51,6 +51,7 @@ import {
   buildChecksNavItems,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
@@ -5469,17 +5470,23 @@ test('the published component seam selects both specimens it mounts', () => {
   }
 });
 
-test('the leaves specimen checks the containment of every mount its fixture makes', () => {
+test('the leaves specimen mounts every issue 2448 leaf and checks the containment of each mount', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
     .find((declarator) => declarator.id.name === 'MOUNTS');
-  const made = mounts.init.arguments[0].elements.length;
+  const mounted = mounts.init.arguments[0].elements.map((mount) => mount.elements[0].value);
+  assert.deepEqual(
+    [...new Set(mounted)].sort(byCodePoint),
+    PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
+      .filter((name) => name !== 'TierTrack')
+      .sort(byCodePoint),
+    'every published component but TierTrack, which has its own specimen, and no other'
+  );
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
-  assert.ok(made > 0, 'the fixture mounts something');
   assert.deepEqual(
     expectContained.map(({ target }) => /:nth-child\((\d+)\)/.exec(target)[1]),
-    Array.from({ length: made }, (_, index) => String(index + 1)),
+    Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
     'one containment check per section, in fixture order'
   );
 });

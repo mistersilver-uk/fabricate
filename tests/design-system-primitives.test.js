@@ -620,7 +620,7 @@ test('(a) a TierTrack change publishes its specimen mounted through the seam', (
   );
 });
 
-test('(a) a change to each leaf issue 2448 published selects the leaves specimen', () => {
+test('(a) a change to each leaf issue 2448 published, or to a primitive one draws, selects the leaves specimen', () => {
   for (const name of [
     'Avatar',
     'Medallion',
@@ -629,6 +629,8 @@ test('(a) a change to each leaf issue 2448 published selects the leaves specimen
     'BandedBar',
     'StatBox',
     'InfoStrip',
+    'Kicker',
+    'Chip',
   ]) {
     const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
       (viewCase) => viewCase.id

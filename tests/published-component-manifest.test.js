@@ -1,9 +1,10 @@
 /**
  * The published component manifest (issue 2426) against each component's parsed declaration: its
- * props, rest and data-only kinds, then its import closure, every `.svelte` and `.js` file it
- * reaches: a stylesheet and template that need no Fabricate ancestor, and no read of a Foundry
- * global. The test-only probe runs beside the shipped entries; the adapter's binding of each path
- * is the mounted suite's.
+ * props, rest and data-only kinds, then its import closure of `.svelte` and `.js` files: a
+ * stylesheet and template that need no Fabricate ancestor, and no read of a Foundry global. The
+ * test-only probe runs beside the shipped entries; the adapter's bindings are the mounted suite's.
+ * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
+ * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  */
 import assert from 'node:assert/strict';
 import { posix } from 'node:path';
@@ -290,6 +291,26 @@ describe('each entry matches its component declaration', () => {
       'src/Script.svelte: reads ui',
     ]);
   });
+
+  for (const name of [
+    'game',
+    'foundry',
+    'Hooks',
+    'CONFIG',
+    'CONST',
+    'ui',
+    'canvas',
+    'fromUuid',
+    'fromUuidSync',
+    'getDocumentClass',
+  ]) {
+    it(`refuses a closure file that reads ${name}`, () => {
+      const reader = syntheticReader({ 'src/E.svelte': `<script>const read = ${name};</script>` });
+      assert.deepEqual(closureDependencies('src/E.svelte', reader), [
+        `src/E.svelte: reads ${name}`,
+      ]);
+    });
+  }
 
   it('reads a local binding and a member of the same name as no global', () => {
     const reader = syntheticReader({
