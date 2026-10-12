@@ -98,6 +98,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-inventory-xref-tool',
     'player-inventory-xref-essence',
   ]),
+  // The published tier track (issue 2424): its column ladder mounted through the seam.
+  'src/ui/svelte/components/TierTrack.svelte': Object.freeze([
+    'manager-published-tier-track-specimen',
+  ]),
   // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
   'src/ui/svelte/components/LogList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-finished-failure',
