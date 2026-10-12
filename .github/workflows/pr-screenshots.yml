@@ -101,12 +101,8 @@ jobs:
             echo "SKIP_CAPTURE=true" >> "$GITHUB_ENV"
           fi
 
-      # The design-library units (issue 2413) are supplementary evidence, so this step may fail
-      # without costing the app frames; a failed fetch still fails the next step, which reads the file.
-      - name: Compute the selected library units
+      - name: Fetch the changed files
         if: env.SKIP_CAPTURE != 'true'
-        id: library
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -118,12 +114,21 @@ jobs:
           # Each entry's `patch` comes along for the ride, because the selector uses it: a change
           # confined to case-object literals in `scripts/lib/view-lab-cases/` selects those
           # cases instead of surface coverage, which is the difference between a two-minute
-          # capture and a four-minute one. The library never reads git itself — it is a pure function of what
-          # this step hands it — and it widens back to surface coverage (one frame of every route
-          # and tab the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
-          # them for very large diffs) costs frames, never evidence.
+          # capture and a four-minute one. `viewLabCases.js` never reads git itself — it is a pure
+          # function of what this step hands it — and it widens back to surface coverage (one frame
+          # of every route and tab the lab renders) for any patch it cannot verify, so a `patch` the
+          # API omits (it drops them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
+
+      # The design-library units (issue 2413) are supplementary evidence, so this step may fail
+      # without costing the app frames; a failed fetch fails the step above, and so `select`.
+      - name: Compute the selected library units
+        if: env.SKIP_CAPTURE != 'true'
+        id: library
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
           node -e '
             const { appendFileSync, readFileSync } = require("node:fs");
             (async () => {
@@ -170,7 +175,7 @@ jobs:
           APPS=""
           if [ "$RENDER" = "true" ]; then APPS="$IDS"; fi
           echo "apps=$APPS" >> "$GITHUB_OUTPUT"
-          UNITS=$(printf '%s' "$LIBRARY" | tr ',' '\n' | grep -c . || true)
+          UNITS=$(printf '%s' "$LIBRARY" | tr ',' '\n' | grep -v '^unlocated:' | grep -c . || true)
           if [ -z "$IDS" ]; then
             echo "No changed file selects a View Lab case; nothing to render; library units: $UNITS."
           else

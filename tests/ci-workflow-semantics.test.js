@@ -340,6 +340,7 @@ const needsOf = (job) =>
     .filter(Boolean);
 
 const SCREENSHOTS_WORKFLOW = '.github/workflows/pr-screenshots.yml';
+const FETCH_STEP = 'Fetch the changed files';
 const screenshotJobs = () => parseJobs(readFileSync(SCREENSHOTS_WORKFLOW, 'utf8'));
 
 function stepNamed(job, name) {
@@ -478,19 +479,27 @@ test('library frames leave the runner by name, under an artifact no shard downlo
   assert.equal(publish.env.LIBRARY_TARGETS, '${{ needs.select.outputs.library }}');
 });
 
-test('select picks the library units in a step of their own, ahead of the cases', () => {
+test('select fetches the changed files once, then picks the library units ahead of the cases', () => {
   const source = readFileSync(SCREENSHOTS_WORKFLOW, 'utf8');
   const { select } = parseJobs(source);
+  const fetchAt = select.steps.findIndex((step) => step.name === FETCH_STEP);
   const libraryAt = select.steps.findIndex((step) => step.id === 'library');
   const casesAt = select.steps.findIndex((step) => step.id === 'select');
-  assert.ok(libraryAt !== -1 && libraryAt < casesAt, 'the library step must run first');
-  const [library, cases] = [select.steps[libraryAt], select.steps[casesAt]];
+  assert.ok(fetchAt !== -1 && fetchAt < libraryAt, 'the fetch must run before the library step');
+  assert.ok(libraryAt < casesAt, 'the library step must run before the cases');
+  const [fetch, library, cases] = [fetchAt, libraryAt, casesAt].map((at) => select.steps[at]);
 
+  // A failed fetch fails select: only the selection after it may fail alone.
+  assert.equal(fetch['continue-on-error'], undefined);
   assert.equal(library['continue-on-error'], 'true');
-  assert.equal(library.if, cases.if);
+  assert.equal(Number(library['timeout-minutes']), 2);
+  assert.ok(Number(library['timeout-minutes']) < Number(select['timeout-minutes']));
+  for (const step of [fetch, library]) assert.equal(step.if, cases.if, labelOf(step));
+  assert.deepEqual(Object.keys(fetch.env), ['GH_TOKEN', 'PR_NUMBER', 'PR_REPO']);
+  assert.deepEqual(library.env ?? {}, {}, 'the library step holds no token');
   assert.deepEqual(
-    select.steps.filter((step) => /> changed-files\.jsonl/.test(step.run)).map((step) => step.id),
-    ['library'],
+    select.steps.filter((step) => /> changed-files\.jsonl/.test(step.run)).map(labelOf),
+    [FETCH_STEP],
     'one fetch of the changed files, ahead of both selections'
   );
   assert.equal(cases.env.LIBRARY, '${{ steps.library.outputs.library }}');
@@ -538,6 +547,35 @@ test("select's apps output is the case ids when they render, and empty when they
   }
 });
 
+/** A temporary `bin/` and `work/` pair, removed after `body` runs. */
+function withStepDirectory(prefix, body) {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  try {
+    const [bin, work] = [path.join(dir, 'bin'), path.join(dir, 'work')];
+    mkdirSync(bin);
+    mkdirSync(work);
+    const PATH = [bin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter);
+    return body({ bin, work, PATH });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('a fetch that fails part-way fails its step, and so select', () => {
+  const fetch = stepNamed(screenshotJobs().select, FETCH_STEP);
+  for (const [script, status] of [
+    ['echo \'{"filename":"a.js","patch":""}\'\nexit 1', 'failed'],
+    ['echo \'{"filename":"a.js","patch":""}\'', 'passed'],
+  ]) {
+    withStepDirectory('select-fetch-', ({ bin, work, PATH }) => {
+      writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+      const result = runStepBody(fetch.run, { cwd: work, env: { PATH } });
+      assert.equal(result.status === 0 ? 'passed' : 'failed', status, result.stderr);
+      assert.match(readFileSync(path.join(work, 'changed-files.jsonl'), 'utf8'), /"a\.js"/);
+    });
+  }
+});
+
 test('the library step writes its keys, or an empty list and a warning when selection throws', () => {
   const step = screenshotJobs().select.steps.find((one) => one.id === 'library');
   const scenarios = [
@@ -546,28 +584,16 @@ test('the library step writes its keys, or an empty list and a warning when sele
     { file: 'scripts/primitive-lab-capture.mjs', linked: false, library: '', warns: true },
   ];
   for (const { file, linked, library, warns = false } of scenarios) {
-    const dir = mkdtempSync(path.join(tmpdir(), 'select-library-'));
-    try {
-      const [bin, work] = [path.join(dir, 'bin'), path.join(dir, 'work')];
-      mkdirSync(bin);
-      mkdirSync(work);
-      writeFileSync(path.join(dir, 'files.jsonl'), `${JSON.stringify({ filename: file, patch: '' })}\n`);
-      writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\ncat "$GH_FIXTURE"\n', { mode: 0o755 });
+    withStepDirectory('select-library-', ({ work, PATH }) => {
+      const entry = `${JSON.stringify({ filename: file, patch: '' })}\n`;
+      writeFileSync(path.join(work, 'changed-files.jsonl'), entry);
       if (linked) symlinkSync(path.resolve('scripts'), path.join(work, 'scripts'));
-      const result = runStepBody(step.run, {
-        cwd: work,
-        env: {
-          PATH: [bin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter),
-          GH_FIXTURE: path.join(dir, 'files.jsonl'),
-        },
-      });
+      const result = runStepBody(step.run, { cwd: work, env: { PATH } });
       const row = JSON.stringify({ file, linked });
       assert.equal(result.status, 0, `${row}: ${result.stderr}`);
       assert.equal(result.outputs.library, library, row);
       assert.equal(/::warning::/.test(result.stdout), warns, `${row}: ${result.stdout}`);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    });
   }
 });
 
