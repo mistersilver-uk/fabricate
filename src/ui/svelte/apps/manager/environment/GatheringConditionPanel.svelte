@@ -55,6 +55,8 @@
   } = $props();
 
   let input = $state('');
+  // A panel's kind never changes: the caller keys one instance per kind and system.
+  // svelte-ignore state_referenced_locally
   let addIcon = $state(defaultConditionIcon(kind));
   let nameInput = $state(null);
   let components = $state(null);
