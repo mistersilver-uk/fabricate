@@ -1293,6 +1293,74 @@
   },
   {
     "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "tier track",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TierTrack.svelte",
+    "props": {
+      "tiers": [
+        { "name": "Thorpe" },
+        { "name": "Hamlet" },
+        { "name": "Village" },
+        { "name": "Town" }
+      ],
+      "currentIndex": 1,
+      "ariaLabel": "Settlement tier",
+      "currentLabel": "You are here",
+      "reachedLabel": "Reached",
+      "aheadLabel": "Ahead",
+      "hint": "You are here · 40 population to Village."
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "tier ladder",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TierTrack.svelte",
+    "props": {
+      "tiers": [
+        {
+          "name": "Revered",
+          "figure": "+20",
+          "notes": ["A seat at the guild table"],
+          "valence": "positive"
+        },
+        {
+          "name": "Honoured",
+          "figure": "+10",
+          "notes": ["Guild rates at every forge"],
+          "valence": "positive"
+        },
+        {
+          "name": "Accepted",
+          "figure": "0",
+          "notes": ["Trade at the market"],
+          "valence": "positive"
+        },
+        {
+          "name": "Wary",
+          "figure": "−10",
+          "notes": ["Watched in the guild hall"],
+          "valence": "neutral"
+        },
+        {
+          "name": "Hated",
+          "figure": "−20",
+          "notes": ["Refused service"],
+          "valence": "negative"
+        }
+      ],
+      "currentIndex": 2,
+      "direction": "descending",
+      "layout": "column",
+      "ariaLabel": "Standing with the Ironvale Guild",
+      "currentLabel": "You are here",
+      "reachedLabel": "Reached",
+      "aheadLabel": "Ahead"
+    },
+    "note": "The View Lab specimen's five rungs and words, mounted directly here rather than through the seam."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
     "cap": "avatar, stack, member row",
     "draws": ":scope > div > div:nth-child(1)",
     "path": "src/ui/svelte/components/Avatar.svelte",
