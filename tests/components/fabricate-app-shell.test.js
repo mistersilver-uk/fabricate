@@ -132,6 +132,7 @@ describe('FabricateAppRoot shell', () => {
       'manager-titlebar-badge',
       'patreon.com',
       'PREMIUM',
+      'AppTitleBar',
     ];
     for (const [name, source] of [
       ['FabricateAppRoot.svelte', rootSource],

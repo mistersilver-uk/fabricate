@@ -292,6 +292,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
   ]),
+  // The manager's title band (issue 2420), on the seven frames ManagerTitleBar's own cases draw.
+  'src/ui/svelte/components/AppTitleBar.svelte': Object.freeze([
+    'manager-default-selection',
+    'manager-systems-empty',
+    'manager-selected-normal',
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-selected-stacked',
+    'manager-world-downtime-test-companion-installed',
+  ]),
   // The app navigation (issue 1777): the manager sidebar expanded and collapsed, the collapsed
   // Downtime rail, and the player rail, its icon variant.
   'src/ui/svelte/components/NavSidebar.svelte': Object.freeze([
