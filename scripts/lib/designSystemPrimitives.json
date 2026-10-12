@@ -786,6 +786,15 @@
       "why": "ONE caller, `src/ui/svelte/components/SearchablePopover.svelte`, whose portaled panel this is. It carries the `<SearchPopover>` entry that specifies its PARENT rather than a specimen of its own. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree opens a picker rather than failing it."
     },
     {
+      "path": "src/ui/svelte/components/RangeBarMarker.svelte",
+      "library": null,
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/ThresholdBandStrip.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/ThresholdBandStrip.svelte`, whose fixed and draggable markers this draws (issue 2431). It names no library entry: `<RangeBar>` specifies its PARENT, whose hours-of-the-day specimen draws it, and it is a file of its own because the strip would otherwise pass 500 lines. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree holds the strip."
+    },
+    {
       "path": "src/ui/svelte/components/NavSidebarRows.svelte",
       "library": "<NavSidebar>",
       "evidence": "broad",

@@ -258,6 +258,9 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+  // Issue 2431: the range bar's marker has no caller drawing one until the time-of-day bar's own
+  // case lands in that issue's second PR, which removes this entry for an override.
+  'src/ui/svelte/components/RangeBarMarker.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {

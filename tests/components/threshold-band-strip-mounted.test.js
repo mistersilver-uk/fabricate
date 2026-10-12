@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
   compiledModules: [
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
+    'src/ui/svelte/components/RangeBarMarker.svelte',
     'src/ui/svelte/components/IconButton.svelte',
   ],
   componentPath: 'src/ui/svelte/components/ThresholdBandStrip.svelte',
@@ -1010,16 +1011,17 @@ describe('ThresholdBandStrip: the add rail', () => {
   it('is one tab stop, moved with the arrow keys and Home and End', async () => {
     const { root } = await mountDay({ addable: true });
     const stops = () => railButtons(root).map((button) => button.getAttribute('tabindex'));
+    const pressed = async (position, key) => {
+      press(railButtons(root)[position], key);
+      await harness.setProps({});
+      return stops();
+    };
     assert.deepEqual(stops(), ['0', '-1', '-1', '-1']);
-    press(railButtons(root)[0], 'ArrowRight');
-    assert.deepEqual(stops(), ['-1', '0', '-1', '-1']);
+    assert.deepEqual(await pressed(0, 'ArrowRight'), ['-1', '0', '-1', '-1']);
     assert.equal(document.activeElement, railButtons(root)[1]);
-    press(railButtons(root)[1], 'End');
-    assert.deepEqual(stops(), ['-1', '-1', '-1', '0']);
-    press(railButtons(root)[3], 'ArrowRight');
-    assert.deepEqual(stops(), ['-1', '-1', '-1', '0'], 'clamped at the end');
-    press(railButtons(root)[3], 'Home');
-    assert.deepEqual(stops(), ['0', '-1', '-1', '-1']);
+    assert.deepEqual(await pressed(1, 'End'), ['-1', '-1', '-1', '0']);
+    assert.deepEqual(await pressed(3, 'ArrowRight'), ['-1', '-1', '-1', '0'], 'clamped');
+    assert.deepEqual(await pressed(3, 'Home'), ['0', '-1', '-1', '-1']);
   });
 
   it('follows the dot and the dividers in document order', async () => {

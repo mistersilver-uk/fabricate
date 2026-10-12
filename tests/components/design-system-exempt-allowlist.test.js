@@ -176,6 +176,10 @@ const ALLOWLIST = Object.freeze([
     },
   ],
   [
+    "the spread is markerLayout's own view, keyed by the marker's props",
+    { 'src/ui/svelte/components/ThresholdBandStrip.svelte': 2 },
+  ],
+  [
     "the spread is this primitive's own rest, forwarded to the field it composes",
     { 'src/ui/svelte/components/Typeahead.svelte': 1 },
   ],

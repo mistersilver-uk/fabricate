@@ -6,14 +6,17 @@ import {
   ariaBoundsFor,
   bandDomain,
   bandIndexAt,
+  boundaryPatch,
   boundsFor,
   clampTo,
   markerBandStep,
+  markerLayout,
   numeric,
   railSeeds,
   resolveBands,
   snapTo,
   trackMaxOf,
+  valueAtClientX,
 } from '../../src/ui/svelte/util/rangeBarGeometry.js';
 
 const FIXED = [
@@ -180,5 +183,61 @@ describe('rangeBarGeometry: the rail seeds', () => {
       railSeeds(rows, 12, 2).map(({ value }) => value),
       [6]
     );
+  });
+});
+
+describe('rangeBarGeometry: patches, pointer values and marker layout', () => {
+  it('writes the start binding through the authored index of the band beginning there', () => {
+    const rows = resolveBands(DAY.toReversed().map((band, index) => ({ ...band, index })));
+    assert.deepEqual(boundaryPatch({ binding: 'start', rows, index: 0, next: 9 }), {
+      binding: 'start',
+      index: 2,
+      start: 9,
+    });
+  });
+
+  it('reads the value under a pointer against a scale, and nothing without one', () => {
+    const scale = { left: 10, width: 240, min: 4, span: 24 };
+    assert.equal(valueAtClientX(130, scale), 16);
+    assert.equal(valueAtClientX(-50, scale), 4, 'clamped to the track');
+    assert.equal(valueAtClientX(130, null), null);
+  });
+
+  it('lays out fixed markers inside the track and draggable ones at their stop', () => {
+    const rows = resolveBands(DAY);
+    const geometry = { domainMin: 4, trackMax: 28, step: 1 };
+    const layout = markerLayout(
+      [
+        { id: 'clock', value: 14.5 },
+        { id: 'outside', value: 2 },
+        { id: 'current', value: 12.5, draggable: true, snap: 'band' },
+        { id: 'hour', value: 9.4, draggable: true },
+        { id: 'lost', value: null, draggable: true, snap: 'band' },
+      ],
+      rows,
+      geometry,
+      String
+    );
+    assert.deepEqual(
+      layout.fixed.map(({ marker, left }) => [marker.id, left]),
+      [['clock', 43.75]]
+    );
+    const [current, hour] = layout.draggable;
+    assert.equal(layout.draggable.length, 2, 'a marker with no value is not drawn');
+    assert.deepEqual(
+      [current.at, current.left, current.stops[current.at].value],
+      [1, (8.5 / 24) * 100, 12.5]
+    );
+    assert.deepEqual(
+      current.stops.map(({ now, text, index }) => [now, text, index]),
+      [
+        [1, '', 0],
+        [2, '', 1],
+        [3, '', 2],
+        [4, '', 3],
+      ]
+    );
+    assert.equal(hour.stops.length, 25, 'one stop per grid value, 4 to 28');
+    assert.deepEqual(hour.stops[hour.at], { from: 8.5, value: 9, now: 9, text: '9', index: 1 });
   });
 });

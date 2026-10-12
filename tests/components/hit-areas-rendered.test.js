@@ -193,7 +193,7 @@ const MOUNTS = Object.freeze({
 const MOUNT_DEPENDENCIES = Object.freeze({
   ThresholdBandStrip: {
     rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
-    compiledModules: [component('IconButton')],
+    compiledModules: [component('RangeBarMarker'), component('IconButton')],
   },
 });
 
@@ -227,7 +227,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
 <style>@layer modules {${readStylesheet()}}</style>
-${['Stepper', 'SelectionCheckbox', 'Chip', 'ThresholdBandStrip']
+${['Stepper', 'SelectionCheckbox', 'Chip', 'ThresholdBandStrip', 'RangeBarMarker']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}
 ${Object.values(PARENTS)

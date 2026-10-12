@@ -205,6 +205,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RuleRow.svelte',
   'src/ui/svelte/components/RuleSentence.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // The range bar's marker (issue 2431).
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).
   'src/ui/svelte/components/Field.svelte',

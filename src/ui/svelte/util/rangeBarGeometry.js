@@ -11,8 +11,8 @@ export const numeric = (value) => {
 };
 
 /** The bands in value order, each with its authored `index`, or null when they do not tile. */
-export function resolveBands(bands) {
-  if (!Array.isArray(bands) || bands.length < 2) return null;
+export function resolveBands(bands, minimum = 2) {
+  if (!Array.isArray(bands) || bands.length < minimum) return null;
   const rows = bands
     .map((band, position) => ({
       id: band?.id ?? '',
@@ -80,4 +80,107 @@ export function clampTo(index, value, geometry) {
 export function snapTo(value, domainMin, step) {
   const size = step > 0 ? step : 1;
   return domainMin + Math.round((value - domainMin) / size) * size;
+}
+
+/** The position of the band holding `value`, its start inclusive, or -1 before the first. */
+export function bandIndexAt(value, rows) {
+  return rows.findLastIndex((row) => row.from <= value);
+}
+
+const BAND_KEY_DELTAS = Object.freeze({
+  ArrowRight: 1,
+  ArrowUp: 1,
+  PageUp: 1,
+  ArrowLeft: -1,
+  ArrowDown: -1,
+  PageDown: -1,
+});
+
+/** A marker's next stop for `key`, clamped to `[0, count - 1]`, or null for another key. */
+export function markerBandStep(key, position, count, page = 1) {
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (!(key in BAND_KEY_DELTAS)) return null;
+  const stride = key.startsWith('Page') ? page : 1;
+  return Math.min(count - 1, Math.max(0, position + BAND_KEY_DELTAS[key] * stride));
+}
+
+/** Where band `index` ends: the next band's start, or the track's end. */
+export const bandEnd = (rows, index, trackMax) =>
+  index === rows.length - 1 ? trackMax : rows[index + 1].from;
+
+/** Each band at least two steps wide, with its midpoint rounded down to the step. */
+export function railSeeds(rows, trackMax, step) {
+  return rows.flatMap((band, index) => {
+    const width = bandEnd(rows, index, trackMax) - band.from;
+    if (width < 2 * step) return [];
+    return [{ band, value: band.from + Math.floor(width / 2 / step) * step }];
+  });
+}
+
+/** A draggable marker's stops: each band's centre under `snap: 'band'`, else each grid value. */
+export function markerStops(snap, rows, { domainMin, trackMax, step, formatValue }) {
+  if (snap === 'band') {
+    return rows.map((band, position) => ({
+      from: band.from,
+      value: (band.from + bandEnd(rows, position, trackMax)) / 2,
+      now: position + 1,
+      text: band.name,
+      index: band.index,
+    }));
+  }
+  const size = step > 0 ? step : 1;
+  const stops = [];
+  for (let value = domainMin; value <= trackMax; value += size) {
+    const band = rows[Math.max(0, bandIndexAt(value, rows))];
+    stops.push({
+      from: value - size / 2,
+      value,
+      now: value,
+      text: formatValue(value),
+      index: band.index,
+    });
+  }
+  return stops;
+}
+
+/** The track value under `clientX` against a scale `{ left, width, min, span }`, or null unmeasured. */
+export function valueAtClientX(clientX, scale) {
+  if (!scale?.width) return null;
+  const ratio = Math.min(1, Math.max(0, (clientX - scale.left) / scale.width));
+  return scale.min + ratio * scale.span;
+}
+
+/** The authored patch handle `index` writes at `next`, per binding. */
+export function boundaryPatch({ binding, rows, index, next, previewDc }) {
+  if (binding === 'simple') return { binding: 'simple', dc: next };
+  const below = rows[index].index;
+  const above = rows[index + 1].index;
+  if (binding === 'fixed') {
+    return { binding: 'fixed', index: below, end: next - 1, nextIndex: above, start: next };
+  }
+  if (binding === 'start') return { binding: 'start', index: above, start: next };
+  return { binding: 'relative', index: above, dc: next - previewDc };
+}
+
+/** Each fixed marker inside the track, and each draggable one with its stops, by `left` percent. */
+export function markerLayout(markers, rows, geometry, formatValue) {
+  const { domainMin, trackMax } = geometry;
+  const percent = (value) =>
+    ((value - domainMin) / Math.max(trackMax - domainMin, Number.EPSILON)) * 100;
+  const fixed = [];
+  const draggable = [];
+  for (const marker of rows && Array.isArray(markers) ? markers : []) {
+    const value = numeric(marker?.value);
+    if (!marker?.draggable) {
+      if (value !== null && value >= domainMin && value <= trackMax) {
+        fixed.push({ marker, value, left: percent(value) });
+      }
+      continue;
+    }
+    const stops = markerStops(marker.snap, rows, { ...geometry, formatValue });
+    const at = value === null ? -1 : bandIndexAt(value, stops);
+    if (at >= 0) draggable.push({ marker, stops, at, left: percent(stops[at].value) });
+  }
+  return { fixed, draggable };
 }
