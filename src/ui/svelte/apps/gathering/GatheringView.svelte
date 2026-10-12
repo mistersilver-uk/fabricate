@@ -256,16 +256,14 @@
         environmentId,
         taskId,
         rememberedActorId: store?.selectedActorId ?? null,
-        // UI-triggered attempt: prompt an interactive roll dialog + post the roll
-        // to chat (Dice So Nice) for the routed/progressive check paths.
+        // A player check (an untimed d100, routed or progressive task) opens the roll prompt.
         interactive: true,
       });
       // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be a silent
-      // no-op; the chat card reports an accepted one. A CANCELLED attempt (a dismissed roll
-      // dialog, also `accepted: false` with no blockedReasons) returns first, its only notice
-      // a refused additional-dice choice's (issue 2008).
+      // no-op; the chat card reports an accepted one. A dismissed roll prompt's only notice is a
+      // refused additional-dice choice's (issue 2008); its run waits ready, so the listing reloads.
       notifyAdditionalDice(result, { notify: notifyWarn, localize }, store?.selectedActor?.name);
-      if (result?.cancelled === true) return;
+      if (result?.cancelled === true) return await load();
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
       } else if (result && result.success === false && !result.additionalDiceRefusal) {

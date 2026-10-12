@@ -261,6 +261,7 @@ A stage with no time requirement begins and resolves together, so completing it 
 Beginning a stage only succeeds once you hold everything it needs, so nothing is taken from you while a choice, a material, an essence, a cost, or a tool is still missing.
 When a stage is underway or ready, use **Complete stage**, **Complete**, **Brew**, or **Collect** to resolve it, as appropriate to the selected run.
 An available check action says **Roll check**, while d100 gathering says **Roll a d100**.
+An untimed d100 gather prompts as soon as it starts, so this action appears for it only after you dismiss the prompt.
 A check cannot be rolled until every other requirement for the stage is met, including its elapsed time.
 Any required player check stays manual.
 The action explains why it is unavailable when the run cannot proceed.

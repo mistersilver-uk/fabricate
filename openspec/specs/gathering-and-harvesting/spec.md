@@ -990,7 +990,7 @@ Because the environment adjustment is clamped into the base before the modifier 
 The attempt then rolls a SINGLE `d100`, and every enabled item row is tested against that same roll: add the gathering modifier and drop the row when `effectiveRoll >= 101 - finalDropRate`.
 Each row's marginal chance is unchanged by this — a row at 40 still drops on 40 of the 100 faces — but rows are not independent draws: within one attempt they succeed and fail together in rarity order, so a low roll yields only the commonest rows and a high roll yields the rare ones too.
 That is what makes a gathering attempt one reportable check; per-row draws could only ever be published as a pool whose total is the sum of unrelated checks.
-The roll is drawn only when the task has at least one enabled item row.
+The roll is drawn only when the task has at least one enabled item row, except that a prompted attempt's `1d100` is drawn and posted when its answer is evaluated (requirement 21) and is the item-row roll only when an item row reads it.
 `environmentDropRateAdjustment` is zero when the selected environment disables task drop-rate adjustments for that task.
 An additive system mode yields `multiplicativeFactor === 1` and is byte-identical to the prior flat sum.
 3. For every enabled composed event in the environment whose runtime condition gates are satisfied, resolve event character modifier references and matching condition modifiers, calculate `finalEventRate = round(clamp((foldedBase + additiveTotal) * multiplicativeFactor, 0, 100))` where `foldedBase = clamp(dropRate + environmentDropRateAdjustment, 0, 100)` is folded at compose time, using the same two-clamp additive-then-multiplicative-then-round aggregation (over both character and condition modifiers) as item rows, roll `d100`, add the event modifier, and drop the event when `effectiveRoll >= 101 - finalEventRate`.
@@ -1013,6 +1013,21 @@ Events are environment hazards rather than part of the gathering check, and one 
 18. Timed d100 runs must snapshot the start-time task, events, conditions, character modifier library evidence, and rules so later configuration changes do not alter completion.
 19. D100 resolution must preserve history-before-side-effects ordering.
 20. Existing routed and progressive task resolution modes remain valid compatibility behavior.
+21. An interactive immediate d100 attempt — one whose run started with no time requirement — opens the roll prompt before its stage resolves.
+The prompt is a versioned player check (`resolution-modes/spec.md` § Versioned Check Entitlement): it names the task, states the `1d100` it rolls, and offers the situational bonus and the roll mode.
+It shows no target and no modifier, because every item row and every event is graded against its own threshold with its own roll-side modifier.
+d100 has no authored check configuration, so its prompt always offers and permits the situational bonus.
+When the answer is evaluated the active GM rolls the attempt's `1d100` and resolves the bonus once to a number: a plain number as typed, any other entry rolled against the actor's roll data, and a malformed entry `0`.
+The stage then resolves with that face as the shared item-row roll, and adds that flat bonus to the item-row roll and to every event's own roll, so a positive bonus makes each event likelier as well as each item row.
+The evaluation grades nothing itself: requirements 2 and 3 grade every row and event, and requirement 17 records the bonus inside the roll-side modifier.
+Nothing resolves, spends or awards between the prompt opening and the answer.
+A non-secret roll is handed back, subject to the post-commit entitlement recheck, for the requesting client to post, so a dice-animation module animates it.
+An opaque blind attempt's check is a secret check (`data-models/spec.md`): its prompt is generic and names no formula, and its roll posts GM-private.
+A bonus entered as anything other than a plain number posts its dice in the same message as the `1d100`, under the same visibility, and the message's flavor states the resolved bonus.
+A dismissed prompt executes nothing: the run stays ready in the Journal with its start-time costs, and its ready action prompts again.
+A caller that is not interactive settles the check without a prompt and with no bonus; nothing is posted from its client, while a secret check still posts GM-private.
+22. A timed d100 run is not a player check: it opens no prompt at start or collection, completes manually or at world time as before, and applies no bonus.
+Whether an attempt is immediate or timed is fixed when its run starts, so a later edit to the task's time requirement never adds a prompt to a started run or removes one.
 
 ## Natural Gathering Expressions
 

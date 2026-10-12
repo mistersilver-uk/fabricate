@@ -10,13 +10,13 @@ import {
 import { ensureSlotOpen } from '../pageOps/toolStudio.mjs';
 
 /**
- * The gathering attempts phase E clicks, with whether each opens the interactive roll prompt. Only
- * a routed or progressive task does (the engine's versioned check descriptor); a d100 or timed
- * gather resolves without one. A Node test pins every row against the engine.
+ * The gathering attempts phase E clicks, with whether each opens the interactive roll prompt: an
+ * untimed d100, routed or progressive task does, and a timed d100 gather does not. A Node test pins
+ * every row against the d0 spine fixture and the engine.
  */
 export const GATHERING_ATTEMPT_PROMPTS = [
-  { taskId: 'smoke-meadow-herbs', resolutionMode: undefined, prompts: false },
-  { taskId: 'smoke-slow-bloom', resolutionMode: undefined, prompts: false },
+  { taskId: 'smoke-meadow-herbs', resolutionMode: 'd100', prompts: true },
+  { taskId: 'smoke-slow-bloom', resolutionMode: 'd100', prompts: false },
 ];
 
 export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
@@ -389,9 +389,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  // `prompts` comes from GATHERING_ATTEMPT_PROMPTS: only a routed or progressive task opens the
-  // roll prompt (the engine's versioned check descriptor); a d100 or timed gather resolves
-  // without one.
+  // `prompts` comes from GATHERING_ATTEMPT_PROMPTS: an untimed d100, routed or progressive task
+  // opens the roll prompt, and a timed d100 gather starts without one.
   async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
