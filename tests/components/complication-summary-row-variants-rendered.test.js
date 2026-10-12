@@ -1,7 +1,7 @@
 /**
- * Issue 2445 — the `player` and `authoring` complication rows, measured in Chromium. The GM
- * read-only variant loses its shell and tile; these two must not move, and no player frame claims
- * `ComplicationSummaryRow.svelte`, so this characterization is the only evidence they did not.
+ * Issue 2445 — the complication row variants, measured in Chromium. The GM read-only variant loses
+ * its shell and tile and must not regain them; `player` and `authoring` must not move, and no
+ * player frame claims `ComplicationSummaryRow.svelte`, so this is the only evidence they did not.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -46,9 +46,16 @@ const VARIANTS = Object.freeze({
     area: 'fabricate-manager',
     props: { ...SHARED, variant: 'authoring', triggerSentence: 'When the award is missed' },
   },
+  'readonly-gm': {
+    area: 'fabricate-manager',
+    props: { ...SHARED, variant: 'readonly-gm', triggerSentence: 'When the award is missed' },
+  },
 });
 
-/** The computed values frozen at origin/main `eb735ecf4`, per variant. */
+/**
+ * The computed values, player and authoring frozen before issue 2445, readonly-gm at its
+ * shell-less row.
+ */
 const FROZEN = Object.freeze({
   player: {
     root: ['1px', 'solid', 'rgba(0, 0, 0, 0)', '9px', 'rgba(0, 0, 0, 0)'],
@@ -66,6 +73,14 @@ const FROZEN = Object.freeze({
     headline: ['contents', 'normal'],
     name: ['Spectral, Georgia, "Times New Roman", serif', '12.5px'],
   },
+  'readonly-gm': {
+    root: ['0px', 'none', 'rgb(241, 209, 181)', '0px', 'rgba(0, 0, 0, 0)'],
+    line: ['8px', '0px', 'center'],
+    tile: null,
+    copy: '2px',
+    headline: ['contents', 'normal'],
+    name: ['Spectral, Georgia, "Times New Roman", serif', '12.5px'],
+  },
 });
 
 const stripHash = (markup) => markup.replaceAll(/\s*svelte-[a-z0-9]+/g, '');
@@ -76,7 +91,8 @@ function measure(variant) {
   const css = (element) => getComputedStyle(element);
   const rootStyle = css(root);
   const line = css(root.querySelector('.fab-complication-row-line'));
-  const tile = css(root.querySelector('.fab-complication-severity'));
+  const tileElement = root.querySelector('.fab-complication-severity');
+  const tile = tileElement && css(tileElement);
   const headline = css(root.querySelector('.fab-complication-row-headline'));
   const name = css(root.querySelector('.fab-complication-row-name'));
   return {
@@ -88,7 +104,7 @@ function measure(variant) {
       rootStyle.backgroundColor,
     ],
     line: [line.gap, line.padding, line.alignItems],
-    tile: [tile.width, tile.height, tile.borderTopLeftRadius, tile.borderTopColor],
+    tile: tile && [tile.width, tile.height, tile.borderTopLeftRadius, tile.borderTopColor],
     copy: css(root.querySelector('.fab-complication-row-copy')).gap,
     headline: [headline.display, headline.gap],
     name: [name.fontFamily, name.fontSize],
@@ -98,7 +114,7 @@ function measure(variant) {
 const markup = {};
 const measured = {};
 
-describe('2445 the player and authoring complication rows do not move', () => {
+describe('2445 the complication row variants keep their frozen geometry', () => {
   before(async () => {
     await harness.setup();
     try {
@@ -138,11 +154,14 @@ describe('2445 the player and authoring complication rows do not move', () => {
   });
 
   for (const variant of Object.keys(VARIANTS)) {
-    // GUARD: green before and after; red when the split-out `is-player` rule loses its radius.
-    it(`GUARD: ${variant} keeps its shell, line, tile and type`, () => {
+    // GUARD: red when the split-out `is-player` rule loses its radius. RED (readonly-gm): red
+    // when its root's border, radius and fill or its line padding come back.
+    it(`${variant === 'readonly-gm' ? 'RED' : 'GUARD'}: ${variant} keeps its shell, line, tile and type`, () => {
       assert.deepEqual(measured[variant], FROZEN[variant], `${variant} moved`);
     });
+  }
 
+  for (const variant of ['player', 'authoring']) {
     // GUARD: the tile stays for both, so the read-only variant's removal is scoped to it alone.
     it(`GUARD: ${variant} still draws the severity tile`, () => {
       assert.match(
