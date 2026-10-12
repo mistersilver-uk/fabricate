@@ -4,6 +4,7 @@
   import Notice from '../../components/Notice.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import { countComponentsByTag } from '../../../model/vocabularyUsage.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
   import ToolEditorTabs from './tools/ToolEditorTabs.svelte';
@@ -31,6 +32,8 @@
     activeTab = 'breakage',
     focusValidationNonce = 0,
     managedItems = [],
+    // The system's `{ id, tags }` components, which the repair tag adder counts each tag over.
+    componentTagOptions = [],
     itemTags = [],
     essenceOptions = [],
     currencyUnits = [],
@@ -90,6 +93,7 @@
     )
   );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
+  const tagComponentCounts = $derived(countComponentsByTag(componentTagOptions));
   /** THE HEADER'S SUBTITLE IS A STATEMENT OF SCOPE (issue 1373): which half of a Tool this screen
       owns — the rules are this system's, the identity is the world Tool's. */
   const sourceContext = $derived(
@@ -363,6 +367,7 @@
           {worldAuthority}
           componentOptions={managedItems}
           {itemTags}
+          {tagComponentCounts}
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}

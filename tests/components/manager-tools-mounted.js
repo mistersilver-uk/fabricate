@@ -1429,6 +1429,41 @@ export function registerToolsCases() {
     );
   });
 
+  it('counts the system’s components per tag in the system Tool’s repair tag adder', async () => {
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: [
+          {
+            ...toolRouteFixture,
+            onBreak: { mode: 'flagBroken' },
+            repairRequirements: [
+              {
+                id: 'repair',
+                options: [
+                  { quantity: 1, match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    await openFixtureToolEditor(calls);
+    target.querySelector('#tool-tab-breakage').click();
+    await tick();
+    flushSync();
+    target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+    await tick();
+    flushSync();
+    const countOf = (tag) =>
+      [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')]
+        .find((node) => node.title === tag)
+        ?.querySelector('.manager-chip')
+        ?.textContent.trim();
+    assert.equal(countOf('herb'), '2 components', 'selectedSystem.componentTagOptions is counted');
+    assert.equal(countOf('ore'), '0 components');
+  });
+
   it('offers NO Tool creation on the system Tool Rules route, on any drop target', async () => {
     // RETARGETED, NOT DELETED (issue 1373). This test used to drop an Item on this route's own
     // creation zone and assert a system-scope draft opened. Creation moved to the world Tools

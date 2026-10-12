@@ -1286,6 +1286,36 @@ describe('Tool Studio editor (mounted)', () => {
     outside.remove();
   });
 
+  it('counts the system’s components per tag in the repair tag adder (issue 2430)', async () => {
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          onBreak: { mode: 'flagBroken' },
+          repairRequirements: [
+            {
+              id: 'tags',
+              options: [{ quantity: 1, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }],
+            },
+          ],
+        }),
+        componentTagOptions: [
+          { id: 'scrap', tags: ['metal'] },
+          { id: 'ingot', tags: ['metal', 'Salvage'] },
+        ],
+      })
+    );
+    root.querySelector('[data-tool-repair-requirements] [data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    assert.deepEqual(
+      [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')].map((node) =>
+        node.textContent.replaceAll(/\s+/gu, ' ').trim()
+      ),
+      ['metal 2 components', 'salvage 0 components'],
+      'each tag counts the components carrying it exactly'
+    );
+  });
+
   it('authors all Recipe-compatible repair match kinds and a cross-type OR group', async () => {
     const patches = [];
     const repairRequirements = [

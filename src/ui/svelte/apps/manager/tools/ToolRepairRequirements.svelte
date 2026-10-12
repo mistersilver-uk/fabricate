@@ -26,6 +26,7 @@
     groups = [],
     componentOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     essenceOptions = [],
     currencyUnits = [],
     currencyEnabled = false,
@@ -128,6 +129,7 @@
       showSetName={false}
       {componentOptions}
       {itemTags}
+      {tagComponentCounts}
       {essenceOptions}
       {currencyUnits}
       {currencyEnabled}
