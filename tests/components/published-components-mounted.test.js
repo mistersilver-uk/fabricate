@@ -2,7 +2,8 @@
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
  * microtask timing, the target claim, three fault paths, destroy on a removed target, ancestor
- * independence, and a companion's own reactive contexts; then each shipped entry, `TierTrack` first.
+ * independence, and a companion's own reactive contexts; then the adapter's table and `TierTrack`.
+ * The issue 2448 leaves are `published-leaves-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
