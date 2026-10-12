@@ -91,6 +91,29 @@ function mountPanel({
   return mounted;
 }
 
+/** The whole Environments view on its settings tab, so the panel gets the view's own props. */
+function mountView({ services = null, systems = ['alchemy'] } = {}) {
+  calls = [];
+  target = document.createElement('div');
+  target.className = 'fabricate-manager';
+  document.body.appendChild(target);
+  const conditions = { timeOfDay: { enabled: true, current: 'day', values: DEFAULTS } };
+  mounted = createClassComponent({
+    component: View,
+    target,
+    props: {
+      activeGatheringTab: 'settings',
+      selectedSystemId: systems[0],
+      services,
+      gatheringConfig: {
+        systems: Object.fromEntries(systems.map((id) => [id, { conditions }])),
+      },
+    },
+  });
+  flushSync();
+  return mounted;
+}
+
 const q = (selector) => target.querySelector(selector);
 const qa = (selector) => [...target.querySelectorAll(selector)];
 const bar = () => q('[data-time-of-day-bar]');
@@ -415,21 +438,8 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
   });
 
   it('clears a rail seed with the half-typed name when the crafting system switches (m)', async () => {
-    calls = [];
-    target = document.createElement('div');
-    target.className = 'fabricate-manager';
-    document.body.appendChild(target);
-    const conditions = { timeOfDay: { enabled: true, current: 'day', values: DEFAULTS } };
-    mounted = createClassComponent({
-      component: View,
-      target,
-      props: {
-        activeGatheringTab: 'settings',
-        selectedSystemId: 'alchemy',
-        gatheringConfig: { systems: { alchemy: { conditions }, tidewrack: { conditions } } },
-      },
-    });
-    flushSync();
+    mountView({ services: clockAt(14, 34), systems: ['alchemy', 'tidewrack'] });
+    assert.ok(Boolean(q('[data-band-strip-marker-line="clock"]')), 'the view passes its services');
     q('[data-band-strip-add="night"]').click();
     flushSync();
     assert.equal(addStepper().getAttribute('aria-valuenow'), '0');
@@ -437,5 +447,21 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     flushSync();
     await tick();
     assert.equal(addStepper().getAttribute('aria-valuenow'), '12');
+  });
+
+  it('draws the world clock through the view`s own services', () => {
+    mountView({ services: clockAt(14, 34) });
+    assert.ok(Boolean(q('[data-time-of-day-bar] [data-band-strip-marker-line="clock"]')));
+    assert.ok(described().includes('World clock: 14:34'));
+  });
+
+  it('reads the day length through the view`s own services, falling back on a short day', () => {
+    mountView({
+      services: {
+        getWorldTimeComponents: () => ({ hour: 3, minute: 0, hoursPerDay: 10, minutesPerHour: 60 }),
+      },
+    });
+    assert.ok(!bar());
+    assert.ok(Boolean(q('[data-time-of-day-fallback]')));
   });
 });

@@ -991,6 +991,7 @@
             icon={condition.icon}
             setting={condition.setting}
             {selectedSystemId}
+            {services}
             {onUpdateGatheringConditions}
             {onToggleGatheringConditionEnabled}
             {onAddGatheringConditionValue}
