@@ -160,7 +160,7 @@ function hookOf({ row, attributes }, source) {
 }
 
 describe('row hook parity', () => {
-  // RED: the two GM strips' rows are one shared row with one hook (issue 2445).
+  // RED: the two GM read-only lists' rows are one shared row with one hook (issue 2445).
   it('RED: keeps every frozen site at its attribute name and rendered value', () => {
     for (const file of new Set(SITES.map(([path]) => path))) {
       const source = readFileSync(resolve(repoRoot, file), 'utf8');
