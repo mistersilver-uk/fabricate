@@ -196,8 +196,9 @@ const MOUNTS = Object.freeze({
       addable: true,
       railLabel: 'Add',
       addLabel: (band) => `Add within ${band.name}`,
+      class: 'manager-time-of-day-bar',
       bands: [
-        { id: 'dawn', name: 'Dawn', from: 4, range: '04–06' },
+        { id: 'dawn', name: 'The Long Grey Hour Before the Bells', from: 4, range: '04–06' },
         { id: 'early', name: 'Early', from: 6, range: '06–08' },
         { id: 'day', name: 'Day', from: 8, range: '08–17' },
         { id: 'dusk', name: 'Dusk', from: 17, range: '17–21' },
@@ -207,6 +208,17 @@ const MOUNTS = Object.freeze({
         { id: 'clock', value: 14.5, label: 'World clock', valueText: '14:30' },
         { id: 'current', value: 12.5, label: 'Now', draggable: true, snap: 'band' },
       ],
+    },
+  },
+  /** The panel's fallback note, which keeps the bar's footprint beside it. */
+  rangeBarFallback: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'start',
+      bands: [],
+      fallbackNote:
+        'Give every time of day its own start hour below 24 to see the time-of-day bar. Check: Day and Night.',
+      class: 'manager-time-of-day-bar',
     },
   },
   componentChip: {
@@ -283,7 +295,7 @@ ${Object.values(PARENTS)
   <div data-case="truncChip" class="row">${markup.truncChip}</div>
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
   <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
-  <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel">${markup.rangeBarPanel}</section><section class="manager-condition-panel"></section></div></div></div>
+  <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel">${markup.rangeBarPanel}</section><section class="manager-condition-panel">${markup.rangeBarFallback}</section></div></div></div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
   <div data-case="decorativeHost" class="row"><div class="host" role="option">${markup.decorative}<span>Text</span></div></div>
   <div data-case="pager" style="width:300px;margin:12px">${scoped(PAGER, PARENTS.inset)}</div>
@@ -861,9 +873,33 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
         dot: rect(dot),
         dotOwnsCentre: owns(dot),
         dividers: [...root.querySelectorAll('[data-band-strip-handle]')].map(rect),
+        bands: [...root.querySelectorAll('[data-band-strip-band]')].map((band) => ({
+          id: band.dataset.bandStripBand,
+          box: rect(band),
+          name: rect(band.querySelector('.fab-band-strip-band-name')),
+          range: rect(band.querySelector('[data-band-strip-range]')),
+        })),
+        barHeight: rect(root.querySelector('.fab-band-strip.manager-time-of-day-bar')).height,
+        fallbackHeight: rect(root.querySelector('[data-band-strip-fallback]')).height,
       };
     });
     assert.ok(Math.abs(bar.track.width - 248) <= 1, `the panel's track is ${bar.track.width}px`);
+    const inside = (inner, outer) =>
+      inner.left >= outer.left - 0.5 &&
+      inner.right <= outer.right + 0.5 &&
+      inner.top >= outer.top - 0.5 &&
+      inner.bottom <= outer.bottom + 0.5;
+    // The track is 46px with a 1px border, so each band fills the 44px inside it and never grows.
+    assert.ok(Math.abs(bar.track.height - 46) <= 0.5, `the track is ${bar.track.height}px tall`);
+    for (const band of bar.bands) {
+      assert.ok(Math.abs(band.box.height - 44) <= 0.5, `${band.id} is ${band.box.height}px tall`);
+      assert.ok(inside(band.name, band.box), `${band.id}'s name leaves its band`);
+      assert.ok(inside(band.range, band.box), `${band.id}'s hours leave its band`);
+    }
+    assert.ok(
+      Math.abs(bar.fallbackHeight - bar.barHeight) <= 0.5,
+      `the fallback note is ${bar.fallbackHeight}px beside the ${bar.barHeight}px bar`
+    );
     const overlaps = (a, b) =>
       a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
     assert.deepEqual(
