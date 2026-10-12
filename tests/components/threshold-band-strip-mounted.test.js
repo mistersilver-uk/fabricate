@@ -8,6 +8,10 @@ import {
   buildCountBands,
   describeCountBandRange,
 } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
+import {
+  CHECK_CALLER_STRIPS,
+  canonicalStrip,
+} from '../fixtures/threshold-band-strip/checkCallerStrips.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -45,6 +49,15 @@ const handles = (root) => [...root.querySelectorAll('[data-band-strip-handle]')]
 function press(handle, key) {
   handle.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
 }
+
+describe("ThresholdBandStrip: the check callers' strip is frozen (issue 2431)", () => {
+  for (const { name, props, html } of CHECK_CALLER_STRIPS) {
+    it(`renders the ${name} check strip exactly as frozen`, async () => {
+      const root = await harness.mount(props);
+      assert.equal(canonicalStrip(root.firstElementChild), html);
+    });
+  }
+});
 
 describe('ThresholdBandStrip: geometry and handles', () => {
   it('renders N bands and N−1 handles, so the outermost authored values carry none', async () => {
