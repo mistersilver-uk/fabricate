@@ -27,6 +27,7 @@ import {
   workingTree,
 } from '../helpers/designSystemRatchet.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
+import { physicalSite } from '../helpers/logicalStylesheet.js';
 import { siteMarker } from '../helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
@@ -2722,7 +2723,7 @@ test('a withdrawn utility or skin class is not declared', () => {
   // NON-VACUITY IS THE CLAUSE ABOVE. An absence check over an empty sheet passes forever.
   for (const { name, why } of WITHDRAWN_UTILITIES) {
     assert.deepEqual(
-      rulesNamingClass(name).map((rule) => `${MODULE_SHEET}:${rule.line}`),
+      rulesNamingClass(name).map((rule) => physicalSite(MODULE_SHEET, rule.line)),
       [],
       `\`.${name}\` must not be declared: ${why}. Declaring one reopens the measurement ` +
         'that withdrew it, so re-run that measurement and publish it rather than adding the rule.'

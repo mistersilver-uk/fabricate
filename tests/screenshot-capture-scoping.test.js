@@ -219,6 +219,17 @@ test('styles/fabricate.css scopes to the two rail frames and the global core set
   );
 });
 
+test('a stylesheet partial scopes to the same views as the sheet it is part of', () => {
+  const ids = (files) => mapChangedFilesToViews(files).map(v => v.id);
+  const sheet = ids(['styles/fabricate.css']);
+  for (const partial of [
+    'styles/fabricate-manager-rail-gathering.css',
+    String.raw`.\styles\fabricate-tokens.css`,
+  ]) {
+    assert.deepEqual(ids([partial]), sheet, partial);
+  }
+});
+
 test('Tool Studio frames are triggered only by Tool Studio files', () => {
   const own = mapChangedFilesToViews([
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',

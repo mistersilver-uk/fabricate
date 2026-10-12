@@ -1,0 +1,3132 @@
+.fabricate-nav.manager-nav,
+.fabricate-manager .manager-rail-block,
+.fabricate-card.fabricate-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* THE NAV IS THE RAIL'S SCROLLER. */
+.fabricate-nav.manager-nav {
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow: hidden auto;
+}
+
+/* World is a presentation group after the selected-system navigation, not another persistence scope. */
+.fabricate-manager .manager-world-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  margin-top: var(--fab-space-4);
+  padding-top: var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-world-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--fab-space-chip);
+  padding: 0 var(--fab-space-1) var(--fab-space-2);
+}
+
+.fabricate-manager .manager-world-heading-row h2,
+.fabricate-manager .manager-world-heading-row span {
+  margin: 0;
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-world-heading-row h2 {
+  color: var(--fab-text-subtle);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.fabricate-manager .manager-world-heading-row span {
+  color: var(--fab-text-muted);
+  font-weight: 500;
+}
+
+/* The two blocks above the nav are not the scroller, so they must not absorb its shrink — a flex item defaults to `flex-shrink: 1` and would otherwise compress instead. */
+.fabricate-manager .manager-rail > .manager-rail-title,
+.fabricate-manager .manager-rail > .manager-rail-block {
+  flex: 0 0 auto;
+}
+
+/* Section and card titles are SERIF (issue 643): the typographic contract sets names and headings in Spectral and every numeric in JetBrains Mono. */
+.fabricate-manager .manager-rail-title,
+.fabricate-manager .manager-card-title {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-serif);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* The rail's own section label sits tighter and tracks wider than a card title. */
+.fabricate-manager .manager-rail-title {
+  padding: 0 var(--fab-space-1);
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
+.fabricate-nav .manager-nav-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font-weight: 500;
+  text-align: left;
+}
+
+.fabricate-nav .manager-nav-button:hover:not(:disabled) {
+  color: var(--fab-text);
+  background: var(--fab-surface-raised);
+}
+
+/* World established the manager rail's quiet selected language. The same link styling is shared by every system-specific direct, parent, and child route so changing scope does not change the meaning of an active navigation row. */
+.fabricate-nav .manager-nav-button.is-active {
+  color: var(--fab-text);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-active);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.fabricate-nav .manager-nav-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-nav .manager-nav-button.is-active:focus {
+  box-shadow: none;
+}
+
+.fabricate-nav .manager-nav-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+/* An expanded group is one box, its hairline inset so the box shifts nothing (issue 2257 E3). */
+.fabricate-nav .manager-nav-group.is-expanded {
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-2xs);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-border);
+}
+
+/* 36px, not 40px: the toggle is 28px wide and sits at `right: 4px`, so 36px still clears it by 4px and returns the other 4px to the label track. */
+.fabricate-nav .manager-nav-parent {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  padding-right: 36px;
+}
+
+/* Each inset gives back the group's padding, so the parent's icon, label and chevron hold still; 34px is the 36px toggle clearance less that padding, and 7 nests the 30px row's corner 2px inside the box's 9. */
+.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent {
+  min-height: 30px;
+  padding: var(--fab-space-chip);
+  padding-right: 34px;
+  border-color: transparent;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent:hover {
+  border-color: transparent;
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-nav .manager-nav-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* `:not(:disabled)` is load-bearing rather than tidy: a group locked open by its own active sub-tab renders this control genuinely disabled, and a hover treatment on a control that cannot act is the same lie the silently-swallowed click used to tell (issue 1185). */
+.fabricate-nav .manager-nav-toggle:not(:disabled):hover {
+  color: var(--fab-text);
+  border-color: var(--fab-border);
+  background: var(--fab-surface-raised);
+}
+
+/* The locked disclosure. It keeps `pointer-events` so the `title` explaining WHY it cannot collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled` above, which has no reason to convey and can afford `pointer-events: none`. */
+.fabricate-nav .manager-nav-toggle:disabled {
+  color: var(--fab-text-muted);
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fabricate-nav .manager-nav-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-nav .manager-nav-toggle:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-nav .manager-nav-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  padding-left: var(--fab-space-3);
+}
+
+.fabricate-nav .manager-nav-subitem {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+
+  /* FOUR tracks, not three (issue 1096): a Checks child can carry an unsaved marker AND an issue badge beside its label, and a three-track grid put the second one into the icon cell of the row below it. */
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid transparent;
+
+  /* ratchet-exempt(design-system): a nav row keeps its 30px rung's corner when a long label wraps it taller */
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-nav .manager-nav-subitem:hover {
+  color: var(--fab-text);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-nav .manager-nav-subitem.is-active {
+  color: var(--fab-text);
+  border-color: transparent;
+  background: var(--fab-surface-active);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.fabricate-nav .manager-nav-subitem:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-nav .manager-nav-subitem.is-active:focus {
+  box-shadow: none;
+}
+
+/* Inset, because the nav scrolls and clips: a child ends 2px inside its group's box and a row spans the nav. */
+.fabricate-nav .manager-nav-subitem:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+.fabricate-nav .manager-nav-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+.fabricate-nav .manager-nav-button:disabled {
+  color: var(--fab-text-muted);
+  cursor: default;
+  opacity: 0.72;
+}
+
+/* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
+  padding: 0 var(--fab-space-4);
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Split from the geometry above for the invariant at `.fabricate-button:disabled`. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+/* The Downtime rail group (issue 1185). */
+.fabricate-manager .manager-downtime-subitem {
+  /* `height: auto` releases Foundry core's `button { height: var(--button-size) }`, which is a FIXED height rather than a floor: the row stayed at core's height while a long localized label wrapped to four lines inside it and overflowed onto the three rows below. */
+  height: auto;
+  font-size: 12px;
+  font-weight: 600;
+
+  /* Entering the route reveals the active sub-item with `scrollIntoView({ block: 'nearest' })`, which by itself lands the item flush against the scrollport's bottom edge and leaves the rest of the group hidden — measured at a 1330x900 Manager, the revealed item sat at 947-977 against a port ending at 977. */
+  scroll-margin-block-end: var(--fab-space-2);
+}
+
+/* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads as one step louder together — see the note above. */
+.fabricate-manager .manager-downtime-subitem .manager-nav-label {
+  font-size: inherit;
+}
+
+/* The padlock does NOT dim with its row. It is the premium marker on a working control, not a disabled state, so it holds the accent whether or not the row is the current one — the one place in this rail where a trailing mark deliberately outranks the label beside it. */
+.fabricate-nav .manager-nav-lock {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-accent);
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* The premium badge on the Downtime parent row — A VEHICLE OF ITS OWN (issue 1515). */
+.fabricate-nav .manager-nav-premium {
+  min-width: 0;
+
+  /* `2px 4px`, a rung tighter each side than the design's `2px 6px` (it was 5, which snaps down to the scale's 4 rather than up to the chip's 6). The design's rail row ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same chip on the same 175px row leaves the label a pixel short and it breaks mid-word. */
+  padding: var(--fab-space-2xs) var(--fab-space-1);
+  border-radius: 6px;
+
+  /* A lettered mark, not a numeral, so it takes the body face rather than the mono one. */
+  font-family: inherit;
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+/* The rail's premium-preview note: what the padlocks above it mean. It sits at the foot of the group and, like the design's own, is below the fold at the rail's resting scroll — the rail scrolls, and this is real copy a default screenshot will not show. */
+.fabricate-nav .manager-nav-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+
+  /* Top gutter left to the group's own gap, so the callout sits the same 6px below the sub-items that the parent row sits above them. */
+  margin: 0 var(--fab-space-chip) var(--fab-space-chip);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.fabricate-nav .manager-nav-callout-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  color: var(--fab-accent);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+
+/* A rail label degrades by WRAPPING AT A SPACE, and then by ELLIPSIS — never by splitting a word (issue 1185). */
+.fabricate-nav .manager-nav-label {
+  overflow: hidden;
+  min-width: 0;
+
+  /* Without this the label inherited Foundry's 14px app base (bleed) — a rail label stands 1.5px over the prototype's 12.5px (issue 643). */
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* A rail count badge is a BARE NUMERAL, not a badge (issue 643): mono, tabular, subtle, pushed to the end of the row (issues 1515, 1304). */
+.fabricate-nav .manager-nav-count {
+  flex: 0 0 auto;
+  min-width: 0;
+  color: var(--fab-text-secondary);
+  font-family: var(--fab-font-mono);
+
+  /* Prototype scale is 10px (0.625rem); an earlier pass bumped this to 0.74rem for readability, but the font-size audit realigned it to the design (issues 643, 1304). */
+  font-size: 0.625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+}
+
+/* THE PLANNED-VIEW WORD, and deliberately NOT a member of the Rail Marker Family (issue 1515). */
+.fabricate-nav .manager-nav-planned {
+  min-width: 0;
+  color: var(--fab-text-secondary);
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* issue 1304 removed the active-row re-tone that used to sit here — `.manager-nav-button.is-active .manager-nav-count` and `.manager-nav-subitem.is-active .manager-nav-count` — because both restated this rule's `color`/`font-weight` byte-for-byte. */
+
+/* THE GOLD BADGE CHIP, stated once (issues 1185, 1304, 1515). */
+.fabricate-manager .manager-titlebar-badge,
+.fabricate-nav .manager-nav-premium,
+.fabricate-manager .manager-premium-icons-ad-badge {
+  color: var(--fab-on-badge-gold);
+  background: var(--fab-badge-gold);
+  font-weight: 700;
+}
+
+/* The Premium advert's six icon tiles (issue 2220). The images live here, beside the module's other bundled assets, so no icon is ever offered as Item art; the tile itself is `ManagerPremiumIconsAd.svelte`'s. */
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-stone {
+  background-image: url("../assets/premium/relic-stone.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-blood {
+  background-image: url("../assets/premium/relic-blood.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-entropy {
+  background-image: url("../assets/premium/relic-entropy.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-verdant {
+  background-image: url("../assets/premium/relic-verdant.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-catalyst {
+  background-image: url("../assets/premium/relic-catalyst.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-formula {
+  background-image: url("../assets/premium/relic-formula.webp");
+}
+
+/* THE SAME CHIP, MUTED — the rail's Downtime marker once a companion holds the surface (issue 1185). */
+.fabricate-nav .manager-nav-premium.is-installed {
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  font-weight: 600;
+}
+
+/* THREE distinguishable markers share the rail's trailing column — a record COUNT (a bare mono numeral), an ISSUE count (this filled, bordered pill, whose `aria-label` names its unit) and an UNSAVED marker (a dot, a different SHAPE with its own accessible name) — so 2 and 3 are told apart by shape and by name, never by colour alone (issues 1096, 1515). */
+.fabricate-nav .manager-nav-issue-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 999px;
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+  font-family: var(--fab-font-mono);
+  font-size: 0.58rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Drawn as a BOX rather than as a bullet glyph, and that is not a style preference: an HTML entity for a filled circle is a numeric character reference, which `tests/components/theme-colour-contract.test.js` reads as a hex colour literal and fails. */
+.fabricate-nav .manager-nav-dirty-marker {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-accent);
+}
+
+/* A collapsed rail keeps the group's parent icon AND its issue badge — that badge is the only signal left once the labels and the children are hidden, so it is deliberately not in the `.manager-nav-count` hide rule above. */
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-dirty-marker {
+  display: none;
+}
+
+/* An editor TAB STRIP's two non-chip markers, on the same rule as the rail's: a count is a bare mono numeral and a dot is a shape with a text accessible name (issues 1429, 1509). */
+.fabricate-tabs .manager-editor-tab-count {
+  flex: 0 0 auto;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count {
+  color: var(--fab-accent);
+}
+
+.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-count {
+  color: var(--fab-accent);
+}
+
+/* The formula token quick-add row (issue 1096): a wrap of small mono chips under the formula field. */
+.fabricate-manager .manager-checks-formula-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-formula-token {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  width: auto;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: var(--fab-bg-1);
+  font-family: var(--fab-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: normal;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-formula-token > i {
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+/* The token's kind glyph (a die, an ability…) at full ink, beside the quieter `+` verb. */
+.fabricate-manager .manager-checks-formula-token > i.is-kind {
+  font-size: 9px;
+  opacity: 1;
+}
+
+.fabricate-manager .manager-checks-formula-token:hover {
+  border-color: var(--fab-accent);
+  color: var(--fab-text);
+}
+
+.fabricate-tabs .manager-editor-tab-dot {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-warning);
+}
+
+.fabricate-card.fabricate-card {
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+}
+
+/* The evidence-list bullet rules are gone: its one consumer, the Tags & Categories contextual help, was a disc-bulleted re-derivation of the Tool Studio's explainer list at a different body scale (issue 881). */
+
+.fabricate-manager .manager-fact {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-overlay-dark-14);
+}
+
+/* Stacked stat-card layout: direct-child <strong>VALUE</strong><span>LABEL</span> (used by environment-edit inspector facts) needs to break onto two lines so value and label do not concatenate into a single overflowing word. */
+.fabricate-manager .manager-fact > strong,
+.fabricate-manager .manager-fact > span:not(.manager-fact-line) {
+  display: block;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-fact.is-off {
+  grid-column: 1 / -1;
+}
+
+.fabricate-manager .manager-fact-line {
+  display: inline;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--fab-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-fact-leading {
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-fact strong {
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-fact strong.is-disabled {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager .manager-feature-list {
+  display: flex;
+  align-items: flex-start;
+  place-content: flex-start flex-start;
+  gap: var(--fab-space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-condition-shortcut-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-condition-shortcut {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-condition-shortcut-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  color: var(--fab-text);
+  line-height: 1.25;
+}
+
+.fabricate-manager .manager-condition-shortcut-label i {
+  width: 16px;
+  color: var(--fab-text-muted);
+  text-align: center;
+}
+
+/* The select fills its field at the `form` rung's 38. */
+.fabricate-manager .manager-condition-shortcut .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, and it is a FLOOR rather than an override (issue 1502). */
+.fabricate-button,
+.fabricate-icon-button {
+  font: inherit;
+}
+
+/* THE FAMILY'S SHARED BASE BLOCK: the lowest-specificity (0,2,0) rule of BOTH button families, and the control contract every carrier gets for free. */
+.fabricate-button.fabricate-button,
+.fabricate-icon-button.fabricate-icon-button {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* THE DISABLED INVARIANT. A switched-off manager button paints from this rule, whatever role it carries — so every rule that states a role's RESTING paint is qualified `:not(:disabled)`, here and above, and none of them relies on standing later in the sheet than this one (issues 1118, 1502). */
+.fabricate-button.fabricate-button:disabled,
+.fabricate-icon-button.fabricate-icon-button:disabled {
+  border-color: var(--fab-overlay-light-12);
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+  opacity: 0.62;
+}
+
+.fabricate-button.fabricate-button {
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-radius: 9px;
+  font-weight: 700;
+}
+
+/* THE STRIP HALF OF THE FAMILY'S FOCUS CHROME, and it is not optional (issues 1502, 1501). */
+.fabricate-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE FAMILY'S OWN FOCUS RING. The MODULE ring above — `.fabricate <element>:focus-visible`, issue 1501 — is (0,2,1) and beats this (0,2,0) rule wherever a Fabricate root is an ancestor; the declarations are COPIED from it verbatim rather than re-chosen, so nothing moves there (issue 1502). */
+.fabricate-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* Twelve manager buttons are anchors, not buttons (issue 1118): docs links, the premium unlock, the explainer card's links. */
+.fabricate-button.fabricate-button:is(a) {
+  text-decoration: none;
+}
+
+.fabricate-button.fabricate-button.is-primary:not(:disabled) {
+  border-color: var(--fab-success-border);
+  color: var(--fab-on-success);
+  background: var(--fab-success);
+}
+
+.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled) {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+}
+
+.fabricate-button.fabricate-button.is-danger:not(:disabled),
+.fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled) {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+/* The armed half of the inline two-step row confirmation. This is the product's first SOLID `--fab-danger` surface, which is why `--fab-on-danger` exists at all: `--fab-on-accent` fails 4.5:1 against `--fab-danger` in foundry-native and is marginal in ironblood-forge, and `--fab-danger-text` fails everywhere (issue 785). */
+.fabricate-button.fabricate-button.is-danger.is-armed {
+  border-color: var(--fab-danger);
+  color: var(--fab-on-danger);
+  background: var(--fab-danger);
+}
+
+.fabricate-button.fabricate-button.is-danger.is-armed:not(:disabled):hover {
+  border-color: var(--fab-danger);
+  color: var(--fab-on-danger);
+  background: var(--fab-danger);
+}
+
+/* The `warning` role's treatment. It has a call site now (issue 1118, task 9), and that call site CANNOT CURRENTLY RENDER — both halves matter, so both are written down (issues 1315, 1422). */
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled) {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-button.fabricate-button:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button:not(:disabled):hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-button.fabricate-button.is-primary:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-on-success);
+  background: var(--fab-success-strong);
+}
+
+.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-button.fabricate-button.is-danger:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover {
+  border-color: var(--fab-warning-focus);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-icon-button.fabricate-icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  flex: 0 0 34px;
+}
+
+/* Opt-in compact dismiss: the owner sets the flex basis as well as the box. */
+.fabricate-icon-button.fabricate-icon-button.is-size-24 {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  flex: 0 0 24px;
+  border-radius: 6px;
+}
+
+/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `Modal`'s. */
+.fabricate-icon-button.fabricate-icon-button.is-size-26 {
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+  border-radius: 7px;
+}
+
+/* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
+   `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
+   repaint below would sit on top of them rather than replace them. Above the repaint because the
+   two tie at (0,2,0). */
+.fabricate-icon-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The primitive's OWN focus ring. The MODULE ring above — `.fabricate <element>:focus-visible`, issue 1501 — is (0,2,1) and reaches every Fabricate window, so it BEATS this (0,2,0) rule wherever a Fabricate root is an ancestor (issue 1502). */
+.fabricate-icon-button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502). */
+.fabricate-pagination.fabricate-pagination .fabricate-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+
+  /* THE PAGER'S CORNER, AND ONLY THE PAGER'S. The family's shared base block corners every icon button at 6px; the specimen's published icon rung is `.k-btn.icon` at radius 7, which is also the corner the `inline` select rung this bar now holds takes (issue 1504). */
+  border-radius: 7px;
+}
+
+.fabricate-icon-button.fabricate-icon-button i,
+.fabricate-button.fabricate-button i {
+  position: static;
+  margin: 0;
+}
+
+/* Recipe-access rows are native <button>s, so Foundry core's fixed button height would clamp them and overlap the stacked name + grant chip (issue 511). */
+.fabricate-manager .manager-access-row {
+  height: auto;
+  min-height: 56px;
+  line-height: normal;
+  align-items: center;
+}
+
+/* The shared.fabricate-search is `flex: 1 1 260px` for the horizontal filter bar; inside a vertical roster column that flex-grow stretches the search box tall (and floats its absolutely-positioned icon mid-gap) (issues 511, 785). */
+.fabricate-manager .manager-access-roster .fabricate-search,
+.fabricate-manager .manager-knowledge-roster .fabricate-search {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-panel {
+  display: grid;
+  gap: var(--fab-space-3);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-gathering-panel-environments {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager .manager-gathering-panel-tasks {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager .manager-gathering-panel-events {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager .manager-gathering-encounters-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--fab-space-3);
+  min-height: 0;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-events-table {
+  --fab-manager-gathering-event-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-event-table-head,
+.fabricate-manager .manager-gathering-event-row {
+  display: grid;
+  grid-template-columns: var(--fab-manager-gathering-event-grid);
+  gap: var(--fab-space-2);
+  align-items: center;
+  align-content: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-event-table-head > *,
+.fabricate-manager .manager-gathering-event-row > * {
+  min-width: 0;
+}
+
+/* Size only; the edge, corner and fill are the one browser-row treatment (issue 883). */
+.fabricate-manager .manager-gathering-event-row {
+  width: 100%;
+  min-height: 76px;
+  padding: var(--fab-space-2);
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-gathering-event-row:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-gathering-event-row.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-surface-active);
+}
+
+.fabricate-manager .manager-gathering-event-row .manager-status-cell {
+  justify-self: start;
+}
+
+.fabricate-manager .manager-gathering-event-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-gathering-event-identity:focus {
+  outline: none;
+}
+
+.fabricate-manager .manager-gathering-event-identity:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-gathering-event-thumb {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--fab-overlay-dark-18);
+}
+
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  align-items: center;
+  align-self: center;
+  min-height: 64px;
+}
+
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-gathering-event-thumb {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 11px;
+  object-fit: cover;
+  align-self: center;
+}
+
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  align-self: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-identity .manager-system-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-status-cell,
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group {
+  align-self: center;
+}
+
+/* Keep the action buttons on a single row (like the environments browser) so the row height is driven by the 64px thumbnail, not a wrapped second button row. */
+.fabricate-manager .manager-gathering-events-table .manager-gathering-event-row .manager-action-group {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-gathering-event-tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  align-content: flex-start;
+  align-items: flex-start;
+  align-self: flex-start;
+  min-width: 0;
+
+  /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
+  height: 64px;
+  overflow-y: auto;
+  padding-right: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-danger-tag-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  box-sizing: border-box;
+  min-height: 28px;
+  max-width: 100%;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-danger-tag-pill > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-safe {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-unsafe {
+  border-color: color-mix(in srgb, var(--fab-success-border) 55%, var(--fab-warning-border) 45%);
+  background: color-mix(in srgb, var(--fab-success-soft) 55%, var(--fab-warning-soft) 45%);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-hazardous {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-dangerous {
+  border-color: color-mix(in srgb, var(--fab-warning-border) 50%, var(--fab-danger-border) 50%);
+  background: color-mix(in srgb, var(--fab-warning-soft) 50%, var(--fab-danger-soft) 50%);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-deadly {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-extreme {
+  border-color: var(--fab-danger);
+  background: color-mix(in srgb, var(--fab-danger-soft) 35%, var(--fab-danger) 65%);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-suggestion {
+  background: transparent;
+  border-style: dashed;
+  color: var(--fab-text-muted);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-suggestion:hover,
+.fabricate-manager .manager-danger-tag-pill.is-suggestion:focus-visible {
+  background: var(--fab-surface-raised);
+  border-style: solid;
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-gathering-event-edit-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-height: 0;
+  min-width: 0;
+  padding: var(--fab-space-4);
+  overflow: auto;
+}
+
+.fabricate-manager .manager-gathering-event-edit-view > * {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-event-edit-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--fab-space-3);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-event-edit-row > .manager-task-availability-card {
+  min-width: 0;
+  align-content: start;
+}
+
+.fabricate-manager [data-gathering-event-drop-rate] .manager-task-availability-row,
+.fabricate-manager [data-gathering-event-danger-tags] .manager-task-availability-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-gathering-event-scene-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  min-height: 48px;
+  padding: var(--fab-space-3);
+  border: 1px dashed var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-gathering-event-scene-dropzone.is-drop-active {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-gathering-event-scene-linked {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-gathering-event-scene-thumb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  object-fit: cover;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-gathering-event-scene-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: var(--fab-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-gathering-event-scene-name:hover {
+  text-decoration: underline;
+}
+
+/* Excludes `[type="range"]` for the reason documented on the task edit view's twin rule: the chance slider paints its fill behind a transparent input, and this blanket rule outranks the slider's own reset (issue 883). */
+.fabricate-manager
+  .manager-gathering-event-edit-view
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  box-shadow: none;
+  font: inherit;
+}
+
+.fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  min-height: 34px;
+  border-radius: 9px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+}
+
+.fabricate-manager .manager-gathering-event-edit-view textarea {
+  min-height: 54px;
+  padding: var(--fab-space-2);
+  border-radius: 9px;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-field-error {
+  display: block;
+  margin-top: var(--fab-space-1);
+  color: var(--fab-danger-border, var(--fab-warning-border));
+  font-size: 0.78rem;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view {
+  /* The recipe editor's structure (issue 1522): a fixed tab bar and page notice over the tab panel, which shrinks to the space left and is the one scroller. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-height: 0;
+  min-width: 0;
+  padding: var(--fab-space-4);
+  overflow: hidden;
+}
+
+/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). Both legs lost their `select` token at issue 1510, when this editor's seven selects became `<Select>` triggers: the rungs paint the box and neither element-typed leg could reach a `<button>` anyway. The requirement row states its own formula and search boxes, so both legs leave them alone (issue 1516). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([data-recipe-option-formula]):not([data-recipe-option-search]),
+    textarea
+  ) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  box-shadow: none;
+  font: inherit;
+}
+
+/* `[type="search"]` is excluded so the compact search's own 34px inline padding, below, clears its glyph (issue 1782). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="search"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
+  min-height: 34px;
+  border-radius: 9px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+}
+
+/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.fabricate-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is not one of them and refuses it in the component's own `<style>` (issue 1510). */
+.fabricate-manager .manager-gathering-task-edit-view .manager-task-field-select .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The stamina modifier row's two pickers fill their own grid cells instead: the row is a `minmax(0, 1fr) 56px` grid whose cells the native selects filled, and a hugging trigger would leave the 1fr cell part-empty and re-measure as the GM picks a longer modifier name (issue 1510). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  .manager-task-stamina-modifier-row
+  .fabricate-select-trigger {
+  width: 100%;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view textarea {
+  min-height: 54px;
+  padding: var(--fab-space-2);
+  border-radius: 9px;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view .fabricate-search:where(.is-compact) input:not([type="checkbox"]):not([type="radio"]) {
+  height: 34px;
+  padding: 0 34px;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view input[type="range"]:focus-visible {
+  /* The 24px target is 1px past the 22px track on each side, so the ring's offset gives that pixel back. */
+  outline-offset: 1px;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view input[type="range"] {
+  box-sizing: border-box;
+  height: 24px;
+  min-height: 24px;
+  margin-block: -1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-gathering-task-edit-view input[type="checkbox"] {
+  accent-color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--fab-space-2);
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font-size: 0.86rem;
+}
+
+.fabricate-manager .manager-link-button:hover {
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-task-core-card,
+.fabricate-manager .manager-task-availability-card,
+.fabricate-manager .manager-task-component-browser-card,
+.fabricate-manager .manager-task-overview-card,
+.fabricate-manager .manager-task-drops-card,
+.fabricate-manager .manager-selected-drop-editor {
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-task-core-card {
+  display: grid;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-task-availability-card {
+  display: grid;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-task-component-browser-card {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 340px;
+  min-height: 340px;
+  max-height: 340px;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-task-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* The heading's COPY block. `> div` is the vehicle because every heading's copy is a bare <div> wrapping the h3 + hint — but a heading's right-hand CONTROL WRAPPER is a div too, and this rule out-specifies its own `flex: 0 0 auto` (0-2-1 beats 0-2-0). */
+.fabricate-manager .manager-task-card-heading > div:not(.manager-task-card-heading-control) {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* Right-pinned at its own width. `margin-left: auto` is belt-and-braces with the heading's `justify-content: space-between` — it keeps the control at the right edge even in a heading whose copy block does not grow. */
+.fabricate-manager .manager-task-card-heading > .manager-task-card-heading-control {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-task-card-heading .manager-link-button {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-task-card-heading h3 {
+  margin: 0 0 var(--fab-space-2xs);
+  color: var(--fab-text);
+  font-size: 1rem;
+}
+
+.fabricate-manager .manager-task-card-heading p {
+  margin: 0;
+}
+
+.fabricate-manager .manager-task-core-grid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-media-column {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-identity-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-identity-fields textarea {
+  min-height: 80px;
+}
+
+.fabricate-manager .manager-task-core-status {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-core-status p {
+  margin: 0;
+  max-width: 14ch;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-task-core-status .fabricate-toggle {
+  max-width: 64px;
+}
+
+.fabricate-manager .manager-task-availability-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* THE PILL SELECT'S FAMILY, ROOTED AT THE CLASS THE PRIMITIVE EMITS (issues 1515, 1480). */
+.fabricate-pill-select.manager-availability-multi {
+  min-width: 0;
+}
+
+.fabricate-pill-select .manager-availability-menu-button,
+.fabricate-manager .manager-condition-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-height: 34px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.fabricate-pill-select .manager-availability-menu-button:hover,
+.fabricate-pill-select .manager-availability-menu-button:focus-visible,
+.fabricate-manager .manager-condition-menu-button:hover,
+.fabricate-manager .manager-condition-menu-button:focus-visible {
+  border-color: var(--fab-warning-border);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-availability-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: var(--fab-space-1);
+  max-height: 190px;
+  padding: var(--fab-space-chip);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 6px;
+  background: var(--fab-bg-3);
+  box-shadow: var(--fab-shadow-lg);
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-availability-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-height: 30px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: transparent;
+  text-align: left;
+}
+
+.fabricate-manager .manager-availability-option:hover,
+.fabricate-manager .manager-availability-option:focus-visible {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+  outline: none;
+}
+
+/* The option row's glyph, which stays with the menu block above for its reason (issue 1515). */
+.fabricate-manager .manager-availability-option i {
+  color: var(--fab-warning-text);
+  text-align: center;
+}
+
+.fabricate-manager .manager-availability-empty {
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+}
+
+.fabricate-pill-select .manager-availability-pill > i {
+  color: var(--fab-warning-text);
+  text-align: center;
+}
+
+.fabricate-pill-select .manager-availability-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-pill-select .manager-availability-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-height: 28px;
+  max-width: 100%;
+  padding: var(--fab-space-2xs) var(--fab-space-1) var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-warning-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.fabricate-pill-select .manager-availability-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-pill-select .manager-availability-remove,
+.fabricate-manager .manager-danger-tag-remove {
+  position: relative;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-pill-select .manager-availability-remove:hover,
+.fabricate-pill-select .manager-availability-remove:focus-visible,
+.fabricate-manager .manager-danger-tag-remove:hover,
+.fabricate-manager .manager-danger-tag-remove:focus-visible {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  outline: none;
+}
+
+/* HIT AREAS (issue 1523): every pointer target offers at least 24 by 24 pixels (WCAG 2.2 section 2.5.8), the painted box unchanged. The glyph-sized removes are 14-22px, so each lets its overflow show (Foundry clips a `button`'s) and carries an invisible `::before` centred on it and never smaller than 24px; it belongs to the button, so a click on it is the button's, and no gap beside these controls is under the 1px the 22px ones reach into. The rules above carry `position` and `overflow` themselves; `.fabricate .fab-hit-area` is the same pair for a component's own button (`Chip`'s remove, the bulk inset's pager and unstage buttons, the essence filter clear), which sit in a `button` Foundry sizes and clips. */
+.fabricate .fab-hit-area {
+  position: relative;
+  overflow: visible;
+}
+
+.fabricate .fab-hit-area::before,
+.fabricate-manager .manager-selected-tag-pill button::before,
+.fabricate-manager .manager-recipe-chip-clear::before,
+.fabricate-manager .manager-component-chip-clear::before,
+.fabricate-manager .manager-scope-collapse::before,
+.fabricate-manager .manager-recipe-tool-remove::before,
+.fabricate-manager .manager-recipe-option-clear::before,
+.fabricate-manager .manager-recipe-option-remove::before,
+.fabricate-pill-select .manager-availability-remove::before,
+.fabricate-manager .manager-danger-tag-remove::before,
+.fabricate-manager .manager-drop-rank-button::before,
+.fabricate-manager .manager-condition-remove::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 24px);
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+
+.fabricate-pill-select .manager-availability-any {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The drops summary card has no rule of its own. It used to restate the whole `.fabricate-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px `--fab-border` edge and an 8px radius were all the same values the shell already declares — and then diverged on the only two it changed: `--fab-bg-3` instead of the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px (issue 883). */
+
+.fabricate-manager .manager-task-drops-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-task-drop-summary-chip {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-drop-summary-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex: 0 0 28px;
+  background: var(--fab-overlay-dark-12);
+}
+
+.fabricate-manager .manager-task-drop-summary-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-task-drop-summary-percent {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-task-environment-usage-grid,
+.fabricate-manager .manager-event-environment-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-3);
+}
+
+.fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty],
+.fabricate-manager [data-event-environment-usage] > [data-event-environment-usage-empty] {
+  margin-top: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-task-environment-usage-card,
+.fabricate-manager .manager-event-environment-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-environment-usage-thumb,
+.fabricate-manager .manager-event-environment-usage-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-overlay-dark-12);
+  border: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-task-environment-usage-name,
+.fabricate-manager .manager-event-environment-usage-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fab-text);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-task-overview-card h3,
+.fabricate-manager .manager-task-card-header h3,
+.fabricate-manager .manager-selected-drop-editor h3,
+.fabricate-manager .manager-drop-modifier-panel h4 {
+  margin: 0;
+  color: var(--fab-text);
+  font-size: 1rem;
+}
+
+.fabricate-manager .manager-task-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border-bottom: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-task-drop-header-copy {
+  display: grid;
+  gap: var(--fab-space-2xs);
+  min-width: min(180px, 100%);
+}
+
+.fabricate-manager .manager-task-drop-header-copy p {
+  margin: 0;
+}
+
+.fabricate-manager .manager-task-card-header h3,
+.fabricate-manager .manager-task-card-header h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-search.fabricate-search.is-compact {
+  width: min(220px, 30%);
+
+  /* ratchet-exempt(design-system): the compact search's 32, the one exception to the retired 32 the geometry requirement names */
+  min-height: 32px;
+}
+
+.fabricate-manager .manager-task-drop-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fab-space-2);
+}
+
+/* A definite floor, because a percentage one resolves to nothing while the caption sizes its line, and the field would then shrink under the add button rather than wrap below the heading. */
+.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact {
+  flex: 1 1 260px;
+  width: 320px;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.fabricate-manager .manager-task-drop-controls > .fabricate-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-task-component-browser-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);
+  gap: var(--fab-space-2);
+  align-items: start;
+  justify-content: end;
+  min-width: min(420px, 100%);
+}
+
+.fabricate-manager .manager-task-component-browser-controls .fabricate-search.is-compact {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-component-tag-suggestions {
+  max-height: 132px;
+}
+
+.fabricate-manager .manager-task-component-pills {
+  min-height: 0;
+  padding: var(--fab-space-2) var(--fab-space-3) 0;
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-manager .manager-task-component-browser-scroll {
+  grid-row-start: 3;
+  min-height: 0;
+  padding: var(--fab-space-3);
+  overflow: hidden auto;
+}
+
+.fabricate-manager .manager-task-component-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-component-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 18px;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+  min-height: 72px;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  cursor: grab;
+  user-select: none;
+}
+
+.fabricate-manager .manager-task-component-card:active {
+  cursor: grabbing;
+}
+
+.fabricate-manager .manager-task-component-card-image {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-task-component-card-copy {
+  display: grid;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-component-card-copy strong,
+.fabricate-manager .manager-task-component-card-copy > span:not(.manager-task-component-card-tags) {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.fabricate-manager .manager-task-component-card-copy strong {
+  -webkit-line-clamp: 1;
+  font-size: 0.84rem;
+  line-height: 1.15;
+}
+
+.fabricate-manager .manager-task-component-card-copy > span:not(.manager-task-component-card-tags) {
+  -webkit-line-clamp: 1;
+  color: var(--fab-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-task-component-card-tags {
+  display: flex;
+  gap: var(--fab-space-1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-task-component-card-tags small {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 72px;
+  padding: 1px var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+  font-size: 0.66rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-task-component-card-grip {
+  justify-self: end;
+  color: var(--fab-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.fabricate-manager .manager-task-component-browser-footer {
+  grid-row-start: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.fabricate-manager .manager-task-required-tools-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-4);
+  height: 340px;
+  min-height: 340px;
+  max-height: 340px;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-3);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-task-required-tools-card > .manager-task-card-heading,
+.fabricate-manager .manager-task-required-tools-card > .manager-task-required-tools-attached,
+.fabricate-manager .manager-task-required-tools-card > .manager-task-required-tools-search,
+.fabricate-manager .manager-task-required-tools-card > .manager-task-required-tools-footer {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-task-required-tools-attached {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-required-tool-pill {
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-required-tool-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-required-tool-pill.is-stale {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-required-tool-pill.is-stale > i {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager .manager-task-required-tools-search {
+  display: flex;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-required-tools-search .fabricate-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-required-tools-scroll {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.fabricate-manager .manager-task-required-tools-scroll > .manager-empty {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  padding: var(--fab-space-3);
+}
+
+/* The tile/title/body overrides that used to live here are gone: this markup already carried `is-compact`, which had NO rule behind it, so the compact look was hand-rolled through these descendant selectors at its own sizes (0.86rem / 0.78rem). */
+
+.fabricate-manager .manager-task-required-tools-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-required-tools-card-item {
+  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  text-align: left;
+  background: var(--fab-bg-2);
+  cursor: pointer;
+  transition:
+    border-color var(--fab-motion-control),
+    background-color var(--fab-motion-control),
+    transform var(--fab-motion-control);
+}
+
+.fabricate-manager .manager-task-required-tools-card-item:hover,
+.fabricate-manager .manager-task-required-tools-card-item:focus-visible {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-task-required-tools-card-item:active {
+  transform: translateY(1px);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-task-required-tools-add-icon {
+  place-self: center end;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fab-border);
+  border-radius: 50%;
+  color: var(--fab-warning-text);
+  background: var(--fab-surface-raised);
+  font-size: 0.7rem;
+}
+
+.fabricate-manager .manager-task-required-tools-card-item:hover .manager-task-required-tools-add-icon,
+.fabricate-manager .manager-task-required-tools-card-item:focus-visible .manager-task-required-tools-add-icon {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-task-required-tools-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.fabricate-manager .manager-drop-count {
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-drop-rank-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2xs);
+  padding: var(--fab-space-1);
+  box-sizing: border-box;
+}
+
+.fabricate-manager .manager-drop-rank-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--fab-text-muted);
+  text-align: center;
+  margin: var(--fab-space-2xs) 0;
+}
+
+.fabricate-manager .manager-drop-rank-button {
+  position: relative;
+  overflow: visible;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  border-radius: 6px;
+  padding: 0;
+}
+
+/* A drop rule row keeps the height of two modifier chip lines; the table's own cells pad it. */
+.fabricate-manager .manager-gathering-task-drops-table tbody tr {
+  height: 72px;
+}
+
+.fabricate-manager .manager-drop-component-cell {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-drop-component-button,
+.fabricate-manager .manager-drop-empty-component {
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: var(--fab-space-2);
+  min-height: 38px;
+}
+
+.fabricate-manager .manager-drop-empty-component {
+  min-height: 52px;
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 9px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-drop-component-button .manager-gathering-task-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-drop-component-button .manager-system-copy,
+.fabricate-manager .manager-drop-empty-component .manager-system-copy {
+  display: grid;
+  align-content: center;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-drop-component-button .manager-system-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.fabricate-manager .manager-drop-empty-component .manager-system-name,
+.fabricate-manager .manager-drop-empty-component .manager-system-description {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-drop-rate-cell {
+  display: block;
+}
+
+.fabricate-slider.manager-drop-rate-value {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-slider .manager-drop-rate-percent {
+  position: relative;
+  display: block;
+  color: var(--fab-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-slider .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  box-sizing: border-box;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-overlay-dark-18);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* NO native spinner on the ChanceSlider's number half (issue 1050, register entry R1) (issue 1036). */
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-slider .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
+  min-height: 28px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
+  background: var(--fab-overlay-dark-18);
+  box-shadow: none;
+}
+
+.fabricate-slider .manager-drop-rate-percent > span[aria-hidden="true"] {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.fabricate-slider .manager-drop-rate-control {
+  --fab-drop-rate-value: 1%;
+  --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+  --fab-chance-slider-track-gradient: var(--fab-drop-rate-color);
+  --fab-chance-slider-thumb-radius: 7px;
+
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-slider .manager-drop-rate-control.is-guaranteed {
+  --fab-drop-rate-color: var(--fab-drop-rate-guaranteed);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-common {
+  --fab-drop-rate-color: var(--fab-drop-rate-common);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-uncommon {
+  --fab-drop-rate-color: var(--fab-drop-rate-uncommon);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-rare {
+  --fab-drop-rate-color: var(--fab-drop-rate-rare);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-very-rare {
+  --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-legendary {
+  --fab-drop-rate-color: var(--fab-drop-rate-legendary);
+}
+
+.fabricate-slider .manager-drop-rate-control.is-none {
+  --fab-drop-rate-color: var(--fab-drop-rate-none);
+}
+
+.fabricate-slider .manager-drop-rate-track {
+  position: absolute;
+  left: var(--fab-chance-slider-thumb-radius);
+  right: var(--fab-chance-slider-thumb-radius);
+  top: 50%;
+  z-index: 0;
+  height: 6px;
+  border: 1px solid var(--fab-overlay-light-10);
+  border-radius: 999px;
+  background: var(--fab-overlay-dark-18);
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.fabricate-slider .manager-drop-rate-fill {
+  display: block;
+  width: var(--fab-drop-rate-value);
+  height: 100%;
+  background: var(--fab-drop-rate-color);
+}
+
+.fabricate-slider .manager-drop-rate-control.has-continuous-gradient .manager-drop-rate-fill {
+  width: 100%;
+  background: var(--fab-chance-slider-track-gradient);
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--fab-drop-rate-color);
+  cursor: pointer;
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: calc(-1 * var(--fab-space-1));
+  border: 2px solid var(--fab-bg-1);
+  border-radius: 999px;
+  background: var(--fab-drop-rate-color);
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-track {
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fabricate-slider .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--fab-bg-1);
+  border-radius: 999px;
+  background: var(--fab-drop-rate-color);
+}
+
+/* THE SLIDER FAMILY'S STRIP HALF, for the reason spelled out on `.fabricate-search input:focus`: core's `input:focus` paints an orange outline and a 4px glow that the module reset removes inside every Fabricate window, and this family now renders in hosts that have no Fabricate root at all (issue 1508). */
+.fabricate-slider input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE SLIDER FAMILY'S OWN KEYBOARD RING, on the range half alone. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+.fabricate-slider input[type='range']:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* The percent half is a text field, so it takes the module's text-field ring, copied for the bare host. */
+.fabricate-slider .manager-drop-rate-percent input:focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+.fabricate-manager .manager-tool-breakage-chance-control {
+  --fab-manager-tool-breakage-chance-track-gradient: linear-gradient(
+    90deg,
+    var(--fab-success) 0%,
+    var(--fab-warning) 33%,
+    var(--fab-badge-gold) 66%,
+    var(--fab-danger) 100%
+  );
+
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-quantity-cell input[type="text"] {
+  width: 100%;
+  max-width: 44px;
+  min-width: 0;
+  box-sizing: border-box;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-drop-quantity-cell {
+  display: flex;
+  justify-content: center;
+}
+
+.fabricate-manager .manager-gathering-task-edit-view .manager-drop-quantity-cell input[type="text"] {
+  min-height: 28px;
+  padding: var(--fab-space-1);
+}
+
+/* The row a drag hovers: the drop rules card's own drop target, set by its row action. Its cells take the ground, because the table's own rules paint a row's cells and clear the row behind them. */
+.fabricate-manager .manager-gathering-task-drops-table tr.is-drop-active {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+.fabricate-manager .manager-gathering-task-drops-table.fabricate-data-table .fabricate-data-table-row.is-drop-active > .fabricate-data-table-cell {
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-inline-drop-zone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-height: 46px;
+  padding: var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+  text-align: center;
+}
+
+.fabricate-manager .manager-drop-empty-component .manager-inline-drop-zone {
+  width: 42px;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-inline-drop-zone.is-drop-active {
+  color: var(--fab-text);
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-drop-modifier-list {
+  display: flex;
+  align-items: center;
+  align-content: flex-start;
+  gap: var(--fab-space-chip);
+  flex-wrap: wrap;
+  min-width: 0;
+
+  /* Two-line chip budget; extra modifier chips scroll within the cell. */
+  max-height: 58px;
+  overflow-y: auto;
+  padding-right: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-drop-modifier-pill {
+  max-width: 100%;
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-overlay-light-06);
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-drop-modifier-pill.is-positive {
+  border-color: var(--fab-success-border);
+  color: var(--fab-text);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-drop-modifier-pill.is-negative {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-text);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-drop-modifier-pill.is-positive strong {
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager .manager-drop-modifier-pill.is-negative strong {
+  color: var(--fab-danger-text);
+}
+
+/* The chip is already 700, so the user agent's `bolder` would draw the value at an unshipped 900. */
+.fabricate-manager .manager-drop-modifier-pill strong {
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-drop-modifier-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-drop-modifier-overflow {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-drop-editor-card {
+  display: grid;
+  align-content: start;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-drop-editor-card .fabricate-field {
+  display: grid;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-editor-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-2);
+  margin-top: 0;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-editor-actions .fabricate-button {
+  justify-content: center;
+  min-width: 0;
+}
+
+/* The inspector's controls run at 28px, a notch under the standard 34px control, because they sit in a 300px column beside a rate slider (issue 1118). */
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 0 var(--fab-space-2);
+}
+
+.fabricate-manager .manager-drop-inspector-stack .fabricate-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: 0 0 28px;
+}
+
+.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  min-height: 28px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  box-shadow: none;
+  font: inherit;
+}
+
+.fabricate-manager .manager-drop-inspector-stack .fabricate-search:where(.is-compact) input {
+  height: 28px;
+  min-height: 28px;
+  padding-block: 0;
+  border-radius: 7px;
+}
+
+.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  height: 28px;
+  min-height: 28px;
+  border-radius: 7px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+}
+
+/* The condition picker fills its cell at the `inline` rung's 30. */
+.fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* `[type="number"]`, not `[type="text"]`: the inspector's rate field is rendered by `ChanceSlider` now, and the shared control uses a real number input (issue 883). */
+.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="number"] {
+  height: 28px;
+  min-height: 28px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
+  background: var(--fab-overlay-dark-18);
+  box-shadow: none;
+  text-align: center;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-value {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="number"] {
+  height: 28px;
+  min-height: 28px;
+  padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-chip);
+  background: var(--fab-overlay-dark-18);
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent > span[aria-hidden="true"] {
+  right: 8px;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-overlay-dark-18);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-track {
+  left: 7px;
+  right: 7px;
+  border: 0;
+  background: var(--fab-overlay-dark-18);
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-fill {
+  border-radius: 999px;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+  border: 0;
+  background: transparent;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control input[type="range"]::-moz-range-track {
+  border: 0;
+  background: transparent;
+}
+
+.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-control input[type="range"] {
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-drop-editor-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: var(--fab-space-2);
+  align-items: end;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-rate-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-count-editor {
+  display: grid;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-drop-count-editor input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: var(--fab-space-1);
+  box-sizing: border-box;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-drop-editor-card .manager-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"] {
+  height: 28px;
+  min-height: 28px;
+  padding: var(--fab-space-1);
+  box-sizing: border-box;
+  background: var(--fab-overlay-dark-18);
+  box-shadow: none;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-gathering-placeholder {
+  min-height: 280px;
+}
+
+.fabricate-manager .manager-gathering-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+  align-items: stretch;
+  overflow: auto;
+  min-height: 0;
+  padding: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-condition-panel {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  height: 100%;
+  min-width: 0;
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-overlay-light-035);
+}
+
+.fabricate-manager .manager-condition-panel.is-time-of-day {
+  grid-column: 1 / -1;
+}
+
+.fabricate-manager .manager-condition-panel.is-disabled {
+  opacity: 0.72;
+  background: var(--fab-overlay-dark-10);
+}
+
+.fabricate-manager .manager-condition-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-condition-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  color: var(--fab-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-condition-panel-title i {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-condition-panel-hint {
+  margin: calc(-1 * var(--fab-space-2xs)) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+/* The trailing track holds the Add button and is `max-content`, not a number (issue 1118). */
+.fabricate-manager .manager-condition-add {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) max-content;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-biome-add {
+  grid-template-columns: 38px 38px minmax(0, 1fr) max-content;
+}
+
+/* The time-of-day add form keeps the weather form's row; its captioned start-hour stepper takes a second row under the name, so the name never narrows (issue 2431). */
+.fabricate-manager .manager-time-of-day-add-start {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+}
+
+/* The fallback note keeps the bar's footprint, so stepping a pill through a duplicate hour does not shift the form. */
+.fabricate-manager .manager-time-of-day-bar.fab-band-strip-fallback {
+  min-height: 85px; /* 13px dot lane + 46px track + 2px rail gap + 24px rail */
+}
+
+/* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the sibling input at `.manager-condition-add input` below and is the only reason the row's controls line up. */
+.fabricate-manager .manager-add-button {
+  height: 38px;
+}
+
+.fabricate-manager .manager-condition-add input {
+  height: 38px;
+}
+
+/* The current-value picker fills its card, as the native select did from `.fabricate-field.fabricate-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38, the add row's height too. */
+.fabricate-manager .manager-condition-current .fabricate-select-trigger {
+  width: 100%;
+}
+
+.fabricate-manager .manager-condition-pill-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-condition-pill {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  gap: var(--fab-space-1);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: var(--fab-space-2xs);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  overflow: hidden;
+}
+
+/* The full-width panel packs pills 280px or wider, so each fits its start-hour stepper (issue 2431). */
+.fabricate-manager .manager-condition-pill-list.is-time-of-day {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.fabricate-manager .manager-condition-pill.is-time-of-day {
+  grid-template-columns: 30px minmax(0, 1fr) max-content 24px;
+}
+
+.fabricate-manager .manager-vocabulary-pill.is-region {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.fabricate-manager .manager-vocabulary-pill.is-biome {
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  overflow: visible;
+}
+
+/* === THE COLOUR PICKER'S OWN ROOTS (issue 1470) === `fabricate-color-picker` is written by `components/TintPickerButton.svelte` and `fabricate-color-picker-popover` by `components/TintPicker.svelte`. */
+.fabricate-color-picker .manager-color-swatch,
+.fabricate-color-picker-popover .manager-color-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  color: var(--fab-bg-0);
+  background: var(--manager-color-swatch, var(--fab-tag-sage));
+}
+
+.fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only,
+.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: 1fr;
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.fabricate-color-picker.manager-color-picker {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  height: 100%;
+}
+
+.fabricate-manager .manager-biome-combined-picker {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  height: 100%;
+}
+
+.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger {
+  color: var(--fab-biome-icon-foreground);
+  background: var(--manager-color-swatch, var(--fab-tag-sage));
+}
+
+.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i {
+  color: var(--fab-biome-icon-foreground);
+  font-size: 0.8rem;
+}
+
+/* `transition: none` because Foundry core sets `transition: 0.5s` on every `button`, which would tween the hover and focus outline in and out over half a second; a highlight appears in the frame the state changes, on the trigger, the popover and the inline strip alike. */
+.fabricate-color-picker .manager-color-picker-trigger,
+.fabricate-color-picker-popover .manager-color-preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 30px;
+  height: 100%;
+  min-height: 30px;
+  padding: var(--fab-space-2xs);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  transition: none;
+}
+
+.fabricate-manager .manager-condition-add .manager-color-picker-trigger {
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-color-picker .manager-color-picker-trigger:hover,
+.fabricate-color-picker .manager-color-picker-trigger:focus-visible,
+.fabricate-color-picker-popover .manager-color-preset:hover,
+.fabricate-color-picker-popover .manager-color-preset:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 1px;
+}
+
+.fabricate-color-picker-popover.manager-color-picker-popover {
+  position: absolute;
+  box-sizing: border-box;
+  z-index: 120;
+  display: grid;
+  gap: var(--fab-space-2);
+  width: 220px;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 6px;
+  background: var(--fab-bg-3);
+  box-shadow: var(--fab-shadow-lg);
+}
+
+.fabricate-color-picker-popover .manager-color-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-color-picker-popover .manager-color-preset {
+  aspect-ratio: 1;
+  border: 1px solid var(--fab-border);
+}
+
+/* A selected swatch is an inset ring at 3:1 on its fill, apart from the outset focus ring (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
+.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
+}
+
+.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-text);
+}
+
+.fabricate-color-picker-popover .manager-color-custom {
+  display: grid;
+  gap: var(--fab-space-1);
+  color: var(--fab-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* The hex field paints its OWN chrome, which is the one place this family needed a declaration rather than a new root (issue 1470). */
+
+.fabricate-color-picker-popover .manager-color-custom input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 var(--fab-space-chip);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  font-size: 0.76rem;
+}
+
+.fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only {
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only .essence-icon-picker-preview,
+.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only .essence-icon-picker-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only .essence-icon-picker-trigger-caret,
+.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only .essence-icon-picker-trigger-caret {
+  display: none;
+}
+
+.fabricate-manager .manager-condition-label-input {
+  align-self: center;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  height: 20px;
+  max-height: 20px;
+  padding: 0 var(--fab-space-1);
+  border: 0;
+  color: var(--fab-text);
+  background: transparent;
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-condition-label-input:focus-visible {
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-condition-remove {
+  position: relative;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-condition-remove:not(:disabled):hover,
+.fabricate-manager .manager-condition-remove:not(:disabled):focus-visible {
+  color: var(--fab-danger);
+}
+
+.fabricate-manager .manager-gathering-rules-card {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-overlay-light-08);
+}
+
+.fabricate-manager .manager-rule-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: var(--fab-space-2);
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-rule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-warning-text);
+  background: var(--fab-overlay-dark-20);
+}
+
+.fabricate-manager .manager-rule-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+  color: var(--fab-text);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-rule-copy strong {
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-rule-copy span {
+  color: var(--fab-text-muted);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager .manager-rule-field {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  color: var(--fab-text);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+/* The rule's `<Select>` fills the description column at the `form` rung's 38. */
+.fabricate-manager .manager-rule-field .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a SIBLING of its `.manager-rule-row` inside the rules `.fab-stack`, not a child of it, so `padding-left` is what lines it up under the description column: the row's icon track is 34px plus its 8px gap. */
+.fabricate-manager .manager-rule-stepper {
+  padding-left: 42px;
+  min-width: 0;
+  max-width: 160px;
+}
+
+.fabricate-toggle.fabricate-toggle.is-disabled,
+.fabricate-toggle.fabricate-toggle:disabled {
+  cursor: not-allowed;
+}
+
+/* The no-state panel's own appearance now lives in its component's scoped block (`src/ui/svelte/components/EmptyState.svelte`), not here: co-located CSS keeps `VIEW_RECIPES` screenshot detection scoped to the views that render the panel instead of matching the broad `theme-or-global-ui` recipe. */
+
+.fabricate-manager .manager-setup-card {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-overlay-light-035);
+}
+
+.fabricate-manager .manager-setup-card-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-setup-card-header > i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-accent);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-setup-card h3 {
+  margin: 0;
+  color: var(--fab-text);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager .manager-setup-list {
+  display: grid;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding-left: var(--fab-space-4);
+  color: var(--fab-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-setup-list li {
+  padding-left: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-setup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-setup-links .fabricate-button {
+  flex: 1 1 112px;
+  justify-content: center;
+  text-decoration: none;
+}
+

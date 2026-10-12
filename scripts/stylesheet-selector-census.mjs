@@ -15,9 +15,10 @@ const targets = sheets.length > 0 ? sheets : [STYLESHEET_ENTRY];
 
 for (const target of targets) {
   const absolute = path.isAbsolute(target) ? target : path.join(repoRoot, target);
-  const isModuleSheet = absolute === path.join(repoRoot, STYLESHEET_ENTRY);
+  const relative = path.relative(repoRoot, absolute);
+  const isModuleSheet = relative.split(path.sep).join('/') === STYLESHEET_ENTRY;
   const census = duplicateSelectorCensus(
     isModuleSheet ? readStylesheet() : readFileSync(absolute, 'utf8')
   );
-  process.stdout.write(formatCensusReport(census, path.relative(repoRoot, absolute)));
+  process.stdout.write(formatCensusReport(census, relative));
 }

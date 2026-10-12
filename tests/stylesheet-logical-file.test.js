@@ -3,7 +3,7 @@
  * sides of a split, the working-tree walk, the integrity check, and View Lab case selection.
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -13,6 +13,7 @@ import {
   STYLESHEET_ENTRY,
   checkoutReader,
   readStylesheet,
+  stylesheetSources,
 } from '../scripts/lib/stylesheetSource.js';
 import {
   hasUiChanges,
@@ -157,7 +158,7 @@ test('(f) a fabricate-*.css the entry does not import fails the integrity check,
 test('the integrity check holds the entry to imports and each partial to its shape', () => {
   const files = {
     ...splitSheet(
-      { one: '.fabricate .a {}\n', two: '.fabricate .b {}' },
+      { one: '.fabricate .a {}\n', two: '.fabricate .b {}', four: '@IMPORT url("x.css");\n' },
       {
         entryPrefix: '/* ratchet-exempt(lint): nothing reads this */\n',
       }
@@ -169,6 +170,7 @@ test('the integrity check holds the entry to imports and each partial to its sha
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(files), Object.keys(files)), [
     'styles/fabricate.css carries a marker or stylelint directive, which no rule sees',
     'styles/fabricate-two.css does not end with a newline',
+    'styles/fabricate-four.css holds an @import',
     'styles/fabricate-three.css holds an @import',
     'styles/fabricate-three.css holds a carriage return',
     'styles/fabricate-three.css is 4002 lines, over 4000',
@@ -176,6 +178,13 @@ test('the integrity check holds the entry to imports and each partial to its sha
   ]);
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(SPLIT), Object.keys(SPLIT)), []);
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(SINGLE), Object.keys(SINGLE)), []);
+});
+
+test('the checked-out sheet is split, and every styles/ file passes the integrity check', () => {
+  const onDisk = readdirSync(path.join(import.meta.dirname, '..', 'styles'));
+  const styles = onDisk.map((name) => `styles/${name}`);
+  assert.deepEqual(stylesheetIntegrityFailures(checkoutReader(), styles), []);
+  assert.ok(stylesheetSources().parts.length > 0, 'the entry imports no partial');
 });
 
 test('a split tree walks as exactly one key holding the joined text', (t) => {

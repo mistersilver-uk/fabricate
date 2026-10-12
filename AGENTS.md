@@ -99,6 +99,7 @@ Do not add or reintroduce Handlebars templates.
 Unlike `src/ui/model/`, these may have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
 Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
 - `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field; in dev also through the `src/main.js` import), so it shares the page with every other module and system sheet.
+It is the module sheet's entry and holds only `@import` rules for the sibling `styles/fabricate-*.css` partials, in cascade order, which `scripts/lib/stylesheetSource.js` reads as one file, so every rule about this file binds each partial it imports.
 Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
 A bare generic selector like `.badge` or `.btn-icon` will bleed into other sheets (it previously broke the D&D 5e Armor Class badge). `tests/styles-namespacing.test.js` enforces this under `npm test` and fails on any unscoped selector.
 Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, which compile to hashed, component-scoped classes and do not bleed.

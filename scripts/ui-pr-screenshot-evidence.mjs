@@ -11,6 +11,7 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // published — lives in the lib for the same two reasons, plus a third: it is a leaf that imports
 // nothing from this file.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+import { logicalStylesheetPath } from './lib/stylesheetSource.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file cannot
 // derive: what to call it, whether it needs a caption, and where the Primitive Lab's boundary lies.
 import { evidenceNoteForCaseId, isPrimitiveLabPath, labelForCaseId } from './lib/viewLabCases.js';
@@ -1147,7 +1148,7 @@ export function hasUiChanges(files = []) {
 
 export function mapChangedFilesToViews(files = []) {
   const normalizedFiles = files
-    .map(normalizePath)
+    .map(file => logicalStylesheetPath(normalizePath(file)))
     .filter(file => file && !isPrimitiveLabPath(file));
   const matched = [];
   for (const recipe of VIEW_RECIPES) {

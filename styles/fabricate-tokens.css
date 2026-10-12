@@ -1,0 +1,752 @@
+/* Fabricate v2 - Universal Crafting System Styles */
+
+/* Self-hosted product faces: Signika and Font Awesome come from Foundry core, these two do not. This sheet loads GLOBALLY into the Foundry document, so keep the face/weight list minimal and re-add a face only by PROVING something resolves to it (issues 643, 1499). */
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Spectral;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/spectral-latin-700-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+}
+
+:root {
+  /* Fabricate product UI design-system tokens; theme colour literals live only in the `[data-fabricate-theme]` blocks below. INVARIANT: the namespace is ONE generation — no name carries a version or generation marker — and a property declared only under `.fabricate-manager` is AREA-SCOPED and must not be declared or read outside it, by every compound of a rule's selector list. See `design-system/spec.md`'s `The token namespace is one generation and names its purpose`; `tests/token-generation-gate.test.js` holds both halves. */
+
+  /* Typographic faces, in `:root` and NOT in a theme block: `tests/components/theme-colour-contract.test.js` asserts every theme block defines an identical token set, and the faces do not vary by theme (issue 643). */
+  --fab-font-serif: "Spectral", "Georgia", "Times New Roman", serif;
+  --fab-font-mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  --fab-space-1: 4px;
+  --fab-space-2: 8px;
+  --fab-space-3: 12px;
+  --fab-space-4: 16px;
+  --fab-space-5: 20px;
+  --fab-space-6: 24px;
+  --fab-space-2xs: 2px; /* fine: tokenizes hairline spacing, zero shift */
+  --fab-space-chip: 6px; /* dense optical unit (icon+label gaps, chips), zero shift */
+
+  /* The one motion: a control's state change. `tests/components/motion-token-gate.test.js` fails any other duration or timing. */
+  --fab-motion-control: 140ms ease;
+
+  /* The icon picker's chip and the row that has to contain it, declared together because the row height is DERIVED from the chip plus its own padding and border — `tests/components/icon-picker-layout.test.js` fails if that arithmetic breaks (issue 1280). */
+  --fab-icon-picker-chip: 28px;
+  --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
+
+  /* The two radii the Books & Scrolls tab and the item-page inspector share (issue 1399), on the published radius ladder: a control at 7 and a panel at 11. A third surface reads the ladder rung for its kind, not these names. */
+  --fab-books-control-radius: 7px;
+  --fab-books-panel-radius: 11px;
+
+  /* Component Studio token mapping, kept as the record of the calls: it adds ZERO colour tokens and edits NONE of the theme blocks, mapping its prototype's ramp index-aligned onto the existing one (issue 676). */
+}
+
+:root,
+:root[data-fabricate-theme="fabricate"],
+.fabricate[data-fabricate-theme="fabricate"] {
+  --fab-bg-0: #111A23;
+  --fab-bg-1: #15212B;
+  --fab-bg-2: #1B2833;
+  --fab-bg-3: #2C3B49;
+  --fab-surface: #15212B;
+  --fab-surface-soft: rgb(241 209 181 / 5%);
+  --fab-surface-raised: rgb(241 209 181 / 8%);
+  --fab-surface-active: rgb(241 209 181 / 12%);
+  --fab-border: rgb(217 184 156 / 18%);
+  --fab-border-strong: rgb(217 184 156 / 32%);
+  --fab-text: #F1D1B5;
+  --fab-text-secondary: #D9B89C;
+  --fab-text-muted: rgb(217 184 156 / 74%);
+  --fab-text-subtle: rgb(217 184 156 / 56%);
+  --fab-text-disabled: rgb(217 184 156 / 42%);
+  --fab-accent: #E8C6A7;
+  --fab-accent-hover: #F1D1B5;
+  --fab-accent-strong: #D9B89C;
+
+  /* `--fab-accent-text` completes the accent family: every SEMANTIC family already ships an ink readable on its own soft fill, and accent shipped only `--fab-on-accent`, the ink for the solid button (issue 1096). */
+  --fab-accent-text: #F1DBC7;
+  --fab-accent-soft: rgb(232 198 167 / 16%);
+  --fab-accent-border: rgb(232 198 167 / 48%);
+  --fab-on-accent: #111A23;
+  --fab-on-danger: #0B121A;
+
+  /* `--fab-on-info` inks a solid `--fab-info` fill and takes each theme's own `--fab-on-success`, the ink that theme already proves readable on its solid fill; no rule here reads it and the premium companion does, so `tests/components/theme-rendered-validation.test.js` measures the 4.5:1 per theme and `tests/components/theme-colour-contract.test.js` pins the declaration in every theme block (issue 1765). */
+  --fab-on-info: #111A23;
+  --fab-on-success: #111A23;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #9AB89C;
+  --fab-success-strong: #A9C7AA;
+  --fab-success-text: #D7E6D8;
+  --fab-success-soft: rgb(154 184 156 / 16%);
+  --fab-success-border: rgb(154 184 156 / 56%);
+  --fab-info: #B9D3DD;
+  --fab-info-text: #DCEEF3;
+  --fab-info-soft: rgb(185 211 221 / 14%);
+  --fab-info-border: rgb(185 211 221 / 44%);
+  --fab-warning: #E7DBB1;
+  --fab-warning-text: #F2E8C7;
+  --fab-warning-soft: rgb(231 219 177 / 14%);
+  --fab-warning-border: rgb(231 219 177 / 46%);
+  --fab-danger: #B97C78;
+  --fab-danger-text: #E7BDBA;
+  --fab-danger-soft: rgb(185 124 120 / 16%);
+  --fab-danger-border: rgb(185 124 120 / 54%);
+  --fab-purple: #CEC1E6;
+  --fab-purple-soft: rgb(206 193 230 / 14%);
+  --fab-tag-sage: #BFD5C3;
+  --fab-tag-mist: #B9D3DD;
+  --fab-tag-lavender: #CEC1E6;
+  --fab-tag-rose: #E4C0CD;
+  --fab-tag-peach: #EBC8B3;
+  --fab-tag-butter: #E7DBB1;
+  --fab-tag-aqua: #B9DDD7;
+  --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
+
+  /* The tag family is WIDER than the eight a GM can pick from — `src/ui/svelte/util/managerColorTokens.js` enumerates those, so adding a token here does not add it to a picker. INVARIANT: each name makes a HUE promise, so a theme's values carry its own saturation and lightness character and keep the hue; see `design-system/spec.md`'s `Token foundations are the only source of colour, space and elevation`. */
+  --fab-tag-verdant: #9AB89C;
+  --fab-tag-azure: #6FA8E8;
+  --fab-tag-bone: #E8E0D2;
+  --fab-tag-slate: #8A97A3;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D0AC95;
+  --fab-overlay-dark-05: rgb(17 26 35 / 5%);
+  --fab-overlay-dark-10: rgb(17 26 35 / 10%);
+  --fab-overlay-dark-12: rgb(17 26 35 / 12%);
+  --fab-overlay-dark-14: rgb(17 26 35 / 14%);
+  --fab-overlay-dark-15: rgb(17 26 35 / 15%);
+  --fab-overlay-dark-16: rgb(17 26 35 / 16%);
+  --fab-overlay-dark-18: rgb(17 26 35 / 18%);
+  --fab-overlay-dark-20: rgb(17 26 35 / 20%);
+  --fab-overlay-dark-24: rgb(17 26 35 / 24%);
+  --fab-overlay-dark-48: rgb(17 26 35 / 48%);
+  --fab-overlay-dark-78: rgb(17 26 35 / 78%);
+  --fab-overlay-light-03: rgb(241 209 181 / 3%);
+  --fab-overlay-light-035: rgb(241 209 181 / 3.5%);
+  --fab-overlay-light-04: rgb(241 209 181 / 4%);
+  --fab-overlay-light-05: rgb(241 209 181 / 5%);
+  --fab-overlay-light-06: rgb(241 209 181 / 6%);
+  --fab-overlay-light-08: rgb(241 209 181 / 8%);
+  --fab-overlay-light-10: rgb(241 209 181 / 10%);
+  --fab-overlay-light-12: rgb(241 209 181 / 12%);
+  --fab-overlay-light-28: rgb(241 209 181 / 28%);
+  --fab-overlay-light-96: rgb(241 209 181 / 96%);
+  --fab-warning-focus: rgb(231 219 177 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(17 26 35 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(17 26 35 / 34%);
+  --fab-badge-gold: #C9A15E;
+  --fab-on-badge-gold: #1A1206;
+}
+
+:root[data-fabricate-theme="mythwright"],
+.fabricate[data-fabricate-theme="mythwright"] {
+  --fab-bg-0: #071116;
+  --fab-bg-1: #0B1720;
+  --fab-bg-2: #101D27;
+  --fab-bg-3: #152633;
+  --fab-surface: #101D27;
+  --fab-surface-soft: rgb(255 255 255 / 3.5%);
+  --fab-surface-raised: rgb(255 255 255 / 6%);
+  --fab-surface-active: rgb(255 255 255 / 10%);
+  --fab-border: rgb(153 191 204 / 16%);
+  --fab-border-strong: rgb(153 191 204 / 28%);
+  --fab-text: #F2F7F5;
+  --fab-text-secondary: #DFF6DF;
+  --fab-text-muted: #A9B8BD;
+  --fab-text-subtle: #7F9299;
+  --fab-text-disabled: rgb(169 184 189 / 50%);
+  --fab-accent: #63D47B;
+  --fab-accent-hover: #72DF89;
+  --fab-accent-strong: #3EB95F;
+  --fab-accent-text: #CCEDD0;
+  --fab-accent-soft: rgb(99 212 123 / 16%);
+  --fab-accent-border: rgb(99 212 123 / 54%);
+  --fab-on-accent: #051E0C;
+  --fab-on-danger: #04120A;
+  --fab-on-info: #051E0C;
+  --fab-on-success: #051E0C;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #5CB85C;
+  --fab-success-strong: #63D47B;
+  --fab-success-text: #DFF6DF;
+  --fab-success-soft: rgb(92 184 92 / 16%);
+  --fab-success-border: rgb(92 184 92 / 54%);
+  --fab-info: #58B7E8;
+  --fab-info-text: #DCEEF3;
+  --fab-info-soft: rgb(88 183 232 / 16%);
+  --fab-info-border: rgb(88 183 232 / 48%);
+  --fab-warning: #F4C04F;
+  --fab-warning-text: #FFE3B6;
+  --fab-warning-soft: rgb(244 192 79 / 16%);
+  --fab-warning-border: rgb(244 192 79 / 48%);
+  --fab-danger: #FF5252;
+  --fab-danger-text: #FFB7B4;
+  --fab-danger-soft: rgb(255 82 82 / 14%);
+  --fab-danger-border: rgb(255 82 82 / 54%);
+  --fab-purple: #A875FF;
+  --fab-purple-soft: rgb(168 117 255 / 16%);
+  --fab-tag-sage: #BFD5C3;
+  --fab-tag-mist: #B9D3DD;
+  --fab-tag-lavender: #CEC1E6;
+  --fab-tag-rose: #E4C0CD;
+  --fab-tag-peach: #EBC8B3;
+  --fab-tag-butter: #E7DBB1;
+  --fab-tag-aqua: #B9DDD7;
+  --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
+  --fab-tag-verdant: #9AB89C;
+  --fab-tag-azure: #6FA8E8;
+  --fab-tag-bone: #E8E0D2;
+  --fab-tag-slate: #8A97A3;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #FA8951;
+  --fab-overlay-dark-05: rgb(0 0 0 / 5%);
+  --fab-overlay-dark-10: rgb(0 0 0 / 10%);
+  --fab-overlay-dark-12: rgb(0 0 0 / 12%);
+  --fab-overlay-dark-14: rgb(0 0 0 / 14%);
+  --fab-overlay-dark-15: rgb(0 0 0 / 15%);
+  --fab-overlay-dark-16: rgb(0 0 0 / 16%);
+  --fab-overlay-dark-18: rgb(0 0 0 / 18%);
+  --fab-overlay-dark-20: rgb(0 0 0 / 20%);
+  --fab-overlay-dark-24: rgb(0 0 0 / 24%);
+  --fab-overlay-dark-48: rgb(0 0 0 / 48%);
+  --fab-overlay-dark-78: rgb(0 0 0 / 78%);
+  --fab-overlay-light-03: rgb(255 255 255 / 3%);
+  --fab-overlay-light-035: rgb(255 255 255 / 3.5%);
+  --fab-overlay-light-04: rgb(255 255 255 / 4%);
+  --fab-overlay-light-05: rgb(255 255 255 / 5%);
+  --fab-overlay-light-06: rgb(255 255 255 / 6%);
+  --fab-overlay-light-08: rgb(255 255 255 / 8%);
+  --fab-overlay-light-10: rgb(255 255 255 / 10%);
+  --fab-overlay-light-12: rgb(255 255 255 / 12%);
+  --fab-overlay-light-28: rgb(255 255 255 / 28%);
+  --fab-overlay-light-96: rgb(255 255 255 / 96%);
+  --fab-warning-focus: rgb(246 176 72 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
+  --fab-badge-gold: #C2A24E;
+  --fab-on-badge-gold: #101806;
+}
+
+:root[data-fabricate-theme="ironblood-forge"],
+.fabricate[data-fabricate-theme="ironblood-forge"] {
+  --fab-bg-0: #141214;
+  --fab-bg-1: #1F1A1D;
+  --fab-bg-2: #2C2428;
+  --fab-bg-3: #5A4A50;
+  --fab-surface: #1F1A1D;
+  --fab-surface-soft: rgb(240 226 212 / 5%);
+  --fab-surface-raised: rgb(240 226 212 / 8%);
+  --fab-surface-active: rgb(240 226 212 / 12%);
+  --fab-border: rgb(200 177 163 / 18%);
+  --fab-border-strong: rgb(200 177 163 / 32%);
+  --fab-text: #F0E2D4;
+  --fab-text-secondary: #C8B1A3;
+  --fab-text-muted: rgb(200 177 163 / 74%);
+  --fab-text-subtle: rgb(200 177 163 / 56%);
+  --fab-text-disabled: rgb(200 177 163 / 42%);
+  --fab-accent: #C58B5A;
+  --fab-accent-hover: #D1A37C;
+  --fab-accent-strong: #A5754D;
+  --fab-accent-text: #EBC5A7;
+  --fab-accent-soft: rgb(197 139 90 / 16%);
+  --fab-accent-border: rgb(197 139 90 / 48%);
+  --fab-on-accent: #141214;
+  --fab-on-danger: #050405;
+  --fab-on-info: #141214;
+  --fab-on-success: #141214;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #92A78B;
+  --fab-success-strong: #A3B298;
+  --fab-success-text: #D2CFBD;
+  --fab-success-soft: rgb(146 167 139 / 16%);
+  --fab-success-border: rgb(146 167 139 / 56%);
+  --fab-info: #8E9A8F;
+  --fab-info-text: #D5CEC1;
+  --fab-info-soft: rgb(142 154 143 / 14%);
+  --fab-info-border: rgb(142 154 143 / 44%);
+  --fab-warning: #D6C08E;
+  --fab-warning-text: #E9D9C2;
+  --fab-warning-soft: rgb(214 192 142 / 14%);
+  --fab-warning-border: rgb(214 192 142 / 46%);
+  --fab-danger: #A86D66;
+  --fab-danger-text: #D5B6AA;
+  --fab-danger-soft: rgb(168 109 102 / 16%);
+  --fab-danger-border: rgb(168 109 102 / 54%);
+  --fab-purple: #C3B2CA;
+  --fab-purple-soft: rgb(195 178 202 / 14%);
+  --fab-tag-sage: #B1BEAC;
+  --fab-tag-mist: #C9C3BF;
+  --fab-tag-lavender: #C3B2CA;
+  --fab-tag-rose: #D1A19A;
+  --fab-tag-peach: #D8AE8D;
+  --fab-tag-butter: #D6C08E;
+  --fab-tag-aqua: #B8C4CB;
+  --fab-tag-mauve: #A39AA2;
+  --fab-tag-ember: #C57142;
+  --fab-tag-verdant: #899D85;
+  --fab-tag-azure: #64A5C3;
+  --fab-tag-bone: #D0C3BA;
+  --fab-tag-slate: #758388;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #BF977A;
+  --fab-overlay-dark-05: rgb(20 18 20 / 5%);
+  --fab-overlay-dark-10: rgb(20 18 20 / 10%);
+  --fab-overlay-dark-12: rgb(20 18 20 / 12%);
+  --fab-overlay-dark-14: rgb(20 18 20 / 14%);
+  --fab-overlay-dark-15: rgb(20 18 20 / 15%);
+  --fab-overlay-dark-16: rgb(20 18 20 / 16%);
+  --fab-overlay-dark-18: rgb(20 18 20 / 18%);
+  --fab-overlay-dark-20: rgb(20 18 20 / 20%);
+  --fab-overlay-dark-24: rgb(20 18 20 / 24%);
+  --fab-overlay-dark-48: rgb(20 18 20 / 48%);
+  --fab-overlay-dark-78: rgb(20 18 20 / 78%);
+  --fab-overlay-light-03: rgb(240 226 212 / 3%);
+  --fab-overlay-light-035: rgb(240 226 212 / 3.5%);
+  --fab-overlay-light-04: rgb(240 226 212 / 4%);
+  --fab-overlay-light-05: rgb(240 226 212 / 5%);
+  --fab-overlay-light-06: rgb(240 226 212 / 6%);
+  --fab-overlay-light-08: rgb(240 226 212 / 8%);
+  --fab-overlay-light-10: rgb(240 226 212 / 10%);
+  --fab-overlay-light-12: rgb(240 226 212 / 12%);
+  --fab-overlay-light-28: rgb(240 226 212 / 28%);
+  --fab-overlay-light-96: rgb(240 226 212 / 96%);
+  --fab-warning-focus: rgb(214 192 142 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(20 18 20 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(20 18 20 / 34%);
+  --fab-badge-gold: #C79A4F;
+  --fab-on-badge-gold: #1A1005;
+}
+
+:root[data-fabricate-theme="hearth-herb"],
+.fabricate[data-fabricate-theme="hearth-herb"] {
+  --fab-bg-0: #161C19;
+  --fab-bg-1: #1F2924;
+  --fab-bg-2: #2B3831;
+  --fab-bg-3: #53695E;
+  --fab-surface: #1F2924;
+  --fab-surface-soft: rgb(241 233 216 / 5%);
+  --fab-surface-raised: rgb(241 233 216 / 8%);
+  --fab-surface-active: rgb(241 233 216 / 12%);
+  --fab-border: rgb(213 198 168 / 18%);
+  --fab-border-strong: rgb(213 198 168 / 32%);
+  --fab-text: #F1E9D8;
+  --fab-text-secondary: #D5C6A8;
+  --fab-text-muted: rgb(213 198 168 / 74%);
+  --fab-text-subtle: rgb(213 198 168 / 56%);
+  --fab-text-disabled: rgb(213 198 168 / 42%);
+  --fab-accent: #C8A36E;
+  --fab-accent-hover: #D3B78C;
+  --fab-accent-strong: #A88B5F;
+  --fab-accent-text: #EAD5B9;
+  --fab-accent-soft: rgb(200 163 110 / 16%);
+  --fab-accent-border: rgb(200 163 110 / 48%);
+  --fab-on-accent: #161C19;
+  --fab-on-danger: #0E1310;
+  --fab-on-info: #161C19;
+  --fab-on-success: #161C19;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #AFC7A4;
+  --fab-success-strong: #BBCDAD;
+  --fab-success-text: #DCDEC7;
+  --fab-success-soft: rgb(175 199 164 / 16%);
+  --fab-success-border: rgb(175 199 164 / 56%);
+  --fab-info: #9BB79E;
+  --fab-info-text: #D9DBC8;
+  --fab-info-soft: rgb(155 183 158 / 14%);
+  --fab-info-border: rgb(155 183 158 / 44%);
+  --fab-warning: #E7D8A2;
+  --fab-warning-text: #EEE5CA;
+  --fab-warning-soft: rgb(231 216 162 / 14%);
+  --fab-warning-border: rgb(231 216 162 / 46%);
+  --fab-danger: #B98378;
+  --fab-danger-text: #DCC2B4;
+  --fab-danger-soft: rgb(185 131 120 / 16%);
+  --fab-danger-border: rgb(185 131 120 / 54%);
+  --fab-purple: #D0C7E2;
+  --fab-purple-soft: rgb(208 199 226 / 14%);
+  --fab-tag-sage: #C6D8C2;
+  --fab-tag-mist: #C8D9D3;
+  --fab-tag-lavender: #D0C7E2;
+  --fab-tag-rose: #DFC0C0;
+  --fab-tag-peach: #E9C5AF;
+  --fab-tag-butter: #E7D8A2;
+  --fab-tag-aqua: #B8C8A5;
+  --fab-tag-mauve: #E7D9B8;
+  --fab-tag-ember: #D78866;
+  --fab-tag-verdant: #97B698;
+  --fab-tag-azure: #6BACE7;
+  --fab-tag-bone: #E6DCCF;
+  --fab-tag-slate: #8796A1;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D0AE8D;
+  --fab-overlay-dark-05: rgb(22 28 25 / 5%);
+  --fab-overlay-dark-10: rgb(22 28 25 / 10%);
+  --fab-overlay-dark-12: rgb(22 28 25 / 12%);
+  --fab-overlay-dark-14: rgb(22 28 25 / 14%);
+  --fab-overlay-dark-15: rgb(22 28 25 / 15%);
+  --fab-overlay-dark-16: rgb(22 28 25 / 16%);
+  --fab-overlay-dark-18: rgb(22 28 25 / 18%);
+  --fab-overlay-dark-20: rgb(22 28 25 / 20%);
+  --fab-overlay-dark-24: rgb(22 28 25 / 24%);
+  --fab-overlay-dark-48: rgb(22 28 25 / 48%);
+  --fab-overlay-dark-78: rgb(22 28 25 / 78%);
+  --fab-overlay-light-03: rgb(241 233 216 / 3%);
+  --fab-overlay-light-035: rgb(241 233 216 / 3.5%);
+  --fab-overlay-light-04: rgb(241 233 216 / 4%);
+  --fab-overlay-light-05: rgb(241 233 216 / 5%);
+  --fab-overlay-light-06: rgb(241 233 216 / 6%);
+  --fab-overlay-light-08: rgb(241 233 216 / 8%);
+  --fab-overlay-light-10: rgb(241 233 216 / 10%);
+  --fab-overlay-light-12: rgb(241 233 216 / 12%);
+  --fab-overlay-light-28: rgb(241 233 216 / 28%);
+  --fab-overlay-light-96: rgb(241 233 216 / 96%);
+  --fab-warning-focus: rgb(231 216 162 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(22 28 25 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(22 28 25 / 34%);
+  --fab-badge-gold: #C7A257;
+  --fab-on-badge-gold: #1B1408;
+}
+
+:root[data-fabricate-theme="starglass-arcana"],
+.fabricate[data-fabricate-theme="starglass-arcana"] {
+  --fab-bg-0: #121824;
+  --fab-bg-1: #1A2232;
+  --fab-bg-2: #243147;
+  --fab-bg-3: #40506B;
+  --fab-surface: #1A2232;
+  --fab-surface-soft: rgb(242 236 255 / 5%);
+  --fab-surface-raised: rgb(242 236 255 / 8%);
+  --fab-surface-active: rgb(242 236 255 / 12%);
+  --fab-border: rgb(203 191 236 / 18%);
+  --fab-border-strong: rgb(203 191 236 / 32%);
+  --fab-text: #F2ECFF;
+  --fab-text-secondary: #CBBFEC;
+  --fab-text-muted: rgb(203 191 236 / 74%);
+  --fab-text-subtle: rgb(203 191 236 / 56%);
+  --fab-text-disabled: rgb(203 191 236 / 42%);
+  --fab-accent: #9FC5E8;
+  --fab-accent-hover: #B6D0EE;
+  --fab-accent-strong: #86A6C5;
+  --fab-accent-text: #D1E1F0;
+  --fab-accent-soft: rgb(159 197 232 / 16%);
+  --fab-accent-border: rgb(159 197 232 / 48%);
+  --fab-on-accent: #121824;
+  --fab-on-danger: #0D1118;
+  --fab-on-info: #121824;
+  --fab-on-success: #121824;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #9DC9BD;
+  --fab-success-strong: #ACCFC9;
+  --fab-success-text: #D7E1EA;
+  --fab-success-soft: rgb(157 201 189 / 16%);
+  --fab-success-border: rgb(157 201 189 / 56%);
+  --fab-info: #C7A6E6;
+  --fab-info-text: #E6D8F8;
+  --fab-info-soft: rgb(199 166 230 / 14%);
+  --fab-info-border: rgb(199 166 230 / 44%);
+  --fab-warning: #E6E0C8;
+  --fab-warning-text: #EFE9F1;
+  --fab-warning-soft: rgb(230 224 200 / 14%);
+  --fab-warning-border: rgb(230 224 200 / 46%);
+  --fab-danger: #C78A96;
+  --fab-danger-text: #E2C7D7;
+  --fab-danger-soft: rgb(199 138 150 / 16%);
+  --fab-danger-border: rgb(199 138 150 / 54%);
+  --fab-purple: #BEC3EE;
+  --fab-purple-soft: rgb(190 195 238 / 14%);
+  --fab-tag-sage: #B8DBE0;
+  --fab-tag-mist: #C7D7EE;
+  --fab-tag-lavender: #D6C4EC;
+  --fab-tag-rose: #E3C4D2;
+  --fab-tag-peach: #EBD8E8;
+  --fab-tag-butter: #E6E0C8;
+  --fab-tag-aqua: #9DC9BD;
+  --fab-tag-mauve: #C3C2DA;
+  --fab-tag-ember: #DB9CA0;
+  --fab-tag-verdant: #A4BEA1;
+  --fab-tag-azure: #78C2EC;
+  --fab-tag-bone: #EDE3DA;
+  --fab-tag-slate: #91A2A9;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D7B5AF;
+  --fab-overlay-dark-05: rgb(18 24 36 / 5%);
+  --fab-overlay-dark-10: rgb(18 24 36 / 10%);
+  --fab-overlay-dark-12: rgb(18 24 36 / 12%);
+  --fab-overlay-dark-14: rgb(18 24 36 / 14%);
+  --fab-overlay-dark-15: rgb(18 24 36 / 15%);
+  --fab-overlay-dark-16: rgb(18 24 36 / 16%);
+  --fab-overlay-dark-18: rgb(18 24 36 / 18%);
+  --fab-overlay-dark-20: rgb(18 24 36 / 20%);
+  --fab-overlay-dark-24: rgb(18 24 36 / 24%);
+  --fab-overlay-dark-48: rgb(18 24 36 / 48%);
+  --fab-overlay-dark-78: rgb(18 24 36 / 78%);
+  --fab-overlay-light-03: rgb(242 236 255 / 3%);
+  --fab-overlay-light-035: rgb(242 236 255 / 3.5%);
+  --fab-overlay-light-04: rgb(242 236 255 / 4%);
+  --fab-overlay-light-05: rgb(242 236 255 / 5%);
+  --fab-overlay-light-06: rgb(242 236 255 / 6%);
+  --fab-overlay-light-08: rgb(242 236 255 / 8%);
+  --fab-overlay-light-10: rgb(242 236 255 / 10%);
+  --fab-overlay-light-12: rgb(242 236 255 / 12%);
+  --fab-overlay-light-28: rgb(242 236 255 / 28%);
+  --fab-overlay-light-96: rgb(242 236 255 / 96%);
+  --fab-warning-focus: rgb(230 224 200 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(18 24 36 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(18 24 36 / 34%);
+  --fab-badge-gold: #C0A468;
+  --fab-on-badge-gold: #141024;
+}
+
+:root[data-fabricate-theme="foundry-native"],
+.fabricate[data-fabricate-theme="foundry-native"] {
+  --fab-bg-0: #0C0A14;
+  --fab-bg-1: #111018;
+  --fab-bg-2: #30282F;
+  --fab-bg-3: #2E2833;
+  --fab-surface: #111018;
+  --fab-surface-soft: rgb(243 243 245 / 3.5%);
+  --fab-surface-raised: rgb(243 243 245 / 6%);
+  --fab-surface-active: rgb(243 243 245 / 10%);
+  --fab-border: rgb(188 137 99 / 18%);
+  --fab-border-strong: rgb(188 137 99 / 32%);
+  --fab-text: #F3F3F5;
+  --fab-text-secondary: #B6B4B2;
+  --fab-text-muted: rgb(182 180 178 / 78%);
+  --fab-text-subtle: rgb(182 180 178 / 60%);
+  --fab-text-disabled: rgb(148 143 144 / 50%);
+
+  /* The accent family is a GOLD lane of its own, not the tan one warning and danger already occupy (issue 1096). */
+  --fab-accent: #D9B06D;
+  --fab-accent-hover: #E9C07C;
+  --fab-accent-strong: #C09855;
+  --fab-accent-text: #F3F3F5;
+  --fab-accent-soft: rgb(217 176 109 / 14%);
+  --fab-accent-border: rgb(217 176 109 / 42%);
+  --fab-on-accent: #191813;
+  --fab-on-danger: #050403;
+  --fab-on-info: #F3F3F5;
+  --fab-on-success: #F3F3F5;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #617054;
+  --fab-success-strong: #7C8B71;
+  --fab-success-text: #F3F3F5;
+  --fab-success-soft: rgb(97 112 84 / 16%);
+  --fab-success-border: rgb(124 139 113 / 44%);
+  --fab-info: #706B70;
+  --fab-info-text: #F3F3F5;
+  --fab-info-soft: rgb(112 107 112 / 14%);
+  --fab-info-border: rgb(148 143 144 / 42%);
+  --fab-warning: #BC8963;
+  --fab-warning-text: #F3F3F5;
+  --fab-warning-soft: rgb(188 137 99 / 16%);
+  --fab-warning-border: rgb(188 137 99 / 44%);
+  --fab-danger: #A16C60;
+  --fab-danger-text: #F3F3F5;
+  --fab-danger-soft: rgb(161 108 96 / 16%);
+  --fab-danger-border: rgb(161 108 96 / 44%);
+  --fab-purple: #584A75;
+  --fab-purple-soft: rgb(88 74 117 / 16%);
+  --fab-tag-sage: #A9BE9E;
+  --fab-tag-mist: #CBC6BB;
+  --fab-tag-lavender: #A99BC4;
+  --fab-tag-rose: #C8A09A;
+  --fab-tag-peach: #D0A17A;
+  --fab-tag-butter: #D5C09A;
+  --fab-tag-aqua: #948F90;
+  --fab-tag-mauve: #706B70;
+  --fab-tag-ember: #BC642B;
+  --fab-tag-verdant: #738E75;
+  --fab-tag-azure: #4C7DBA;
+  --fab-tag-bone: #C3B9A6;
+  --fab-tag-slate: #666E76;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #AF7B62;
+  --fab-overlay-dark-05: rgb(12 10 20 / 5%);
+  --fab-overlay-dark-10: rgb(12 10 20 / 10%);
+  --fab-overlay-dark-12: rgb(12 10 20 / 12%);
+  --fab-overlay-dark-14: rgb(12 10 20 / 14%);
+  --fab-overlay-dark-15: rgb(12 10 20 / 15%);
+  --fab-overlay-dark-16: rgb(12 10 20 / 16%);
+  --fab-overlay-dark-18: rgb(12 10 20 / 18%);
+  --fab-overlay-dark-20: rgb(12 10 20 / 20%);
+  --fab-overlay-dark-24: rgb(12 10 20 / 24%);
+  --fab-overlay-dark-48: rgb(12 10 20 / 48%);
+  --fab-overlay-dark-78: rgb(12 10 20 / 78%);
+  --fab-overlay-light-03: rgb(243 243 245 / 3%);
+  --fab-overlay-light-035: rgb(243 243 245 / 3.5%);
+  --fab-overlay-light-04: rgb(243 243 245 / 4%);
+  --fab-overlay-light-05: rgb(243 243 245 / 5%);
+  --fab-overlay-light-06: rgb(243 243 245 / 6%);
+  --fab-overlay-light-08: rgb(243 243 245 / 8%);
+  --fab-overlay-light-10: rgb(243 243 245 / 10%);
+  --fab-overlay-light-12: rgb(243 243 245 / 12%);
+  --fab-overlay-light-28: rgb(243 243 245 / 28%);
+  --fab-overlay-light-96: rgb(243 243 245 / 96%);
+  --fab-warning-focus: rgb(193 150 110 / 72%);
+  --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
+  --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
+  --fab-badge-gold: #C9A15E;
+  --fab-on-badge-gold: #1A1206;
+}
+
+:root[data-fabricate-theme="sovereign"],
+.fabricate[data-fabricate-theme="sovereign"] {
+  --fab-bg-0: #0A0E1A;
+  --fab-bg-1: #101627;
+  --fab-bg-2: #182036;
+  --fab-bg-3: #2A3550;
+  --fab-surface: #101627;
+  --fab-surface-soft: rgb(228 192 102 / 5%);
+  --fab-surface-raised: rgb(228 192 102 / 8%);
+  --fab-surface-active: rgb(228 192 102 / 12%);
+  --fab-border: rgb(214 203 168 / 16%);
+  --fab-border-strong: rgb(214 203 168 / 28%);
+  --fab-text: #F2EAD6;
+  --fab-text-secondary: #CFC198;
+  --fab-text-muted: rgb(207 193 152 / 74%);
+  --fab-text-subtle: rgb(207 193 152 / 56%);
+  --fab-text-disabled: rgb(207 193 152 / 42%);
+  --fab-accent: #E4C066;
+  --fab-accent-hover: #EED592;
+  --fab-accent-strong: #C9A94E;
+  --fab-accent-text: #ECDBB5;
+  --fab-accent-soft: rgb(228 192 102 / 16%);
+  --fab-accent-border: rgb(228 192 102 / 46%);
+  --fab-on-accent: #161007;
+  --fab-on-danger: #100B05;
+  --fab-on-info: #0A0E1A;
+  --fab-on-success: #0A0E1A;
+  --fab-biome-icon-foreground: #202124;
+  --fab-success: #81BE96;
+  --fab-success-strong: #97CBA8;
+  --fab-success-text: #D4EAD9;
+  --fab-success-soft: rgb(129 190 150 / 16%);
+  --fab-success-border: rgb(129 190 150 / 50%);
+  --fab-info: #8FB0D6;
+  --fab-info-text: #DCE9F3;
+  --fab-info-soft: rgb(143 176 214 / 14%);
+  --fab-info-border: rgb(143 176 214 / 46%);
+  --fab-warning: #E6D08A;
+  --fab-warning-text: #F1E4B8;
+  --fab-warning-soft: rgb(230 208 138 / 14%);
+  --fab-warning-border: rgb(230 208 138 / 46%);
+  --fab-danger: #C96E66;
+  --fab-danger-text: #EAB6AF;
+  --fab-danger-soft: rgb(201 110 102 / 16%);
+  --fab-danger-border: rgb(201 110 102 / 54%);
+  --fab-purple: #C4B6DE;
+  --fab-purple-soft: rgb(196 182 222 / 14%);
+  --fab-tag-sage: #B6CDBA;
+  --fab-tag-mist: #AFC6DC;
+  --fab-tag-lavender: #C4B6DE;
+  --fab-tag-rose: #DCB4BE;
+  --fab-tag-peach: #E6C39F;
+  --fab-tag-butter: #E6D08A;
+  --fab-tag-aqua: #A9CFCB;
+  --fab-tag-mauve: #CBB2C8;
+  --fab-tag-ember: #D48654;
+  --fab-tag-verdant: #8DAE91;
+  --fab-tag-azure: #5D94E2;
+  --fab-tag-bone: #DFD7C3;
+  --fab-tag-slate: #7D8A98;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D89F78;
+  --fab-overlay-dark-05: rgb(10 14 26 / 5%);
+  --fab-overlay-dark-10: rgb(10 14 26 / 10%);
+  --fab-overlay-dark-12: rgb(10 14 26 / 12%);
+  --fab-overlay-dark-14: rgb(10 14 26 / 14%);
+  --fab-overlay-dark-15: rgb(10 14 26 / 15%);
+  --fab-overlay-dark-16: rgb(10 14 26 / 16%);
+  --fab-overlay-dark-18: rgb(10 14 26 / 18%);
+  --fab-overlay-dark-20: rgb(10 14 26 / 20%);
+  --fab-overlay-dark-24: rgb(10 14 26 / 24%);
+  --fab-overlay-dark-48: rgb(10 14 26 / 48%);
+  --fab-overlay-dark-78: rgb(10 14 26 / 78%);
+  --fab-overlay-light-03: rgb(228 192 102 / 3%);
+  --fab-overlay-light-035: rgb(228 192 102 / 3.5%);
+  --fab-overlay-light-04: rgb(228 192 102 / 4%);
+  --fab-overlay-light-05: rgb(228 192 102 / 5%);
+  --fab-overlay-light-06: rgb(228 192 102 / 6%);
+  --fab-overlay-light-08: rgb(228 192 102 / 8%);
+  --fab-overlay-light-10: rgb(228 192 102 / 10%);
+  --fab-overlay-light-12: rgb(228 192 102 / 12%);
+  --fab-overlay-light-28: rgb(228 192 102 / 28%);
+  --fab-overlay-light-96: rgb(228 192 102 / 96%);
+  --fab-warning-focus: rgb(230 208 138 / 78%);
+  --fab-shadow-md: 0 10px 24px rgb(10 14 26 / 32%);
+  --fab-shadow-lg: 0 14px 38px rgb(10 14 26 / 40%);
+  --fab-badge-gold: #CBA75F;
+  --fab-on-badge-gold: #171208;
+}
+
+/* ratchet-exempt(design-system): a derived token is declared once on every root a palette is, :root included, so each resolves against its own palette. --fab-control-outline outlines an unchecked selection control at 3:1 on its surface in every palette (issue 2047). */
+:root,
+.fabricate[data-fabricate-theme] {
+  --fab-control-outline: var(--fab-text-subtle);
+}
+
