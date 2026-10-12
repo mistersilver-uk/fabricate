@@ -7,16 +7,27 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const LIST_PATH = 'src/ui/svelte/apps/manager/StageComplicationList.svelte';
+const repoRoot = resolve(import.meta.dirname, '../..');
+const STYLED = Object.freeze([
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  LIST_PATH,
+]);
 
 const harness = createMountedComponentHarness({
-  repoRoot: resolve(import.meta.dirname, '../..'),
+  repoRoot,
   tmpPrefix: 'fabricate-stage-complication-list-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
@@ -182,6 +193,28 @@ describe('2445 StageComplicationList', () => {
         ),
       'above the list'
     );
+  });
+
+  // GUARD: red when the list's `font-weight: 400` is deleted.
+  it('GUARD: the trigger sentence keeps 400 inside the Component Studio’s 700 field', async () => {
+    const { innerHTML } = await mountList();
+    const css = STYLED.map((path) => scopedComponentCss(resolve(repoRoot, path)).css).join('\n');
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(
+        '<!doctype html><html><head><meta charset="utf-8">' +
+          `<style>@layer modules { ${readStylesheet()} }</style><style>${css}</style></head><body>` +
+          '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+          `<div class="fabricate-field" style="width:420px">${innerHTML}</div></div></body></html>`
+      );
+      const weights = await page.$$eval('.fab-complication-row-body', (bodies) =>
+        bodies.map((body) => getComputedStyle(body).fontWeight)
+      );
+      assert.deepEqual(weights, ['400', '400', '400']);
+    } finally {
+      await browser.close();
+    }
   });
 
   it('GUARD: renders nothing at all for no complications', async () => {
