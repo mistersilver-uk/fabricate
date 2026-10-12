@@ -112,7 +112,7 @@
   // THE SOURCE FILTER TAKES THE ITEM ROSTER: `Broken link` is a RESOLUTION question.
   const filters = $derived([
     ...componentSourceFilters({ worldItems }, phrase),
-    // THE ESSENCE, THEN CATEGORY, FILTERS FOLLOW THE SOURCE SELECT ON THE LEAD ROW (M30, #2440).
+    // THE ESSENCE, THEN CATEGORY, FILTERS FOLLOW THE SOURCE SELECT ON THE LEAD ROW (M30, issue 2440).
     ...componentEssenceFilter({ essences: worldEssences, systems }, phrase),
     ...componentCategoryFilter({ categories: categoryOptions, entries }, phrase),
     ...componentMembershipScopeFilter({ systemId, systemName: addressedSystemName }, phrase),
