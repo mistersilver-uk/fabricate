@@ -62,10 +62,10 @@ const COMPLICATIONS = Object.freeze([
 function mountList(complications = COMPLICATIONS) {
   return harness.mount({
     complications,
+    ownerId: 'cmp-reagent',
     ownerName: 'Ground Reagent',
     macroNames: new Map([[MACRO_UUID, 'Shrapnel Burst']]),
     triggerLabels: new Map(),
-    'data-test-list': 'cmp-reagent',
   });
 }
 
@@ -77,12 +77,16 @@ describe('2445 StageComplicationList', () => {
   after(() => harness.teardown());
   afterEach(() => harness.remount());
 
-  it('RED: is a SortableList named for its count and owner, carrying the caller’s hook', async () => {
+  it('RED: is a SortableList named for its count and owner, carrying its owner’s hook', async () => {
     const target = await mountList();
     const list = target.querySelector('ul.fabricate-sortable-list');
     assert.ok(Boolean(list), 'the complications are a list of the shared ordered list’s rows');
     assert.equal(list.getAttribute('aria-label'), '3 complications on Ground Reagent');
-    assert.equal(list.getAttribute('data-test-list'), 'cmp-reagent', 'the hook is on the list');
+    assert.equal(
+      list.getAttribute('data-stage-complications'),
+      'cmp-reagent',
+      'the owner hook is on the list'
+    );
     harness.remount();
 
     const one = await mountList(COMPLICATIONS.slice(0, 1));

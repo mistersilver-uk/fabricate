@@ -386,8 +386,8 @@
         {#snippet body(item)}
           <StageComplicationList
             complications={stageComplicationsFor(item)}
+            ownerId={item?.componentId || ''}
             ownerName={componentNameFor(item)}
-            data-recipe-result-complications={item?.componentId || ''}
           />
         {/snippet}
         {#snippet footer()}

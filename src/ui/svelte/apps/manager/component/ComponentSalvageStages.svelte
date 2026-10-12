@@ -201,10 +201,10 @@
            authors none for salvage. -->
       <StageComplicationList
         complications={salvageComplicationsFor(result.componentId)}
+        ownerId={result.componentId}
         ownerName={componentName(result.componentId)}
         macroNames={complicationMacroNames}
         triggerLabels={complicationTriggerLabels}
-        data-salvage-stage-complications={result.componentId}
       />
     {/snippet}
     {#snippet footer()}

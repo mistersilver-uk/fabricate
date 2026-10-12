@@ -822,11 +822,11 @@ export const CASES = Object.freeze([
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
       },
-      { selector: '[data-salvage-stage-complications]', scroll: true },
+      { selector: '[data-stage-complications]', scroll: true },
     ],
     expectView: 'component-edit',
     expectSelector:
-      '.fabricate-manager .fabricate-sortable-list-row.has-band [data-salvage-stage-complications]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band [data-stage-complications]',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
@@ -1104,11 +1104,11 @@ export const CASES = Object.freeze([
         selector:
           '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
       },
-      { selector: '[data-salvage-stage-complications]', scroll: true },
+      { selector: '[data-stage-complications]', scroll: true },
     ],
     expectView: 'component-edit',
     expectSelector:
-      '.fabricate-manager .fabricate-sortable-list-row.has-band > .fabricate-sortable-list-body ul[data-salvage-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band > .fabricate-sortable-list-body ul[data-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
@@ -1127,11 +1127,11 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-grind"]' },
       { selector: '#recipe-tab-results' },
-      { selector: '[data-recipe-result-complications]', scroll: true },
+      { selector: '[data-stage-complications]', scroll: true },
     ],
     expectView: 'recipe-edit',
     expectSelector:
-      '.fabricate-manager .fabricate-sortable-list-row.has-band[data-recipe-result-row] > .fabricate-sortable-list-body ul[data-recipe-result-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
+      '.fabricate-manager .fabricate-sortable-list-row.has-band[data-recipe-result-row] > .fabricate-sortable-list-body ul[data-stage-complications].fabricate-sortable-list:not(:has(.fab-complication-severity, [data-sortable-grip], [data-sortable-move], [data-sortable-ordinal], button)) > .fabricate-sortable-list-row [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'recipes', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,

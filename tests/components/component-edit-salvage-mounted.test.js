@@ -511,7 +511,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     });
   }
 
-  const strips = (target) => [...target.querySelectorAll('[data-salvage-stage-complications]')];
+  const strips = (target) => [...target.querySelectorAll('[data-stage-complications]')];
 
   it('RED 1286: a stage whose yield authors salvage complications nests a list in its body; one that does not, does not', async () => {
     const target = await harness.mount(complicatedProps());
@@ -519,7 +519,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const found = strips(target);
     assert.equal(found.length, 1, 'only the yield that authors one gets a list');
     assert.equal(
-      found[0].getAttribute('data-salvage-stage-complications'),
+      found[0].getAttribute('data-stage-complications'),
       'cmp-scrap',
       'and it is bound to the component that owns the complications'
     );
@@ -585,7 +585,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const plain = target.querySelector('[data-salvage-result="res-2"]');
     assert.ok(plain, 'the yield that authors no complication still renders its stage');
     assert.equal(
-      plain.querySelectorAll('[data-salvage-stage-complications]').length,
+      plain.querySelectorAll('[data-stage-complications]').length,
       0,
       'and draws no band at all'
     );

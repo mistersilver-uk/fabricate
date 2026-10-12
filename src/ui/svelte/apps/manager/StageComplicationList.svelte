@@ -9,11 +9,9 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `complications` | complication[] | `[]` | already filtered to the surface's activity by the caller, whose same filter decides `has-band` |
+  | `ownerId` | string | `''` | the referenced component's id, written to the list as the `data-stage-complications` hook |
   | `ownerName` | string | `''` | the referenced component's name, for the list's count-and-owner accessible name |
   | `macroNames` / `triggerLabels` | `Map` | `undefined` | the system-scoped uuid→name and trigger id→label vocabularies; absent, the sentence names the shape |
-
-  Rest spread:
-  - `{...rest}` lands on the nested list's `<ul>` and carries the caller's `data-*` hook.
 
   Invariants:
   - No complications renders nothing at all — pinned by `tests/components/stage-complication-list-mounted.test.js`.
@@ -25,7 +23,7 @@
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../model/complicationSummary.js';
 
-  let { complications = [], ownerName = '', macroNames, triggerLabels, ...rest } = $props();
+  let { complications = [], ownerId = '', ownerName = '', macroNames, triggerLabels } = $props();
 
   const stageComplications = $derived(Array.isArray(complications) ? complications : []);
 
@@ -74,13 +72,12 @@
         'Complications'
       )}</Kicker
     >
-    <!-- ratchet-exempt(design-system): the spread carries one `data-*` hook, the caller's list hook -->
     <SortableList
       items={stageComplications}
       itemLabel={(complication) => complication?.name || ''}
       reorderable={false}
       ariaLabel={listName}
-      {...rest}
+      data-stage-complications={ownerId}
     >
       {#snippet row(complication)}
         <ComplicationSummaryRow

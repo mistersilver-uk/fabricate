@@ -141,7 +141,7 @@ describe('ComponentSalvageStages', () => {
     const { target } = await mountWith({ componentOptions: [COMPONENTS[0], ...crafting] });
     const row = stage(target, 2);
     assert.ok(!row.querySelector('.fab-kicker'), 'no Complications kicker');
-    assert.ok(!row.querySelector('[data-salvage-stage-complications]'), 'no list');
+    assert.ok(!row.querySelector('[data-stage-complications]'), 'no list');
     assert.ok(!row.classList.contains('has-band'), 'and no has-band, so the body is hidden');
     assert.equal(row.querySelector('.fabricate-sortable-list-body').textContent.trim(), '');
     harness.remount();
@@ -150,7 +150,7 @@ describe('ComponentSalvageStages', () => {
   // GUARD: red when the nested complication list is left reorderable.
   it('GUARD: holds every control while saving, and nothing anywhere reorders', async () => {
     const { calls, target } = await mountWith({ saving: true });
-    assert.ok(Boolean(target.querySelector('[data-salvage-stage-complications]')), 'a list draws');
+    assert.ok(Boolean(target.querySelector('[data-stage-complications]')), 'a list draws');
     assert.ok(!target.querySelector('[data-sortable-move]'), 'no list is reorderable');
     const disabled = [
       '[data-remove-salvage-result]',

@@ -3216,7 +3216,7 @@ describe('RecipeEditView (mounted)', () => {
   ]);
 
   const stageStrips = (target) => [
-    ...target.querySelectorAll('[data-recipe-result-complications]'),
+    ...target.querySelectorAll('[data-stage-complications]'),
   ];
 
   // RED: the nested list replaces the band, and its rows draw no severity tile (issue 2445).
@@ -3230,7 +3230,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     const found = stageStrips(target);
     assert.equal(found.length, 1, 'only the stage whose component authors one gets a list');
-    assert.equal(found[0].getAttribute('data-recipe-result-complications'), 'cmp-herb');
+    assert.equal(found[0].getAttribute('data-stage-complications'), 'cmp-herb');
     assert.ok(found[0].matches('ul.fabricate-sortable-list'), 'a list of the shared list’s rows');
     assert.equal(found[0].getAttribute('aria-label'), '1 complication on Mountain Herb');
     assert.ok(!found[0].querySelector('.fab-complication-severity'), 'and no severity tile');
@@ -3261,7 +3261,7 @@ describe('RecipeEditView (mounted)', () => {
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
     const banded = target.querySelector(
-      '[data-recipe-result-row]:has([data-recipe-result-complications])'
+      '[data-recipe-result-row]:has([data-stage-complications])'
     );
     assert.ok(Boolean(banded), 'the herb stage draws a list');
 
@@ -3272,19 +3272,19 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(line.querySelector('[data-sortable-grip]'), 'the grip rides that line');
     assert.ok(line.querySelector('.fabricate-sortable-list-ordinal'), 'so does the ordinal');
     assert.ok(
-      !line.querySelector('[data-recipe-result-complications]'),
+      !line.querySelector('[data-stage-complications]'),
       'the list is a sibling of the line, not part of it'
     );
     assert.equal(
       banded
-        .querySelector('[data-recipe-result-complications]')
+        .querySelector('[data-stage-complications]')
         .closest('.fabricate-sortable-list-body').parentElement,
       line.parentElement,
       'the list sits in the row`s BODY, the line`s own sibling'
     );
 
     const plain = [...target.querySelectorAll('[data-recipe-result-row]')].find(
-      (row) => !row.querySelector('[data-recipe-result-complications]')
+      (row) => !row.querySelector('[data-stage-complications]')
     );
     assert.ok(plain.querySelector('[data-sortable-grip]'), 'an unbanded row still grips');
     editHarness.remount();
