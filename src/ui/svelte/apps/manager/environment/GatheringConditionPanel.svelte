@@ -60,8 +60,8 @@
   let addIcon = $state(defaultConditionIcon(kind));
   let nameInput = $state(null);
   let components = $state(null);
-  /** The add form's start hour once a GM sets or seeds it; `undefined` follows the default. */
-  let addStartHour = $state(undefined);
+  /** The add form's start hour once a GM sets or seeds it; unset follows the default. */
+  let addStartHour = $state(null);
 
   const isTimeOfDay = $derived(kind === 'timeOfDay');
   const lastHour = $derived(lastHourOf(components));
@@ -69,7 +69,7 @@
     new Map(timeOfDayPeriods(conditionValues(setting)).map((p) => [p.id, p.startHour]))
   );
   const addDefault = $derived(addStartDefault({ values: conditionValues(setting), components }));
-  const addStart = $derived(addStartHour === undefined ? addDefault : addStartHour);
+  const addStart = $derived(addStartHour ?? addDefault);
   const startsAtLabels = $derived(
     stepperLabels(text('FABRICATE.Admin.Manager.Environment.Conditions.StartsAt'))
   );
@@ -134,7 +134,7 @@
       selectedSystemId
     );
     input = '';
-    addStartHour = undefined;
+    addStartHour = null;
   }
 
   function updateCurrentCondition(kind, value) {

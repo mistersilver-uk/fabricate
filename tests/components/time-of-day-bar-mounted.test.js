@@ -132,6 +132,12 @@ function key(node, name) {
   flushSync();
 }
 
+function clearAddStepper() {
+  addStepper().value = '';
+  addStepper().dispatchEvent(new Event('blur'));
+  flushSync();
+}
+
 function submitAdd() {
   q('.manager-condition-add').dispatchEvent(
     new Event('submit', { bubbles: true, cancelable: true })
@@ -418,6 +424,30 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
       'Give every time of day its own start hour below 24 to see the time-of-day bar. Check: Day and Night.'
     );
     assert.equal(addStepper().value, '', 'with no tiling the add form starts empty');
+    key(addStepper(), 'ArrowUp');
+    assert.notEqual(addStepper().value, '', 'the arrow sets an hour');
+    clearAddStepper();
+    addName().value = 'Vigil';
+    addName().dispatchEvent(new Event('input', { bubbles: true }));
+    submitAdd();
+    assert.deepEqual(calls, [
+      ['add', 'timeOfDay', { label: 'Vigil', icon: 'fas fa-clock', startHour: null }, 'alchemy'],
+    ]);
+  });
+
+  it('drops a cleared add hour once the day tiles again', () => {
+    const panel = mountPanel({ values: [...DEFAULTS.slice(0, 3), { ...DEFAULTS[3], startHour: 8 }] });
+    key(addStepper(), 'ArrowUp');
+    clearAddStepper();
+    panel.$set({ setting: { enabled: true, current: 'day', values: DEFAULTS } });
+    flushSync();
+    assert.equal(addStepper().getAttribute('aria-valuenow'), '12', 'the longest period`s midpoint');
+    addName().value = 'Noon';
+    addName().dispatchEvent(new Event('input', { bubbles: true }));
+    submitAdd();
+    assert.deepEqual(calls, [
+      ['add', 'timeOfDay', { label: 'Noon', icon: 'fas fa-clock', startHour: 12 }, 'alchemy'],
+    ]);
   });
 
   it('falls back on a short calendar day without writing anything (c)', () => {
