@@ -876,6 +876,15 @@
       "why": "Issue 2321 builds the specified cross-reference list: a read-only list named by its own kicker, each row ListRow's dense row or, for a row that opens, its selectable dense form, with a caller-formatted detail at the trailing edge, an `opens: false` opt-out and per-row `attrs`. ONE importer, `src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte`, whose Sources, Contributing, Used by, Required for and Produced by sections it draws, so it is below the two-importer membership bar on the `LogList` and `StageNav` precedent; the manager's cross-reference lists are its adoption debt under issue 2322. Its library specimen reads `shipped`, and its broad-signal override names the inventory inspector, a tool's Required for and an essence's Contributing."
     },
     {
+      "path": "src/ui/svelte/components/ViewToggle.svelte",
+      "library": "<ViewToggle>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/manager/EssenceBrowserView.svelte"
+      ],
+      "why": "Issue 2412 builds the specified list and grid switch as `SegmentedControl`'s icon-only form over the closed list and grid pair, its two radios named by required, already-localized labels and the group by its `ariaLabel`. One importer, `src/ui/svelte/apps/manager/EssenceBrowserView.svelte`, so it is below the two-importer membership bar on the `LogList`, `StageNav` and `XrefList` precedent. Its library specimen reads `shipped`, and its broad-signal override names the essence browser's list and grid frames."
+    },
+    {
       "path": "src/ui/svelte/components/RuleSentence.svelte",
       "library": "<RuleSentence>",
       "evidence": "broad",

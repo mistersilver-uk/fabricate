@@ -781,9 +781,21 @@
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "card grid — same row model, one track",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/ViewToggle.svelte",
+    "props": {
+      "view": "list",
+      "listLabel": "List",
+      "gridLabel": "Grid",
+      "ariaLabel": "Presentation"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
-    "note": "The card layout, the same row model on one track, its facts passed as the `meta` snippet. The list and grid switcher above stays drawn: it is ViewToggle, which is not built.",
+    "note": "The card layout, the same row model on one track, its facts passed as the `meta` snippet. The list and grid switcher above it is the live ViewToggle row.",
     "props": {
       "name": "Steel Ingot",
       "icon": "fas fa-hammer",

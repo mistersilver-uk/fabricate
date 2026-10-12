@@ -12,6 +12,8 @@ import {
   attributeValue,
   declaresAttribute,
   importsModule,
+  passesProp,
+  propNone,
 } from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +36,8 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const INSPECTOR = 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte';
+const BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const VIEW_TOGGLE = 'src/ui/svelte/components/ViewToggle.svelte';
 const inspectorSource = read(INSPECTOR);
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
@@ -220,10 +224,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'and the min-width without which overflow never engages on a flex item'
     );
     // The full name stays reachable. Truncation that loses text is a defect, not a fix.
-    assert.ok(
-      rowSource.includes('nameTitle={essence.name}'),
-      'the whole name survives as a title'
-    );
+    assert.ok(rowSource.includes('nameTitle={essence.name}'), 'the whole name survives as a title');
     // LIST rows are untouched: a 76px row beside a clamped description has the width.
     assert.equal(
       /\.manager-system-name \{/.test(styleBlock(rowSource)),
@@ -278,9 +279,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fabricate-button\.fabricate-button\.fab-manager-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
       'the ghost verb sits ON the pane, bounded by --fab-border'
     );
-    const danger = /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
-      globalCss
-    );
+    const danger =
+      /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
+        globalCss
+      );
     assert.ok(danger, 'the danger role still has its resting rule');
     assert.match(danger[1], /color: var\(--fab-danger-text\);/, 'in danger text');
     assert.doesNotMatch(danger[1], /background/, 'and no fill of its own');
@@ -345,9 +347,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'so the picker + reset row beneath fills the tile width instead of sizing itself'
     );
     assert.ok(
-      globalCss.includes(
-        'grid-template-columns: 124px minmax(0, 1fr);'
-      ),
+      globalCss.includes('grid-template-columns: 124px minmax(0, 1fr);'),
       'in a column narrowed to the square tile width so the controls sit under it'
     );
     // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.
@@ -582,22 +582,20 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   it('compacts the presentation toggle to glyph tiles without losing its name', () => {
     // The rendered symptom: the prototype draws list/grid as two compact glyph tiles
     // (~86px for the pair); the shipped toggle spelled out "List" and "Grid" and measured
-    // ~135px, which made a presentation switch shout as loudly as the status FILTER beside
-    // it and pushed row one to the edge of the 1280px capture.
-    const viewControl = browserSource.slice(browserSource.indexOf('options={viewModeOptions}'));
+    // ~135px, which pushed row one to the edge of the 1280px capture.
+    const browser = componentAstOf(BROWSER);
     assert.ok(
-      /^[^/]*?\biconOnly\b/s.test(viewControl.slice(0, viewControl.indexOf('/>'))),
-      'the view-mode segmented control opts into the compact variant'
+      importsModule(browser, '../../components/ViewToggle.svelte') &&
+        renderedNodes(browser, 'ViewToggle').length === 1,
+      'the browser switches its arrangement through ViewToggle'
     );
-    // Opt-IN, so the status filter one line above must not have been swept along.
-    const statusControl = browserSource.slice(
-      browserSource.indexOf('options={statusOptions}'),
-      browserSource.indexOf('options={viewModeOptions}')
+    assert.ok(
+      passesProp(componentAstOf(VIEW_TOGGLE), 'SegmentedControl', 'iconOnly'),
+      'which is the segmented control at its compact glyph form'
     );
-    assert.equal(
-      /\biconOnly\b/.test(statusControl),
-      false,
-      'the status filter keeps its words — its options are not glyphs'
+    assert.ok(
+      propNone(browser, 'SegmentedControl', 'iconOnly'),
+      'the membership filter keeps its words'
     );
 
     // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name.

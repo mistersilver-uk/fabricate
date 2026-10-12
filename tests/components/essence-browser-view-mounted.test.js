@@ -88,6 +88,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/SegmentedControl.svelte',
+    'src/ui/svelte/components/ViewToggle.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
@@ -198,6 +199,17 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     root.querySelector('[data-essence-view-option="grid"] input').click();
     flushSync();
     assert.equal(root.querySelector('.manager-essences-table').dataset.essenceView, 'grid');
+    const gridOption = root.querySelector('[data-essence-view-option="grid"]');
+    assert.ok(gridOption.classList.contains('is-active'), 'the switch shows grid as chosen');
+    assert.equal(gridOption.querySelector('input').checked, true);
+    for (const [view, word] of [
+      ['list', 'List'],
+      ['grid', 'Grid'],
+    ]) {
+      const option = root.querySelector(`[data-essence-view-option="${view}"]`);
+      assert.equal(option.getAttribute('title'), word, `the ${view} option's title`);
+      assert.equal(option.querySelector('.manager-segment-label').textContent, word);
+    }
     assert.deepEqual(
       vocabularyOf(root, 'aether'),
       asList,

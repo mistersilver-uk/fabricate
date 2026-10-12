@@ -114,6 +114,33 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: A list's arrangement switch renders through ViewToggle
+
+A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
+Its two options are `list` and `grid` and no third, because a third arrangement is a different screen rather than a third button; any value other than `grid` reads as `list`, which is the rule `LibraryShelf` applies to the same value, so the toggle and the arrangement it controls cannot disagree.
+It holds no state of its own: the list around it owns the current arrangement, and `onChange` receives the chosen one.
+Its glyphs are fixed, `fa-list` for list and `fa-table-cells-large` for grid, so every list's switch reads alike; a caller supplies the words, never the glyphs.
+Each option renders a glyph alone, so each takes its accessible name from a required, already-localized label prop, `listLabel` and `gridLabel`, and the group takes its own from a required `ariaLabel`.
+A caller's per-option hook rides `optionDataAttr` onto each option's clickable label, never onto its hidden radio.
+The essence browser's presentation control is its first caller (issue 2412).
+With one importer, `ViewToggle` is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+
+#### Scenario: A GM switches the essence library to its grid
+
+- **WHEN** a GM chooses the grid option of the essence browser's list and grid switch
+- **THEN** `onChange` receives `grid` and the list renders its grid
+- **AND** the switch shows grid as the one checked option
+
+#### Scenario: The checked option is chosen again
+
+- **WHEN** the GM chooses the option that is already checked
+- **THEN** `onChange` is not called
+
+#### Scenario: An arrangement outside the pair
+
+- **WHEN** a `ViewToggle` is given a `view` that is neither `list` nor `grid`
+- **THEN** the list option is the checked one
+
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
 WorldClockChip MUST compose Chip's opt-in `presentation="clock"` around one baseline-aligned line of icon, label and value, centred inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
@@ -293,6 +320,7 @@ The same issue adds `DataTable`, which emits `fabricate-data-table` on its own r
 The same issue gives `SearchField` a labelled form, which emits `fabricate-search-field` on the `Field` root it renders and keeps `fabricate-search` on the inner shell, while the bare form keeps `fabricate-search` on its own root; it portals nothing, so those two are its only roots.
 The same issue adds `Typeahead`, which emits `fabricate-typeahead` on its field's root and `fabricate-typeahead-list`, `-option` and `-note` on the list it floats to the application root, rooted in the module sheet, so the suggestion rules rooted at `.fabricate-manager` under `manager-tag-suggestion(s)` are re-rooted at an unchanged (0,2,0); the roll-data chips that borrowed the option's box keep it under their own class.
 Issue 2321 adds `XrefList`, which emits `fab-xref-list` on its own root, `fab-xref-list-label` on its label and `fab-xref-list-items` on its list, all painted from its own scoped block; its rows are `ListRow`'s, whose family it does not restate, and it portals nothing, so it needs one root.
+Issue 2412 adds `ViewToggle`, which writes no family of its own: its root is the `SegmentedControl` it composes, whose classes it does not restate, and it portals nothing.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -909,6 +937,7 @@ A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed 
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
 An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, because muted measures under 4.5:1 on the raised hover ground; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
 A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
+A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`, and each of its two glyph options is a radio named by its own label prop, `listLabel` or `gridLabel`, and never by its glyph; each option is titled with the same word, the pointer half of that name.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4).
 `TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
@@ -1116,6 +1145,7 @@ The two are separate entries rather than one tile taking a `kind` prop, because 
 A dense cross-reference list row is the one exception: its 22px mark is the record tile even for an actor, because the portrait ladder has no 22px rung, so an actor there falls back to a glyph.
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
+A list's arrangement, list or grid, is the view toggle, which is that segmented control at its icon-only form over a closed pair; it is never a pair of pressed icon buttons, which announce two independent states for one choice.
 An on/off property of the record in its own editor, drawn as a card, is the toggle card — the settings-row toggle at card scale.
 Option cards are the two-to-four-way choice above, used when each side needs its own sentence.
 Neither is a mode of the other.
