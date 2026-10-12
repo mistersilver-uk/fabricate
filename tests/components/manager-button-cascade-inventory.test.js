@@ -69,7 +69,12 @@ const CONVERTED_BATCHES = Object.freeze([
       // 23 sites across eight browser views. Two carried a forgotten `primary`.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
-        sites: 7,
+        sites: 6,
+      }),
+      // The condition panels' add submit, moved out of the browser view (issue 2431).
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
+        sites: 1,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte', sites: 3 }),
       Object.freeze({
@@ -1122,12 +1127,13 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    48,
+    49,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), one for the
     // salvage DC card's move into `CheckOverrideField` (issue 2005), and one each for the salvage
     // adds' and the gathering task adds' splits across two files (issue 1522); the site total above
-    // is unchanged by those. Issue 2367's two files into KindAdder took one away.
-    'across 48 components'
+    // is unchanged by those. Issue 2367's two files into KindAdder took one away, and issue 2431's
+    // condition panel added one.
+    'across 49 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

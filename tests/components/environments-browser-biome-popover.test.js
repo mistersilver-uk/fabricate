@@ -96,6 +96,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
+    'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',

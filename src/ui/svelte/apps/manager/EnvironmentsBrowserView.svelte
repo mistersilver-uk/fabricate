@@ -24,6 +24,7 @@
   import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
+  import GatheringConditionPanel from './environment/GatheringConditionPanel.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ActionMenu from '../../components/ActionMenu.svelte';
   import SearchField from '../../components/SearchField.svelte';
@@ -140,11 +141,7 @@
   const biomeFilter = $derived(ui.biomeFilter || 'all');
   const pageIndex = $derived(ui.pageIndex || 0);
   const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
-  let weatherInput = $state('');
-  let timeOfDayInput = $state('');
   let biomeInput = $state('');
-  let weatherIconInput = $state('fas fa-cloud-sun');
-  let timeOfDayIconInput = $state('fas fa-clock');
   let biomeIconInput = $state('fas fa-tree');
   let biomeColorTokenInput = $state('sage');
   let biomeCustomColorInput = $state('');
@@ -211,11 +208,7 @@
       biomeFilter: 'all',
     },
     onSystemSwitch: () => {
-      weatherInput = '';
-      timeOfDayInput = '';
       biomeInput = '';
-      weatherIconInput = defaultConditionIcon('weather');
-      timeOfDayIconInput = defaultConditionIcon('timeOfDay');
       biomeIconInput = 'fas fa-tree';
       biomeColorTokenInput = 'sage';
       biomeCustomColorInput = '';
@@ -468,72 +461,6 @@
     onSelectGatheringTab(tabId);
   }
 
-  function conditionTitle(kind) {
-    return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayTitle', 'Times of day')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherTitle', 'Weather conditions');
-  }
-
-  function conditionCurrentLabel(kind) {
-    return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.CurrentTimeOfDay', 'Current time')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.CurrentWeather', 'Current weather');
-  }
-
-  function conditionAddLabel(kind) {
-    return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.AddTimeOfDay', 'Add time of day')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.AddWeather', 'Add weather');
-  }
-
-  function conditionHint(kind) {
-    return kind === 'timeOfDay'
-      ? text(
-          'FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint',
-          'These values control current time matching for gathering tasks and events. Click the name of a time of day to edit it.'
-        )
-      : text(
-          'FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint',
-          'These values control weather matching for gathering tasks and events. Click the name of a condition to edit it.'
-        );
-  }
-
-  function conditionInputPlaceholder(kind) {
-    return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. Midnight')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherPlaceholder', 'e.g. Ashfall');
-  }
-
-  function conditionInputValue(kind) {
-    return kind === 'timeOfDay' ? timeOfDayInput : weatherInput;
-  }
-
-  function setConditionInput(kind, value) {
-    if (kind === 'timeOfDay') timeOfDayInput = value;
-    else weatherInput = value;
-  }
-
-  function conditionAddIcon(kind) {
-    return kind === 'timeOfDay' ? timeOfDayIconInput : weatherIconInput;
-  }
-
-  function setConditionAddIcon(kind, value) {
-    if (kind === 'timeOfDay') timeOfDayIconInput = value;
-    else weatherIconInput = value;
-  }
-
-  function submitConditionValue(event, kind) {
-    event.preventDefault();
-    const value = conditionInputValue(kind).trim();
-    if (!value) return;
-    onAddGatheringConditionValue?.(
-      kind,
-      { label: value, icon: conditionAddIcon(kind) },
-      selectedSystemId
-    );
-    setConditionInput(kind, '');
-  }
-
   function vocabularyTitle() {
     return text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesTitle', 'Biomes');
   }
@@ -659,42 +586,6 @@
 
     return () => handle.destroy();
   });
-
-  function updateCurrentCondition(kind, value) {
-    onUpdateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
-  }
-
-  function conditionId(option) {
-    if (option && typeof option === 'object') return String(option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionLabel(option) {
-    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionIcon(option, kind) {
-    if (option && typeof option === 'object' && option.icon) return option.icon;
-    return defaultConditionIcon(kind);
-  }
-
-  function defaultConditionIcon(kind) {
-    return kind === 'timeOfDay' ? 'fas fa-clock' : 'fas fa-cloud-sun';
-  }
-
-  function conditionValues(setting) {
-    return Array.isArray(setting?.values) ? setting.values : [];
-  }
-
-  function conditionSelectOptions(setting) {
-    return conditionValues(setting).map((option) => ({
-      value: conditionId(option),
-      label: conditionLabel(option),
-    }));
-  }
-
-  const instanceId = $props.id();
 </script>
 
 <main
@@ -1093,161 +984,21 @@
     >
       <GatheringEconomyView {services} systemId={selectedSystemId} />
 
-      {#each [{ kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition }, { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }] as condition (condition.kind)}
-        <section
-          class={`manager-condition-panel ${condition.setting.enabled === false ? 'is-disabled' : ''}`}
-          data-gathering-condition-panel={condition.kind}
-          aria-label={conditionTitle(condition.kind)}
-        >
-          <header class="manager-condition-panel-header">
-            <span class="manager-condition-panel-title">
-              <i class={condition.icon} aria-hidden="true"></i>
-              <span>{conditionTitle(condition.kind)}</span>
-            </span>
-            <StatusToggle
-              on={condition.setting.enabled !== false}
-              label={condition.setting.enabled === false
-                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              ariaLabel={condition.setting.enabled === false
-                ? text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.EnableMatching',
-                    'Enable matching'
-                  )
-                : text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.DisableMatching',
-                    'Disable matching'
-                  )}
-              onclick={() =>
-                onToggleGatheringConditionEnabled?.(
-                  condition.kind,
-                  condition.setting.enabled === false,
-                  selectedSystemId
-                )}
-            />
-          </header>
-          <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
-
-          <!-- A div host: a label would forward a caption click into the trigger. The caption names
-               it through its id, and the panel may grow past the form rung's 340px ceiling to
-               follow a trigger that fills a one-column card up to the 1120px restack breakpoint
-               (issue 1510). -->
-          <Field as="div" class="manager-condition-current">
-            <span id={`${instanceId}-condition-${condition.kind}`}
-              >{conditionCurrentLabel(condition.kind)}</span
-            >
-            <Select
-              value={condition.setting.current}
-              options={conditionSelectOptions(condition.setting)}
-              maxWidth={1120}
-              ariaLabelledBy={`${instanceId}-condition-${condition.kind}`}
-              onChange={(next) => updateCurrentCondition(condition.kind, next)}
-            />
-          </Field>
-
-          <form
-            class="manager-condition-add"
-            onsubmit={(event) => submitConditionValue(event, condition.kind)}
-          >
-            <IconPicker
-              value={conditionAddIcon(condition.kind)}
-              iconOnly={true}
-              ariaLabel={text(
-                'FABRICATE.Admin.Manager.Environment.Conditions.NewIcon',
-                'New value icon'
-              )}
-              onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
-            />
-            <Field as="label">
-              <input
-                value={conditionInputValue(condition.kind)}
-                aria-label={conditionAddLabel(condition.kind)}
-                placeholder={conditionInputPlaceholder(condition.kind)}
-                oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
-              />
-            </Field>
-            <Button
-              role="primary"
-              type="submit"
-              class="manager-add-button"
-              data-gathering-condition-add={condition.kind}
-              aria-label={conditionAddLabel(condition.kind)}
-              title={conditionAddLabel(condition.kind)}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </Button>
-          </form>
-
-          <div
-            class="manager-condition-pill-list"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Environment.Conditions.Values',
-              'Condition values'
-            )}
-          >
-            {#each conditionValues(condition.setting) as option (conditionId(option))}
-              {@const valueId = conditionId(option)}
-              <span class="manager-condition-pill" data-gathering-condition-value={valueId}>
-                <IconPicker
-                  value={conditionIcon(option, condition.kind)}
-                  iconOnly={true}
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.EditIcon',
-                    'Edit icon'
-                  )}
-                  onChange={(icon) =>
-                    onUpdateGatheringConditionValue?.(
-                      condition.kind,
-                      valueId,
-                      { icon },
-                      selectedSystemId
-                    )}
-                />
-                <input
-                  class="manager-condition-label-input"
-                  value={conditionLabel(option)}
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.EditLabel',
-                    'Edit label'
-                  )}
-                  onblur={(event) =>
-                    onUpdateGatheringConditionValue?.(
-                      condition.kind,
-                      valueId,
-                      { label: event.currentTarget.value },
-                      selectedSystemId
-                    )}
-                  onkeydown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      event.currentTarget.blur();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  class="manager-condition-remove"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.RemoveValue',
-                    'Remove {value}'
-                  ).replace('{value}', conditionLabel(option))}
-                  title={text(
-                    'FABRICATE.Admin.Manager.Environment.Conditions.RemoveValue',
-                    'Remove {value}'
-                  ).replace('{value}', conditionLabel(option))}
-                  disabled={condition.setting.enabled !== false &&
-                    conditionValues(condition.setting).length <= 1}
-                  onclick={() =>
-                    onDeleteGatheringConditionValue?.(condition.kind, valueId, selectedSystemId)}
-                >
-                  <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
-              </span>
-            {/each}
-          </div>
-        </section>
-      {/each}
+      {#key selectedSystemId}
+        {#each [{ kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition }, { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }] as condition (condition.kind)}
+          <GatheringConditionPanel
+            kind={condition.kind}
+            icon={condition.icon}
+            setting={condition.setting}
+            {selectedSystemId}
+            {onUpdateGatheringConditions}
+            {onToggleGatheringConditionEnabled}
+            {onAddGatheringConditionValue}
+            {onUpdateGatheringConditionValue}
+            {onDeleteGatheringConditionValue}
+          />
+        {/each}
+      {/key}
       {#each [{ kind: 'biomes', icon: 'fas fa-tree', vocabulary: biomeVocabulary }] as vocabulary (vocabulary.kind)}
         <section
           class="manager-condition-panel manager-vocabulary-settings-panel is-biomes"
