@@ -26,6 +26,10 @@ const extensionHostSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/PlayerExtensionHost.svelte'),
   'utf8'
 );
+const topBarSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/ActorSelectTopBar.svelte'),
+  'utf8'
+);
 
 describe('FabricateAppRoot shell', () => {
   it('renders the planned navigation tabs', () => {
@@ -125,7 +129,7 @@ describe('FabricateAppRoot shell', () => {
   });
 
   // AC12 / maintainer decision A1. Scope prose expires when an issue closes; this does not.
-  it('carries no premium signal of any kind, in either player-side component', () => {
+  it('carries no premium signal of any kind, in any player-side component', () => {
     const forbidden = [
       'premiumInstalled',
       'registeredSurfaceIds',
@@ -137,6 +141,7 @@ describe('FabricateAppRoot shell', () => {
     for (const [name, source] of [
       ['FabricateAppRoot.svelte', rootSource],
       ['PlayerExtensionHost.svelte', extensionHostSource],
+      ['ActorSelectTopBar.svelte', topBarSource],
     ]) {
       for (const token of forbidden) {
         assert.ok(
