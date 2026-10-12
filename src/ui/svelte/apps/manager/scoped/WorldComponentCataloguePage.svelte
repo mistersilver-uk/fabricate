@@ -106,6 +106,9 @@
       )?.name ?? ''
     )
   );
+  // THE BULK INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (M18): the union of what the
+  // records carry offered the SYSTEMS' categories as the world's, and missed unapplied tags.
+  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
   // THE SOURCE FILTER TAKES THE ITEM ROSTER: `Broken link` is a RESOLUTION question.
   const filters = $derived([
     ...componentSourceFilters({ worldItems }, phrase),
@@ -116,9 +119,6 @@
   ]);
   const sorts = $derived(componentSorts(phrase));
 
-  // THE BULK INSETS OFFER THE WORLD VOCABULARY AND NOTHING ELSE (M18): the union of what the
-  // records carry offered the SYSTEMS' categories as the world's, and missed unapplied tags.
-  const categoryOptions = $derived(worldVocabularyComponentCategories(scope));
   const tagOptions = $derived(worldVocabularyComponentTags(scope));
 
   // THE ONE WORLD-DEFAULT CARD, THROUGH THE SHELL; its TITLE names the VALUE, its NOTE the reach.

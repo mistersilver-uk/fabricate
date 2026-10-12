@@ -7,7 +7,9 @@ export const COMPONENT_CATEGORY_FILTER_NONE = '__none';
  */
 export function componentCategoryFilter({ categories = [], entries = [] } = {}, phrase) {
   const categoryOf = (entry) => String(entry?.defaults?.category ?? '').trim();
-  const vocabulary = Array.isArray(categories) ? categories : [];
+  const vocabulary = (Array.isArray(categories) ? categories : [])
+    .map((category) => String(category).trim())
+    .filter(Boolean);
   const known = new Set(vocabulary);
   const strays = new Set();
   for (const entry of Array.isArray(entries) ? entries : []) {
@@ -27,16 +29,13 @@ export function componentCategoryFilter({ categories = [], entries = [] } = {}, 
       options: [
         {
           value: 'all',
-          label: phrase(
-            'FABRICATE.Admin.Manager.Scoped.Component.FilterCategoryAll',
-            'All categories'
-          ),
+          label: phrase('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories'),
         },
         {
           value: COMPONENT_CATEGORY_FILTER_NONE,
           label: phrase(
-            'FABRICATE.Admin.Manager.Scoped.Component.FilterCategoryNone',
-            'No category'
+            'FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory',
+            'No world category'
           ),
         },
         ...named.map((category) => ({ value: category, label: category })),
