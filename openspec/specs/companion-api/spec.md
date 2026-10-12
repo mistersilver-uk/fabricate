@@ -8,7 +8,7 @@ A member that **asks** a question, a member that **places value**, and — since
 Every rule below that separates a question from an act binds harder on the second kind than on anything published before it, and hardest of all on the third: an award a GM did not want is value to find and reverse, while a take a GM did not want is a player's inventory gone.
 
 This specification governs a companion **consuming Fabricate's behaviour**.
-Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-extension-points/spec.md`.
+Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, and the **published UI components** by which a companion renders Fabricate's own primitives into an element it owns, both live in `ui-extension-points/spec.md`.
 **Inbound** integrations, by which Fabricate consumes another module's data or services, live in `integrations/spec.md`.
 
 ## Scope

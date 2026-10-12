@@ -15,8 +15,11 @@ Fabricate exposes its API through two Foundry globals:
   Convenience functions for macros.
 - **`game.fabricate.api`**.
   Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names — and `companion`, the versioned [companion contract](#companion-contract)).
+- **`game.fabricate.api.ui`**.
+  The [published UI components](#published-ui-components) a companion renders into an element it owns.
 
-All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires:
+All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires.
+`api.ui` is readable from `init`, but its `mount` throws until Fabricate is ready:
 
 ```javascript
 Hooks.on('fabricate.ready', () => {
@@ -30,6 +33,7 @@ Hooks.on('fabricate.ready', () => {
 > The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
 > A companion's extension registrations are the exceptions, and there are two of them.
 > Register each during the companion's `init` callback, as described in [Manager Navigation Extension](#manager-navigation-extension) and [Player Navigation Extension](#player-navigation-extension).
+> `api.ui` is readable from `init`, but its `mount` throws until Fabricate is ready.
 
 ---
 
@@ -592,7 +596,7 @@ If you render a name from this list and get a blank glyph, that is the check to 
 ## Companion Contract
 
 `game.fabricate.api.companion` is Fabricate's named, versioned contract for outbound **behavioural** consumption — the capabilities a companion module needs to settle a downtime activity against an actor, or against a whole party.
-It is the behavioural sibling of the two navigation seams below, which are outbound **UI contribution** rather than consumption.
+It is the behavioural sibling of the two navigation seams below, which are outbound **UI contribution** rather than consumption, and of the [published UI components](#published-ui-components) seam, by which a companion renders Fabricate's own primitives into an element it owns.
 
 The enumerable `game.fabricate.api.COMPANION` alias remains available for compatibility, but reading it warns once per client page session and points here for migration.
 
@@ -1970,6 +1974,76 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
   console.log(`Fabricate player surface ${surfaceId} moved to ${tabId}`);
 });
 ```
+
+## Published UI Components
+
+`game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
+It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
+Phase 1 publishes data-only leaf primitives; text and slot content, callbacks, bindables and overlays arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+
+{: .warning }
+> Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
+> Use `const fabUi = game.fabricate.api.ui` instead.
+
+Feature-detect it at the point of use, and never hold an `api` reference taken at `init`, because Fabricate rebuilds `game.fabricate.api` at `ready`:
+
+```javascript
+const fabUi = game.fabricate?.api?.ui;
+if (fabUi?.schemaVersion !== 1) return; // Absent, or a shape this companion does not know.
+if (!fabUi.components.includes(name)) return; // Not published by this Fabricate version.
+
+const handle = fabUi.mount(name, { target: element, props }); // `props` as `describe(name)` lists.
+handle.update(nextProps); // Replaces every prop; it never merges.
+handle.destroy(); // Required on every path that ends the mount.
+```
+
+The published components, in publication order:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Component | Version | Props | Rest |
+| --- | --- | --- | --- |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### The descriptor
+
+`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount }`.
+`components` lists the published names in publication order, and a new name is appended, never interleaved.
+`describe(name)` returns a frozen `{ version, props, rest }`, where each prop is `{ kind: 'data', required }` and `rest` says whether the component takes `data-*` attributes; it returns `null` for a name that is not published.
+Treat an unknown name, member or prop kind as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind is additive.
+A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
+
+### Mounting, updating and destroying
+
+`mount(name, { target, props = {} })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
+It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
+It returns a frozen `{ update(props), destroy() }`.
+
+- `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window works), must be empty, and must not hold a live mount.
+- `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with no function at any depth and no cycle.
+  A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean.
+- Props are copied when you pass them, so mutating your object afterwards changes nothing.
+- `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
+  It is atomic: when it throws, the previous props stay rendered.
+  It returns `true` once accepted and `false` after `destroy` or a fault.
+- `destroy()` is idempotent and unmounts whether or not `target` is still in the document.
+  Call it from your own cleanup, from an ApplicationV2 `_preClose` (or before `super.close`), and before any re-render that replaces the target's ancestors, because DialogV2 and Handlebars `_replaceHTML` replace their content on every render.
+  A mount that is never destroyed leaks for the life of the page.
+
+`mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
+The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
+
+If the component faults while rendering, updating or in an effect, Fabricate logs `Fabricate | Published component render failed:` with the name and the error, empties `target`, and the handle goes inert.
+Any fallback copy is yours to draw.
+
+### Ownership and theme
+
+You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
+`.fab-*` classes and `svelte-*` hashes are private and may change in any release.
+Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
+A published component resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor; mount it after `target` is attached to its final document.
+Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
 ## Data Persistence
 

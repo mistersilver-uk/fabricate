@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Define the UI extension points — the GM Manager's downtime preview and premium extension, and the player window's navigation extension — and the GM Manager's one Core-owned Premium advert outside the Downtime route.
+Define the UI extension points in both directions, and the GM Manager's one Core-owned Premium advert outside the Downtime route.
+Inward, a companion contributes navigation and content into Fabricate's windows: the GM Manager's downtime preview and premium extension, and the player window's navigation extension.
+Outward, a companion renders Fabricate's published UI components into an element it owns (§Published UI Components).
 Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
 
 ## Downtime Preview and Premium Extension
@@ -354,3 +356,121 @@ Every requirement in this subsection is removed when the Studio releases; nothin
   The same registration renders the moment the world opts in, with no re-registration.
 - **What a gated companion observes is an ABSENCE.**
   `mount` is never called, so no cleanup runs and none of `fabricate.player.surfaceMounted`, `fabricate.player.surfaceUnmounted` or `fabricate.player.surfaceTabChanged` fire.
+
+## Published UI Components
+
+This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
+Phase 1 (issue #2426) publishes the seam and data-only leaf primitives; text and slot content, bindables, callbacks, the overlay host, keyboard handling and the standalone style root for interactive primitives are phase 2 (issue #2427).
+
+### The descriptor
+
+- **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount }`.**
+- `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
+- `describe(name)` returns a frozen `{ version, props, rest }`, where `props` is `{ <key>: { kind: 'data', required: boolean } }` and `rest` says whether the component takes data attributes; it returns `null` for a name that is not published.
+- `mount(name, { target, props = {} })` renders a published component into `target` and returns a frozen `{ update(props), destroy() }`.
+- `api.ui` is bound at `init` and rebound at `ready` as the same object.
+It is readable from Fabricate's own `init` onward, and not guaranteed readable from another package's `init`.
+- `api.ui` is not a member of either navigation context, and neither context gains a component or a mount function.
+
+### The manifest and versioning
+
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data', required? } }, rest }`, and Fabricate's runtime adapter binds each `path` to its component.
+- Registration refuses any prop `kind` other than `'data'` with an `Error` naming #2427.
+- A breaking change to one entry — removing or renaming a prop, or narrowing a prop's accepted values — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
+- `schemaVersion` changes only with the seam's own shape.
+- Adding a component, an optional prop, a descriptor member, a handle method or a prop `kind` is additive.
+- A companion treats an unknown name, member or kind as absent, and never assumes the list is closed.
+
+### Mounting and its refusals
+
+- **`mount` is synchronous, runs under Fabricate's `untrack`, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
+Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam never calls `flushSync`.
+- `mount` throws only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+| | Condition | Message tail |
+| --- | --- | --- |
+| M1 | No runtime adapter has registered | `not registered` |
+| M2 | Fabricate is not yet ready | `mount before ready` |
+| M3 | The name is not published | `"<name>" is not published` |
+| M4 | `target.nodeType !== 1`, checked by `nodeType` and never `instanceof`, so a V14 detached window's element passes | `target must be an element` |
+| M5 | `target` holds a live mount | `target already holds a published component` |
+| M6 | `target` is not empty | `target must be empty` |
+| M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
+| M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
+| M9 | A `required` prop is absent or `''` | `<name> requires a non-empty "<key>"` |
+| M10 | A function at any depth, a callback or a snippet | `functions are phase 2 (#2427)` |
+| M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
+| M12 | A cycle | `"<key>" holds a cycle` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean | `"<key>" is not a data attribute` |
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- **A target holds a mount only while its handle is live and the target still contains the mount's root.**
+Otherwise `mount` destroys the stale entry first, then checks that the target is empty.
+- Props are copied at call time and snapshotted with Fabricate's `$state.snapshot`, so a companion's reactive proxies never enter Fabricate's reactive graph.
+
+### Updating and destroying
+
+- **`update(props)` is validated with M7 to M13 and is atomic**: when it throws, the previous props stay rendered.
+- `update` replaces the props and never merges them, so an omitted key reads `undefined` and the component's default applies, and nothing remounts.
+- `update` returns `true` once accepted, with the DOM reflecting it after the next flush, and `false` after `destroy` or a fault.
+- **`destroy()` is idempotent**: it unmounts what Fabricate rendered, whether or not `target` is still connected, and releases the target.
+- The companion MUST call `destroy` on every path that ends the mount: its own cleanup, an ApplicationV2 close (in `_preClose` or before `super.close`), and before any re-render that replaces the target's ancestors, because DialogV2 and Handlebars `_replaceHTML` replace their content on every render.
+- A mount that is never destroyed leaks: Svelte's module-level listener and root sets hold it for the life of the page.
+
+### Faults
+
+- **A fault in render, update or an effect is caught by the host's boundary, and by the next microtask Fabricate reports it, unmounts, releases the target and makes the handle inert.**
+- The report is `console.error('Fabricate | Published component render failed:', name, error)`.
+- A fault that arrives before the runtime's `mount` has returned defers its unmount with `queueMicrotask`.
+- A synchronous throw from the runtime's `mount` is reported the same way, releases the target, and `mount` returns an inert handle.
+- The target is left empty, and any fallback copy is the companion's.
+
+### Ownership, strings and theme
+
+- **The companion owns the placement of `target`**, sizes it as a block-level container, writes nothing inside it while mounted, and styles only the target's own box.
+- `.fab-*` classes and `svelte-*` hashes are private.
+- A phase-1 published component draws only its declared content and adds no premium signal.
+It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus and makes no network request.
+- **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a phase-1 published component makes no `game.i18n` call and has no default copy.
+- Tokens resolve from `:root[data-fabricate-theme]`, which Fabricate's theme sets on `documentElement`.
+- **A published component's own `<style>` states everything it needs**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or `--font-primary`.
+- Svelte's scoped CSS is unlayered and so beats module sheets, which Foundry loads in `layer(modules)`.
+- The companion mounts after `target` is attached to its final document.
+- Mount at the composite level, on stable keyed elements, and reuse a mount through `update`.
+
+#### Scenario: A companion draws a published primitive
+
+- **WHEN** a companion calls `mount(name, { target, props })` with a published name and valid props after Fabricate is ready
+- **THEN** Fabricate renders it into `target` on its own runtime and returns a frozen `{ update, destroy }`
+- **AND** `update` replaces the props without remounting, and `destroy` empties `target`
+
+#### Scenario: A malformed request
+
+- **WHEN** the name is unpublished, a prop key is unpublished, a required prop is empty, or a value is a function
+- **THEN** `mount` throws its fixed `TypeError`, and nothing is rendered
+
+#### Scenario: An occupied target
+
+- **WHEN** a companion mounts into a target that holds a live mount
+- **THEN** `mount` throws, and the earlier mount is untouched
+
+#### Scenario: Destroy is idempotent
+
+- **WHEN** `destroy` is called twice
+- **THEN** the second call does nothing, and every later `update` answers `false`
+
+#### Scenario: A render fault
+
+- **WHEN** the primitive throws while rendering
+- **THEN** Fabricate reports it, empties `target`, and every later `update` answers `false`
+
+#### Scenario: A bare ancestor
+
+- **WHEN** a published component is mounted under an element with no Fabricate ancestor
+- **THEN** its tokens, its typeface and its visually hidden text resolve from its own stylesheet and `:root`
+
+#### Scenario: Before ready
+
+- **WHEN** `mount` is called before Fabricate is ready
+- **THEN** it throws its fixed `TypeError`

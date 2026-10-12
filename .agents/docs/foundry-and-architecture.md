@@ -531,6 +531,11 @@ Core validates a package id against `/^[A-Za-z0-9-_]+$/` (`common/packages/base-
 Additional dice's path validation (`countAdditionalDicePathInvalid` in `src/ui/svelte/apps/manager/checks/countReadiness.js`) special-cases exactly that first segment rather than banning a hyphen or a leading digit everywhere in the path.
 - **Foundry's own `Die#explode` throws "Maximum recursion depth" once a recursive explosion has checked more than 1000 results, and that limit is Foundry's, not Fabricate's.**
 `FabricateCountRoll` (`src/systems/countRoll.js`) catches exactly that message and maps it to its own `explode-unbounded` refusal, while any other error during evaluation is rethrown rather than swallowed.
+- **A published UI component renders into a COMPANION's element, so four Foundry facts bind its seam rather than any Fabricate window** (`ui-extension-points/spec.md` § Published UI Components, issue 2426).
+Module sheets load in `layer(modules)` while a Svelte scoped block is an unlayered injected `<style>`, so a published component's own `<style>` beats any module rule and must state everything it needs without a Fabricate ancestor.
+A V14 detached window is a second realm: test an element with `nodeType === 1`, never `instanceof`, expect its head styles to have been copied ONCE when it detached, and read `document` as the main window's.
+DialogV2 and Handlebars `_replaceHTML` replace their content on every render, so a companion destroys its mount before any re-render that replaces the target's ancestors.
+An ApplicationV2 close tears its element down after `_preClose`, so a companion destroys its mount in `_preClose` or before calling `super.close`.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
