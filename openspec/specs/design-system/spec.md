@@ -1365,6 +1365,7 @@ A `Typeahead` that appends one id per choice to a short list its caller renders 
 Two look-alikes are adjudicated out by their widgets.
 The recipe editor's Books & Scrolls tab renders remove-only rows that write per row, by its own recorded decision that a recipe joins a book only from the book's editor, so nothing in it is searched, bounded or staged.
 The access inspector's two rosters are each searchable and paged at six, and each row toggle persists the whole access snapshot and is its own reversal, so the inspector's content IS the set, already bounded by its pager, and a trigger would hide the grant state in a column whose only job is showing it.
+The requirement row's tag adder is outside this requirement too: its set is the row's own chip run, which the row draws and removes from itself, and each choice writes one add or one remove at once, so it is the shared picker's multi-select panel rather than `SetPicker`; what binds it is the announcement, which `multiple` makes.
 One record's membership is this control's; a MULTI-RECORD edit is the staging inset's, and the requirement below states what that one owns.
 
 The trigger renders a FIXED maximum number of selected tokens and then an overflow count.
@@ -1565,7 +1566,12 @@ Every row leads with a kind-tinted chip, and the tint is what makes a list of ei
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
 A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list.
 `tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
-The catalogue lists each tag with the number of components already carrying it, which is what distinguishes a real tag from a typo of one, and offers creating an absent tag from its own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
+The catalogue lists every tag in the site's vocabulary, those already on the row included, each with the number of components already carrying it wherever the site supplies those counts, which is what distinguishes a real tag from a typo of one.
+That number is how many of the site's components carry the tag exactly, the comparison a tag requirement matches with, and a tag no component carries reads zero; a site that supplies no counts draws none rather than a zero.
+A tag already on the row that the vocabulary holds is listed SELECTED — the shared picker's multi-select state, announced as selected and marked with a check — so the panel doubles as the row's current state, and choosing a selected tag takes it off the row exactly as its chip's remove does.
+Each choice writes at once, and the list keeps vocabulary order, so a choice moves no row.
+The panel stays open across choices.
+Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
 The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
 Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
 
