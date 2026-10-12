@@ -59,6 +59,7 @@ const VARIANTS = Object.freeze({
 const FROZEN = Object.freeze({
   player: {
     root: ['1px', 'solid', 'rgba(0, 0, 0, 0)', '9px', 'rgba(0, 0, 0, 0)'],
+    flex: ['0', '0px'],
     line: ['8px', '0px', 'flex-start'],
     tile: ['30px', '30px', '7px', 'rgba(185, 124, 120, 0.54)'],
     copy: '2px',
@@ -67,6 +68,7 @@ const FROZEN = Object.freeze({
   },
   authoring: {
     root: ['1px', 'solid', 'rgba(217, 184, 156, 0.18)', '11px', 'rgb(21, 33, 43)'],
+    flex: ['0', '0px'],
     line: ['12px', '12px', 'center'],
     tile: ['30px', '30px', '7px', 'rgba(185, 124, 120, 0.54)'],
     copy: '2px',
@@ -75,6 +77,7 @@ const FROZEN = Object.freeze({
   },
   'readonly-gm': {
     root: ['0px', 'none', 'rgb(241, 209, 181)', '0px', 'rgba(0, 0, 0, 0)'],
+    flex: ['1', '0px'],
     line: ['8px', '0px', 'center'],
     tile: null,
     copy: '2px',
@@ -103,6 +106,7 @@ function measure(variant) {
       rootStyle.borderTopLeftRadius,
       rootStyle.backgroundColor,
     ],
+    flex: [rootStyle.flexGrow, rootStyle.minWidth],
     line: [line.gap, line.padding, line.alignItems],
     tile: tile && [tile.width, tile.height, tile.borderTopLeftRadius, tile.borderTopColor],
     copy: css(root.querySelector('.fab-complication-row-copy')).gap,
