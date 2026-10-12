@@ -114,6 +114,33 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: A list's arrangement switch renders through ViewToggle
+
+A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
+Its two options are `list` and `grid` and no third, because a third arrangement is a different screen rather than a third button; any value other than `grid` reads as `list`, which is the rule `LibraryShelf` applies to the same value, so the toggle and the arrangement it controls cannot disagree.
+It holds no state of its own: the list around it owns the current arrangement, and `onChange` receives the chosen one.
+Its glyphs are fixed, `fa-list` for list and `fa-table-cells-large` for grid, so every list's switch reads alike; a caller supplies the words, never the glyphs.
+Each option renders a glyph alone, so each takes its accessible name from a required, already-localized label prop, `listLabel` and `gridLabel`, and the group takes its own from a required `ariaLabel`.
+A caller's per-option hook rides `optionDataAttr` onto each option's clickable label, never onto its hidden radio.
+The essence browser's presentation control is its first caller (issue 2412).
+With one importer, `ViewToggle` is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+
+#### Scenario: A GM switches the essence library to its grid
+
+- **WHEN** a GM chooses the grid option of the essence browser's list and grid switch
+- **THEN** `onChange` receives `grid` and the list renders its grid
+- **AND** the switch shows grid as the one checked option
+
+#### Scenario: The checked option is chosen again
+
+- **WHEN** the GM chooses the option that is already checked
+- **THEN** `onChange` is not called
+
+#### Scenario: An arrangement outside the pair
+
+- **WHEN** a `ViewToggle` is given a `view` that is neither `list` nor `grid`
+- **THEN** the list option is the checked one
+
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
 WorldClockChip MUST compose Chip's opt-in `presentation="clock"` around one baseline-aligned line of icon, label and value, centred inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
@@ -147,7 +174,7 @@ A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or wi
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
 `environment/GatheringModifierEditor.svelte` is the worked example of that register doing its job: a composition reaching two independent callers is owed a manifest row and cannot be recorded as a non-member instead, so when issue 1707 wrote the twice-authored gathering modifier panel once and the gathering task and gathering event inspector leaves became its two callers, it left the register by entering the member table as a manager-only row naming no library entry, because no specimen specifies a condition-and-character modifier editor.
-`apps/manager/ManagerTitleBar.svelte` is a one-caller component and not a member: its caller is `CraftingSystemManagerRoot.svelte`, it has no manifest row, and `<AppTitleBar>` stays `target` until a second host exists (#1777 decision E1).
+`AppTitleBar` (`components/AppTitleBar.svelte`) is the shipped implementation of the library's `<AppTitleBar>` entry (issue 2420); its one importer is `apps/manager/ManagerTitleBar.svelte`, the manager's call site, which composes the selected system's resolution summary from the shell's mode label and outcome-tier count, so it is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent, and that record replaces #1777 decision E1, which held the entry at `target` until a second host existed.
 The title bar (`AppTitleBar`) and the page header (`PageHeader`) are distinct entries.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
@@ -293,6 +320,8 @@ The same issue adds `DataTable`, which emits `fabricate-data-table` on its own r
 The same issue gives `SearchField` a labelled form, which emits `fabricate-search-field` on the `Field` root it renders and keeps `fabricate-search` on the inner shell, while the bare form keeps `fabricate-search` on its own root; it portals nothing, so those two are its only roots.
 The same issue adds `Typeahead`, which emits `fabricate-typeahead` on its field's root and `fabricate-typeahead-list`, `-option` and `-note` on the list it floats to the application root, rooted in the module sheet, so the suggestion rules rooted at `.fabricate-manager` under `manager-tag-suggestion(s)` are re-rooted at an unchanged (0,2,0); the roll-data chips that borrowed the option's box keep it under their own class.
 Issue 2321 adds `XrefList`, which emits `fab-xref-list` on its own root, `fab-xref-list-label` on its label and `fab-xref-list-items` on its list, all painted from its own scoped block; its rows are `ListRow`'s, whose family it does not restate, and it portals nothing, so it needs one root.
+Issue 2412 adds `ViewToggle`, which writes no family of its own: its root is the `SegmentedControl` it composes, whose classes it does not restate, and it portals nothing.
+Issue 2420 records `AppTitleBar`, a non-member, which writes no root of its own: it keeps the `manager-titlebar` family and its `data-manager-titlebar` hooks, every rule of which is rooted at `.fabricate-manager`, so it is not adoptable outside the manager until that family is re-rooted, which no host asks for because the player window carries no premium signal; it portals nothing.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -909,8 +938,9 @@ A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed 
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
 An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, because muted measures under 4.5:1 on the raised hover ground; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
 A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
+A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`, and each of its two glyph options is a radio named by its own label prop, `listLabel` or `gridLabel`, and never by its glyph; each option is titled with the same word, the pointer half of that name.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
-`AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4).
+`AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
 `TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
@@ -1116,6 +1146,7 @@ The two are separate entries rather than one tile taking a `kind` prop, because 
 A dense cross-reference list row is the one exception: its 22px mark is the record tile even for an actor, because the portrait ladder has no 22px rung, so an actor there falls back to a glyph.
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
+A list's arrangement, list or grid, is the view toggle, which is that segmented control at its icon-only form over a closed pair; it is never a pair of pressed icon buttons, which announce two independent states for one choice.
 An on/off property of the record in its own editor, drawn as a card, is the toggle card — the settings-row toggle at card scale.
 Option cards are the two-to-four-way choice above, used when each side needs its own sentence.
 Neither is a mode of the other.
@@ -2232,6 +2263,11 @@ The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button ca
 Every caller MUST draw `PageHeader`'s specimen and MUST NOT restate its padding, trail, title, subtitle or action size; a caller rule MAY only place the header in its grid and keep its route's #1373 fill.
 The specimen draws a 1px bottom rule, 16 padding, the trail as its own first row at 12px/500 in `--fab-text-muted` with its leaf in `--fab-text-secondary`, a 22px title (identity snippets included), a 12px/1.6 subtitle at most 74ch wide and 38px actions at the top of the title block (ruling 2026-10-07 E4; D1, D2).
 
+The manager's title band MUST render through `AppTitleBar` (`src/ui/svelte/components/AppTitleBar.svelte`), above the page header and the rail on every manager route, the Tool routes included, and only `apps/manager/ManagerTitleBar.svelte` renders it (issue 2420).
+`ManagerTitleBar` formats the summary the shell derives — the selected system's resolution mode, followed by its outcome-tier count when that count is positive — and hands `AppTitleBar` that caption and whether a companion is installed; with no mode label, which is to say with no system selected, it hands no caption, so the band draws no status line.
+`AppTitleBar` draws the band's own words, the `PREMIUM` mark, its read name and the status prefix, from the `FABRICATE.Admin.Manager.Titlebar` keys, and draws a caller's caption verbatim.
+The player window renders no `AppTitleBar`, because it carries no premium signal; its top bar is `ActorSelectTopBar`, a region beside its rail.
+
 The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
 `NavSidebar`'s `labelled` variant MUST draw an expanded group on the expanded rail as one box (radius 9, soft ground, inset hairline, `--fab-space-2xs` padding) with the parent row unshifted, borderless and unplated unless the rail marks it active, and its children one `--fab-space-3` step in; the collapsed rail draws no box.
@@ -2257,6 +2293,17 @@ Its `icon` variant MUST keep 8/0/6 item padding and the `--fab-success` pip (rul
 - **THEN** the parent and its rows draw inside one radius-9 box
 - **AND** the parent's icon, label and chevron do not move
 - **AND** on the collapsed rail the group draws no box and the parent's icon does not move
+
+#### Scenario: A manager route draws its title band
+
+- **WHEN** any manager route renders
+- **THEN** its title band is `AppTitleBar`, rendered by `ManagerTitleBar` alone
+- **AND** the band carries the PREMIUM mark while a companion is installed, and the selected system's resolution summary while a system is selected
+
+#### Scenario: No system is selected
+
+- **WHEN** the shell hands `ManagerTitleBar` no mode label, because no system is selected, whatever the outcome-tier count
+- **THEN** the band draws no status line
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 

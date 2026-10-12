@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The manager's title band above the page header, on every route including the Tool routes: the
-  PREMIUM mark and the selected system's resolution summary (issues 1185, 1373, 1777).
+  PREMIUM mark and the selected system's resolution summary (issues 1185, 1373, 1777, 2420).
 
   Props:
   | prop | values | default | contract |
@@ -14,11 +14,13 @@
   Invariants:
   - The only caller is `CraftingSystemManagerRoot.svelte`, which renders none of this markup —
     pinned by `tests/components/manager-title-bar-mounted.test.js`.
-  - The PREMIUM mark is a bare span sharing the rail's gold badge rule, not a `Chip`.
-  - No element here has a role, so none carries `aria-label`; each name is `.visually-hidden`
-    text (issue 2257 D4) — pinned by `tests/components/manager-title-bar-mounted.test.js`.
+  - Renders `AppTitleBar` and none of its markup — pinned by
+    `tests/components/manager-title-bar-mounted.test.js`.
+  - With no `modeLabel` it hands no caption, whatever the tier count.
 -->
 <script>
+  import AppTitleBar from '../../components/AppTitleBar.svelte';
+
   let { text, premiumInstalled = false, modeLabel = '', outcomeTierCount = 0 } = $props();
 
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
@@ -28,6 +30,7 @@
   }
 
   const statusLabel = $derived.by(() => {
+    if (!modeLabel) return '';
     if (outcomeTierCount <= 0) return modeLabel;
     const tiers = formatCount(
       'FABRICATE.Admin.Manager.Titlebar.OutcomeTier',
@@ -38,30 +41,6 @@
     );
     return `${modeLabel} · ${tiers}`;
   });
-
-  const premiumStatus = $derived(
-    text(
-      'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-      'Fabricate Premium is installed and connected'
-    )
-  );
 </script>
 
-<div class="manager-titlebar" data-manager-titlebar>
-  {#if premiumInstalled}
-    <span class="manager-titlebar-badge" data-manager-titlebar-premium title={premiumStatus}
-      ><span aria-hidden="true">{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-      ><span class="visually-hidden">{premiumStatus}</span></span
-    >
-  {/if}
-  {#if modeLabel}
-    <span class="manager-titlebar-status" data-manager-titlebar-status title={statusLabel}>
-      <span class="visually-hidden"
-        >{text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}</span
-      >
-      <!-- An information glyph, because the line is a caption, not a dice-roll control (issue 1373). -->
-      <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
-      <span class="manager-titlebar-status-text">{statusLabel}</span>
-    </span>
-  {/if}
-</div>
+<AppTitleBar {premiumInstalled} {statusLabel} />

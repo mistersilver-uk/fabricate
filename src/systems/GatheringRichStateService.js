@@ -7,7 +7,6 @@ import {
   normalizeTagList,
 } from '../utils/scalars.js';
 
-import { chatModeOption } from './bulkChatVisibility.js';
 import { resolveModifierLibrary } from './characterLibraries.js';
 import {
   conditionSettingsToCurrent,
@@ -416,14 +415,10 @@ export class GatheringRichStateService {
     system = null,
     gatheringModifier = 0,
     eventModifier = 0,
-    // Opt-in Dice So Nice: `animate` pre-rolls one `Nd100` Roll and draws each row/event face
-    // from it (falling back to `this.rollD100()`); `extraModifier` is a flat bonus on every throw;
-    // `rollMode`/`speaker`/`flavor` decorate the post. Off, throws are silent.
-    animate = false,
+    // A prompted attempt's GM-rolled face, used when an item row reads it, else `rollD100()`;
+    // `extraModifier` is its flat bonus on every throw.
+    attemptRoll = null,
     extraModifier = 0,
-    rollMode,
-    speaker,
-    flavor,
   } = {}) {
     const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
@@ -466,12 +461,12 @@ export class GatheringRichStateService {
       };
     }
 
-    const itemRoll = await this._rollD100ItemRows({
+    const itemRoll = this._rollD100ItemRows({
       rowContributions,
       rules,
       environment,
       modifier: taskModifier + flatBonus,
-      animate,
+      presetRoll: attemptRoll,
     });
 
     const eventResolution = this._resolvePreparedEnvironmentalEvents({
@@ -482,20 +477,6 @@ export class GatheringRichStateService {
       eventModifier,
       extraModifier: flatBonus,
     });
-
-    // Post the attempt's d100 so Dice So Nice animates it and the shown number is the one tested;
-    // animate-only, and a chat failure is logged, never thrown.
-    if (itemRoll.attemptRollMessage) {
-      try {
-        // `rollMode` is deprecated on V14; the shim picks key and vocabulary together.
-        await itemRoll.attemptRollMessage.toMessage(
-          { speaker, flavor },
-          { ...chatModeOption(rollMode), create: true }
-        );
-      } catch (error) {
-        console.error('Fabricate | Failed to post d100 roll to chat:', error);
-      }
-    }
 
     return {
       status: eventResolution.status === 'failed' ? 'failed' : 'succeeded',
@@ -551,25 +532,11 @@ export class GatheringRichStateService {
     return { rowSnapshots, rowContributions, diagnostics };
   }
 
-  async _rollD100ItemRows({ rowContributions, rules, environment, modifier, animate }) {
+  _rollD100ItemRows({ rowContributions, rules, environment, modifier, presetRoll = null }) {
     // All item rows share one attempt roll. Environmental events are resolved separately,
     // with one independent throw per event, so hazards never correlate with the item haul.
-    const rollsAttemptCheck = rowContributions.length > 0;
-    let attemptRoll = null;
-    let attemptRollMessage = null;
-    if (rollsAttemptCheck && animate && typeof globalThis.Roll === 'function') {
-      try {
-        const rolled = await new globalThis.Roll('1d100').evaluate({ allowInteractive: false });
-        const face = Number(rolled?.dice?.[0]?.results?.[0]?.result);
-        if (Number.isFinite(face)) {
-          attemptRoll = face;
-          attemptRollMessage = rolled;
-        }
-      } catch (error) {
-        console.error('Fabricate | Failed to roll the d100 gathering check:', error);
-      }
-    }
-    if (rollsAttemptCheck && attemptRoll === null) attemptRoll = this.rollD100();
+    const preset = Number.isInteger(presetRoll) ? presetRoll : null;
+    const attemptRoll = rowContributions.length > 0 ? (preset ?? this.rollD100()) : null;
 
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
@@ -592,7 +559,6 @@ export class GatheringRichStateService {
       roll: attemptRoll,
       itemRows,
       selectedItems: selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit),
-      attemptRollMessage,
     };
   }
 

@@ -749,7 +749,7 @@ Capabilities:
   The card is itself the drop target, so no second drop prompt renders beneath it — a card and a zone side by side state the same affordance twice.
   A sub-line states what the GM can do with the card; it never restates the card's own title or the raw uuid, which is what a copy-uuid action is for.
   The essence source's UNLINKED state keeps the drop-or-pick control, because an essence source is an in-system managed component and the pick half is the only route to that list.
-  The presentation toggle renders through the shared segmented control's icon-only variant, because a list glyph and a grid glyph ARE the two layouts, while the status filter beside it keeps its words.
+  The presentation toggle renders through `ViewToggle`, the shared segmented control's icon-only form over the closed list and grid pair (issue 2412), because a list glyph and a grid glyph ARE the two layouts.
 - A browser row that leads with the 40px medallion states selection as the accent ring alone and drops the inset left bar, which would otherwise bite into the medallion; the essence row is one of them, and on its grid card a left bar is not even the correct axis.
 - A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
   A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.

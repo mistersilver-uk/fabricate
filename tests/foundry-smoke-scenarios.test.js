@@ -13,7 +13,7 @@ import { SMOKE_SCENARIOS, SMOKE_SCENARIO_IDS } from '../scripts/foundry-smoke/re
 import { GATHERING_ATTEMPT_PROMPTS } from '../scripts/foundry-smoke/scenarios/phase-e-inventory-gathering-crafting.mjs';
 import { D0_SKIPPABLE_SECTIONS, SCREENSHOT_CAPTURE_ORDER } from '../scripts/lib/screenshotCaptureMap.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { parseModule } from './helpers/moduleAst.js';
+import { parseModule, walkNodes } from './helpers/moduleAst.js';
 import { physicalLines } from './helpers/unitSizes.js';
 import {
   SMOKE_SOURCE_FILES,
@@ -313,16 +313,54 @@ test('the label-emission parse over every module covers the whole capture order'
   assert.deepEqual(missing, []);
 });
 
-test('phase E expects a gather roll prompt exactly when the engine requires a check', () => {
+/** The d0 spine's authored gathering tasks by id: their resolution mode and whether they are timed. */
+function spineGatheringTasks() {
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/foundry-smoke/scenarios/d0-spine.mjs'), 'utf8');
+  const valueOf = (object, key) =>
+    object.properties.find((property) => property.key?.name === key)?.value ?? null;
+  const tasks = new Map();
+  for (const node of walkNodes(parseModule(source).ast)) {
+    if (node.type !== 'ObjectExpression') continue;
+    const id = valueOf(node, 'id');
+    if (id?.type !== 'Literal' || !valueOf(node, 'dropRows')) continue;
+    const time = valueOf(node, 'timeRequirement');
+    for (const property of time?.properties ?? []) {
+      // A computed duration would read as untimed here, so the spine authors only literals.
+      assert.equal(property.value?.type, 'Literal', `${id.value}: timeRequirement is literal`);
+    }
+    tasks.set(id.value, {
+      resolutionMode: valueOf(node, 'resolutionMode')?.value,
+      timed: (time?.properties ?? []).some((property) => Number(property.value?.value) > 0),
+    });
+  }
+  return tasks;
+}
+
+test('phase E expects a gather roll prompt exactly when the engine requires a check', async () => {
+  const { offersD100Prompt } = await import('../src/systems/gatheringD100Check.js');
+  const spine = spineGatheringTasks();
   const engine = new GatheringEngine({});
   for (const { taskId, resolutionMode, prompts } of GATHERING_ATTEMPT_PROMPTS) {
-    const { required } = engine._versionedCheckDescriptor({
+    const authored = spine.get(taskId);
+    assert.ok(authored, `${taskId} is a d0 spine task`);
+    // The spec's default mode is d100, which a fixture authoring none resolves to.
+    assert.equal(resolutionMode, authored.resolutionMode ?? 'd100', taskId);
+    const task = { id: taskId, resolutionMode };
+    const run = { taskId, ...(authored.timed && { timeGate: { durationSeconds: 60 } }) };
+    const descriptor = engine._versionedCheckDescriptor({
       actor: { name: 'A' },
-      run: { taskId },
+      run,
       system: {},
       environment: {},
-      task: { id: taskId, resolutionMode },
+      task,
     });
-    assert.equal(prompts, required, taskId);
+    assert.equal(prompts, offersD100Prompt({ task, run }) || descriptor.required, taskId);
   }
+  assert.deepEqual(
+    GATHERING_ATTEMPT_PROMPTS.map(({ taskId, prompts }) => [taskId, prompts]),
+    [
+      ['smoke-meadow-herbs', true],
+      ['smoke-slow-bloom', false],
+    ]
+  );
 });

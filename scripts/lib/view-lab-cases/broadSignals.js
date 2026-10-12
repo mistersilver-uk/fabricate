@@ -86,6 +86,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-component-tag-suggestions',
     'manager-gathering-task-drop-modifier-suggestions',
   ]),
+  // The list and grid switch (issue 2412): the essence browser in each arrangement.
+  'src/ui/svelte/components/ViewToggle.svelte': Object.freeze([
+    'manager-essences-normal',
+    'manager-essences-grid',
+  ]),
   // The cross-reference list (issue 2321): the inventory inspector, a tool's Required for and an
   // essence's Contributing.
   'src/ui/svelte/components/XrefList.svelte': Object.freeze([
@@ -286,6 +291,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
+  ]),
+  // The manager's title band (issue 2420), on the seven frames ManagerTitleBar's own cases draw.
+  'src/ui/svelte/components/AppTitleBar.svelte': Object.freeze([
+    'manager-default-selection',
+    'manager-systems-empty',
+    'manager-selected-normal',
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-selected-stacked',
+    'manager-world-downtime-test-companion-installed',
   ]),
   // The app navigation (issue 1777): the manager sidebar expanded and collapsed, the collapsed
   // Downtime rail, and the player rail, its icon variant.

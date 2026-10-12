@@ -1,10 +1,11 @@
 <!--
   An essence requirement's open slot: the chooser's tile row, and beneath it the stage's essence
-  pool as its `panel`, wired as `StepDetails` wires its pool. Each carrier's reading is the row's.
+  pool as its `panel`, wired as crafting's `EssencePoolPanel` wires its pool. Each carrier's reading
+  is the row's.
 -->
 <script>
   import EssencePool from '../../../../src/ui/svelte/components/EssencePool.svelte';
-  import { format } from '../fixtureActs.js';
+  import { format, localize } from '../fixtureActs.js';
 
   let {
     component: Specimen,
@@ -14,6 +15,8 @@
     readings = {},
     yields = {},
     held = {},
+    labelKey,
+    hintKey,
     meterKey,
     allocateKey,
     decreaseKey,
@@ -40,6 +43,7 @@
   <EssencePool
     {thresholds}
     {allocation}
+    capAtHeld
     yield={contribution}
     {spare}
     held={holding}
@@ -49,6 +53,8 @@
     {allocationLabel}
     {decrementLabel}
     {incrementLabel}
+    label={localize(labelKey)}
+    hint={localize(hintKey)}
     onStep={step}
   />
 {/snippet}

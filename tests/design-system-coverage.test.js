@@ -208,8 +208,7 @@ test('every manifest library name resolves to a library entry', () => {
  * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
 const SPECIFIED_ONLY = [
-  'AppTitleBar',
-  'TierTrack', 'ViewToggle',
+  'TierTrack',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -647,6 +646,16 @@ const MERGED_BY_1778 = ['BrowseCard'];
 test('XrefList, which issue 2321 built, reads shipped in the library', () => {
   // A non-member row: the status clause above reads member rows only, so this one is pinned here.
   assert.equal(PER_NAME_STATUS.get('XrefList'), 'shipped');
+});
+
+test('ViewToggle, which issue 2412 built, reads shipped in the library', () => {
+  // A non-member row, pinned here for the reason XrefList's is.
+  assert.equal(PER_NAME_STATUS.get('ViewToggle'), 'shipped');
+});
+
+test('AppTitleBar, which issue 2420 built, reads shipped in the library', () => {
+  // A non-member row: the status clause above reads member rows only, so this one is pinned here.
+  assert.equal(PER_NAME_STATUS.get('AppTitleBar'), 'shipped');
 });
 
 test('every name issue 1782 built reads shipped in the library', () => {

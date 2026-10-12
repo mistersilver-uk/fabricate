@@ -31,6 +31,7 @@ const VALUE_PROP_NAMES = new Set([
   'art',
   'side',
   'layout',
+  'view',
   'fill',
   'pipKind',
   'shape',
