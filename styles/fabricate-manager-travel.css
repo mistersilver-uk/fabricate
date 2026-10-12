@@ -1,0 +1,849 @@
+/* === GM Travel route (issue 257): world-level party management + per-system current-region overrides. === */
+.fabricate-manager .manager-travel-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  min-width: 0;
+}
+
+/* Travel > Parties accordion list (styled after the gathering tools browser). */
+
+/* Travel > Realms browse pane: filter bar, `.manager-table-scroll` body, pager — the Environments browse recipe. */
+.fabricate-manager .manager-travel-realms {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager .manager-travel-realms-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-height: 0;
+}
+
+.fabricate-manager .manager-travel-realms-row {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color var(--fab-motion-control);
+}
+
+/* Travel > Map Region Links: one row per Foundry Scene Region. */
+.fabricate-manager .manager-map-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-height: 0;
+}
+
+.fabricate-manager .manager-map-link-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  transition: border-color var(--fab-motion-control), background-color var(--fab-motion-control);
+}
+
+.fabricate-manager .manager-map-link-row:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-map-link-row.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-surface-active);
+}
+
+.fabricate-manager .manager-map-link-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--fab-space-3);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  text-align: left;
+  color: inherit;
+}
+
+.fabricate-manager .manager-map-link-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-map-link-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid var(--fab-border-strong);
+
+  /* Themed default; the scene region's own colour overrides this inline. */
+  background: var(--fab-overlay-light-04);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-map-link-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-text);
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 3ch;
+  text-align: left;
+}
+
+.fabricate-manager .manager-map-link-picker-cell {
+  flex: 0 0 auto;
+
+  /* Every row's link picker is the same fixed width so the column lines up; overflowing region names truncate with an ellipsis inside the trigger. */
+  width: 200px;
+  padding: var(--fab-space-chip) var(--fab-space-2) var(--fab-space-chip) 0;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-travel-picker {
+  width: 100%;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.fabricate-manager .manager-map-link-picker-cell .manager-map-link-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.fabricate-manager .manager-map-link-inspector-swatch {
+  border: 1px solid var(--fab-border-strong);
+  background: var(--fab-overlay-light-04);
+}
+
+/* Map tab inspector: the selected map region and its link live in two sibling cards, so the shared outer inspector card drops its own chrome and just lays them out in a spaced column. */
+.fabricate-manager .manager-travel-inspector[data-travel-inspector="map"] {
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {
+  margin: 0;
+}
+
+.fabricate-manager .manager-travel-realms-row:hover {
+  border-color: var(--fab-border-strong);
+}
+
+/* A `<button>` since issue 1512, so core's `button` reset is neutralised here: it pins a height, a fill and a centred content box. No `min-height` is declared — `height: auto` keeps the box the 38px realm icon and this padding already set, and a figure here would invent one. `text-rendering` is inherited explicitly because `font: inherit` does not cover it and the UA sheet pins it on a form control, which re-measures every chip in the row. */
+.fabricate-manager .manager-travel-realms-header {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: var(--fab-space-3);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  border-radius: 9px;
+  font: inherit;
+  text-rendering: inherit;
+}
+
+.fabricate-manager .manager-travel-realms-header:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-travel-realms-row.is-expanded > .manager-travel-realms-header {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fabricate-manager .manager-travel-realms-left {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-realms-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-text-muted);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-realms-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-text);
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Three classes: the tighter 4px gap collides with the chip primitive’s 6px, and at two classes it would tie with the scoped block and lose (issue 883). */
+.fabricate-manager .manager-chip.manager-travel-realms-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-realms-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  margin-left: auto;
+  color: var(--fab-text-muted);
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-realms-editor {
+  min-height: 56px;
+  padding: var(--fab-space-4);
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-04);
+  border-bottom-left-radius: 9px;
+  border-bottom-right-radius: 9px;
+}
+
+/* The selected/expanded region row uses the same neutral treatment as the Parties tab — no fill highlight; the expanded body itself signals selection. */
+
+/* Region accordion body: available / included environment membership editor. */
+.fabricate-manager .manager-realm-env-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--fab-space-4);
+  align-items: start;
+}
+
+.fabricate-manager .manager-realm-env-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-realm-env-column .fabricate-search {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-realm-env-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-realm-env-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+}
+
+/* Colour-code the two columns so "in the realm" vs "can be added" reads at a glance: included rows are tinted/accented success, available rows stay plain with an accent Add affordance. */
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="included"] .manager-card-subtitle {
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="included"] .manager-realm-env-row {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+  box-shadow: inset 3px 0 0 var(--fab-success-border);
+}
+
+.fabricate-manager .manager-realm-env-column[data-realm-env-column="available"] .manager-realm-env-row {
+  box-shadow: inset 3px 0 0 var(--fab-border);
+  opacity: 0.92;
+}
+
+.fabricate-manager .manager-realm-env-add {
+  color: var(--fab-accent);
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-realm-env-column .manager-card-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-realm-env-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fab-text);
+}
+
+.fabricate-manager .manager-realm-env-row .fabricate-icon-button {
+  flex: 0 0 auto;
+}
+
+@container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-realm-env-editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Region inspector environment / party summaries. */
+.fabricate-manager .manager-travel-region-environments,
+.fabricate-manager .manager-travel-region-parties {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-travel-region-environments li,
+.fabricate-manager .manager-travel-region-parties li {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+  color: var(--fab-text);
+  font-size: 0.88rem;
+}
+
+.fabricate-manager .manager-travel-region-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  border: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-text-muted);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-travel-region-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-travel-region-item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* World > Parties (issue 1182). */
+
+/* The pane scrolls itself at the prototype's `14px 18px 26px`, so the shared travel wrapper must not add a second inset around it. */
+.fabricate-manager .manager-travel-view.is-parties-pane {
+  padding: 0;
+  gap: 0;
+}
+
+/* Foundry core pins a fixed height on every `button`, which crops a card control and the wrapped no-state tile outright. */
+.fabricate-manager .manager-travel-parties-create,
+.fabricate-manager .manager-party-enable-pill,
+.fabricate-manager .manager-party-delete,
+.fabricate-manager .manager-party-member-move,
+.fabricate-manager .manager-party-member-remove,
+.fabricate-manager .manager-party-move-target,
+.fabricate-manager .manager-party-move-cancel,
+.fabricate-manager .manager-party-add-open,
+.fabricate-manager .manager-party-add-done,
+.fabricate-manager .manager-party-add-candidate,
+.fabricate-manager .manager-party-actor-tile,
+.fabricate-manager .manager-party-actor-unlink,
+.fabricate-manager .manager-party-actor-open {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  height: auto;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-travel-parties-create:disabled,
+.fabricate-manager .manager-party-enable-pill:disabled,
+.fabricate-manager .manager-party-delete:disabled,
+.fabricate-manager .manager-party-member-move:disabled,
+.fabricate-manager .manager-party-member-remove:disabled,
+.fabricate-manager .manager-party-move-target:disabled,
+.fabricate-manager .manager-party-add-open:disabled,
+.fabricate-manager .manager-party-add-candidate:disabled,
+.fabricate-manager .manager-party-actor-tile:disabled,
+.fabricate-manager .manager-party-actor-unlink:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+/* The drop affordance for the travel-actor tile. It lives here, not in `PartyTravelActorPanel`'s scoped block, because `dragDrop` adds the class at runtime. */
+.fabricate-manager .manager-party-actor-tile.is-drop-active {
+  border-radius: 11px;
+  background: var(--fab-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--fab-accent-border);
+}
+
+/* The pager is the pane's full-width sibling footer, outside the card scroller. */
+.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .fabricate-pagination {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--fab-space-3) var(--fab-space-5);
+  border: 0;
+  border-top: 1px solid var(--fab-border);
+  border-radius: 0;
+  background: var(--fab-bg-0);
+}
+
+/* The travel-actor picker's trigger, inline search field and popover — all rendered by `SearchablePopover`. */
+.fabricate-manager .manager-party-actor-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-party-actor-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-secondary);
+  background: var(--fab-surface-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-party-actor-open > i {
+  font-size: 9px;
+}
+
+/* === THE PICKER PRIMITIVE'S OWN ROOTS (issue 1464) === `.fabricate-picker` and `.fabricate-picker-popover` are written by `SearchablePopover` itself, on its root element and on the panel it portals out of that root. */
+.fabricate-picker .manager-travel-picker-inline {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 7px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-picker .manager-travel-picker-inline > i {
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+}
+
+/* `align-self: stretch` with `height: auto` pins the input to the ROW's height. */
+.fabricate-picker .manager-travel-picker-inline input {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+  color: var(--fab-text);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+/* The inline search field's close control, which `SearchablePopover` renders itself and which therefore has to paint outside `.fabricate-manager`. */
+.fabricate-picker .manager-travel-picker-inline-close {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  color: var(--fab-text-subtle);
+  background: none;
+  font-size: 10px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+/* COMPOSITE SEARCH FIELDS — the World > Parties add-a-member search and the travel-actor picker's inline field (issue 1515). */
+@supports selector(:has(*)) {
+  .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible {
+    outline: none;
+  }
+
+  /* The picker's own inline field, split out of the row above so it keeps this treatment outside `.fabricate-manager`. */
+  .fabricate-picker .manager-travel-picker-inline input:focus-visible {
+    outline: none;
+  }
+
+  .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible) {
+    border-color: var(--fab-accent);
+    box-shadow: inset 0 0 0 1px var(--fab-accent);
+  }
+
+  /* 2px, not 1px. This row rests on `--fab-accent-border` — the accent at partial alpha — so a 1px inset ring leaves the focus delta as an alpha change plus one pixel, far weaker than the same treatment on the two rows that rest on the neutral `--fab-border`. */
+  .fabricate-picker .manager-travel-picker-inline:has(input:focus-visible) {
+    border-color: var(--fab-accent);
+    box-shadow: inset 0 0 0 2px var(--fab-accent);
+  }
+}
+
+/* `.manager-travel-actor-popover` carries no style: it is the View Lab capture hook that names the travel-actor picker's panel (`scripts/lib/viewLabCases.js`). */
+
+.fabricate-picker-popover .manager-travel-option-marker {
+  flex: 0 0 auto;
+  color: var(--fab-accent);
+  font-size: 9px;
+}
+
+/* The realm-override picker, moved from the card HEAD into the card's right column (`ui-integration/spec.md:1603-1604` pins every editing control to the centre column). */
+.fabricate-manager .manager-travel-parties-override {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.fabricate-button.fabricate-button.manager-travel-parties-override-trigger {
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 7px;
+  padding: 0 var(--fab-space-2);
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-parties-override-trigger > i {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-parties-override-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-travel-inspector-actions {
+  display: flex;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-travel-inspector-actions > button {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.fabricate-manager .manager-card-subtitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fab-text);
+}
+
+.fabricate-picker .manager-travel-portrait,
+.fabricate-picker-popover .manager-travel-portrait {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+
+  /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
+  height: 32px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--fab-surface-raised);
+  color: var(--fab-text-muted);
+}
+
+.fabricate-picker .manager-travel-portrait img,
+.fabricate-picker-popover .manager-travel-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-picker-popover .manager-travel-option-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The recipe row-level "or…" popover no longer lets its option labels WRAP: `proto:4683` gives each entry the bare kind name, one word, in a 150px panel, so the shared single-line ellipsis above is the right treatment for all of them (issue 1373). */
+
+/* The TWO-LINE option. A picker whose choices differ by a fact rather than by a name states that fact on a second line; the wrapper takes over the flex sizing the single-line name carries alone, so the label still ellipsises instead of pushing a trailing chip out of the row (issue 1010). */
+.fabricate-picker-popover .manager-travel-option-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-picker-popover .manager-travel-option-lines > .manager-travel-option-name {
+  flex: 0 0 auto;
+}
+
+.fabricate-picker-popover .manager-travel-option-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-picker.manager-travel-picker {
+  position: relative;
+  min-width: 0;
+}
+
+/* The recipe bulk panel's book picker. Its trigger sits in a 300px rail whose other controls are full-width selects, so a content-hugging button would read as a stray chip in a column of fields (issue 1010); it takes their `form` rung's 38 for the same reason. */
+.fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 9px;
+}
+
+/* AND THE SAME JOB FOR THE SAME RAIL, one control along. `BulkEditSelect` was a native `<select>` whose own scoped rule carried `width: 100%` for exactly the reason above; it is a shared `<Select>` now, whose trigger is rendered by `SearchablePopover` and whose API deliberately exposes no trigger-box prop (issue 1504). */
+.fabricate-manager .fab-bulk-edit-select .fabricate-select-trigger {
+  width: 100%;
+}
+
+.fabricate-picker .manager-travel-picker-trigger {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 34px;
+  border-radius: 9px;
+}
+
+/* THE PANEL, AT THE DESIGN'S OWN FIGURES. `proto:2258` states it as `padding:7px; border-radius:10px; background:var(--bg0); border:1px solid var(--border-strong); box-shadow` (a deep 16/38 drop, which `--fab-shadow-lg` already answers for); `display:flex; flex-direction:column; gap:5px` (issue 1373). */
+.fabricate-picker-popover.manager-travel-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  width: max-content;
+  min-width: 240px;
+  max-width: 340px;
+  max-height: min(50vh, 360px);
+  padding: var(--fab-space-chip);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 11px;
+  background: var(--fab-bg-0);
+  box-shadow: var(--fab-shadow-lg);
+  overflow: hidden;
+}
+
+/* The field is a DIRECT column item of the panel now, so the panel's own inset and gap place it and this row keeps neither an inset nor a rule of its own. */
+.fabricate-picker-popover .manager-travel-popover-search {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* `proto:2259` is `padding:7px 9px; border-radius:7px; border:1px solid var(--accent-border); background:var(--bg1)`, and that `--bg1` IS our `--fab-bg-0` under the ramp shift the panel block above describes - so the field sits on the same rung as the panel and is told apart by its accent edge rather than by a fill, which is what the design does. */
+.fabricate-picker-popover .manager-travel-popover-search input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-bg-0);
+}
+
+.fabricate-picker-popover .manager-travel-popover-search input:focus-visible {
+  outline: none;
+  border-color: var(--fab-accent);
+}
+
+/* `proto:2260`: `max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:2px`, and no inset of its own - the panel's 7px is what every left edge in the popover sits on (issue 1035). */
+.fabricate-picker-popover .manager-travel-popover-options {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  padding: 0;
+  overflow-y: auto;
+}
+
+/* THE GRID FORM. `as="grid"` is a list of TILES rather than a column of lines — the essence source picker draws two columns of image tiles — and the primitive emits it as `data-picker-as` plus `data-picker-columns` on the list ELEMENT rather than as an inline style (issue 1503). */
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-as='grid'] {
+  display: grid;
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fabricate-picker-popover .manager-travel-popover-empty {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* Optional grouped choices. A menu whose choices do not all mean the same thing gets one `role="group"` per meaning, each under its own heading — the recipe editor's "or…" menu splits OR alternatives ("Accept instead") from the essence requirement that bubbles to the ingredient SET ("Require as well") (issue 643). */
+.fabricate-picker-popover .manager-travel-popover-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-picker-popover .manager-travel-popover-group + .manager-travel-popover-group {
+  margin-top: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-picker-popover .manager-travel-popover-group-label {
+  margin: 0 0 var(--fab-space-2xs);
+  padding: 0 var(--fab-space-1);
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* `proto:2261`: `display:flex; align-items:center; gap:8px; height:30px; padding:0 8px; border-radius:7px`. */
+.fabricate-picker-popover .manager-travel-option {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  height: auto;
+  min-height: 30px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A set picker's rows keep their height when its list overflows, so the list scrolls rather than squeezing every row to the base rule's 30px floor (issue 1782). */
+.fabricate-picker-popover .fabricate-set-picker-option {
+  flex-shrink: 0;
+}
+
+.fabricate-picker-popover .manager-travel-option:hover {
+  background: var(--fab-surface-raised);
+}
+
+/* THE KEYBOARD CURSOR. DOM focus stays on the search field — or on the trigger, where there is none — and the list is driven with `aria-activedescendant`, so the row the arrow keys are on has no focus of its own to paint with (issue 1503). */
+.fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+/* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ── The requirement row's kind menu: `ActionMenu` at the exemplar's 150px, headed `Accept instead`, over one-word entries. */
+.fabricate-action-menu-panel.manager-recipe-or-menu {
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
+}
+
+/* The panel IS the inset, so the entries stack without a gap exactly as `proto:2292` draws them. */
+.fabricate-action-menu-panel.manager-recipe-or-menu .manager-action-menu-list {
+  gap: 0;
+}
+
+/* `proto:4683`: a 28px entry, `font:600 11px` in secondary ink, the glyph in a 14px column so the four labels share one left edge. */
+.fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item {
+  min-height: 28px;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: var(--fab-space-2);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item > i {
+  width: 14px;
+  font-size: 10px;
+  text-align: center;
+}
+

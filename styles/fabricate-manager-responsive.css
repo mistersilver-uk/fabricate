@@ -1,0 +1,365 @@
+@container fabricate-manager (max-width: 1320px) {
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-core-grid {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-art {
+    --art-picker-size: 88px;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-core-status p {
+    max-width: 12ch;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-card-header {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .fabricate-search.is-compact {
+    flex: 1 1 180px;
+    width: auto;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-drop-controls {
+    justify-content: space-between;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-component-browser-controls {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-drop-controls .fabricate-search.is-compact {
+    width: auto;
+    max-width: none;
+  }
+}
+
+@container fabricate-manager (max-width: 1120px) {
+  /* `grid-auto-rows: max-content` is LOAD-BEARING, not tidiness (issue 643). */
+  .fabricate-manager .manager-body,
+  .fabricate-manager .manager-body.is-rail-collapsed {
+    grid-template-columns: 1fr;
+    grid-auto-rows: max-content;
+    overflow-y: auto;
+  }
+
+  /* World Parties releases its unused inspector at desktop widths. Its route rule has more class/attribute specificity than the shared stack above, so it must explicitly join the one-column rail/body layout here rather than retaining its desktop two-track grid. */
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body,
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-main {
+    display: grid;
+
+    /* ONE track, not two. The leading `auto` was the browse view's own duplicate page header; with that deleted the Parties pane is the only child, and two tracks would leave it in the `auto` row this rule exists to keep it OUT of — sized to max-content, which is what carries the persistent footer off the bottom of the panel (issue 1515). */
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  /* Stacked, the rail is a full-height nav sitting ABOVE the content it navigates to (issue 1372). */
+  .fabricate-manager .manager-rail {
+    max-height: 320px;
+    overflow: hidden auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--fab-border);
+  }
+
+  /* PINNED, so the crafting-system picker and `← All crafting systems` survive any scroll position of the nav below them. */
+  .fabricate-manager .manager-rail > .manager-rail-title,
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    position: sticky;
+    z-index: 1;
+    background: var(--fab-bg-0);
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-title {
+    top: 0;
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    top: 12px;
+  }
+
+  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded strip; if the nav kept the scroller it would grow to that cap and scroll the list inside whatever the pinned label and scope card left of it — a much smaller window than the strip the rule above deliberately built. */
+  .fabricate-nav.manager-nav {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--fab-border);
+  }
+
+  .fabricate-manager .manager-main {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-gathering-task-edit-view {
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-task-core-grid,
+  .fabricate-manager .manager-task-card-heading,
+  .fabricate-manager .manager-task-identity-fields,
+  .fabricate-manager .manager-task-component-grid,
+  .fabricate-manager .manager-task-availability-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-task-media-column {
+    justify-items: start;
+  }
+
+  .fabricate-manager .manager-task-core-status {
+    justify-items: start;
+  }
+
+  .fabricate-manager .manager-task-core-status p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .fabricate-manager .manager-gathering-settings {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-system-edit-main {
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-table-scroll {
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-system-edit-form {
+    overflow: visible;
+  }
+
+  .fabricate-manager .manager-environment-editor-shell {
+    overflow: visible;
+  }
+
+  .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
+  .fabricate-manager[data-manager-view^="checks"] .manager-body,
+  .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
+  .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
+  .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="system-edit"] .manager-body {
+    grid-template-columns: 1fr;
+  }
+
+  .fabricate-manager .manager-environment-edit-view,
+  .fabricate-manager .manager-system-edit-view {
+    min-height: auto;
+    overflow: visible;
+  }
+
+  /* The workspace releases its 300px side rail through the TOKEN its base rule reads, not through `grid-template-columns`: that base rule is declared later in this file and a container query adds no specificity, so the direct property tied and lost. */
+  .fabricate-manager .manager-environment-workspace {
+    --fab-manager-env-workspace-grid: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-table-head,
+  .fabricate-manager .manager-recipe-table-head {
+    display: none;
+  }
+
+  .fabricate-manager .manager-system-row {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  /* The essence row LEAVES both of these joins. `align-items: stretch` is a live flex property, so it would stretch the medallion and the whole control cluster to full card height; and `grid-template-columns` places nothing on a flex row (issue 1036). */
+  .fabricate-manager .manager-component-row,
+  .fabricate-manager .manager-environment-row,
+  .fabricate-manager .manager-gathering-task-row {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .fabricate-manager .manager-system-row > *,
+  .fabricate-manager .manager-component-row > *,
+  .fabricate-manager .manager-environment-row > *,
+  .fabricate-manager .manager-gathering-task-row > * {
+    min-width: 0;
+  }
+
+  .fabricate-manager .manager-labeled-cell {
+    display: grid;
+    grid-template-columns: minmax(88px, 0.35fr) minmax(0, 1fr);
+    gap: var(--fab-space-2);
+    align-items: center;
+  }
+
+  .fabricate-manager .manager-labeled-cell::before {
+    content: attr(data-label);
+    color: var(--fab-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .fabricate-manager .manager-action-group.manager-labeled-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .fabricate-manager .manager-action-group.manager-labeled-cell::before {
+    flex: 0 0 88px;
+    min-width: 88px;
+  }
+
+  .fabricate-manager .manager-toggle-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Downtime is a bounded workspace, unlike the stacked reading surfaces above. */
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body,
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-auto-rows: unset;
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-main {
+    display: grid;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* The side-rail routes keep a bounded body row, as they do above this rung: their columns out-specify the stack above, so without this the body scrolls as one page under a full-height rail. Knowledge leads the list so its top-level body rule is the first one naming it; its own 831px block, later in the sheet, still restacks it (issue 1976). */
+  .fabricate-manager[data-manager-view="knowledge"] .manager-body,
+  .fabricate-manager[data-manager-view="component-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
+  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
+    .manager-body,
+  .fabricate-manager[data-manager-view="world-currency"] .manager-body,
+  .fabricate-manager[data-manager-view="world-prerequisites"] .manager-body,
+  .fabricate-manager[data-manager-view="world-modifiers"] .manager-body,
+  .fabricate-manager[data-manager-view="tags"] .manager-body,
+  .fabricate-manager[data-manager-view="world-components"] .manager-body,
+  .fabricate-manager[data-manager-view="world-component-entry"] .manager-body,
+  .fabricate-manager[data-manager-view="world-essences"] .manager-body,
+  .fabricate-manager[data-manager-view="world-essence-entry"] .manager-body,
+  .fabricate-manager[data-manager-view="world-tools"] .manager-body,
+  .fabricate-manager[data-manager-view="world-tool-entry"] .manager-body,
+  .fabricate-manager[data-manager-view="world-vocabulary"] .manager-body {
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  /* The recipe editor's main is its scroller, so it gets back the overflow the shared `.manager-main` override above takes from it (issue 1976). */
+  .fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
+    overflow: hidden auto;
+  }
+
+  /* A d100 task's Results tab keeps the side rail and stacks its drop rail beneath the editor, so a tab switch never moves the nav or the tab bar (issue 1522). */
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) fit-content(40%);
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-body.is-rail-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-rail {
+    grid-row: 1 / -1;
+    max-height: none;
+    border-right: 1px solid var(--fab-border);
+    border-bottom: 0;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-inspector {
+    grid-column: 2;
+  }
+}
+
+@container fabricate-manager (max-width: 680px) {
+  .fabricate-page-header.fabricate-page-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-body {
+    overflow-y: auto;
+  }
+
+  .fabricate-manager .manager-rail,
+  .fabricate-manager .manager-inspector {
+    border-right: 0;
+    border-left: 0;
+    border-bottom: 1px solid var(--fab-border);
+  }
+
+  .fabricate-manager .manager-toolbar-primary,
+  .fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)),
+  .fabricate-manager .manager-header-actions,
+  .fabricate-manager .manager-action-group {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .fabricate-manager .manager-gathering-task-edit-view {
+    padding: var(--fab-space-3);
+  }
+
+  .fabricate-manager .manager-task-card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fabricate-search.fabricate-search.is-compact {
+    width: 100%;
+  }
+
+  .fabricate-search.fabricate-search {
+    flex-basis: 100%;
+  }
+
+  .fabricate-manager .manager-edit-card-heading,
+  .fabricate-manager .manager-edit-grid,
+  .fabricate-manager .manager-form-grid,
+  .fabricate-manager .manager-essence-edit-grid,
+  .fabricate-manager .manager-essence-source-summary,
+  .fabricate-manager .environment-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-vocabulary-form-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fabricate-manager .manager-essence-icon-panel {
+    grid-row: auto;
+  }
+
+  .fabricate-manager .manager-edit-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+}
+

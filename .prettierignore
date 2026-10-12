@@ -42,3 +42,6 @@ docs/
 # The compiled stylesheet. Its source of truth is the component `<style>` blocks and the design
 # tokens; stylelint gates those.
 styles/fabricate.css
+
+# The partials that sheet imports: the same text, which Stylelint gates and Prettier does not own.
+styles/fabricate-*.css

@@ -1,0 +1,580 @@
+/* ========================================== Crafting System Manager ========================================== */
+
+.fabricate.crafting-system-manager {
+  font-family: var(--font-primary);
+}
+
+/* The manager renders its own edge-to-edge chrome — a titlebar, a header and a three-column body — so the Foundry window frame is the only frame it needs (issue 643). */
+.fabricate.crafting-system-manager .window-content {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fabricate-manager {
+  /* The dark UA scheme for the manager root (issue 772). */
+  color-scheme: dark;
+
+  /* One control-text scale shared by the recipe browser filter bar (search + selects) and the recipe editor overview fields (name, flavour, selects), so both read at the same size (issue 643). */
+  --fab-manager-recipe-control-font: 0.72rem;
+
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  container-name: fabricate-manager fabricate-option-host;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  height: 100%;
+  min-width: 0;
+
+  /* CLIP, NOT HIDDEN (issue 1286). */
+  overflow: clip;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+
+  /* THE SCROLLERS (issue 1096, maintainer parity round 2). Nothing in this sheet ever selected a colour for a scrollbar, so every scrolling region in the manager inherited Foundry core's own — which is a dark red. */
+  scrollbar-color: var(--fab-bg-3) transparent;
+}
+
+.fabricate-manager * {
+  box-sizing: border-box;
+
+  /* THE SCROLLERS, restated per element rather than inherited (issue 1096, round 3). */
+  scrollbar-color: var(--fab-bg-3) transparent;
+}
+
+.fabricate-manager button,
+.fabricate-manager input,
+.fabricate-manager textarea {
+  font: inherit;
+}
+
+/* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issues 1508, 1509). */
+.fabricate-field :is(input, textarea),
+.fabricate-search input,
+.fabricate-slider input,
+.fabricate-tabs button {
+  font: inherit;
+}
+
+/* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). */
+.fabricate-manager input[type="text"],
+.fabricate-manager input[type="url"],
+.fabricate-manager input[type="email"],
+.fabricate-manager input[type="tel"],
+.fabricate-manager input[type="password"],
+.fabricate-manager input:not([type]),
+.fabricate-manager textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager textarea {
+  min-height: 68px;
+  padding: var(--fab-space-2);
+  line-height: 1.4;
+}
+
+.fabricate-manager input[type="text"]:disabled,
+.fabricate-manager input[type="url"]:disabled,
+.fabricate-manager input[type="email"]:disabled,
+.fabricate-manager input[type="tel"]:disabled,
+.fabricate-manager input[type="password"]:disabled,
+.fabricate-manager input:not([type]):disabled,
+.fabricate-manager textarea:disabled {
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+}
+
+/* The manager titlebar — a thin identity strip above the header, shared by every manager screen (issues 643, 1185). */
+.fabricate-manager .manager-titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-titlebar-badge {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-width: 220px;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border-radius: 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-titlebar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin-left: auto;
+  color: var(--fab-text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-titlebar-status-icon {
+  flex: 0 0 auto;
+  color: var(--fab-info);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-titlebar-status-text {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The page header's family is rooted at PageHeader's own class (issue 1777), doubled to keep (0,2,0); the title and subtitle keep both roots because the rail and scoped cards spell them too. The trail spans the first row; the heading and actions share the second, top-aligned (issue 2257). */
+.fabricate-page-header.fabricate-page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--fab-space-2) var(--fab-space-4);
+  min-width: 0;
+  padding: var(--fab-space-4);
+  border-bottom: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
+}
+
+.fabricate-page-header .manager-heading {
+  min-width: 0;
+}
+
+/* THE MANAGER'S EYEBROW, AT THE REFERENCE'S OWN FIGURES (issue 1373). */
+
+/* THE PAGE HEADER'S EYEBROW WRAPPER. The eyebrow itself is `Kicker.svelte`, which declares `margin: 0` and takes no `class` — a caller needing layout keeps its own element and nests the primitive inside it (issue 1515). */
+.fabricate-page-header .manager-page-kicker {
+  margin-bottom: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-kicker {
+  margin: 0 0 var(--fab-space-2xs);
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+/* The screen title is the manager's display type — and the ONLY page title on the screen (issue 643: the recipe library used to render a second `manager-section-header` under this one). */
+.fabricate-manager .manager-title,
+.fabricate-page-header .manager-title {
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Header actions (Back, Delete, Save/Create) share one compact scale: a label a notch below body text so the toolbar reads as chrome, not content (issue 1118). */
+.fabricate-manager .manager-header-actions .fabricate-button {
+  /* 0.72rem (~11.5px) matches the prototype's header buttons (issue 643 audit). */
+  font-size: 0.72rem;
+}
+
+/* The page's single loudest action (Create recipe, Create system) keeps the heavier weight and roomier padding so the green Save wins the eye (§F6). */
+.fabricate-manager .manager-header-actions .fabricate-button.is-primary {
+  padding: 0 var(--fab-space-4);
+  font-weight: 700;
+}
+
+/* ── The tool studio's treatment, released from its ancestor ── `Button.svelte` emits `fab-manager-button` beside `fabricate-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
+
+/* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.fabricate-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
+.fabricate-button.fabricate-button.fab-manager-button {
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-radius: 9px;
+  font-size: 0.72rem;
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.is-primary {
+  padding: 0 var(--fab-space-4);
+  font-weight: 700;
+}
+
+/* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is borderless until hover, while the tool studio's Back button keeps a border so it reads as a button before the pointer arrives (§F6) (issue 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled) {
+  border-color: var(--fab-border);
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover {
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-raised);
+}
+
+/* The `dashed` role (issue 1096): the append action at the foot of a list (issue 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed {
+  display: flex;
+
+  /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a `min-height` alone let the button stand one pixel over the prototype's 34. */
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+
+  /* Longhands rather than the `border` shorthand: the dashed EDGE is geometry and survives into the disabled state, while the ink beside it is paint and must not — a shorthand here would carry `border-color` across that line with it. */
+  border-width: 1px;
+  border-style: dashed;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Paint only, and qualified: see the invariant at `.fabricate-button:disabled` below. */
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-raised);
+}
+
+/* `fullWidth`, split out of the `dashed` role that used to carry it (issue 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.is-full-width {
+  width: 100%;
+}
+
+/* The attempted-and-failed save alert that the editor toolbars render beside Save (issues 919, 1118). */
+.fabricate-manager .manager-header-actions .manager-header-save-error {
+  margin: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border-radius: 6px;
+  border: 1px solid var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-subtitle,
+.fabricate-page-header .manager-subtitle {
+  margin: var(--fab-space-2xs) 0 0;
+  color: var(--fab-text-muted);
+
+  /* 0.72rem (~11.5px) matches the prototype's subtitle scale; 0.82rem read ~2px hot against the design (issue 643 font-size audit). */
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* The page header's own subtitle is the specimen's, identity snippets included (issue 2257 D2). */
+.fabricate-page-header.fabricate-page-header .manager-subtitle {
+  max-width: 74ch;
+  margin-top: var(--fab-space-chip);
+  font-size: 12px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* The action cluster never gives: the page header gives it an `auto` track beside the heading's `minmax(0, 1fr)`, and `flex: 0 0 auto` holds it in a flex row, because a squeezed cluster wraps `Save` under `Delete` rather than overflowing (`manager-header-geometry.test.js`). */
+.fabricate-manager .manager-header-actions,
+.fabricate-manager .manager-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fab-space-2);
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+/* NO CHIP RULE LIVES HERE ANY MORE, and the reason is ownership rather than taste (issue 1118). */
+
+/* The specimen's trail at the ruled readable size: 12px in the muted ink, its leaf in the secondary (issue 2257 E4). */
+.fabricate-page-header .manager-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  grid-column: 1 / -1;
+  color: var(--fab-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.fabricate-page-header .manager-breadcrumbs > i {
+  font-size: 7px;
+}
+
+.fabricate-page-header .manager-breadcrumbs [aria-current='page'] {
+  color: var(--fab-text-secondary);
+}
+
+/* `display: block`, stated: core's `a.button, button` reset makes every button a centred flex container, and a flex container's text is an anonymous item that cannot shrink, so a squeezed crumb clipped its label at BOTH edges instead of taking the ellipsis the rule below declares. A block container is what `text-overflow` applies to. */
+.fabricate-page-header .manager-breadcrumbs button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-page-header .manager-breadcrumbs button:hover,
+.fabricate-page-header .manager-breadcrumbs button:focus-visible {
+  color: var(--fab-text);
+}
+
+.fabricate-page-header .manager-breadcrumbs span,
+.fabricate-page-header .manager-breadcrumbs button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 300px;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr) 300px;
+}
+
+.fabricate-manager .manager-rail,
+.fabricate-manager .manager-main,
+.fabricate-manager .manager-inspector {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border-right: 1px solid var(--fab-border);
+  background: var(--fab-bg-0);
+
+  /* The backstop under the nav's own scroller (see `.manager-nav`), and inert in normal use: the nav absorbs the rail's slack, so the rail itself only ever overflows when it is too short for the pinned label, the scope card and the nav's floor together. */
+  overflow: hidden auto;
+
+  /* And when that backstop DOES engage, the scroller it shows is the LEFT of the two crimson rules the maintainer reported. */
+  scrollbar-width: thin;
+}
+
+.fabricate-manager .manager-rail-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-rail-toggle:hover {
+  color: var(--fab-text);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager .manager-rail-toggle:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail {
+  padding: var(--fab-space-2) var(--fab-space-1);
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-toggle {
+  align-self: center;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-block {
+  display: flex;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card-head {
+  justify-content: center;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card-head .manager-kicker,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-select,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-return,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-card > .manager-title {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+/* The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail adds has to opt out explicitly, or it blows the column out: the crafting-system card content (above), the uppercase section label, and every trailing marker that reports on the row's own contents rather than raising an alert (issue 1515). */
+.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-planned,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-premium {
+  display: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-button {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  padding-right: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-parent {
+  padding-right: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-toggle,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-callout {
+  display: none;
+}
+
+/* The collapsed rail draws no group box, and its parent keeps the plain row's insets. */
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-group.is-expanded {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-group.is-expanded .manager-nav-parent {
+  min-height: 34px;
+  padding: var(--fab-space-2);
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-nav {
+  margin-top: var(--fab-space-1);
+  padding-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-heading-row {
+  display: none;
+}
+
+.fabricate-manager .manager-main {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  background: var(--fab-bg-2);
+}
+
+/* The settings tab's scrolling form, and nothing above it. The leading `auto` track was the view's own duplicate page header; with that deleted the form is the only child, and leaving two tracks put the form in the `auto` row and left the growing one empty — the same failure the components pager and the tags workspace hit when their headers went (issue 1515). */
+.fabricate-manager .manager-system-edit-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* Drop zone, toolbar, the LIST (which takes the slack), then the pager. The fourth `auto` track used to be the view's own duplicate page header; with that deleted, leaving the template at `auto auto auto minmax(0, 1fr)` handed the growing track to the PAGER and left the list to size to its content (issue 676). */
+.fabricate-manager[data-manager-view="components"] .manager-main {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+/* Toolbar, then the LIST which takes the slack, then the pager (issue 1036). */
+.fabricate-manager[data-manager-view="essences"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* Drop zone, filter toolbar, then the TABLE which takes the slack. Named explicitly rather than left to the shared `auto auto 1fr`: this view carried its own duplicate page header until issue 785, so it had four children against a three-track template — the `1fr` landed on the TOOLBAR, which absorbed every pixel of slack and floated mid-panel, while the table fell into an implicit `auto` row pinned to the bottom. */
+.fabricate-manager[data-manager-view="books-scrolls"] .manager-main {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/* Filter toolbar, then the LIST which takes the slack, then the pager (issue 1515). */
+.fabricate-manager[data-manager-view="systems"] .manager-main,
+.fabricate-manager[data-manager-view="access"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* The recipe library is filter bar → list → pager, with no per-view page header of its own: the shell's `.manager-header` is the only one (issues 643, 1515). */
+.fabricate-manager[data-manager-view="recipes"] .manager-main {
+  position: relative;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+/* ONE SCROLLING ROW HOLDING THE SHARED VOCABULARY SHELL, at the same values the seven world routes declare (issue 1915). The tab strip this route used to lead with is retired, so a leading `auto` track would size the shell's status line and leave the growing track to the panels beneath it; and the shell declares none of these properties itself, because an unlayered scoped rule beats this layered one at any specificity. It is its own rule rather than a member of the world list, which stays byte-identical. */
+.fabricate-manager[data-manager-view="tags"] .manager-main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
+}
+
+/* Tab strip, then the scrolling tab body. One track was right while the editor was a single flat card; the tabbed editor has two children and a single `1fr` would stretch the strip (issue 1036). */
+.fabricate-manager[data-manager-view="essence-edit"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="environment-edit"] .manager-main,
+.fabricate-manager[data-manager-view^="checks"] .manager-main,
+.fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
+.fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
+.fabricate-manager[data-manager-view="system-edit"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* The World Downtime host owns the one scrolling workspace row. Without this explicit route layout, the shared three-row shell gives the host an auto-sized first row, so narrow copy grows the Manager instead of scrolling inside its panel. */
+.fabricate-manager[data-manager-view="world-downtime"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* Same contract for the World Currency, Prerequisites, Modifiers and Travel routes, and for the same reason: the tab renders a single child straight into `.manager-main`, so without this it lands in the shared shell's auto-sized first row and a tall ladder grows the Manager instead of scrolling inside `.manager-world-currency`'s own overflow (issue 1278). */
+.fabricate-manager[data-manager-view="world-currency"] .manager-main,
+.fabricate-manager[data-manager-view="world-prerequisites"] .manager-main,
+.fabricate-manager[data-manager-view="world-modifiers"] .manager-main,
+.fabricate-manager[data-manager-view="world-travel"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
