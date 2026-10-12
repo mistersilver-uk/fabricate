@@ -37,6 +37,7 @@ manager-tool-parity-01-library-1280x720
 manager-tool-stress-long-name
 manager-knowledge-owned-copies
 manager-bulk-edit-panel-shell-specimen
+manager-published-tier-track-specimen
 player-gathering-environments
 fabricate-app-shell
 player-inventory

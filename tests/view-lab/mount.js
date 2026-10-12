@@ -707,9 +707,13 @@ async function mountManagerApp(content, params) {
  * shipped component directly, for props no shipped caller passes yet. Nothing in `src/` imports
  * them, so a specimen frame depicts a state no GM can reach, and its case label says so.
  */
+// view-lab-region:lab-specimens
 const LAB_SPECIMENS = Object.freeze({
   'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
+  // Issue 2424: the published tier track, mounted through the seam a companion calls.
+  'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
 });
+// view-lab-region:end
 
 /**
  * Mount a specimen into the built frame in place of the window's own root.
