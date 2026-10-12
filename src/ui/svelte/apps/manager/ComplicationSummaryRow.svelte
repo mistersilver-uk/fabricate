@@ -2,8 +2,9 @@
   One summary row for a complication (issue 1286): severity tile, name, one body line, an optional
   Player pill, the severity pill and the activity glyph run, plus — in the authoring variant only —
   a disclosure and a delete control. `readonly-gm` draws no tile and no shell: it is the content of
-  a nested `SortableList` row, whose box it is drawn in (issue 2445). String props are PRE-LOCALIZED by the caller, on the
-  `ToggleCard` precedent, so this stays a presentational leaf with no `localize` import.
+  a nested `SortableList` row, whose box it is drawn in (issue 2445). String props are PRE-LOCALIZED
+  by the caller, on the `ToggleCard` precedent, so this stays a presentational leaf with no
+  `localize` import.
 
   Props:
   | prop | values | default | contract |
@@ -114,7 +115,7 @@
     {/if}
     <span class="fab-complication-row-copy">
       {#if eyebrow}<span class="fab-complication-row-eyebrow">{eyebrow}</span>{/if}
-      <!-- `display: contents` on every variant but `player`, so the GM strips' copy column
+      <!-- `display: contents` on every variant but `player`, so the GM rows' copy column
            is the two children it has always been and no rule keyed on it moves. -->
       <span class="fab-complication-row-headline">
         <span class="fab-complication-row-name is-{nameEmphasis}">{name}</span>

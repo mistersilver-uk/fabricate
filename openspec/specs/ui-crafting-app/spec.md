@@ -777,7 +777,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   A row that still says "this can go wrong" beneath a spent roll asserts something that is no longer true, and the player has no way to tell it from a row that is genuinely still pending.
   The design prototype does say it — its `fired` flag is derived from a stage being short, so a recovered stage keeps its forecast copy — and this rule deliberately overrides it.
 - **The player row renders the authored DESCRIPTION, and it WRAPS.**
-  The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
+  The GM read-only complication lists clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
   It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
   It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
 - **The band lies outside the drag source and carries no destructive or navigational control.**
