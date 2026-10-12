@@ -261,6 +261,9 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
   it('seeds a plain add with the longest period`s midpoint and resets it after the submit', () => {
     mountPanel();
     assert.equal(addStepper().getAttribute('aria-label'), 'Starts at');
+    const caption = addStepper().closest('.manager-time-of-day-add-start');
+    assert.ok(Boolean(caption), 'the stepper takes its own captioned row');
+    assert.equal(caption.querySelector(':scope > [aria-hidden="true"]').textContent, 'Starts at');
     assert.equal(addStepper().getAttribute('aria-valuenow'), '12');
     key(addStepper(), 'ArrowUp');
     assert.equal(addStepper().getAttribute('aria-valuenow'), '13');
@@ -436,7 +439,9 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
   });
 
   it('drops a cleared add hour once the day tiles again', () => {
-    const panel = mountPanel({ values: [...DEFAULTS.slice(0, 3), { ...DEFAULTS[3], startHour: 8 }] });
+    const panel = mountPanel({
+      values: [...DEFAULTS.slice(0, 3), { ...DEFAULTS[3], startHour: 8 }],
+    });
     key(addStepper(), 'ArrowUp');
     clearAddStepper();
     panel.$set({ setting: { enabled: true, current: 'day', values: DEFAULTS } });

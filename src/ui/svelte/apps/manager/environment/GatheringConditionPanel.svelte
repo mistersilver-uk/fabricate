@@ -247,19 +247,24 @@
       />
     </Field>
     {#if isTimeOfDay}
-      <Stepper
-        value={addStart}
-        min={0}
-        max={lastHour}
-        allowUnset={addDefault === null}
-        placeholder="--:--"
-        formatValue={hourText}
-        parseValue={parseHourText}
-        ariaLabel={startsAtLabels.ariaLabel}
-        decrementLabel={startsAtLabels.decrementLabel}
-        incrementLabel={startsAtLabels.incrementLabel}
-        onChange={(next) => (addStartHour = next)}
-      />
+      <span class="manager-time-of-day-add-start">
+        <span aria-hidden="true"
+          >{text('FABRICATE.Admin.Manager.Environment.Conditions.StartsAt')}</span
+        >
+        <Stepper
+          value={addStart}
+          min={0}
+          max={lastHour}
+          allowUnset={addDefault === null}
+          placeholder="--:--"
+          formatValue={hourText}
+          parseValue={parseHourText}
+          ariaLabel={startsAtLabels.ariaLabel}
+          decrementLabel={startsAtLabels.decrementLabel}
+          incrementLabel={startsAtLabels.incrementLabel}
+          onChange={(next) => (addStartHour = next)}
+        />
+      </span>
     {/if}
     <Button
       role="primary"

@@ -13052,9 +13052,15 @@
   grid-template-columns: 38px 38px minmax(0, 1fr) max-content;
 }
 
-/* The time-of-day add form's start-hour stepper sits between the name and Add (issue 2431). */
-.fabricate-manager .manager-time-of-day-add {
-  grid-template-columns: 38px minmax(0, 1fr) max-content max-content;
+/* The time-of-day add form keeps the weather form's row; its captioned start-hour stepper takes a second row under the name, so the name never narrows (issue 2431). */
+.fabricate-manager .manager-time-of-day-add-start {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
 }
 
 /* The fallback note keeps the bar's footprint, so stepping a pill through a duplicate hour does not shift the form. */
