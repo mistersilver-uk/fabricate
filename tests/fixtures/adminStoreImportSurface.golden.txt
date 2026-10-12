@@ -95,11 +95,6 @@ import { componentsWithResolvedEssences } from '../../../systems/resolvedCompone
 import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
-  TIME_OF_DAY_ICONS,
-  WEATHER_ICONS,
-  WEATHER_FALLBACK_ICON,
-} from '../util/gatheringConditionIcons.js';
-import {
   createRecipeGraphIndex,
   buildBoundedRecipeGraph,
   layoutGraph,
@@ -108,6 +103,13 @@ import {
   buildItemCards as _buildItemCards,
   republishHydratedItemCards as _republishHydratedItemCards,
 } from './adminComponentRowProjection.js';
+import {
+  applyGatheringConditionUpdate as _applyGatheringConditionUpdate,
+  normalizeGatheringConditionId as _normalizeGatheringConditionId,
+  normalizeGatheringConditionOption as _normalizeGatheringConditionOption,
+  normalizeGatheringConditionOptions as _normalizeGatheringConditionOptions,
+  seedGatheringConditionOptions as _seedGatheringConditionOptions,
+} from './adminGatheringConditionOptions.js';
 import {
   buildRecipeList as _buildRecipeList,
   withoutDerivedRecipeProjectionFields,

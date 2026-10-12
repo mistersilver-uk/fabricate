@@ -101,11 +101,6 @@ import { componentsWithResolvedEssences } from '../../../systems/resolvedCompone
 import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
-  TIME_OF_DAY_ICONS,
-  WEATHER_ICONS,
-  WEATHER_FALLBACK_ICON,
-} from '../util/gatheringConditionIcons.js';
-import {
   createRecipeGraphIndex,
   buildBoundedRecipeGraph,
   layoutGraph,
@@ -118,6 +113,13 @@ import {
   buildItemCards as _buildItemCards,
   republishHydratedItemCards as _republishHydratedItemCards,
 } from './adminComponentRowProjection.js';
+import {
+  applyGatheringConditionUpdate as _applyGatheringConditionUpdate,
+  normalizeGatheringConditionId as _normalizeGatheringConditionId,
+  normalizeGatheringConditionOption as _normalizeGatheringConditionOption,
+  normalizeGatheringConditionOptions as _normalizeGatheringConditionOptions,
+  seedGatheringConditionOptions as _seedGatheringConditionOptions,
+} from './adminGatheringConditionOptions.js';
 import {
   buildRecipeList as _buildRecipeList,
   withoutDerivedRecipeProjectionFields,
@@ -225,14 +227,6 @@ const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({
   urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
   ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
   wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' }),
-});
-const DEFAULT_GATHERING_CONDITION_ICONS = Object.freeze({
-  weather: WEATHER_ICONS,
-  timeOfDay: TIME_OF_DAY_ICONS,
-});
-const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
-  weather: WEATHER_FALLBACK_ICON,
-  timeOfDay: 'fas fa-clock',
 });
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const GATHERING_EVENT_POLICIES = new Set(['successWithEvent', 'failureWithEvent']);
@@ -356,17 +350,6 @@ function _normalizeGatheringVocabularyId(value) {
   return _normalizeGatheringTag(value);
 }
 
-function _normalizeGatheringConditionId(value) {
-  if (value && typeof value === 'object') {
-    return _normalizeGatheringConditionId(value.id ?? value.value ?? value.label);
-  }
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
-}
-
 function _normalizeGatheringTagList(value) {
   const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
   return [...new Set(values.map(_normalizeGatheringTag).filter(Boolean))];
@@ -469,61 +452,6 @@ function _normalizeGatheringSystemVocabularies(raw = {}, fallbackVocabularies = 
     };
   }
   return normalized;
-}
-
-function _conditionLabelFromId(id) {
-  return String(id || '')
-    .split('-')
-    .filter(Boolean)
-    .map((token) =>
-      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
-    )
-    .join(' ');
-}
-
-function _defaultGatheringConditionIcon(kind, id) {
-  return (
-    DEFAULT_GATHERING_CONDITION_ICONS[kind]?.[id] ||
-    FALLBACK_GATHERING_CONDITION_ICONS[kind] ||
-    DEFAULT_ESSENCE_ICON
-  );
-}
-
-function _normalizeGatheringConditionOption(kind, value) {
-  const isRecord = value && typeof value === 'object';
-  const id = _normalizeGatheringConditionId(
-    isRecord ? (value.id ?? value.value ?? value.label) : value
-  );
-  if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
-  const label = isRecord
-    ? rawLabel || _conditionLabelFromId(id)
-    : /[A-Z]/.test(rawLabel)
-      ? rawLabel
-      : _conditionLabelFromId(id);
-  const icon = normalizeEssenceIcon(
-    isRecord ? value.icon : _defaultGatheringConditionIcon(kind, id)
-  );
-  return { id, label, icon };
-}
-
-function _normalizeGatheringConditionOptions(kind, value) {
-  const values = Array.isArray(value) ? value : value ? String(value).split(',') : [];
-  const options = [];
-  const seen = new Set();
-  for (const raw of values) {
-    const option = _normalizeGatheringConditionOption(kind, raw);
-    if (!option || seen.has(option.id)) continue;
-    seen.add(option.id);
-    options.push(option);
-  }
-  return options;
-}
-
-function _seedGatheringConditionOptions(kind, raw, defaults) {
-  const values = _normalizeGatheringConditionOptions(kind, raw);
-  if (values.length > 0) return values;
-  return _normalizeGatheringConditionOptions(kind, defaults);
 }
 
 function _normalizeGatheringDropRow(row = {}, randomID = _fallbackRandomID) {
@@ -4875,14 +4803,7 @@ export function createAdminStore(services) {
     setting.values = setting.values.map((option) => {
       if (option.id !== id) return option;
       changed = true;
-      return {
-        ...option,
-        label:
-          updates.label === undefined
-            ? option.label
-            : String(updates.label || '').trim() || option.label,
-        icon: updates.icon === undefined ? option.icon : normalizeEssenceIcon(updates.icon),
-      };
+      return _applyGatheringConditionUpdate(kind, option, updates);
     });
     if (!changed) return false;
     await _saveGatheringConfig(config);

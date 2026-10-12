@@ -31,6 +31,11 @@ import {
   normalizeNullableAdjustment,
   normalizeNullableSuccesses,
 } from './normalize/checkEvaluation.js';
+import {
+  normalizeConditionIcon,
+  normalizeConditionOptions,
+  seedConditionOptions,
+} from './normalize/gatheringConditionOptions.js';
 import { resolvedToolsFor } from './scopedEntityReads.js';
 
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
@@ -76,27 +81,6 @@ const DEFAULT_BIOME_METADATA = Object.freeze({
   urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
   ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
   wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' }),
-});
-const DEFAULT_CONDITION_ICONS = Object.freeze({
-  weather: Object.freeze({
-    clear: 'fas fa-sun',
-    cloudy: 'fas fa-cloud',
-    rain: 'fas fa-cloud-rain',
-    storm: 'fas fa-bolt',
-    snow: 'fas fa-snowflake',
-    fog: 'fas fa-smog',
-    wind: 'fas fa-wind',
-  }),
-  timeOfDay: Object.freeze({
-    dawn: 'fas fa-cloud-sun',
-    day: 'fas fa-sun',
-    dusk: 'fas fa-cloud-moon',
-    night: 'fas fa-moon',
-  }),
-});
-const FALLBACK_CONDITION_ICONS = Object.freeze({
-  weather: 'fas fa-cloud-sun',
-  timeOfDay: 'fas fa-clock',
 });
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
@@ -2477,74 +2461,6 @@ function normalizeVocabularyOptions(kind, value) {
 function normalizeConditionIdList(value) {
   const values = Array.isArray(value) ? value : value ? [value] : [];
   return [...new Set(values.map(normalizeConditionId).filter(Boolean))];
-}
-
-function normalizeConditionIcon(icon, fallback) {
-  const tokens = String(icon || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const prefix =
-    tokens.find((token) =>
-      /^(?:fa[bsrltd]?|fa-solid|fa-regular|fa-light|fa-thin|fa-duotone|fa-brands)$/.test(token)
-    ) || 'fas';
-  const iconToken = tokens.findLast(
-    (token) =>
-      token.startsWith('fa-') &&
-      !['fa', 'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands'].includes(
-        token
-      )
-  );
-  return iconToken ? `${prefix} ${iconToken}` : fallback;
-}
-
-function conditionLabelFromId(id) {
-  return String(id || '')
-    .split('-')
-    .filter(Boolean)
-    .map((token) =>
-      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
-    )
-    .join(' ');
-}
-
-function defaultConditionIcon(kind, id) {
-  return DEFAULT_CONDITION_ICONS[kind]?.[id] || FALLBACK_CONDITION_ICONS[kind] || 'fas fa-tag';
-}
-
-function normalizeConditionOption(kind, value) {
-  const isRecord = value && typeof value === 'object';
-  const id = normalizeConditionId(isRecord ? (value.id ?? value.value ?? value.label) : value);
-  if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
-  const fallbackIcon = defaultConditionIcon(kind, id);
-  return {
-    id,
-    label: isRecord
-      ? rawLabel || conditionLabelFromId(id)
-      : /[A-Z]/.test(rawLabel)
-        ? rawLabel
-        : conditionLabelFromId(id),
-    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon),
-  };
-}
-
-function normalizeConditionOptions(kind, value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  const options = [];
-  const seen = new Set();
-  for (const raw of values) {
-    const option = normalizeConditionOption(kind, raw);
-    if (!option || seen.has(option.id)) continue;
-    seen.add(option.id);
-    options.push(option);
-  }
-  return options;
-}
-
-function seedConditionOptions(kind, raw, defaults) {
-  const values = normalizeConditionOptions(kind, raw);
-  return values.length > 0 ? values : normalizeConditionOptions(kind, defaults);
 }
 
 function clampDropRate(value) {
