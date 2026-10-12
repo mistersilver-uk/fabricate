@@ -352,6 +352,67 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     ]);
   });
 
+  it('drags the current marker between bands, persisting only the released one', () => {
+    mountPanel();
+    stubTrack();
+    const node = dot();
+    // Band centres on the 10px-per-hour track: Day 12.5 at 85px, Dusk 19 at 150, Night 24.5 at 205.
+    pointer(node, 'pointerdown', 85);
+    pointer(node, 'pointermove', 150);
+    pointer(node, 'pointermove', 205);
+    assert.deepEqual(calls, [], 'a drag writes nothing');
+    assert.equal(dot().getAttribute('aria-valuetext'), 'Night', 'but draws its draft');
+    pointer(node, 'pointerup', 205);
+    assert.deepEqual(calls, [['current', { timeOfDay: 'night', systemId: 'alchemy' }]]);
+    pointer(node, 'pointerdown', 205);
+    pointer(node, 'pointermove', 85);
+    pointer(node, 'pointerup', 85);
+    assert.deepEqual(
+      calls.at(-1),
+      ['current', { timeOfDay: 'day', systemId: 'alchemy' }],
+      'a gesture back to Day reverses the unconfirmed Night'
+    );
+    pointer(node, 'pointerdown', 85);
+    pointer(node, 'pointermove', 150);
+    pointer(node, 'pointermove', 85);
+    pointer(node, 'pointerup', 85);
+    assert.equal(calls.length, 2, 'a gesture released on the period last written writes nothing');
+  });
+
+  it('drops a divider draft once the store replaces the values', () => {
+    const panel = mountPanel();
+    key(handle('Day'), 'ArrowRight');
+    assert.equal(handle('Day').getAttribute('aria-valuenow'), '9');
+    panel.$set({
+      setting: {
+        enabled: true,
+        current: 'day',
+        values: [DEFAULTS[0], { ...DEFAULTS[1], startHour: 10 }, ...DEFAULTS.slice(2)],
+      },
+    });
+    flushSync();
+    assert.equal(handle('Day').getAttribute('aria-valuenow'), '10');
+  });
+
+  it('drops a current-marker draft once the store replaces the current value', () => {
+    const panel = mountPanel();
+    key(dot(), 'ArrowRight');
+    assert.equal(dot().getAttribute('aria-valuetext'), 'Dusk');
+    panel.$set({ setting: { enabled: true, current: 'dawn', values: [...DEFAULTS] } });
+    flushSync();
+    assert.equal(dot().getAttribute('aria-valuetext'), 'Dawn');
+  });
+
+  it('reads clock hours on a day rotated to start at the first-listed period', () => {
+    mountPanel({ values: [DEFAULTS[2], DEFAULTS[0], DEFAULTS[3], DEFAULTS[1]] });
+    assert.deepEqual(
+      qa('[data-band-strip-band]').map((band) => band.dataset.bandStripBand),
+      ['dusk', 'night', 'dawn', 'day']
+    );
+    assert.equal(handle('Dawn').getAttribute('aria-valuetext'), '04:00');
+    assert.equal(handle('Day').getAttribute('aria-valuetext'), '08:00');
+  });
+
   it('moves the current marker two bands on two quick keypresses against a deferred store', () => {
     mountPanel();
     key(dot(), 'ArrowRight');
@@ -384,6 +445,14 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     ['no services', null],
     ['no clock method', {}],
     ['a null reading', { getWorldTimeComponents: () => null }],
+    [
+      'a throwing reading',
+      {
+        getWorldTimeComponents: () => {
+          throw new Error('offline');
+        },
+      },
+    ],
   ]) {
     it(`draws no clock line with ${label} (j)`, () => {
       mountPanel({ services });
