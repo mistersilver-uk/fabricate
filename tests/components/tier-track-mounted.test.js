@@ -37,11 +37,11 @@ const LADDER = Object.freeze([
 ]);
 
 const mount = (props) => harness.mount({ ...LABELS, ...props });
-const tiersOf = (target) => [...target.querySelectorAll('.fab-tier-track-list > li')];
+const tiersOf = (target) => [...target.querySelectorAll(':scope .fab-tier-track-list > li')];
 const valences = (target) => tiersOf(target).map((li) => li.getAttribute('data-valence'));
 const currents = (target) => tiersOf(target).map((li) => li.getAttribute('aria-current'));
 const hiddenText = (li) => li.querySelector('.fab-tier-track-hidden')?.textContent;
-const textOf = (node) => node.textContent.replace(/\s+/g, ' ').trim();
+const textOf = (node) => node.textContent.replaceAll(/\s+/g, ' ').trim();
 const chipOf = (li) => li.querySelector('.manager-chip');
 const toneOf = (li) => [...chipOf(li).classList].filter((name) => name.startsWith('is-'));
 
@@ -70,7 +70,7 @@ describe('TierTrack (issue 2424)', () => {
       currentIndex: 1,
       hint: '40 population to Village.',
     });
-    const hint = target.querySelector('.fab-tier-track > ol + p.fab-tier-track-hint');
+    const hint = target.querySelector(':scope .fab-tier-track > ol + p.fab-tier-track-hint');
     assert.equal(textOf(hint), '40 population to Village.');
   });
 
@@ -178,14 +178,17 @@ describe('TierTrack (issue 2424)', () => {
     assert.ok(!textOf(row).includes('Hall keys'));
   });
 
-  for (const currentIndex of [-1, -2, 5, 1.5, Number.NaN, '2']) {
+  for (const currentIndex of [-1, -2, 5, 1.5, NaN, '2']) {
     const shown = typeof currentIndex === 'string' ? `'${currentIndex}'` : String(currentIndex);
     for (const direction of ['ascending', 'descending']) {
       it(`reaches nothing at currentIndex ${shown}, ${direction}`, async () => {
         const target = await mount({ tiers: LADDER, currentIndex, direction });
         assert.deepEqual(valences(target), [null, null, null, null, null]);
         assert.deepEqual(currents(target), [null, null, null, null, null]);
-        assert.deepEqual(tiersOf(target).map(hiddenText), Array(5).fill('Ahead'));
+        assert.deepEqual(
+          tiersOf(target).map(hiddenText),
+          Array.from({ length: 5 }, () => 'Ahead')
+        );
       });
     }
   }

@@ -5391,7 +5391,7 @@ test('a mount.js patch confined to a canvas region selects every canvas frame an
 
 test('a mount.js patch confined to the specimen region selects every specimen frame and only those', () => {
   const specimens = publishableCases()
-    .filter((viewCase) => Boolean(viewCase.query?.specimen))
+    .filter((viewCase) => viewCase.query?.specimen)
     .map((viewCase) => viewCase.id);
   assert.ok(specimens.length >= 2, 'the registry must hold specimen cases for this to measure');
   for (const [region, text] of SPECIMEN_MOUNT_REGION_ANCHORS) {
@@ -5420,7 +5420,7 @@ test('the published component seam selects the tier track specimen it mounts', (
     'src/ui/svelte/published/PublishedComponentHost.svelte',
   ]) {
     assert.ok(
-      selectedIds([file]).includes('manager-published-tier-track-specimen'),
+      selectedIds([file], {}).includes('manager-published-tier-track-specimen'),
       `a change to ${file} does not select the published tier track specimen`
     );
   }

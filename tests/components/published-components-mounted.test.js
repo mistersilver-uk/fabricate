@@ -223,12 +223,12 @@ function shippedSeam() {
 
 const tierProps = (props = {}) => ({ ...TIER_LABELS, tiers: LADDER, currentIndex: 2, ...props });
 const tierStates = (target) =>
-  [...target.querySelectorAll('.fab-tier-track-list > li')].map(
+  [...target.querySelectorAll(':scope .fab-tier-track-list > li')].map(
     (li) =>
       li.getAttribute('aria-current') ?? li.querySelector('.fab-tier-track-hidden')?.textContent
   );
 
-function mountTierTrack(props) {
+function mountTierTrack(props = {}) {
   const target = companionTarget();
   assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
   return { target, handle: shippedSeam().mount('TierTrack', { target, props: tierProps(props) }) };
@@ -283,7 +283,7 @@ describe('TierTrack through the seam', () => {
         assert.throws(
           () => shippedSeam().mount('TierTrack', { target: companionTarget(), props }),
           new RegExp(
-            `^TypeError: Fabricate \\| published components: TierTrack requires a non-empty "${key}"$`
+            String.raw`^TypeError: Fabricate \| published components: TierTrack requires a non-empty "${key}"$`
           )
         );
       });
@@ -299,7 +299,7 @@ describe('TierTrack through the seam', () => {
         target,
         props: tierProps(),
       });
-      assert.equal(target.querySelectorAll('.fab-tier-track-list > li').length, 5);
+      assert.equal(target.querySelectorAll(':scope .fab-tier-track-list > li').length, 5);
       handle.destroy();
     } finally {
       delete globalThis.game.fabricate;
@@ -349,7 +349,7 @@ describe('TierTrack through the seam', () => {
       const figure = getComputedStyle(target.querySelector('.fab-tier-track-figure'));
       assert.equal(figure.fontFamily, 'ProbeMono');
       assert.equal(figure.color, 'rgb(1, 2, 3)');
-      const current = target.querySelector('[aria-current="step"] .fab-tier-track-name');
+      const current = target.querySelector(':scope [aria-current="step"] .fab-tier-track-name');
       assert.equal(getComputedStyle(current).color, 'rgb(4, 5, 6)');
       handle.destroy();
     } finally {

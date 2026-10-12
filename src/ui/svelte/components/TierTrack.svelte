@@ -85,6 +85,7 @@
 
 <div class={['fab-tier-track', isColumn ? 'is-column' : 'is-row', extraClass]} {...rest}>
   <ol class="fab-tier-track-list" role="list" aria-label={ariaLabel}>
+    <!-- ratchet-exempt(lint): unkeyed, so a repeated or absent id or name cannot fault the mount -->
     {#each rungs as rung, index}
       {#if rung}
         <li
@@ -113,6 +114,7 @@
                 {#if rung.figure}<span class="fab-tier-track-figure">{rung.figure}</span>{/if}
                 {#if rung.current}<span class="fab-tier-track-marker">{rung.state}</span>{/if}
               </div>
+              <!-- ratchet-exempt(lint): unkeyed, so a repeated note cannot fault the mount -->
               {#each rung.notes as note}<p class="fab-tier-track-note">{note}</p>{/each}
             </div>
           {:else}
