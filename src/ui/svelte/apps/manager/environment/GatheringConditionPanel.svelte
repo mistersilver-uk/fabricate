@@ -175,7 +175,11 @@
 </script>
 
 <section
-  class={`manager-condition-panel ${setting.enabled === false ? 'is-disabled' : ''}`}
+  class={[
+    'manager-condition-panel',
+    setting.enabled === false && 'is-disabled',
+    isTimeOfDay && 'is-time-of-day',
+  ]}
   data-gathering-condition-panel={kind}
   aria-label={conditionTitle(kind)}
 >

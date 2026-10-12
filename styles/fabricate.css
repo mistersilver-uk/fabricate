@@ -13004,6 +13004,10 @@
   background: var(--fab-overlay-light-035);
 }
 
+.fabricate-manager .manager-condition-panel.is-time-of-day {
+  grid-column: 1 / -1;
+}
+
 .fabricate-manager .manager-condition-panel.is-disabled {
   opacity: 0.72;
   background: var(--fab-overlay-dark-10);
@@ -13105,9 +13109,9 @@
   overflow: hidden;
 }
 
-/* One time of day per row, so each pill fits its start-hour stepper (issue 2431). */
+/* The full-width panel packs pills 280px or wider, so each fits its start-hour stepper (issue 2431). */
 .fabricate-manager .manager-condition-pill-list.is-time-of-day {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
 .fabricate-manager .manager-condition-pill.is-time-of-day {
