@@ -50,6 +50,7 @@ import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
+import './ui/publishedComponents.svelte.js';
 
 
 // A lazy chunk, so non-GM players never download the manager (issue 1565). A rejection clears the

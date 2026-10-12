@@ -204,6 +204,8 @@ async function mountTab({
   componentOptions = [],
   essenceOptions = [],
   itemTags = [],
+  // The repair tag adder's per-tag component counts (issue 2430); `null` supplies none.
+  tagComponentCounts = null,
   // THE WORLD CURRENCY LADDER (issue 1373, maintainer round 5). Units are world scope
   // (issue 1278) and the world Tool entry is a world-scope screen, so the repair set offers
   // a cost here exactly as the recipe editor does for a system that enables one.
@@ -225,6 +227,7 @@ async function mountTab({
     componentOptions,
     essenceOptions,
     itemTags,
+    tagComponentCounts,
     currencyUnits,
     onSourceDrop,
     onUnlinkSource,
@@ -1667,6 +1670,96 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       assert.ok(Boolean(note), 'a two-option group draws the `Any one of` head');
       assert.equal(note.textContent.trim(), 'any one of these mends it');
+    });
+
+    it('counts the world components carrying each tag in the repair tag adder (issue 2430)', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'tags', tags: ['wood'], tagMatch: 'any' } },
+                ],
+              },
+            ],
+          },
+          itemTags: ['oak', 'wood'],
+          tagComponentCounts: { oak: 1, wood: 2 },
+        }
+      );
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await tick();
+      await settle();
+      assert.deepEqual(
+        [
+          ...target.ownerDocument
+            .querySelector('.fabricate-picker-popover')
+            .querySelectorAll('[role="option"]'),
+        ].map((node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()),
+        ['oak 1 component', 'wood 2 components']
+      );
+    });
+
+    it('keeps the latest in-flight repair list until its own write settles, and reverts a refused one (issue 2430)', async () => {
+      const writes = [];
+      const groupOf = (tags) => [
+        { id: 'g1', options: [{ quantity: 1, match: { type: 'tags', tags, tagMatch: 'any' } }] },
+      ];
+      const publish = (groups) =>
+        harness.setProps({
+          scope: scopeFor({ onBreak: { mode: 'flagBroken' }, repairRequirements: groups }),
+        });
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: { repairRequirements: groupOf([]) },
+          itemTags: ['a', 'b', 'c'],
+          actions: {
+            setWorldRepairRequirements: (id, groups) =>
+              new Promise((resolve) => {
+                writes.push({ groups, resolve });
+              }),
+          },
+        }
+      );
+      const chips = () =>
+        [
+          ...target.querySelectorAll(':scope [data-tool-repair-requirements] [data-recipe-tag]'),
+        ].map((node) => node.dataset.recipeTag);
+      const settleAll = async () => {
+        await tick();
+        await settle();
+      };
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await settleAll();
+      const choose = async (tag) => {
+        target.ownerDocument
+          .querySelector(`.fabricate-picker-popover [role="option"][title="${tag}"]`)
+          .click();
+        await settleAll();
+      };
+      await choose('a');
+      await choose('b');
+      assert.deepEqual(chips(), ['a', 'b'], 'both picks show while in flight');
+      assert.match(
+        target.querySelector('[data-tool-repair-summary]').textContent,
+        /\bb\b/u,
+        'and the summary reads the in-flight list'
+      );
+      await publish(writes[0].groups);
+      writes[0].resolve(true);
+      await settleAll();
+      assert.deepEqual(chips(), ['a', 'b'], 'the first write settling does not drop the second');
+      await publish(writes[1].groups);
+      writes[1].resolve(true);
+      await settleAll();
+      await choose('c');
+      writes[2].resolve(false);
+      await settleAll();
+      assert.deepEqual(chips(), ['a', 'b'], 'a refused write falls back to the stored list');
     });
 
     // IMMEDIATE, NOT BUFFERED, and that is forced rather than chosen.

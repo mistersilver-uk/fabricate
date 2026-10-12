@@ -3838,11 +3838,8 @@
   }
 
   function activateCraftingParent() {
-    if (isCraftingRoute) {
-      navRail.expandGroup('crafting');
-      return;
-    }
-    openCraftingSection('recipes');
+    if (isCraftingRoute) navRail.expandGroup('crafting');
+    else openCraftingSection('recipes');
   }
 
   function backToBooksScrolls() {
@@ -4344,6 +4341,7 @@
         componentOptions={worldScope.worldComponentOptions}
         essenceOptions={worldScope.worldEssenceOptions}
         itemTags={worldScope.worldComponentTags}
+        tagComponentCounts={worldScope.worldComponentTagCounts}
         currencyUnits={selectedCurrencyUnits}
         previewActors={worldScope.worldToolPreviewActors}
         getPreviewRollData={worldScope.worldToolPreviewRollData}
@@ -4766,6 +4764,7 @@
         activeTab={toolEditorActiveTab}
         focusValidationNonce={toolValidationFocusNonce}
         managedItems={selectedSystem?.managedItemOptions || []}
+        componentTagOptions={selectedSystem?.componentTagOptions || []}
         itemTags={selectedSystem?.itemTags || []}
         {essenceOptions}
         currencyUnits={selectedCurrencyUnits}

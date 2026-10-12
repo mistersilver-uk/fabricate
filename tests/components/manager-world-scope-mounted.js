@@ -3315,6 +3315,75 @@ export function registerWorldScopeCases() {
         assert.match(summary, /Scrap Iron/, 'the component offer names the requirement');
         assert.match(summary, /Fire Essence/, 'and so does the essence offer');
       });
+
+      it('counts the world components carrying each tag in the repair tag adder (issue 2430)', async () => {
+        const store = await mountWithRealStore({
+          worldTools: [{ id: 'pick', name: 'Mining Pick' }],
+          worldComponents: [
+            { id: 'plank', name: 'Plank' },
+            { id: 'log', name: 'Log' },
+          ],
+        });
+        // The selected system holds no components, so its own count of `wood` is zero: a world
+        // page fed the system's counts would read `0 components` where the world reads two.
+        scopeStores.component.save({
+          ...scopeStores.component.get(),
+          defaults: {
+            plank: { id: 'plank', tags: ['wood', 'resin'] },
+            log: { id: 'log', tags: ['wood'] },
+          },
+        });
+        scopeStores.tool.save({
+          ...scopeStores.tool.get(),
+          defaults: {
+            pick: {
+              id: 'pick',
+              onBreak: { mode: 'flagBroken' },
+              repairRequirements: [
+                {
+                  id: 'g1',
+                  options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+                },
+              ],
+            },
+          },
+        });
+        await settle(store);
+        await openMountedEntry(ENTRY_ROWS[1]);
+        target.querySelector('[data-world-tool-entry-tab="breakage"]').click();
+        await settleWiring();
+        target
+          .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]')
+          .click();
+        await settleWiring();
+        const panel = () => document.querySelector('.fabricate-picker-popover');
+        const options = () =>
+          [...(panel()?.querySelectorAll('[role="option"]') ?? [])].map((node) =>
+            node.textContent.replaceAll(/\s+/gu, ' ').trim()
+          );
+        assert.deepEqual(options(), ['resin 1 component', 'wood 2 components']);
+
+        // Two picks inside one republish: the second must build on the first, not on the stale
+        // projection the page still holds while the first write is in flight.
+        const choose = (tag) => panel().querySelector(`[role="option"][title="${tag}"]`).click();
+        choose('wood');
+        flushSync();
+        choose('resin');
+        await settleWiring();
+        assert.deepEqual(
+          scopeStores.tool.get().defaults.pick.repairRequirements[0].options[0].match.tags,
+          ['wood', 'resin'],
+          'both picks are saved to the world tool corpus'
+        );
+        assert.ok(Boolean(panel()), 'the panel stays open across the save round-trip');
+        assert.deepEqual(
+          ['resin', 'wood'].map((tag) =>
+            panel().querySelector(`[title="${tag}"]`).getAttribute('aria-selected')
+          ),
+          ['true', 'true'],
+          'and both saved tags now read as held'
+        );
+      });
     });
 
     describe('the essence inspector reads the world entry through the model (issue 1721)', () => {

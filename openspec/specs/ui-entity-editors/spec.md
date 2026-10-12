@@ -344,6 +344,11 @@ An unfilled tag row is therefore level with the component row beside it, and ask
 The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
 What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
+Every surface that draws a tag row supplies its tag counts.
+A recipe's ingredients and a system Tool's repair materials count the system's own components by their in-system tags, the set a tag requirement in that system matches against.
+A world Tool's repair materials count the world catalogue's components by their default tags, the same list that adder's tag vocabulary is derived from.
+That figure describes world authoring and not what the repair will match, because a world Tool's repair materials are a seed copied into each adopting system and matched there against that system's own components.
+
 #### Adding a requirement, and adding an alternative
 
 Every adder creates a row carrying its KIND and no value; the row's own field names it.
