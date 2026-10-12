@@ -2,6 +2,7 @@
  * Issue 2463 — the Stepper computes the type its library entry states: the value at 11.5px with
  * tabular figures, the adjunct glyph at 9px and a disabled group at opacity .45, at every density
  * and in the formatted mode, under the layered module sheet and a host that restyles bare inputs.
+ * The library's `.k-step` drawings measure the boxes it ships.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -11,6 +12,7 @@ import { after, before, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { readDesignLibrary } from '../helpers/designLibrary.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -72,8 +74,33 @@ function readMounted() {
   };
 }
 
+/** The `<Stepper>` entry's drawn units, and the box of every horizontal `.k-step` on the page. */
+function readDrawn() {
+  const size = (element) => {
+    const box = element.getBoundingClientRect();
+    return `${box.width}x${box.height}`;
+  };
+  const entry = [...document.querySelectorAll('.spec')].find(
+    (spec) => spec.querySelector(':scope > .spec-head > h4')?.textContent === '<Stepper>'
+  );
+  const units = [...entry.querySelectorAll(':scope .unit')].map((unit) => {
+    const step = unit.querySelector(':scope .k-step');
+    return [
+      unit.querySelector(':scope > .cap').textContent,
+      { box: size(step), opacity: Number(getComputedStyle(step).opacity) },
+    ];
+  });
+  return {
+    units: Object.fromEntries(units),
+    horizontal: [...document.querySelectorAll('.k-step:not(.vert)')]
+      .filter((step) => !step.closest('.k-stepset'))
+      .map(size),
+  };
+}
+
 let browser;
 let live;
+let drawn;
 
 before(async () => {
   const harness = createMountedComponentHarness({
@@ -96,6 +123,9 @@ before(async () => {
   const tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await tab.setContent(page(markup), { waitUntil: 'load' });
   live = await tab.evaluate(readMounted);
+  await tab.route(/^https?:/u, (route) => route.abort());
+  await tab.setContent(readDesignLibrary());
+  drawn = await tab.evaluate(readDrawn);
 });
 
 after(async () => {
@@ -128,4 +158,33 @@ it('dims a disabled group to .45 and no other', () => {
 it('keeps its type inside a host whose input rule is live', () => {
   assert.equal(live.cases.hosted.bareMinHeight, '34px', 'the host rule reaches a bare input');
   assert.equal(live.cases.hosted.value, '11.5px tabular-nums');
+});
+
+it('draws each library unit at the box and opacity its mount ships', () => {
+  const pairs = {
+    integer: 'default',
+    comfortable: 'comfortable',
+    'vertical · in a 48px slot': 'vertical',
+  };
+  const boxes = Object.entries(pairs).map(([cap, key]) => [
+    drawn.units[cap].box,
+    live.cases[key].box,
+  ]);
+  assert.deepEqual(boxes, [
+    ['102x28', '102x28'],
+    ['106x30', '106x30'],
+    ['48x86', '48x86'],
+  ]);
+  assert.equal(drawn.units.disabled.opacity, live.cases.disabled.opacity);
+});
+
+it('draws every horizontal library stepper at a shipped box', () => {
+  const endpoint = drawn.units['formatted · null endpoint'].box;
+  assert.equal(endpoint, '118x28', 'the endpoint draws its 64px floor');
+  assert.equal(drawn.horizontal.filter((box) => box === endpoint).length, 1);
+  assert.deepEqual(
+    new Set(drawn.horizontal),
+    new Set(['102x28', '106x30', '84x28', endpoint]),
+    'the default, the comfortable, the 30px-input and the endpoint groups, and no other'
+  );
 });
