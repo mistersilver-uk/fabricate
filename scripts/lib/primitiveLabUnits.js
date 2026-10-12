@@ -119,8 +119,50 @@ const VOID_ELEMENTS = new Set([
   'wbr',
 ]);
 const RAW_TEXT_ELEMENTS = new Set(['script', 'style']);
-const TOKEN_PATTERN = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+const TAG_NAME = /<(\/?)([a-zA-Z][\w-]*)/y;
 const CLASS_PATTERN = /(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+/** The index of the `>` that ends a tag's attributes, skipping any inside quotes; -1 when none. */
+function tagEnd(text, from) {
+  let quote = null;
+  for (let index = from; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '>') return index;
+  }
+  return -1;
+}
+
+/** The next tag at or after `from`, comments skipped, or null when none is left. */
+function nextTag(text, from) {
+  let at = text.indexOf('<', from);
+  while (at !== -1) {
+    if (text.startsWith('<!--', at)) {
+      const close = text.indexOf('-->', at + 4);
+      if (close === -1) return null;
+      at = text.indexOf('<', close + 3);
+      continue;
+    }
+    TAG_NAME.lastIndex = at;
+    const match = TAG_NAME.exec(text);
+    const end = match ? tagEnd(text, TAG_NAME.lastIndex) : -1;
+    if (end !== -1) {
+      const [, closing, name] = match;
+      const attributes = text.slice(TAG_NAME.lastIndex, end);
+      return {
+        index: at,
+        closing: closing === '/',
+        name: name.toLowerCase(),
+        attributes,
+        end: end + 1,
+      };
+    }
+    at = text.indexOf('<', at + 1);
+  }
+  return null;
+}
 
 function classTokens(attributes) {
   const match = CLASS_PATTERN.exec(attributes);
@@ -210,6 +252,33 @@ function closeEntries(entries, sectionEnds, lastLine) {
   }
 }
 
+function closeTag(state, name, line) {
+  if (name === 'div') closeDiv(state, line);
+  else if (name === 'section') state.sectionEnds.push(line);
+  else {
+    const top = state.stack.at(-1);
+    if (top) top.open = Math.max(0, top.open - 1);
+  }
+}
+
+/** Apply one tag to the scan, returning where the search for the next tag starts. */
+function readTag(state, text, tag, line) {
+  const { closing, name, attributes, end } = tag;
+  if (closing) {
+    closeTag(state, name, line);
+    return end;
+  }
+  if (RAW_TEXT_ELEMENTS.has(name)) return end + innerMarkup(text, end, name).length;
+  if (name === 'div') {
+    openDiv(state, attributes, line);
+    return end;
+  }
+  const top = state.stack.at(-1);
+  readLabel(state, name, attributes, () => innerMarkup(text, end, name));
+  if (top && !VOID_ELEMENTS.has(name) && !attributes.endsWith('/')) top.open += 1;
+  return end;
+}
+
 /**
  * Scan `library.html` into entry and unit regions by balanced `<div>` depth over class tokens.
  *
@@ -220,33 +289,11 @@ function closeEntries(entries, sectionEnds, lastLine) {
  */
 export function scanLibraryRegions(text) {
   const lineOf = lineIndex(text);
-  const state = { stack: [], entries: [], units: [] };
-  const sectionEnds = [];
-  TOKEN_PATTERN.lastIndex = 0;
-  for (let match = TOKEN_PATTERN.exec(text); match; match = TOKEN_PATTERN.exec(text)) {
-    const [whole, closing, rawName, attributes = ''] = match;
-    if (!rawName) continue;
-    const name = rawName.toLowerCase();
-    const line = lineOf(match.index);
-    const top = state.stack.at(-1);
-    if (closing) {
-      if (name === 'div') closeDiv(state, line);
-      else if (name === 'section') sectionEnds.push(line);
-      else if (top) top.open = Math.max(0, top.open - 1);
-      continue;
-    }
-    const end = match.index + whole.length;
-    if (RAW_TEXT_ELEMENTS.has(name)) {
-      TOKEN_PATTERN.lastIndex = end + innerMarkup(text, end, name).length;
-      continue;
-    }
-    if (name === 'div') {
-      openDiv(state, attributes, line);
-      continue;
-    }
-    readLabel(state, name, attributes, () => innerMarkup(text, end, name));
-    if (top && !VOID_ELEMENTS.has(name) && !attributes.endsWith('/')) top.open += 1;
+  const state = { stack: [], entries: [], units: [], sectionEnds: [] };
+  let from = 0;
+  for (let tag = nextTag(text, from); tag; tag = nextTag(text, from)) {
+    from = readTag(state, text, tag, lineOf(tag.index));
   }
-  closeEntries(state.entries, sectionEnds, lineOf(text.length));
+  closeEntries(state.entries, state.sectionEnds, lineOf(text.length));
   return { entries: state.entries.map(({ units, ...entry }) => entry), units: state.units };
 }

@@ -31,13 +31,19 @@ export const MANIFEST_PATH = 'scripts/lib/designSystemPrimitives.json';
 const CATALOGUE_FILE_PATTERN = /^tests\/view-lab\/primitives\/catalogue\/([^/]+)\.json$/;
 const FIXTURE_FILE_PATTERN = /^tests\/view-lab\/primitives\/fixtures\/([^/]+)\.svelte$/;
 
-/** The lab's page, harness and capture machinery, and the repository files they import. */
+/**
+ * The lab's page, harness and capture machinery, and the repository files they import; pinned by
+ * the import walk in `tests/primitive-lab-import-graph.test.js`.
+ */
 const MACHINERY_PATTERNS = Object.freeze([
   /^tests\/view-lab\/primitives(?:\.html$|\/)/,
-  /^tests\/view-lab\/(?:vite\.config|servedFile|watchIgnore)\.js$/,
+  /^tests\/view-lab\/(?:vite\.config|servedFile|watchIgnore|foundryFrame|foundryDialog)\.js$/,
+  /^tests\/view-lab\/(?:labI18n|rollPromptAnswer|world\/labFlags|foundry\/[^/]+)\.js$/,
+  /^tests\/view-lab\/chrome-provenance\.json$/,
   /^scripts\/primitive-lab-[^/]+\.mjs$/,
   /^scripts\/lib\/primitiveLab[^/]*\.js$/,
   /^scripts\/lib\/(?:foundryChromeCache|foundryChromeSpec|zipRead)\.js$/,
+  /^scripts\/lib\/(?:resolveExecutable|viewLabRenderPool)\.js$/,
   /^tests\/helpers\/designLibrary[^/]*\.js$/,
 ]);
 
@@ -155,32 +161,41 @@ function readCatalogue(source) {
   };
 }
 
-/** The `(spec, cap)` addresses of rows whose `spec` or `cap` line a hunk removes. */
-function removedAddresses(hunks) {
+const isRowBound = (text) => ROW_BOUNDS.open.test(text) || ROW_BOUNDS.close.test(text);
+
+/** A row with one more `spec` or `cap` line read into it, or the row unchanged when it is neither. */
+function readRowField(row, marker, text) {
+  const field = ROW_FIELD_PATTERN.exec(text);
+  if (!field) return row;
+  const next = row ?? { spec: null, cap: null, removed: false };
+  next[field[1]] = JSON.parse(field[2]);
+  next.removed ||= marker === '-';
+  return next;
+}
+
+/** The addresses of the rows one hunk removes a `spec` or `cap` line from. */
+function hunkRemovedAddresses(hunk) {
   const keys = [];
-  for (const hunk of hunks ?? []) {
-    let row = null;
-    const flush = () => {
-      if (row?.removed && row.spec !== null) keys.push(addressKey(row.spec, row.cap));
-      row = null;
-    };
-    for (const { marker, text } of hunk) {
-      if (marker === '+') continue;
-      if (ROW_BOUNDS.open.test(text) || ROW_BOUNDS.close.test(text)) {
-        flush();
-        if (ROW_BOUNDS.open.test(text)) row = { spec: null, cap: null, removed: false };
-        continue;
-      }
-      const field = ROW_FIELD_PATTERN.exec(text);
-      if (!field) continue;
-      row ??= { spec: null, cap: null, removed: false };
-      row[field[1]] = JSON.parse(field[2]);
-      row.removed ||= marker === '-';
+  let row = null;
+  const flush = () => {
+    if (row?.removed && row.spec !== null) keys.push(addressKey(row.spec, row.cap));
+    row = null;
+  };
+  for (const { marker, text } of hunk) {
+    if (marker === '+') continue;
+    if (!isRowBound(text)) {
+      row = readRowField(row, marker, text);
+      continue;
     }
     flush();
+    if (ROW_BOUNDS.open.test(text)) row = { spec: null, cap: null, removed: false };
   }
+  flush();
   return keys;
 }
+
+/** The `(spec, cap)` addresses of rows whose `spec` or `cap` line a hunk removes. */
+const removedAddresses = (hunks) => (hunks ?? []).flatMap(hunkRemovedAddresses);
 
 /** Locate each hunk over `regions`, adding what it reaches and counting what it cannot place. */
 function locateHunks(hunks, lines, regions, reach) {
