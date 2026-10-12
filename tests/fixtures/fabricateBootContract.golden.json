@@ -1593,7 +1593,8 @@
     "getInteractablesManagerAppClass",
     "loadCraftingSystemManagerAppClass",
     "managerExtensions",
-    "playerExtensions"
+    "playerExtensions",
+    "ui"
   ],
   "macroApiKeys": [
     "craft",
@@ -1625,6 +1626,7 @@
   "references": {
     "apiHooksIsFabricateHooks": true,
     "apiCompanionIsCompanionContract": true,
+    "apiUiIsPublishedSeam": true,
     "facadeIsEntrySingleton": true,
     "recipeManagerTookCurrencyStore": true,
     "craftingEngineTookCurrencyStore": true,

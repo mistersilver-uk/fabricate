@@ -20,6 +20,7 @@ import { managerExtensions } from '../src/ui/managerExtensions.js';
 import { playerExtensions } from '../src/ui/playerExtensions.js';
 import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { publishedComponentSeam } from '../src/ui/publishedComponentSeam.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
@@ -71,7 +72,8 @@ const PUBLIC_MEMBERS = Object.freeze([
     'GatheringRegionStore',
     'GatheringPartyStore',
     'GatheringLocationService',
-    'HOOKS'
+    'HOOKS',
+    'ui'
   ),
   ...published(
     'gatheringKeys',
@@ -164,6 +166,26 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       assert.ok(key, 'the registry publicApi is on game.fabricate.api');
       assert.equal(atReady[key], registry.publicApi, 'a replay binds the page-session singleton');
     }
+    assert.equal(atInit.ui, publishedComponentSeam.publicApi, 'api.ui is the page-session seam');
+    assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
+  });
+
+  it('publishes exactly the pinned components, each described as pinned, and documents them', () => {
+    installPublicGame();
+    bindFabricateGlobal(recordingFacade().facade, {});
+    const { ui } = globalThis.game.fabricate.api;
+    assert.deepEqual(ui.components, []);
+    assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {});
+    const header = '| Component | Version | Props | Rest |';
+    const start = DOCUMENTED.indexOf(header);
+    assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
+    const end = DOCUMENTED.indexOf('\n\n', start);
+    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
+    assert.deepEqual(
+      rows.map((row) => row.match(/^\| `([^`]+)` \|/)?.[1]),
+      ui.components,
+      'one documented row per published component, in publication order'
+    );
   });
 
   it('publishes the canonical realm classes and the deprecated alias as the same class', () => {

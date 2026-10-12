@@ -427,6 +427,7 @@ async function measureBootContract({ init, ready, loadModule }) {
   const facade = globalThis.game.fabricate;
   const { FABRICATE_HOOKS } = await loadModule('/src/config/hooks.js');
   const { COMPANION_CONTRACT } = await loadModule('/src/systems/companionContract.js');
+  const { publishedComponentSeam } = await loadModule('/src/ui/publishedComponentSeam.js');
   const whenReady = await Promise.race([
     facade.whenReady().then(() => 'resolved'),
     new Promise((settle) => setTimeout(() => settle('pending'), 500)),
@@ -449,6 +450,7 @@ async function measureBootContract({ init, ready, loadModule }) {
     references: {
       apiHooksIsFabricateHooks: facade.api.HOOKS === FABRICATE_HOOKS,
       apiCompanionIsCompanionContract: facade.api.companion === COMPANION_CONTRACT,
+      apiUiIsPublishedSeam: facade.api.ui === publishedComponentSeam.publicApi,
       facadeIsEntrySingleton: facade === instance,
       recipeManagerTookCurrencyStore:
         facade.recipeManager.currencyConfigStore === facade.currencyConfigStore,
