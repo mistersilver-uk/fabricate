@@ -95,7 +95,7 @@ function recordRunManagerCalls(runManager, calls, stageJournal) {
  * reservation-count semantics, only enough to prove when a run's provisional claim is released
  * relative to commit and respond, via a `reservation-released` marker.
  */
-function buildEngine({
+export function buildEngine({
   system,
   store,
   actor,

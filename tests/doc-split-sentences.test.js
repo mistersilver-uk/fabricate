@@ -134,7 +134,7 @@ const DECOUNTED_COUNT = 4;
  * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
  * #2118, #2119). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287', '#2414']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -308,8 +308,9 @@ const SUPERSEDED_POLICY = [
     issue: '#2119',
     before:
       "The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    // Issue #2414 added the broad-signal override table to these inputs.
     after:
-      "The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+      "The patch-narrowed inputs — the case registry, the broad-signal override table, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
     survivesIn: 'CONTRIBUTING.md',
   },
   {
@@ -651,23 +652,39 @@ const SUPERSEDED_POLICY = [
       'Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
     survivesIn: '.github/workflows/README.md',
   },
+  {
+    issue: '#2414',
+    before: 'Five inputs narrow below coverage.',
+    after: 'These inputs narrow below coverage.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2414',
+    before:
+      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
+    after: [
+      'A patch to a case file in `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
+      'A patch to `scripts/lib/view-lab-cases/broadSignals.js` selects only what the override entries it touches name, plus the representative set, when it is confined to `BROAD_SIGNAL_CASE_OVERRIDES`; an edit anywhere else in that file keeps the coverage default.',
+    ],
+    survivesIn: 'CONTRIBUTING.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 60;
+const SUPERSEDED_POLICY_COUNT = 62;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
  * #1761).
  */
 const RENAMED = [
-  // Issue #2381 replaced ProgressiveStageList with ProgressiveStageBand, the text(key, fallback) example.
+  // Issue #2381 deleted ProgressiveStageList; InteractableBrowserRoot is now the text(key, fallback) example.
   {
     before:
       'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.',
     after:
-      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageBand.svelte`) quietly renders its **hardcoded English fallback**.',
-    identifiers: [['ProgressiveStageBand.svelte', 'ProgressiveStageList.svelte']],
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `InteractableBrowserRoot.svelte`) quietly renders its **hardcoded English fallback**.',
+    identifiers: [['InteractableBrowserRoot.svelte', 'ProgressiveStageList.svelte']],
   },
   {
     before:
@@ -691,17 +708,10 @@ const RENAMED = [
       '`getWorldItemOptions` in `src/ui/managerServices.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
     identifiers: [['src/ui/managerServices.js', 'src/ui/SvelteCraftingSystemManagerApp.svelte.js']],
   },
-  // Issue #1671 moved the cases into one file per surface, so these three sentences name the directory.
+  // Issue #1671 moved the cases into one file per surface, so this sentence names the directory.
   {
     before: 'Cases live in `scripts/lib/viewLabCases.js`.',
     after: 'Cases live in `scripts/lib/view-lab-cases/`.',
-    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
-  },
-  {
-    before:
-      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
-    after:
-      'A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
     identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
   },
   {
@@ -934,7 +944,7 @@ const RENAMED = [
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 35;
+const RENAMED_COUNT = 34;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): ProgressiveStageRow composes Medallion inside SortableList and draws no control of its own; its manifest row lands with its Primitive Lab specimen (issue 2381) -->
+<!-- ratchet-exempt(design-system): ProgressiveStageRow is a new shared member at target, because the crafting and salvage progressive bodies both render it as SortableList's row (issue 2381) -->
 <!--
   A player progressive stage row's content in `SortableList`'s `row` snippet: the art, the name, the
   component's progressive DC and the cumulative threshold. The crafting and salvage bodies share it.

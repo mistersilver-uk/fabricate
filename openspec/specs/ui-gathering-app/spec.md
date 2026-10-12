@@ -196,6 +196,8 @@ A blind environment's header Attempt states only the generic reason, because its
 
 If `task.timeRequirement` is absent:
 
+- an attempt with a player check (an untimed d100 task, or a routed or progressive task) first opens the roll prompt, and the terminal result shows only once the player answers it
+- a dismissed prompt shows no notice and still refreshes task and run state, because the attempt's run waits ready in the Journal
 - show the terminal `startAttempt` result in the same interaction flow
 - present success with created result summary when details are visible
 - present failure without implying any gathered result items were created

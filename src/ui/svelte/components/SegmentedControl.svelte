@@ -8,7 +8,7 @@
   | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
-  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. |
+  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
 
   Callbacks:
   - `onChange(value)` — the chosen option's `value`.
@@ -30,7 +30,8 @@
     iconOnly = false,
     density = 'default',
     // `variant` says what choosing a segment MEANS, `tone` what the track is ABOUT. 'tag' carries
-    // the track's SCALE too, so a `tone="tag"` consumer passes no `density`.
+    // its own 22px SCALE, so a `tone="tag"` consumer in a row that must not grow passes no `density`;
+    // `inline` (30px) and `field` (34px) lift it to those rungs for a row of taller siblings.
     tone = '',
     shape = '',
     class: extraClass = '',
@@ -208,9 +209,45 @@
     font-weight: 600;
   }
 
-  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. */
+  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. The
+     weight is restated because `is-inline` and `is-field` set an idle 500 at the same specificity. */
   .manager-segmented.is-tag .manager-segment:not(.is-active) {
     color: var(--fab-text-subtle);
+    font-weight: 600;
+  }
+
+  /* TAG tone on a taller rung: `density` lifts the track to the height of its row's siblings and
+     nothing else, so the well, the gap and the equal-width segments the density would bring stay
+     out. The track owns the rung and the segments stretch to fill it inside its border. */
+  .manager-segmented.is-tag.is-inline {
+    box-sizing: border-box;
+    height: 30px;
+  }
+
+  .manager-segmented.is-tag.is-field {
+    box-sizing: border-box;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .manager-segmented.is-tag.is-inline .manager-segment,
+  .manager-segmented.is-tag.is-field .manager-segment {
+    align-self: stretch;
+    padding: 0 var(--fab-space-2);
+  }
+
+  /* `:not(.is-fill)`: at (0,4,0) this would otherwise out-specify `.is-fill`'s shared width. */
+  .manager-segmented.is-tag.is-inline:not(.is-fill) .manager-segment,
+  .manager-segmented.is-tag.is-field:not(.is-fill) .manager-segment {
+    flex: 0 1 auto;
+  }
+
+  .manager-segmented.is-tag.is-inline .manager-segment {
+    font-size: 10px;
+  }
+
+  .manager-segmented.is-tag.is-field .manager-segment {
+    font-size: 10.5px;
   }
 
   .manager-segmented.is-tag .manager-segment.is-active {

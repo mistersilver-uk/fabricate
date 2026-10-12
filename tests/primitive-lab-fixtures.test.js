@@ -69,6 +69,9 @@ const EVENT_METHODS = new Set(['focus', 'blur', 'click', 'dispatchEvent']);
 
 const PRESENTATION_ATTRIBUTES = new Set(['class', 'style']);
 
+/** A prop that hands a primitive presentation, as `rowClass` or `wellStyle` do. */
+const PRESENTATION_PROP = /(?:Class|Style)$/;
+
 /** AST keys that hold positions, back-references or comments rather than code. */
 const SKIPPED_KEYS = new Set([
   'type',
@@ -318,7 +321,8 @@ function presentationName(attribute) {
   if (attribute.type === 'ClassDirective') return `class:${attribute.name}`;
   if (attribute.type === 'StyleDirective') return `style:${attribute.name}`;
   const isPresentation =
-    attribute.type === 'Attribute' && PRESENTATION_ATTRIBUTES.has(attribute.name);
+    attribute.type === 'Attribute' &&
+    (PRESENTATION_ATTRIBUTES.has(attribute.name) || PRESENTATION_PROP.test(attribute.name));
   return isPresentation ? attribute.name : null;
 }
 
@@ -330,15 +334,17 @@ function readsRow(expression, readable) {
 }
 
 /**
- * No `<style>`, no `{@html}`, and no class or style the fixture authors: a `class` or `style`
- * attribute only reads the row's `props` or `data`, and a directive's name is always its own.
+ * No `<style>`, no `{@html}`, and no class or style the fixture authors: a `class`, `style`,
+ * `*Class` or `*Style` attribute only reads the row's `props` or `data` or a shipped primitive's
+ * export, and a directive's name is always its own.
  */
-function presentationProblems(ast, nodes, bindings) {
-  const readable = new Set(
-    [...bindings]
+function presentationProblems(ast, nodes, { bindings, primitives }) {
+  const readable = new Set([
+    ...[...bindings]
       .filter(([key]) => key !== 'component' && key !== 'children')
-      .map(([, local]) => local)
-  );
+      .map(([, local]) => local),
+    ...primitives.keys(),
+  ]);
   const problems = ast.css
     ? ['carries a <style> block, so presentation no shipped primitive owns']
     : [];
@@ -429,7 +435,7 @@ function templateProblems(ast, { file, rows, propsOf }) {
   return [
     ...problems,
     ...handedProblems(ast, nodes, { bindings, rows }),
-    ...presentationProblems(ast, nodes, bindings),
+    ...presentationProblems(ast, nodes, { bindings, primitives }),
   ];
 }
 
@@ -754,6 +760,8 @@ test('a <style> block, an {@html} tag, and a class or style the fixture authors 
     ["style={'margin: 0'}", 'style'],
     ['style:margin={typed}', 'style:margin'],
     ['class:is-open={typed}', 'class:is-open'],
+    ['rowClass="is-open"', 'rowClass'],
+    ["wellStyle={'margin: 0'}", 'wellStyle'],
   ];
   for (const [attribute, name] of authored) {
     const template = withAttribute(attribute);
@@ -764,7 +772,12 @@ test('a <style> block, an {@html} tag, and a class or style the fixture authors 
       template
     );
   }
-  for (const attribute of ['class={props.class}', 'class={typed}', 'style={props.style}']) {
+  for (const attribute of [
+    'class={props.class}',
+    'class={typed}',
+    'style={props.style}',
+    'wellStyle={props.wellStyle}',
+  ]) {
     const template = withAttribute(attribute);
     assert.deepEqual(problemsOf({ template }), [], `${attribute} reads the row`);
   }

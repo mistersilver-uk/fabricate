@@ -305,6 +305,7 @@ After issue 2046 exactly one member row scoped `shared` lives under `apps/manage
 Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `CheckEvidenceRows.svelte`, the executed check's evidence rows, which the crafting result box and the salvage summary both render, each row through `JournalFactRow`'s keyed `.k-fact` form.
 `JournalFactRow`'s keyed form takes a per-site `prose` prop for a value that is a sentence rather than a figure (issue 2134): the value sets in the inherited body face at 12px with tabular numerals and wraps by word, and every other keyed row keeps the atom's 13px mono, so the prop extends the one row rather than forking it.
 `CheckEvidenceRows` passes it for a counting check's `Count`, `Pool` and `Result` rows.
+Issue 2381 adds two more under `apps/crafting/detail/`: `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`, the player progressive stage row's content and its complication band, which the crafting and salvage bodies both render inside `SortableList`.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.

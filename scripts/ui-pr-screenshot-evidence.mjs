@@ -11,8 +11,8 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // nothing from this file.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file cannot
-// derive: what to call it, and whether it needs a caption.
-import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
+// derive: what to call it, whether it needs a caption, and where the Primitive Lab's boundary lies.
+import { evidenceNoteForCaseId, isPrimitiveLabPath, labelForCaseId } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -1132,6 +1132,7 @@ export function normalizePath(filePath) {
 
 export function isUiFile(filePath) {
   const normalized = normalizePath(filePath);
+  if (isPrimitiveLabPath(normalized)) return false;
   // `lang/` is deliberately excluded: a localization file is not itself a UI render target.
   return normalized.startsWith('src/ui/')
     || normalized.startsWith('styles/')
@@ -1144,7 +1145,9 @@ export function hasUiChanges(files = []) {
 }
 
 export function mapChangedFilesToViews(files = []) {
-  const normalizedFiles = files.map(normalizePath).filter(Boolean);
+  const normalizedFiles = files
+    .map(normalizePath)
+    .filter(file => file && !isPrimitiveLabPath(file));
   const matched = [];
   for (const recipe of VIEW_RECIPES) {
     if (normalizedFiles.some(file => recipe.matches.some(pattern => pattern.test(file)))) {
