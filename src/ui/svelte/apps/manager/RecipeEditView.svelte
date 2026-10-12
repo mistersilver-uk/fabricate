@@ -185,12 +185,8 @@
   // Append WITHOUT an id, since store normalization assigns one, and remove by id. A null stepId
   // patches the recipe scope, a present one that step.
   function updateIngredientSets(stepId, nextSets) {
-    if (stepId == null) {
-      onUpdateRecipe({ ingredientSets: nextSets });
-      return;
-    }
-    if (!stepById(stepId)) return;
-    onUpdateStep(stepId, { ingredientSets: nextSets });
+    if (stepId == null) onUpdateRecipe({ ingredientSets: nextSets });
+    else if (stepById(stepId)) onUpdateStep(stepId, { ingredientSets: nextSets });
   }
   // The section emits the whole replacement array, shallow-cloned to the changed node; group ids
   // and names, which routing references, are preserved upstream.
@@ -516,6 +512,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {componentTagOptions}
             {showSetName}
             {routingProvider}
             onUpdateIngredientSets={updateIngredientSets}

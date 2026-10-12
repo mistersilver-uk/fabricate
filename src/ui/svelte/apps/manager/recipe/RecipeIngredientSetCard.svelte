@@ -26,6 +26,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled. Preset units are seeded even for a
     // disabled system, so the Currency kind gates on this flag and not on unit presence.
@@ -176,6 +177,7 @@
           {group}
           {componentOptions}
           {itemTags}
+          {tagComponentCounts}
           {currencyUnits}
           {currencyEnabled}
           {essenceOptions}

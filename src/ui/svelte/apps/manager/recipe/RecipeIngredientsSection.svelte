@@ -16,6 +16,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
     // the read-only rendering of existing currency requirements. Forwarded to every set card.
@@ -107,6 +108,7 @@
         {componentOptions}
         {essenceOptions}
         {itemTags}
+        {tagComponentCounts}
         {currencyUnits}
         {currencyEnabled}
         onChange={(nextSet) => updateSimpleSet(nextSet)}
@@ -132,6 +134,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
             {showSetName}

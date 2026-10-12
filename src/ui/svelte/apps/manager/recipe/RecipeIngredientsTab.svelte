@@ -17,6 +17,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeIngredientsSection from './RecipeIngredientsSection.svelte';
+  import { countComponentsByTag } from '../../../../model/vocabularyUsage.js';
 
   let {
     // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
@@ -36,6 +37,8 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // The system's `{ id, tags }` components, which the tag adder counts each tag over.
+    componentTagOptions = [],
     // Whether the system mode allows more than one ingredient set. Forwarded to each
     // section to gate the "Add ingredient set" promotion affordance (issue 643).
     canAddSet = false,
@@ -57,6 +60,7 @@
     Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
   );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+  const tagComponentCounts = $derived(countComponentsByTag(componentTagOptions));
 
   // Per-mode heading + intro OUTSIDE any card (§B5), mirroring the Results tab.
   const heading = $derived(
@@ -133,6 +137,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
             {showSetName}
@@ -148,6 +153,7 @@
       {componentOptions}
       {essenceOptions}
       {itemTags}
+      {tagComponentCounts}
       {currencyUnits}
       {currencyEnabled}
       {showSetName}
