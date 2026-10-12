@@ -3,7 +3,7 @@
  * sides of a split, the working-tree walk, the integrity check, and View Lab case selection.
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -13,6 +13,7 @@ import {
   STYLESHEET_ENTRY,
   checkoutReader,
   readStylesheet,
+  stylesheetSources,
 } from '../scripts/lib/stylesheetSource.js';
 import {
   hasUiChanges,
@@ -176,6 +177,13 @@ test('the integrity check holds the entry to imports and each partial to its sha
   ]);
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(SPLIT), Object.keys(SPLIT)), []);
   assert.deepEqual(stylesheetIntegrityFailures(mapReader(SINGLE), Object.keys(SINGLE)), []);
+});
+
+test('the checked-out sheet is split, and every styles/ file passes the integrity check', () => {
+  const onDisk = readdirSync(path.join(import.meta.dirname, '..', 'styles'));
+  const styles = onDisk.map((name) => `styles/${name}`);
+  assert.deepEqual(stylesheetIntegrityFailures(checkoutReader(), styles), []);
+  assert.ok(stylesheetSources().parts.length > 0, 'the entry imports no partial');
 });
 
 test('a split tree walks as exactly one key holding the joined text', (t) => {
