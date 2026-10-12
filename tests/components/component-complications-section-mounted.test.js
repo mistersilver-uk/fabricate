@@ -1123,18 +1123,6 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
 
 /* THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT. */
 describe('1286 the complication row exposes its name treatment, and prose is not mono', () => {
-  // The Component Studio's band is the progressive stage list's body (issue 1522).
-  const salvageStagesSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte'),
-    'utf8'
-  );
-  // The Recipe Studio's band is the shared ordered list's BODY (issue 1512), so
-  // `RecipeStageComplicationBand.svelte` is where that call site lives.
-  const recipeStageBandSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/StageComplicationList.svelte'),
-    'utf8'
-  );
-
   it('states no face and no size on the shared name, only on its two emphases', () => {
     const base = blockIn(summaryRowSource, '.fab-complication-row-name');
     assert.doesNotMatch(
@@ -1157,22 +1145,9 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     );
   });
 
-  it('has both GM read-only strips ASK for the inline treatment', () => {
-    // Read at the call sites, because "the prop exists" and "the drift is fixed" are two
-    // different claims and only the second one is the finding. A prop nothing passes leaves
-    // both strips exactly as they were.
-    for (const [name, source] of [
-      ['the Component Studio salvage strip', salvageStagesSource],
-      ['the Recipe Studio stage strip', recipeStageBandSource],
-    ]) {
-      assert.match(
-        source,
-        /<ComplicationSummaryRow\s+variant="readonly-gm"\s+nameEmphasis="inline"/,
-        `${name} passes the inline emphasis`
-      );
-    }
-
-    // Non-vacuity: the ACCORDION deliberately passes nothing and takes the default.
+  // GUARD: the authoring accordion takes the default display treatment; the GM read-only list's
+  // own `is-display` is asserted on the mounted list (issue 2445).
+  it('GUARD: the authoring section passes no name treatment and takes the default', () => {
     assert.doesNotMatch(
       sectionSource,
       /nameEmphasis/,

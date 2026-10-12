@@ -58,14 +58,14 @@ describe('ComponentSalvageStages', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('forwards add, remove, move, a cleared pick and both Edit links', async () => {
+  it('RED: forwards add, remove, move, a cleared pick and the one row Edit link', async () => {
     const { calls, target } = await mountWith();
     target.querySelector(':scope .manager-salvage-stage-add [data-add-salvage-result]').click();
     stage(target, 2).querySelector('[data-remove-salvage-result]').click();
     stage(target, 1).querySelector('[data-sortable-move="down"]').click();
     stage(target, 1).querySelector('[data-recipe-option-clear]').click();
     stage(target, 1).querySelector('[data-salvage-result-edit]').click();
-    target.querySelector('[data-salvage-stage-complications-edit="cmp-dust"]').click();
+    stage(target, 2).querySelector('[data-salvage-result-edit]').click();
 
     assert.deepEqual(
       calls.map(([name, ...args]) =>
@@ -80,10 +80,24 @@ describe('ComponentSalvageStages', () => {
         ['open', 'cmp-dust'],
       ]
     );
+    assert.ok(
+      !target.querySelector('[data-salvage-stage-complications-edit]'),
+      'the stage row’s own Edit is the one route to the component that owns the complications'
+    );
     harness.remount();
   });
 
-  it('draws each stage’s DC and only its yield’s salvage complications', async () => {
+  it('RED: the row Edit link’s tooltip names complications as well as difficulty', async () => {
+    const { target } = await mountWith();
+    assert.match(
+      stage(target, 2).querySelector('[data-salvage-result-edit]').getAttribute('title'),
+      /complications/i
+    );
+    harness.remount();
+  });
+
+  // GUARD (re-pointed to the unified row hook): red when the salvage activity filter is dropped.
+  it('GUARD: draws each stage’s DC and only its yield’s salvage complications', async () => {
     const { target } = await mountWith();
     assert.equal(
       stage(target, 1).querySelector('[data-salvage-result-difficulty]').textContent,
@@ -93,7 +107,7 @@ describe('ComponentSalvageStages', () => {
       stage(target, 2).querySelector('[data-salvage-result-difficulty]').textContent,
       'No difficulty'
     );
-    const band = target.querySelectorAll('[data-salvage-stage-complication]');
+    const band = target.querySelectorAll('[data-stage-complication]');
     assert.equal(band.length, 1, 'the crafting-only complication is filtered out');
     assert.ok(!stage(target, 1).classList.contains('has-band'), 'a stage with no band draws none');
     assert.ok(stage(target, 2).classList.contains('has-band'), 'the stage with a band is marked');
@@ -121,13 +135,26 @@ describe('ComponentSalvageStages', () => {
     harness.remount();
   });
 
-  it('holds every control while saving', async () => {
+  it('GUARD: a stage whose yield authors only crafting complications draws no body', async () => {
+    // Red when the salvage activity filter is dropped: the crafting-only list would draw.
+    const crafting = [{ ...COMPONENTS[1], complications: [COMPONENTS[1].complications[1]] }];
+    const { target } = await mountWith({ componentOptions: [COMPONENTS[0], ...crafting] });
+    const row = stage(target, 2);
+    assert.ok(!row.querySelector('.fab-kicker'), 'no Complications kicker');
+    assert.ok(!row.querySelector('[data-salvage-stage-complications]'), 'no list');
+    assert.ok(!row.classList.contains('has-band'), 'and no has-band, so the body is hidden');
+    assert.equal(row.querySelector('.fabricate-sortable-list-body').textContent.trim(), '');
+    harness.remount();
+  });
+
+  // GUARD: red when the nested complication list is left reorderable.
+  it('GUARD: holds every control while saving, and nothing anywhere reorders', async () => {
     const { calls, target } = await mountWith({ saving: true });
-    assert.ok(!target.querySelector('[data-sortable-move]'), 'the list is not reorderable');
+    assert.ok(Boolean(target.querySelector('[data-salvage-stage-complications]')), 'a list draws');
+    assert.ok(!target.querySelector('[data-sortable-move]'), 'no list is reorderable');
     const disabled = [
       '[data-remove-salvage-result]',
       '[data-salvage-result-edit]',
-      '[data-salvage-stage-complications-edit]',
       '[data-add-salvage-result]',
     ].map((selector) => [selector, target.querySelector(selector).disabled]);
     assert.deepEqual(
