@@ -8,24 +8,20 @@ import { describe, it } from 'node:test';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 
-function storeWithConditions() {
+function storeWithConditions(
+  conditions = {
+    weather: { values: ['rain'] },
+    timeOfDay: { values: ['dawn', 'day', { id: 'night', startHour: 22 }] },
+  }
+) {
   const settings = {
     lastManagedCraftingSystem: 'sys1',
-    gatheringConfig: {
-      systems: {
-        sys1: {
-          conditions: {
-            weather: { values: ['rain'] },
-            timeOfDay: { values: ['dawn', 'day', { id: 'night', startHour: 22 }] },
-          },
-        },
-      },
-    },
+    gatheringConfig: { systems: { sys1: { conditions } } },
   };
   const system = makeSystem({ features: { gathering: true } });
   const store = createAdminStore(createServices(system, [], [], { settings }));
-  const values = (kind) => settings.gatheringConfig.systems.sys1.conditions[kind].values;
-  return { store, values };
+  const condition = (kind) => settings.gatheringConfig.systems.sys1.conditions[kind];
+  return { store, values: (kind) => condition(kind).values, condition };
 }
 
 const startHours = (options) =>
@@ -76,6 +72,38 @@ describe('the manager store authors time-of-day start hours', () => {
       ['dawn', '-'],
       ['day', '-'],
       ['night', 22],
+    ]);
+  });
+
+  it('gives no weather option a start hour through an update of an authored option', async () => {
+    const { store, values } = storeWithConditions({
+      weather: { values: [{ id: 'clear', label: 'Clear', icon: 'fas fa-sun' }] },
+    });
+    assert.equal(
+      await store.updateGatheringConditionValue('weather', 'clear', { startHour: 5 }, 'sys1'),
+      true
+    );
+    assert.deepStrictEqual(startHours(values('weather')), [['clear', '-']]);
+  });
+
+  it('deletes the current period without moving any other start hour', async () => {
+    const { store, values, condition } = storeWithConditions({
+      timeOfDay: {
+        current: 'dawn',
+        values: [
+          { id: 'dawn', label: 'Dawn' },
+          { id: 'day', label: 'Day' },
+          { id: 'dusk', label: 'Dusk', startHour: 18 },
+          { id: 'night', label: 'Night' },
+        ],
+      },
+    });
+    await store.deleteGatheringConditionValue('timeOfDay', 'dawn', 'sys1');
+    assert.equal(condition('timeOfDay').current, 'day');
+    assert.deepStrictEqual(startHours(values('timeOfDay')), [
+      ['day', '-'],
+      ['dusk', 18],
+      ['night', '-'],
     ]);
   });
 });
