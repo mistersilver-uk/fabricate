@@ -351,6 +351,7 @@
 
   .fab-band-strip.has-marker-lane {
     position: relative;
+    /* ratchet-exempt(design-system): a derived lane, not spacing; the 24px dot hit area centred on the track's top edge reaches 13px above it */
     padding-top: 13px;
   }
 

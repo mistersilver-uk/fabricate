@@ -85,6 +85,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/Stepper.svelte': 1 },
   ],
   [
+    "a derived lane, not spacing; the 24px dot hit area centred on the track's top edge reaches " +
+      '13px above it',
+    { 'src/ui/svelte/components/ThresholdBandStrip.svelte': 1 },
+  ],
+  [
     "an alignment, not a step: the header's 8px inset, its 38px thumb and the thumb's 12px gap",
     { 'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte': 1 },
   ],
