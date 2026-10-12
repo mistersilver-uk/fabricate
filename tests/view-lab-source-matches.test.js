@@ -127,6 +127,12 @@ test('the capture workflow selects for every PR and renders on rendersCapture, n
   );
   assert.match(workflow, /process\.stdout\.write\(`\$\{rendersCapture\(files\)\}\\n/);
   assert.doesNotMatch(workflow, /hasUiChanges/, 'the capture must not key rendering on the gate');
+  // The library units come from the same changed files, by the selection of their own step.
+  assert.match(
+    workflow,
+    /\n\s+keys = selectLibraryTargets\(files, \{ patches \}\)\.map\(\(record\) => record\.key\);\n/
+  );
+  assert.equal(workflow.match(/readFileSync\("changed-files\.jsonl", "utf8"\)/g)?.length, 2);
 });
 
 /**
