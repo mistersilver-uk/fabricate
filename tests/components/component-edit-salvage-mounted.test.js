@@ -625,7 +625,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const row = strips(target)[0].querySelector('[data-stage-complication="cx-1"]');
     assert.ok(row, 'the gmOnly complication renders on the GM list');
     assert.ok(
-      ![...row.querySelectorAll('.manager-chip')].some((chip) => /Player/.test(chip.textContent)),
+      [...row.querySelectorAll('.manager-chip')].every((chip) => !/Player/.test(chip.textContent)),
       'and carries no Player pill, because it is not shown to the player'
     );
     harness.remount();
@@ -666,7 +666,9 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         'from an editor whose Save button belongs to a different component'
     );
     assert.ok(!target.querySelector('[data-salvage-stage-complications-edit]'), 'no second link');
-    const edit = target.querySelector('[data-salvage-result="res-1"] [data-salvage-result-edit]');
+    const edit = target
+      .querySelector('[data-salvage-result="res-1"]')
+      .querySelector('[data-salvage-result-edit]');
     assert.match(edit.getAttribute('title'), /complications/i, 'the row Edit names complications');
     edit.click();
     assert.deepEqual(opened, ['cmp-scrap']);
@@ -696,7 +698,8 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const target = await harness.mount(complicatedProps({ saving: true }));
     assert.ok(!strips(target)[0].querySelector('button'), 'nothing in the list to hold');
     assert.equal(
-      target.querySelector('[data-salvage-result="res-1"] [data-salvage-result-edit]').disabled,
+      target.querySelector('[data-salvage-result="res-1"]').querySelector('[data-salvage-result-edit]')
+        .disabled,
       true,
       "navigating away mid-save is the hazard the row's own Edit link guards against"
     );
