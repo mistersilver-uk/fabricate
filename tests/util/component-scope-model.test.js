@@ -14,6 +14,10 @@ import {
   componentScopeValidationPresentation,
 } from '../../src/ui/model/componentScopeValidation.js';
 import {
+  COMPONENT_CATEGORY_FILTER_NONE,
+  componentCategoryFilter,
+} from '../../src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js';
+import {
   componentAttributionNote,
   componentBulkEssenceCarried,
   componentBulkEssencePlan,
@@ -789,6 +793,56 @@ describe('the catalogue’s essence filter is the rules list’s, over the world
   it('is WITHHELD over an empty world essence catalogue', () => {
     assert.deepEqual(componentEssenceFilter({ essences: [], systems: ROSTER }, phrase), []);
     assert.deepEqual(componentEssenceFilter({ systems: ROSTER }, phrase), []);
+  });
+});
+
+describe('the catalogue’s category filter reads the trimmed `defaults.category` (#2440)', () => {
+  const entry = (id, category = '') => ({ id, defaults: { category } });
+  const ENTRIES = [
+    entry('a', 'Raw'),
+    entry('b', ' Refined '),
+    entry('c'),
+    entry('d', 'Zed'),
+    entry('e', 'Alpha'),
+  ];
+  const [filter] = componentCategoryFilter(
+    { categories: ['Raw', 'Refined'], entries: ENTRIES },
+    phrase
+  );
+
+  it('is one lead-row descriptor: all, none, the vocabulary, then strays by code point', () => {
+    assert.equal(filter.id, 'category');
+    assert.equal(filter.toolbarRow, 'lead');
+    assert.equal(filter.label, 'Category');
+    assert.deepEqual(
+      filter.options.map((option) => [option.value, option.label]),
+      [
+        ['all', 'All categories'],
+        [COMPONENT_CATEGORY_FILTER_NONE, 'No category'],
+        ['Raw', 'Raw'],
+        ['Refined', 'Refined'],
+        ['Alpha', 'Alpha'],
+        ['Zed', 'Zed'],
+      ]
+    );
+  });
+
+  it('matches all, none and the exact stored trim', () => {
+    const passes = (value) => ENTRIES.filter((e) => filter.matches(e, value)).map((e) => e.id);
+    assert.deepEqual(passes('all'), ['a', 'b', 'c', 'd', 'e']);
+    assert.deepEqual(passes(COMPONENT_CATEGORY_FILTER_NONE), ['c']);
+    assert.deepEqual(passes('Raw'), ['a']);
+    assert.deepEqual(passes('Refined'), ['b'], 'the stored value is trimmed, nothing more');
+    assert.deepEqual(passes('raw'), [], 'no case folding');
+    assert.deepEqual(passes('ghost'), []);
+  });
+
+  it('is withheld when no category exists anywhere', () => {
+    assert.deepEqual(
+      componentCategoryFilter({ categories: [], entries: [entry('c')] }, phrase),
+      []
+    );
+    assert.deepEqual(componentCategoryFilter({}, phrase), []);
   });
 });
 
