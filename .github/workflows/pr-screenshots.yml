@@ -290,6 +290,10 @@ jobs:
           retention-days: 1
 
       # Its 15 minutes sit inside the job's, so the capture-timeout sum in `ci.yml` is unchanged.
+      - name: Proof only, fail the library leg at job level
+        if: matrix.kind == 'library'
+        run: exit 1
+
       - name: Capture the selected library units
         if: matrix.kind == 'library'
         continue-on-error: true
