@@ -465,10 +465,29 @@ describe('CraftingSystemManager source contract', () => {
     { calls: ['resolveItemSourceSnapshot'] }
   );
 
+  // One keyed pick forwards the internal service set's keys into prepared Svelte props.
+  defineStructureContract(
+    'forwards the listed internal services into prepared Svelte props',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services'], names: ['COMPONENT_SERVICE_KEYS'] }
+  );
+
   defineStructureContract(
     'forwards Tool Item services from the internal service set into prepared Svelte props',
-    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
-    { reads: ['this._services.getWorldItemOptions', 'this._services.resolveToolSource'] }
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getWorldItemOptions', 'resolveToolSource'] }
+  );
+
+  defineStructureContract(
+    'forwards the world clock components into prepared Svelte props',
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getWorldTimeComponents'] }
+  );
+
+  defineStructureContract(
+    'reads the world clock components through the Fabricate facade',
+    { file: MANAGER_SERVICES, fn: 'worldTimeServices', property: 'getWorldTimeComponents' },
+    { reads: ['game.fabricate.getWorldTimeComponents'] }
   );
 
   // Under the accessor name the adminStore's read and write legs already call (issue 1392).
@@ -2854,8 +2873,8 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'exposes the setting seam to the Svelte component services',
-    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
-    { reads: ['this._services.getSetting', 'this._services.setSetting'] }
+    { file: MANAGER_SERVICES, constant: 'COMPONENT_SERVICE_KEYS' },
+    { spellsExactly: ['getSetting', 'setSetting'] }
   );
 });
 

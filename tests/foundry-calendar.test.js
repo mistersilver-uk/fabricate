@@ -7,6 +7,7 @@ import {
   secondsPerUnitFromCalendar,
   daysPerYearFromCalendar
 } from '../src/systems/foundryCalendar.js';
+import * as foundryCalendar from '../src/systems/foundryCalendar.js';
 
 describe('foundryCalendar — deriving interval lengths from a world calendar', () => {
   it('reads seconds-per-day from explicit calendar config', () => {
@@ -69,5 +70,42 @@ describe('foundryCalendar — deriving interval lengths from a world calendar', 
     assert.equal(daysPerYearFromCalendar({}), null);
     assert.equal(daysPerYearFromCalendar({ days: { daysPerYear: 0 } }), null);
     assert.equal(daysPerYearFromCalendar({ months: { values: [] } }), null);
+  });
+});
+
+// The time-of-day bar's calendar hour (issue 2431), unlike the fixed 3,600-second regen hour.
+describe('foundryCalendar — the hours of a calendar day', () => {
+  const hoursPerDay = (calendar) => foundryCalendar.hoursPerDayFromCalendar?.(calendar);
+  const minutesPerHour = (calendar) => foundryCalendar.minutesPerHourFromCalendar?.(calendar);
+
+  it('reads hoursPerDay and minutesPerHour from explicit calendar config', () => {
+    const cal = { days: { hoursPerDay: 10, minutesPerHour: 100, secondsPerMinute: 100 } };
+    assert.equal(hoursPerDay(cal), 10);
+    assert.equal(minutesPerHour(cal), 100);
+  });
+
+  it('derives hoursPerDay from a measured day when it divides into whole hours', () => {
+    const measuredDay = (seconds, days) => ({
+      days,
+      componentsToTime: ({ day = 0 }) => day * seconds,
+    });
+    assert.equal(hoursPerDay(measuredDay(72_000, {})), 20);
+    const shortHours = { minutesPerHour: 50, secondsPerMinute: 60 };
+    assert.equal(hoursPerDay(measuredDay(90_000, shortHours)), 30);
+    assert.equal(hoursPerDay(measuredDay(5000, {})), 24, 'a day of no whole hours falls back');
+  });
+
+  it('keeps an authored non-whole or falls back on a non-positive hoursPerDay', () => {
+    assert.equal(hoursPerDay({ days: { hoursPerDay: 10.5 } }), 10.5);
+    assert.equal(hoursPerDay({ days: { hoursPerDay: 0 } }), 24);
+    assert.equal(hoursPerDay({ days: { hoursPerDay: -4 } }), 24);
+  });
+
+  it('falls back to 24 hours of 60 minutes with no usable calendar', () => {
+    for (const cal of [null, undefined, {}, { days: {} }]) {
+      assert.equal(hoursPerDay(cal), 24);
+      assert.equal(minutesPerHour(cal), 60);
+    }
+    assert.equal(minutesPerHour({ days: { minutesPerHour: 0 } }), 60);
   });
 });
