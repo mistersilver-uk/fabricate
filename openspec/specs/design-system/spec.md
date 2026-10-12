@@ -1274,6 +1274,9 @@ The always-open mode is REQUIRED wherever the body is the entire subject of the 
 Where the opener is a chevron beside the row's content, `RowDisclosure` is that control; where the opener is the whole header, the header is itself the button and cannot nest the component, because a button may not contain a button.
 The three modes MUST be encoded as the two booleans the list already declares rather than as a mode enum: `expandable` with `alwaysOpen` false is the accordion, `alwaysOpen` is the always-open mode, and `expandable` false is the plain collapsed list.
 A row that opens in place but carries no order of its own renders the list with its reorder disabled — no grip, no rocker, no reorder callback required — rather than a grip that reorders nothing.
+A collection that a GM row's body lists IN FULL and READ-ONLY — a GM progressive stage row's complications — is a nested `SortableList` in the plain collapsed mode (`expandable` false), declared non-reorderable and unnumbered, with no remove: each record is one of the nested list's own rows, and the caller draws no frame, band, fill, accent rule or eyebrow around those rows and no control inside them.
+The nested list carries an accessible name stating what it lists, because it is a list of its own rather than more rows of the list around it, and it sits inside its owner's list item, so the outer list's count is unchanged.
+A body that SUMMARISES a collection rather than listing it is not bound by this: the player progressive stage band draws the first entry plus "+N more" in a tensed band (`ui-crafting-app/spec.md` § Progressive Stage List).
 
 The row itself MUST remain non-focusable, and not a button, and the disclosure MUST be the only control in it that opens the row.
 A whole-row button nests the row's own grip, chevrons, delete and menu controls, which is invalid DOM that `createElement` accepts and no mounted test detects.
@@ -1350,6 +1353,12 @@ A surface whose prototype pins the adder outside the list in the POPULATED state
 - **WHEN** a row's whole area selects a record into a panel beside it and opens no body
 - **THEN** its keyboard path is a real button with an accessible name and a hit target, declaring `data-keyboard-focus="true"`, while the row itself carries the selection state
 - **AND** it is not held to the disclosure, retention or reorder rules above, because it discloses nothing
+
+#### Scenario: A stage row's body lists records the GM cannot edit there
+
+- **WHEN** a GM progressive stage row's body shows the complications of the component the row references
+- **THEN** each complication renders as a row of a nested non-reorderable, unnumbered `SortableList` named for what it lists, drawing no grip, rocker, ordinal, delete or disclosure
+- **AND** the body draws no band, fill or accent rule around those rows
 
 ### Requirement: Set membership is edited through a bounded, staged picker
 
