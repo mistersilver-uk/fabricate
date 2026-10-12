@@ -24,6 +24,8 @@ import {
   rendersCapture,
 } from '../scripts/lib/viewLabCases.js';
 
+import { parseJobs } from './helpers/workflow-source.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' })
@@ -127,6 +129,9 @@ test('the capture workflow selects for every PR and renders on rendersCapture, n
   );
   assert.match(workflow, /process\.stdout\.write\(`\$\{rendersCapture\(files\)\}\\n/);
   assert.doesNotMatch(workflow, /hasUiChanges/, 'the capture must not key rendering on the gate');
+  // The library units come from the same changed files, by the selection of their own step.
+  const ids = parseJobs(workflow).select.steps.map((step) => step.id);
+  assert.ok(ids.includes('library') && ids.indexOf('library') < ids.indexOf('select'));
 });
 
 /**

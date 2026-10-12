@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -23,6 +31,8 @@ import {
   value,
 } from './helpers/workflow-source.js';
 import { createTempGitRepo, envWithoutGitLocation } from './helpers/temp-git-repo.js';
+import { OUTPUT_DIRECTORY } from '../scripts/lib/primitiveLabCapture.js';
+import { COVERAGE_KEY } from '../scripts/lib/primitiveLabUnits.js';
 // The gate's bound defaults are READ, not restated (issue 1133).
 import {
   GRACE_MS,
@@ -31,6 +41,7 @@ import {
   POLL_INTERVAL_MS,
   SLACK_MS,
 } from '../scripts/lib/screenshotEvidenceMatching.js';
+import { renderMatrix } from '../scripts/lib/viewLabShards.js';
 // The channel resolver the publishers themselves import, so a channel declared by the scalar
 // back-compat shape is not invisible to this file's second reading of the same config.
 import { resolveChannelConfig } from '../scripts/release-s3.js';
@@ -328,34 +339,262 @@ const needsOf = (job) =>
     .map((name) => name.trim())
     .filter(Boolean);
 
+const SCREENSHOTS_WORKFLOW = '.github/workflows/pr-screenshots.yml';
+const FETCH_STEP = 'Fetch the changed files';
+const screenshotJobs = () => parseJobs(readFileSync(SCREENSHOTS_WORKFLOW, 'utf8'));
+
+function stepNamed(job, name) {
+  const step = job.steps.find((candidate) => candidate.name === name);
+  assert.ok(step, `no step named "${name}"`);
+  return step;
+}
+
+const labelOf = (step) => step.name || step.uses;
+const stepRuns = (step, context) => !step.if || Boolean(evaluate(unwrap(step.if), context));
+
+/** A `continue-on-error` value, literal or expression, evaluated in a context. */
+const continuesOnError = (raw = '', context = {}) =>
+  raw === 'true' || (/^\$\{\{/.test(raw) && evaluate(unwrap(raw), context) === true);
+
+const selectOutputs = (outputs) => ({ needs: { select: { outputs } } });
+
 test('the capture workflow publishes only after every shard and the chrome verification pass', () => {
-  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const source = readFileSync(SCREENSHOTS_WORKFLOW, 'utf8');
   const jobs = parseJobs(source);
 
   assert.deepEqual(needsOf(jobs.capture).sort(), ['render', 'select', 'verify-chrome']);
+  assert.equal(
+    unwrap(jobs.capture.if),
+    'github.event.pull_request.head.repo.full_name == github.repository'
+  );
   // A status function would let capture publish past a failed or skipped dependency.
-  assert.doesNotMatch(unwrap(jobs.capture.if), /\b(?:always|failure|cancelled)\(/);
-  // capture only runs after render ran, so a step-level render test there is always true.
-  for (const step of jobs.capture.steps) {
-    assert.doesNotMatch(step.if, /render/, `capture's "${step.name || step.uses}" re-tests render`);
+  assert.doesNotMatch(unwrap(jobs.capture.if), /\b(?:always|failure|cancelled|success)\(/);
+  // capture only runs after render ran, so its steps key on what select chose, never on render.
+  const keyed = jobs.capture.steps.filter((step) => step.if);
+  assert.ok(keyed.length >= 3, 'capture no longer gates its downloads on the selection');
+  for (const step of keyed) {
+    const paths = unwrap(step.if).match(/[a-z_]+(?:\.[\w-]+)+/gi) ?? [];
+    assert.ok(
+      paths.length > 0 &&
+        paths.every((name) => /^needs\.select\.outputs\.(?:apps|library)$/.test(name)),
+      `capture's "${labelOf(step)}" keys on ${paths.join(', ') || 'nothing'}`
+    );
   }
-  // No shard starts for a selection that is not rendered (issue 2153: not keyed to the gate).
-  assert.match(unwrap(jobs.render.if), /needs\.select\.outputs\.render == 'true'/);
   assert.doesNotMatch(source, /has_ui/, 'the capture keys rendering on `render`, not on the gate');
-  // The harvest is warmed and verified for any selection, rendered or not.
+  // The harvest is warmed and verified for any selection, rendered or not, app or library.
   for (const name of ['warm-foundry', 'verify-chrome']) {
-    assert.equal(unwrap(jobs[name].if), "needs.select.outputs.ids != ''", `${name} must key on ids`);
+    assert.equal(
+      unwrap(jobs[name].if),
+      "needs.select.outputs.ids != '' || needs.select.outputs.library != ''",
+      `${name} must key on ids or library`
+    );
+  }
+});
+
+test('the render job runs exactly when the shard plan holds a leg', () => {
+  // Issue 2153: app shards key on `render`, never on the gate; library units add a leg of their own.
+  const renderIf = unwrap(screenshotJobs().render.if);
+  for (const ids of ['', 'case-a']) {
+    for (const render of ['false', 'true']) {
+      for (const library of ['', 'coverage']) {
+        const row = JSON.stringify({ ids, render, library });
+        const runs = Boolean(evaluate(renderIf, selectOutputs({ ids, render, library })));
+        assert.equal(runs, (ids !== '' && render === 'true') || library !== '', row);
+        const cases = ids === '' ? [] : [{ id: ids }];
+        assert.equal(renderMatrix(cases, render === 'true', library).length > 0, runs, row);
+      }
+    }
+  }
+});
+
+test('a library leg is best-effort, and an app shard still fails on any failed step', () => {
+  const { render } = screenshotJobs();
+  const library = { matrix: { kind: 'library' } };
+  const apps = { matrix: { kind: 'apps' } };
+  assert.equal(continuesOnError(render['continue-on-error'], library), true);
+  assert.equal(continuesOnError(render['continue-on-error'], apps), false);
+  for (const name of ['Render the selected frames', "Upload this shard's frames"]) {
+    assert.equal(unwrap(stepNamed(render, name).if), "matrix.kind == 'apps'", name);
   }
 
-  // Only the PNGs and the manifest leave a shard: exactly these two lines, nothing wider.
-  const renderStart = source.indexOf('\n  render:\n');
-  const renderSource = source.slice(renderStart, source.indexOf('\n  verify-chrome:\n'));
-  const upload = /\n( +)path: \|\n((?:\1 {2}.*\n)+)/.exec(renderSource);
-  assert.ok(upload, 'the render job no longer uploads a block-scalar path');
-  assert.deepEqual(
-    upload[2].trim().split('\n').map((line) => line.trim()),
-    ['ui-screenshot-artifact/apps/*.png', 'ui-screenshot-artifact/apps/manifest.json']
+  const libraryLeg = render.steps.filter((step) => stepRuns(step, library));
+  assert.deepEqual(libraryLeg.map(labelOf), [
+    'actions/checkout@v6',
+    'Prepare the View Lab',
+    'Capture the selected library units',
+    'Upload the library units',
+  ]);
+  for (const step of libraryLeg) {
+    assert.ok(
+      continuesOnError(step['continue-on-error'], library),
+      `"${labelOf(step)}" can fail the library leg`
+    );
+  }
+  for (const step of render.steps) {
+    assert.ok(
+      !stepRuns(step, apps) || !continuesOnError(step['continue-on-error'], apps),
+      `"${labelOf(step)}" no longer fails an app shard`
+    );
+  }
+
+  const capture = stepNamed(render, 'Capture the selected library units');
+  assert.ok(Number(capture['timeout-minutes']) < Number(render['timeout-minutes']));
+  assert.equal(capture.env.LIBRARY_TARGETS, '${{ matrix.targets }}');
+  assert.equal(capture.run, 'node scripts/primitive-lab-capture.mjs "$LIBRARY_TARGETS"');
+});
+
+test('library frames leave the runner by name, under an artifact no shard download matches', () => {
+  const { render, capture } = screenshotJobs();
+  // Only the PNGs and the manifest leave a runner: exactly these lines, nothing wider.
+  assert.deepEqual(stepNamed(render, "Upload this shard's frames").with.path.split('\n'), [
+    'ui-screenshot-artifact/apps/*.png',
+    'ui-screenshot-artifact/apps/manifest.json',
+  ]);
+  const upload = stepNamed(render, 'Upload the library units');
+  assert.deepEqual(upload.with.path.split('\n'), [
+    `${OUTPUT_DIRECTORY}/*.png`,
+    `${OUTPUT_DIRECTORY}/manifest.json`,
+  ]);
+  assert.equal(upload.with['if-no-files-found'], 'ignore');
+
+  const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const pattern = stepNamed(capture, "Download every shard's frames").with.pattern;
+  const shardGlob = new RegExp(`^${pattern.split('*').map(escape).join('.*')}$`);
+  const shardName = stepNamed(render, "Upload this shard's frames").with.name;
+  assert.match(shardName.replaceAll(/\$\{\{.*?}}/g, 'library'), shardGlob, 'the glob is real');
+  assert.doesNotMatch(upload.with.name, shardGlob);
+
+  const download = stepNamed(capture, 'Download the library units');
+  assert.equal(download.with.name, upload.with.name);
+  assert.equal(download.with.path, OUTPUT_DIRECTORY);
+  assert.equal(download['continue-on-error'], 'true');
+  assert.equal(
+    stepNamed(capture, 'Merge the shards into one frame set').env.CASE_IDS,
+    '${{ needs.select.outputs.apps }}'
   );
+
+  const publish = stepNamed(capture, "Publish into the PR's screenshot block");
+  assert.equal(flagValue(publish.run, '--library-dir'), OUTPUT_DIRECTORY);
+  assert.match(publish.run, /--library-targets "\$LIBRARY_TARGETS"/);
+  assert.equal(publish.env.LIBRARY_TARGETS, '${{ needs.select.outputs.library }}');
+});
+
+test('select fetches the changed files once, then picks the library units ahead of the cases', () => {
+  const source = readFileSync(SCREENSHOTS_WORKFLOW, 'utf8');
+  const { select } = parseJobs(source);
+  const fetchAt = select.steps.findIndex((step) => step.name === FETCH_STEP);
+  const libraryAt = select.steps.findIndex((step) => step.id === 'library');
+  const casesAt = select.steps.findIndex((step) => step.id === 'select');
+  assert.ok(fetchAt !== -1 && fetchAt < libraryAt, 'the fetch must run before the library step');
+  assert.ok(libraryAt < casesAt, 'the library step must run before the cases');
+  const [fetch, library, cases] = [fetchAt, libraryAt, casesAt].map((at) => select.steps[at]);
+
+  // A failed fetch fails select: only the selection after it may fail alone.
+  assert.equal(fetch['continue-on-error'], undefined);
+  assert.equal(library['continue-on-error'], 'true');
+  assert.equal(Number(library['timeout-minutes']), 2);
+  assert.ok(Number(library['timeout-minutes']) < Number(select['timeout-minutes']));
+  for (const step of [fetch, library]) assert.equal(step.if, cases.if, labelOf(step));
+  assert.deepEqual(Object.keys(fetch.env), ['GH_TOKEN', 'PR_NUMBER', 'PR_REPO']);
+  assert.deepEqual(library.env ?? {}, {}, 'the library step holds no token');
+  assert.deepEqual(
+    select.steps.filter((step) => /> changed-files\.jsonl/.test(step.run)).map(labelOf),
+    [FETCH_STEP],
+    'one fetch of the changed files, ahead of both selections'
+  );
+  assert.equal(cases.env.LIBRARY, '${{ steps.library.outputs.library }}');
+  assert.match(cases.run, /view-lab-shards\.mjs plan "\$IDS" "\$RENDER" "\$LIBRARY"\)/);
+  const outputs = jobOutputs(source, 'select');
+  assert.equal(outputs.library, '${{ steps.library.outputs.library }}');
+  assert.equal(outputs.apps, '${{ steps.select.outputs.apps }}');
+});
+
+/** Run a step's shell body as the runner does, in `cwd`, returning its status, stdout and outputs. */
+function runStepBody(run, { cwd, env = {} }) {
+  const outputFile = path.join(cwd, '..', 'github-output');
+  writeFileSync(outputFile, '');
+  const result = spawnSync('bash', ['-eo', 'pipefail'], {
+    cwd,
+    input: run,
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, ...env, GITHUB_OUTPUT: outputFile },
+  });
+  return { ...result, outputs: readStepOutputs(outputFile) };
+}
+
+test("select's apps output is the case ids when they render, and empty when they do not", () => {
+  const { run } = screenshotJobs().select.steps.find((step) => step.id === 'select');
+  const start = run.indexOf('APPS=');
+  const end = run.indexOf('\n', run.indexOf('echo "apps='));
+  assert.ok(start !== -1 && end > start, 'the case step no longer computes APPS');
+  const dir = mkdtempSync(path.join(tmpdir(), 'select-apps-'));
+  try {
+    mkdirSync(path.join(dir, 'work'));
+    for (const [ids, render, apps] of [
+      ['a,b', 'true', 'a,b'],
+      ['a,b', 'false', ''],
+      ['', 'true', ''],
+    ]) {
+      const result = runStepBody(run.slice(start, end), {
+        cwd: path.join(dir, 'work'),
+        env: { IDS: ids, RENDER: render },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.outputs.apps, apps, JSON.stringify({ ids, render }));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** A temporary `bin/` and `work/` pair, removed after `body` runs. */
+function withStepDirectory(prefix, body) {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  try {
+    const [bin, work] = [path.join(dir, 'bin'), path.join(dir, 'work')];
+    mkdirSync(bin);
+    mkdirSync(work);
+    const PATH = [bin, path.dirname(process.execPath), process.env.PATH].join(path.delimiter);
+    return body({ bin, work, PATH });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('a fetch that fails part-way fails its step, and so select', () => {
+  const fetch = stepNamed(screenshotJobs().select, FETCH_STEP);
+  for (const [script, status] of [
+    ['echo \'{"filename":"a.js","patch":""}\'\nexit 1', 'failed'],
+    ['echo \'{"filename":"a.js","patch":""}\'', 'passed'],
+  ]) {
+    withStepDirectory('select-fetch-', ({ bin, work, PATH }) => {
+      writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+      const result = runStepBody(fetch.run, { cwd: work, env: { PATH } });
+      assert.equal(result.status === 0 ? 'passed' : 'failed', status, result.stderr);
+      assert.match(readFileSync(path.join(work, 'changed-files.jsonl'), 'utf8'), /"a\.js"/);
+    });
+  }
+});
+
+test('the library step writes its keys, or an empty list and a warning when selection throws', () => {
+  const step = screenshotJobs().select.steps.find((one) => one.id === 'library');
+  const scenarios = [
+    { file: 'scripts/primitive-lab-capture.mjs', linked: true, library: COVERAGE_KEY },
+    { file: 'README.md', linked: true, library: '' },
+    { file: 'scripts/primitive-lab-capture.mjs', linked: false, library: '', warns: true },
+  ];
+  for (const { file, linked, library, warns = false } of scenarios) {
+    withStepDirectory('select-library-', ({ work, PATH }) => {
+      const entry = `${JSON.stringify({ filename: file, patch: '' })}\n`;
+      writeFileSync(path.join(work, 'changed-files.jsonl'), entry);
+      if (linked) symlinkSync(path.resolve('scripts'), path.join(work, 'scripts'));
+      const result = runStepBody(step.run, { cwd: work, env: { PATH } });
+      const row = JSON.stringify({ file, linked });
+      assert.equal(result.status, 0, `${row}: ${result.stderr}`);
+      assert.equal(result.outputs.library, library, row);
+      assert.equal(/::warning::/.test(result.stdout), warns, `${row}: ${result.stdout}`);
+    });
+  }
 });
 
 test('a cold Foundry cache is filled once, and select never holds the Foundry credentials', () => {
