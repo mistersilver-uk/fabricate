@@ -17,7 +17,9 @@
   - The track is `FillBar` at `compact` density — pinned by
     `tests/components/instruments-mounted.test.js`.
   - `.fab-meter-hidden` restates the module's visually hidden set, because a companion's
-    ancestor is not `.fabricate` — held by `tests/published-component-manifest.test.js`.
+    ancestor is not `.fabricate` — its clip is pinned by
+    `tests/components/published-leaves-mounted.test.js`, and the absence of `.visually-hidden` by
+    `tests/published-component-manifest.test.js`.
 -->
 <script>
   import FillBar from './FillBar.svelte';
