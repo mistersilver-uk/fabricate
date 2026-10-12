@@ -1786,16 +1786,24 @@ export function registerEnvironmentsCases() {
     );
     // Three name fields, and the time-of-day form's start-hour stepper beside its own (issue 2431).
     assert.equal(
-      target.querySelectorAll('.manager-condition-add input:not([role="spinbutton"])').length,
+      target.querySelectorAll(':scope .manager-condition-add input:not([role="spinbutton"])')
+        .length,
       3
     );
-    assert.equal(target.querySelectorAll('.manager-time-of-day-add [role="spinbutton"]').length, 1);
+    assert.equal(
+      target.querySelectorAll(':scope .manager-time-of-day-add [role="spinbutton"]').length,
+      1
+    );
     assert.ok(
-      target.querySelector('[data-gathering-condition-panel="timeOfDay"] [data-time-of-day-bar]'),
+      target.querySelector(
+        ':scope [data-gathering-condition-panel="timeOfDay"] [data-time-of-day-bar]'
+      ),
       'the Times of day panel draws the time-of-day bar'
     );
     assert.ok(
-      !target.querySelector('[data-gathering-condition-panel="weather"] [data-band-strip-track]'),
+      !target.querySelector(
+        ':scope [data-gathering-condition-panel="weather"] [data-band-strip-track]'
+      ),
       'and the weather panel draws none'
     );
     assert.equal(
