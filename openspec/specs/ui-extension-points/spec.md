@@ -375,6 +375,7 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 ### The manifest and versioning
 
 - **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data', required? } }, rest }`, and Fabricate's runtime adapter binds each `path` to its component.
+- The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
 - Registration refuses any prop `kind` other than `'data'` with an `Error` naming issue 2427.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, or narrowing a prop's accepted values — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.

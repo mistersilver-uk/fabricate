@@ -141,6 +141,29 @@ With one importer, `ViewToggle` is recorded as a non-member on the `LogList`, `S
 - **WHEN** a `ViewToggle` is given a `view` that is neither `list` nor `grid`
 - **THEN** the list option is the checked one
 
+### Requirement: A position along an ordered set of named tiers renders through TierTrack
+
+A screen that states where a record stands along an ordered set of named tiers MUST render through `TierTrack`.
+Position decides which tiers are reached: every tier from the lowest up to the current one, whichever direction the caller lists them in.
+A tier's valence colours only a reached tier's mark, the current tier's included, so an unreached tier can never read as reached; an absent valence reads positive, and a valence outside the closed set reads neutral.
+The current tier carries `aria-current="step"` and a caller-supplied marker, visible in its column layout; in its row layout its badge leads with a location-dot glyph; every other tier carries visually hidden reached or ahead text, so its state is never told by colour alone.
+`row` is the badge track, drawn through the shared `Chip`; `column` is the ladder whose rungs carry a figure and notes.
+Its props are `tiers`, each `{ id?, name, figure?, notes?, valence? }` in drawn order, `currentIndex`, `direction` (`ascending` or `descending`), `layout` (`row` or `column`), `hint`, and the required final-text labels `ariaLabel`, `currentLabel`, `reachedLabel` and `aheadLabel`; `valence` is `positive` (the default), `negative` or `neutral`; an unknown `direction` or `layout` reads as `ascending` or `row`, and a `currentIndex` that is not an in-range integer reaches nothing.
+It is stated, never operated: it has no event.
+Its one importer is the published-component seam's runtime adapter, through which the premium companion's player faction ladder draws it, so it is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent (issue 2424).
+A tier's valence restates what its name already says and is never the only carrier of it: it is drawn in colour alone and reaches no assistive technology, so a caller MUST NOT use valence to convey a standing its tier names do not state.
+
+#### Scenario: A character stands on the middle rung of a descending ladder
+
+- **WHEN** `TierTrack` is given five tiers, `direction: 'descending'` and `currentIndex: 2`
+- **THEN** tiers 2 to 4 read reached, tier 2 carries `aria-current="step"` and the marker and keeps its valence, and tiers 0 and 1 carry no valence
+- **AND** tiers 3 and 4 announce `reachedLabel`, and tiers 0 and 1 announce `aheadLabel`
+
+#### Scenario: Nothing is reached yet
+
+- **WHEN** `currentIndex` is `-1`, in either direction
+- **THEN** no tier reads reached and none is current
+
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
 WorldClockChip MUST compose Chip's opt-in `presentation="clock"` around one baseline-aligned line of icon, label and value, centred inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
@@ -170,6 +193,7 @@ The two groups are disjoint — four pills into one chip, two thumbnails into on
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.
 An independent caller is any other file under `src/` that imports the component by path, which is the reading a gate can decide and the one `scripts/lib/componentImporters.js` implements.
+A primitive published through `game.fabricate.api.ui` is imported by the seam's runtime adapter, which binds its manifest `path`, and that import is one of its measured callers; its companion consumer is named in its row's `why`.
 A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
@@ -490,6 +514,7 @@ The gate that PROVES a family is not application-rooted keeps its own hand-autho
 The register records the DECISION; the gate proves the ROOTING.
 Conflating the two would make an unmeasured row look like a passing proof, which is worse than either artefact alone.
 The two do meet at one place, and that place is asserted: a row whose family THIS PROGRAMME re-rooted carries `shared` and has an entry in that gate, so neither half can land without the other.
+Issue 2424 adds `TierTrack`, rooted at `fab-tier-track`; it portals nothing, and its row badges keep `Chip`'s own family.
 
 One measured instance was declined rather than shipped: relocating `Chip`'s `list` and `inspector` densities to caller context, because it would size a shared primitive's own geometry from an area scope; the densities stay in the primitive's own scoped block.
 
@@ -551,6 +576,7 @@ And a duplicate-selector lint configured to skip list members begins comparing a
 
 A class that carries no meaning beyond a repeated declaration set — visually-hidden, truncation, a column stack, a wrapping cluster — is a UTILITY.
 A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
+A published component restates the visually hidden declaration set in its own scoped stylesheet, recorded with the reason that it renders under a companion's ancestor, so the `.fabricate` ancestor is not guaranteed (`ui-extension-points` § Ownership, strings and theme); `TierTrack`'s `.fab-tier-track-hidden` is the first (issue 2424).
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
@@ -939,6 +965,7 @@ A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry i
 An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, because muted measures under 4.5:1 on the raised hover ground; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
 A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
 A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`, and each of its two glyph options is a radio named by its own label prop, `listLabel` or `gridLabel`, and never by its glyph; each option is titled with the same word, the pointer half of that name.
+A tier track is an ordered list with an explicit `role="list"`, named by its required `ariaLabel`; its current tier carries `aria-current="step"` and its `currentLabel`, every other tier its visually hidden `reachedLabel` or `aheadLabel`; chevrons, dots and the current tier's glyph are decorative.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
 `TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
