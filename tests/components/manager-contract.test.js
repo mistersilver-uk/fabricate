@@ -819,7 +819,13 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
-    [MANAGER_ROOT, MANAGER_NAV_ITEMS, HEADER_MODEL, MANAGER_TITLE_BAR],
+    [
+      MANAGER_ROOT,
+      MANAGER_NAV_ITEMS,
+      HEADER_MODEL,
+      MANAGER_TITLE_BAR,
+      'src/ui/svelte/components/AppTitleBar.svelte',
+    ],
     {
       // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
       // cases render this copy, which `text(key, fallback)` still produces under a renamed key.

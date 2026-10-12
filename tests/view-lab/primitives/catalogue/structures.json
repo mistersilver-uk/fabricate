@@ -240,6 +240,12 @@
     ]
   },
   {
+    "spec": "<AppTitleBar>",
+    "draws": ".stage.col > div",
+    "path": "src/ui/svelte/components/AppTitleBar.svelte",
+    "props": { "premiumInstalled": true, "statusLabel": "Routed by check · 3 outcome tiers" }
+  },
+  {
     "spec": "<NavSidebar>",
     "cap": "app rail 72",
     "draws": ":scope > div",
