@@ -28,6 +28,11 @@ const GOLDEN = JSON.parse(
   readFileSync(resolve(import.meta.dirname, 'fixtures/fabricateBootContract.golden.json'), 'utf8')
 );
 const DOCUMENTED = readFileSync(resolve(import.meta.dirname, '../docs/api/index.md'), 'utf8');
+const SPECIFIED = readFileSync(
+  resolve(import.meta.dirname, '../openspec/specs/ui-extension-points/spec.md'),
+  'utf8'
+);
+const COMPONENTS_TABLE_HEADER = '| Component | Version | Props | Rest |';
 
 const member = (name, length) => ({ set: 'prototypeProperties', name, length });
 const published = (set, ...names) => names.map((name) => ({ set, name }));
@@ -161,6 +166,48 @@ function documentedComponentRow(name, { version, props, rest }) {
   return `| \`${name}\` | ${version} | ${cells.join(', ') || '—'} | ${rest ? 'yes' : 'no'} |`;
 }
 
+/** `api.ui` as a fresh bind publishes it. */
+function publishedUi() {
+  installPublicGame();
+  bindFabricateGlobal(recordingFacade().facade, {});
+  return globalThis.game.fabricate.api.ui;
+}
+
+/** The docs `### <Name>` sections from the components table to the descriptor section, in order. */
+function documentedComponentSections() {
+  const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
+  const end = DOCUMENTED.indexOf('\n### The descriptor\n', start);
+  assert.ok(start !== -1 && end !== -1, 'the table, then the descriptor section');
+  return DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
+}
+
+/** Each top-level bullet under the spec's issue 2448 heading that one component names, by name. */
+function specifiedComponentGroups() {
+  const start = SPECIFIED.indexOf('\n### The issue 2448 components\n');
+  const end = SPECIFIED.indexOf('\n### ', start + 1);
+  assert.ok(start !== -1 && end !== -1, 'the issue 2448 components, then another heading');
+  const bullets = SPECIFIED.slice(start, end).split(/^- \*\*/mu);
+  return new Map(
+    bullets.flatMap((group) => {
+      const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
+      return name ? [[name, group]] : [];
+    })
+  );
+}
+
+/** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
+function linesOpenedBy(text, key) {
+  const opening = new RegExp('^\\s*(?:- )?(?:`[^`]+` and )?`' + key + '`', 'u');
+  return text.split('\n').filter((line) => opening.test(line));
+}
+
+/** The set of every other backticked token on the lines `key` opens: the values stated for it. */
+function statedValues(text, key) {
+  const tokens = new Set(linesOpenedBy(text, key).flatMap((line) => line.match(/`[^`]+`/gu)));
+  tokens.delete(`\`${key}\``);
+  return tokens;
+}
+
 describe('bindFabricateGlobal publishes the stable namespaces', () => {
   it('re-publishes the SAME extension registries through the init and ready binds', () => {
     installPublicGame();
@@ -269,8 +316,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: true,
       },
     });
-    const header = '| Component | Version | Props | Rest |';
-    const start = DOCUMENTED.indexOf(header);
+    const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);
     const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
@@ -281,14 +327,9 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     );
   });
 
-  it('gives each published component its own docs section, naming every prop it publishes', () => {
-    installPublicGame();
-    bindFabricateGlobal(recordingFacade().facade, {});
-    const { ui } = globalThis.game.fabricate.api;
-    const start = DOCUMENTED.indexOf('| Component | Version | Props | Rest |');
-    const end = DOCUMENTED.indexOf('\n### The descriptor\n', start);
-    assert.ok(start !== -1 && end !== -1, 'the table, then the descriptor section');
-    const sections = DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
+  it('gives each published component its own docs section, each prop opening a sentence', () => {
+    const ui = publishedUi();
+    const sections = documentedComponentSections();
     assert.deepEqual(
       sections.map((section) => section.slice(0, section.indexOf('\n'))),
       ui.components,
@@ -296,8 +337,37 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     );
     for (const [index, name] of ui.components.entries()) {
       for (const key of Object.keys(ui.describe(name).props)) {
-        assert.ok(sections[index].includes(`\`${key}\``), `### ${name} names \`${key}\``);
+        assert.ok(
+          linesOpenedBy(sections[index], key).length > 0,
+          `### ${name} opens a sentence with \`${key}\``
+        );
       }
+    }
+  });
+
+  it('states the same values for each key in its docs section as in its spec group', () => {
+    const ui = publishedUi();
+    const sections = documentedComponentSections();
+    const groups = specifiedComponentGroups();
+    assert.deepEqual(
+      [...groups.keys()],
+      ui.components.filter((name) => name !== 'TierTrack'),
+      'one group per component but TierTrack, which the design-system capability states'
+    );
+    for (const [name, group] of groups) {
+      const keys = Object.keys(ui.describe(name).props);
+      const valuesIn = (text) =>
+        Object.fromEntries(keys.map((key) => [key, statedValues(text, key)]));
+      const specified = valuesIn(group);
+      assert.ok(
+        Object.values(specified).some((values) => values.size > 0),
+        `the ${name} group states a value`
+      );
+      assert.deepEqual(
+        valuesIn(sections[ui.components.indexOf(name)]),
+        specified,
+        `### ${name} in docs/api/index.md against its spec group`
+      );
     }
   });
 
