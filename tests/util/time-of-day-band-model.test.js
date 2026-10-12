@@ -143,6 +143,13 @@ describe('the time-of-day bar model (issue 2431)', () => {
       assert.equal(odd.status, 'fallback', `hoursPerDay ${hoursPerDay}`);
       assert.deepEqual(odd.unplaced, ['Dawn', 'Day', 'Dusk', 'Night']);
     }
+    const late = timeOfDayBar({
+      values: [...DEFAULTS, { id: 'late', label: 'Late', startHour: 24 }],
+      current: 'day',
+      components: null,
+    });
+    assert.equal(late.status, 'fallback', 'an hour of 24 is past a 24-hour day');
+    assert.deepEqual(late.unplaced, ['Late']);
     assert.equal(dayLengthOf(null), 24, 'no components means a 24-hour day');
     assert.equal(dayLengthOf({ hour: 1 }), 24, 'and so does components with no day shape');
   });
