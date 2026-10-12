@@ -55,6 +55,33 @@ Only a GM can change them, and the value must be one of the weather or time-of-d
 Changing a condition refreshes the gathering listings for everyone.
 Players cannot change conditions.
 
+### The time-of-day bar
+
+In the **Times of day** panel, a bar draws one calendar day split into your times of day.
+Each time of day has a **Starts at** stepper, set in whole hours.
+A new time of day starts at the middle of the longest existing one until you change it.
+The defaults are dawn at 04:00, day at 08:00, dusk at 17:00 and night at 21:00.
+A time of day lasts until the next one starts, and the last one runs round to the first.
+The length of the day, and so the number of hours the bar offers, comes from the world calendar.
+Without a calendar reading the bar assumes a 24-hour day.
+Drag a divider on the bar to move a start hour, or use the stepper.
+
+A line on the bar marks the world clock, read out as hours and minutes to assistive tools.
+The line moves as world time advances.
+
+A dot marks the current time of day.
+You set it by hand, either by dragging it to another time of day or with the **Current time of day** menu below the bar.
+Start hours place each time of day on the bar, but they never change the current time of day.
+The dot can therefore sit away from the line when the clock is in a different time of day.
+
+Under the bar, a **+** button sits inside each time of day that is wide enough to split.
+Pressing it fills the add form with a start hour in the middle of that time of day.
+It creates nothing until you finish adding the value.
+
+If two times of day share a start hour, or a start hour falls outside the day, the bar cannot be drawn.
+The panel shows a note naming the times of day to fix instead.
+Give each time of day its own start hour within the day and the bar returns.
+
 When gathering is enabled and you have not set up your own values, Fabricate provides default lists for biomes, danger, weather, and time of day.
 There is no region list any more.
 Geography is now authored as a realm under **World > Travel > Realms** (see [Gathering Realms & Travel]({% link world/travel/index.md %})).
