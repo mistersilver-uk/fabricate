@@ -24,9 +24,8 @@ const SUMMARY_ROW = `${MANAGER}/ComplicationSummaryRow.svelte`;
 const CONVERTED_ROWS = new Set(['IconFactRow', 'ComplicationEffectRow', 'ComplicationSummaryRow']);
 
 /**
- * The 14 hooked sites, frozen at `9b891d90b` and since issue 2445 joined the two GM strips' rows as
- * one `StageComplicationList` row. `rendered` is what the root's attribute is set from: `true` for
- * a bare hook, a quoted literal, or an expression where `dataValue || true` once stood.
+ * The 14 hooked sites, frozen. `rendered` is what the root's attribute is set from: `true` for a
+ * bare hook, a quoted literal, or an expression where `dataValue || true` once stood.
  */
 const SITES = Object.freeze([
   [

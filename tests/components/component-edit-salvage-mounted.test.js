@@ -601,7 +601,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  // GUARD (re-pointed to the unified row hook): red when the salvage activity filter is dropped.
+  // GUARD: red when the salvage activity filter is dropped.
   it('GUARD 1286: the list shows only the complications enabled for SALVAGE', async () => {
     const target = await harness.mount(complicatedProps());
     const rows = [...strips(target)[0].querySelectorAll('[data-stage-complication]')];
@@ -618,7 +618,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  // GUARD (re-pointed): red when the list is fed the player forecast projection.
+  // GUARD: red when the list is fed the player forecast projection.
   it('GUARD 1286: the list is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
     // The trap this pins: feeding the list `forecastComplications`.
     const target = await harness.mount(complicatedProps());
@@ -631,7 +631,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  // GUARD (re-pointed): red when the Player chip stops rendering for a visible complication.
+  // GUARD: red when the Player chip stops rendering for a visible complication.
   it('GUARD 1286: a complication the player is told about carries the Player pill', async () => {
     const target = await harness.mount(
       complicatedProps({
