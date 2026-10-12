@@ -21,6 +21,8 @@ const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/InteractableConfigRoot.svelte',
   'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte',
   'src/ui/svelte/apps/crafting/RollPrompt.svelte',
+  // The published-component seam's adapter: a companion mounts through it, and the lab's specimen does too (issue 2424).
+  'src/ui/publishedComponents.svelte.js',
 ];
 
 /** Components inside the closure that no case claims ON PURPOSE, each with the reason. */

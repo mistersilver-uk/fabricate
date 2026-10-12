@@ -207,6 +207,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // Issue 2424: the published tier track, on its specimen mounted through the seam.
+  'src/ui/svelte/components/TierTrack.svelte',
   // Issue 2257: the tint palette and its trigger, on the frames that draw a pressed cell.
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
@@ -599,6 +601,16 @@ test('(a) an XrefList change publishes the inspector and its two cross-reference
   }
 });
 
+test('(a) a TierTrack change publishes its specimen mounted through the seam', () => {
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/TierTrack.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  assert.ok(
+    selected.includes('manager-published-tier-track-specimen'),
+    'a TierTrack change does not select its specimen'
+  );
+});
+
 test('(a) a ViewToggle change publishes the essence browser in both arrangements', () => {
   const selected = mapChangedFilesToCases(['src/ui/svelte/components/ViewToggle.svelte']).map(
     (viewCase) => viewCase.id
@@ -686,8 +698,8 @@ const COUNT_WORDS = new Map([
 const PROSE_CALLER_COUNT =
   /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+callers?\b/gi;
 
-/** A backticked component path or partial path, as the `why` prose writes one. */
-const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
+/** A backticked component or rune-module path, or a partial path, as the `why` prose writes one. */
+const BACKTICKED_COMPONENT = /`([^`]*\.svelte(?:\.js)?)`/g;
 
 /**
  * Whether `token` names `file`, anchored on the path separator.
