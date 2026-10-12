@@ -298,6 +298,10 @@
     white-space: nowrap;
   }
 
+  .manager-travel-option > i:not(.manager-travel-option-marker) {
+    flex: 0 0 auto;
+  }
+
   .manager-travel-popover.is-compact-option-rows {
     padding: var(--fab-space-1);
   }
