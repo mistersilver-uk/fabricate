@@ -317,15 +317,25 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'environments',
-    expectSelector: '.fabricate-manager [data-time-of-day-bar] [data-band-strip-marker="current"]',
+    // The clock line proves the view hands the panel its services; the dot rests on Day.
+    expectSelector:
+      '.fabricate-manager [data-time-of-day-bar]:has([data-band-strip-marker-line="clock"]) [data-band-strip-marker="current"]',
+    expectAttributes: [
+      {
+        selector: '[data-time-of-day-bar] [data-band-strip-marker="current"]',
+        name: 'aria-valuetext',
+        value: 'Day',
+      },
+    ],
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
       /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|worldTimeLabel)\.js$/,
     ],
   }),
-  // A rail "+" activated: Day's midpoint seeds the add form's Starts at, and its name takes focus.
+  // A rail "+" activated: Dusk's midpoint seeds the add form's Starts at, and its name takes focus.
   managerCase({
     id: 'manager-gathering-time-of-day-rail-seeded',
     label: 'Manager — Gathering settings time-of-day rail seeds the add form',
@@ -339,7 +349,7 @@ export const CASES = Object.freeze([
         selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
         scroll: true,
       },
-      { selector: '[data-time-of-day-bar] [data-band-strip-add="day"]' },
+      { selector: '[data-time-of-day-bar] [data-band-strip-add="dusk"]' },
     ],
     expectView: 'environments',
     expectSelector: '.fabricate-manager .manager-time-of-day-add input[placeholder]:focus',
@@ -347,7 +357,7 @@ export const CASES = Object.freeze([
       {
         selector: '.manager-time-of-day-add [role="spinbutton"]',
         name: 'aria-valuenow',
-        value: '12',
+        value: '19',
       },
     ],
     kinds: ['manager', 'environments'],
