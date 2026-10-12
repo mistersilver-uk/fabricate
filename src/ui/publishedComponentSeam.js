@@ -1,7 +1,8 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
- * Fabricate primitive into an element it owns and gets back `{ update, destroy }`. Plain JS, so the
- * public API binds it without Svelte; the runtime adapter registers the host, `mount` and `unmount`.
+ * Fabricate primitive into an element it owns and gets back `{ update, destroy }`, and is told of
+ * a contained fault through `onFault` (issue 2451). Plain JS, so the public API binds it without
+ * Svelte; the runtime adapter registers the host, `mount` and `unmount`.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
@@ -43,14 +44,27 @@ function copyData(value, key, ancestors) {
   return copy;
 }
 
-/** The validated copy one mount or update renders: M7, M8, M10-M13, then M9. */
+/** One `text` value: a string as passed, `undefined` as absent, a function M10, else M14. */
+function copyText(value, key) {
+  if (typeof value === 'function') throw refuse('functions are phase 2 (issue 2427)');
+  if (value !== undefined && typeof value !== 'string') throw refuse(`"${key}" must be a string`);
+  return value;
+}
+
+/** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */
+const SHIPPED_KINDS = Object.freeze({
+  data: (value, key) => copyData(value, key, new Set()),
+  text: copyText,
+});
+
+/** The validated copy one mount or update renders: M7, M8, M10-M14, then M9. */
 function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
   const copy = {};
   for (const [key, raw] of Object.entries(props)) {
     const published = Object.hasOwn(entry.props, key);
     if (!published && !entry.rest) throw refuse(`"${key}" is not a prop of ${entry.name}`);
-    const value = copyData(raw, key, new Set());
+    const value = SHIPPED_KINDS[published ? entry.props[key].kind : 'data'](raw, key);
     if (!published && !(DATA_ATTRIBUTE.test(key) && ATTRIBUTE_TYPES.has(typeof value))) {
       throw refuse(`"${key}" is not a data attribute`);
     }
@@ -76,14 +90,41 @@ function describeEntry(entry) {
   });
 }
 
-function assertDataKinds(entry) {
+function assertKnownKinds(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
-    if (spec.kind !== 'data') {
-      throw new Error(
-        `${PREFIX}${entry.name} "${key}" is a ${spec.kind} prop; only data props ship before issue 2427`
-      );
+    if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
+      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown kind "${spec.kind}"`);
     }
   }
+}
+
+/** The entry's keys that are not `data`, as the frozen `{ <key>: <kind> }` the host draws from. */
+function contentKinds(entry) {
+  const kinds = {};
+  for (const [key, spec] of Object.entries(entry.props)) {
+    if (spec.kind !== 'data') kinds[key] = spec.kind;
+  }
+  return Object.freeze(kinds);
+}
+
+/**
+ * Queues the mount's `onFault(fault)` on the platform microtask queue, after `first` in that same
+ * callback, so it never runs inside `mount`, `update` or a Svelte flush. The callback is taken off
+ * the record before queueing, so one mount is told once; a throw from it is reported.
+ */
+function queueFaultNotice(record, fault, report, first = null) {
+  const notify = record.onFault;
+  record.onFault = null;
+  if (!notify && !first) return;
+  queueMicrotask(() => {
+    first?.();
+    if (!notify) return;
+    try {
+      notify(fault);
+    } catch (error) {
+      report(FAULT_REPORT, record.name, error);
+    }
+  });
 }
 
 /**
@@ -121,8 +162,9 @@ function createMountLifecycle({ runtime, report }) {
     if (!record.live) return;
     retire(record);
     report(FAULT_REPORT, record.name, error);
-    if (record.instance) unmountQuietly(record);
-    else queueMicrotask(() => record.instance && unmountQuietly(record));
+    const deferred = record.instance ? null : () => record.instance && unmountQuietly(record);
+    if (!deferred) unmountQuietly(record);
+    queueFaultNotice(record, error, report, deferred);
   }
 
   function handleFor(entry, record) {
@@ -136,18 +178,24 @@ function createMountLifecycle({ runtime, report }) {
     });
   }
 
-  function start(entry, target, initial) {
-    const record = { name: entry.name, target, live: true, instance: null, root: null };
+  function start(entry, target, initial, onFault) {
+    const record = { name: entry.name, target, live: true, instance: null, root: null, onFault };
     claims.set(target, record);
     live.add(record);
     const { components, host, mount } = runtime();
-    const props = { component: components[entry.path], initial, onfault: (e) => fault(record, e) };
+    const props = {
+      component: components[entry.path],
+      initial,
+      onfault: (e) => fault(record, e),
+      kinds: contentKinds(entry),
+    };
     try {
       record.instance = mount(host, { target, props });
     } catch (error) {
       retire(record);
       report(FAULT_REPORT, entry.name, error);
       target.replaceChildren?.();
+      queueFaultNotice(record, error, report);
       return INERT_HANDLE;
     }
     if (!record.live) return INERT_HANDLE;
@@ -191,15 +239,24 @@ export function createPublishedComponents({
     if (!isReady()) throw refuse('mount before ready');
     const entry = entries.get(name);
     if (!entry) throw refuse(`"${String(name)}" is not published`);
-    const { target, props = {} } = options ?? {};
+    const { target, props = {}, onFault } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
     lifecycle.claimTarget(target);
-    return lifecycle.start(entry, target, copyProps(entry, props));
+    const notify = typeof onFault === 'function' ? onFault : null;
+    return lifecycle.start(entry, target, copyProps(entry, props), notify);
+  }
+
+  // `async`, so the M3 refusal is a rejection and never a synchronous throw. Every entry is eager
+  // today, so there is no code to fetch; it needs neither a runtime nor `fabricate.ready`.
+  async function loadPublished(names) {
+    for (const name of Array.isArray(names) ? names : [names]) {
+      if (!entries.has(name)) throw refuse(`"${String(name)}" is not published`);
+    }
   }
 
   function register(adapter) {
     if (runtime) throw new Error(`${PREFIX}already registered`);
-    for (const entry of table) assertDataKinds(entry);
+    for (const entry of table) assertKnownKinds(entry);
     const { components, host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
     runtime = Object.freeze({
       components,
@@ -214,6 +271,7 @@ export function createPublishedComponents({
     components: Object.freeze(table.map((entry) => entry.name)),
     describe: (name) => descriptions.get(name) ?? null,
     mount: mountPublished,
+    load: loadPublished,
   });
 
   if (mount) {
