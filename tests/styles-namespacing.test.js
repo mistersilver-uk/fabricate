@@ -64,9 +64,9 @@ function collectSelectors(css) {
   return selectors;
 }
 
-describe('fabricate.css namespacing', () => {
-  const selectors = collectSelectors(stripComments(readStylesheet()));
+const selectors = collectSelectors(stripComments(readStylesheet()));
 
+describe('fabricate.css namespacing', () => {
   it('parses a non-trivial number of selectors', () => {
     // Sanity check so a parser regression can't make the guard vacuously pass.
     assert.ok(selectors.length > 100, `expected many selectors, got ${selectors.length}`);
