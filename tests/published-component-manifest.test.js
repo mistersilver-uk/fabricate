@@ -9,6 +9,8 @@
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
  * forwarded `text` key fails closed and a forwarded `data` key is not seen.
+ * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and takes on
+ * trust that no extension target sits under a `CHIP_LAYOUT_ANCESTORS` class.
  */
 import assert from 'node:assert/strict';
 import { posix } from 'node:path';
@@ -138,7 +140,7 @@ function declarationFaults(entry, ast) {
 }
 
 const CHIP_ROOT = 'manager-chip';
-/** The classes the published `Chip` keys can write beside its root class. */
+/** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
   'is-warning',
@@ -146,7 +148,19 @@ const PUBLISHED_CHIP_CLASSES = new Set([
   'is-info',
   'is-neutral',
   'is-accent',
+  'is-active',
+  'is-disabled',
+  'is-negative',
+  'is-muted',
+  'is-tag',
+  'is-secondary',
+  'is-subtle',
   'is-list',
+  'is-row',
+  'is-action',
+  'is-tag-run',
+  'is-inspector',
+  'is-header',
 ]);
 /** The manager layout classes a sheet rule reaches a chip under; no extension target sits in one. */
 const CHIP_LAYOUT_ANCESTORS = new Set([
@@ -167,7 +181,7 @@ const classesOf = (compound) =>
  */
 function cannotMatchPublishedChip(complex) {
   const compounds = complex.children;
-  const at = compounds.findIndex((compound) => classesOf(compound).includes(CHIP_ROOT));
+  const at = compounds.findLastIndex((compound) => classesOf(compound).includes(CHIP_ROOT));
   if (at === -1) return false;
   const chip = compounds[at];
   const unwritable = classesOf(chip).some(
@@ -490,6 +504,11 @@ describe('the module sheet against the published Chip', () => {
       []
     );
     assert.equal(selectors.length, 18, 'the census the static Chip was published on');
+    assert.deepEqual(
+      Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
+      ['tone', 'density', 'children'],
+      'a published key that draws a classed child reopens cannotMatchPublishedChip'
+    );
   });
 
   const MANAGER = '.fabricate-manager';
@@ -511,6 +530,8 @@ describe('the module sheet against the published Chip', () => {
     `${MANAGER} .manager-chip.is-warning.is-list`,
     `${MANAGER} .manager-inspector .manager-chip`,
     `${MANAGER} .manager-chip > span`,
+    `${MANAGER} .manager-chip ~ div > .manager-chip`,
+    `${MANAGER} .manager-chip.is-row`,
     `${MANAGER} :is(.manager-chip.manager-tag-pill, .manager-pill)`,
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published chip`, () => {

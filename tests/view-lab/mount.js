@@ -716,7 +716,7 @@ const LAB_SPECIMENS = Object.freeze({
   'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
   // Issue 2424: the published tier track, mounted through the seam a companion calls.
   'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
-  // Issue 2448: the seven data-only leaves, each mounted through the same seam.
+  // Issue 2448's seven data-only leaves, then issue 2451's `Kicker` and `Chip`, by the same seam.
   'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
 });
 // view-lab-region:end

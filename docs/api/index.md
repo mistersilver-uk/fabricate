@@ -2225,7 +2225,7 @@ Any fallback copy is yours to draw.
 Pass `onFault(error)` to `mount` to be told of that fault.
 It is called once, in a microtask after Fabricate has torn its own content down, and never inside `mount`, `update` or `destroy`.
 By then the claim is released and `target` is empty, so you may mount into it from `onFault`.
-Do not mount the same input again unconditionally: a fault that repeats calls `onFault` again one microtask later, and the page cannot paint in between.
+Do not mount the same input again unconditionally: a fault that repeats calls `onFault` again in a later microtask of the same task, so the page cannot paint in between.
 A throw from `onFault` is reported as a render failure under the component's name and goes no further; a Promise it returns is ignored.
 Without `onFault`, a fault is discovered only when `update` answers `false`.
 
@@ -2240,12 +2240,13 @@ const handle = fabUi.mount('Kicker', {
 ```
 
 `load(names)` takes an array of published names and returns a Promise.
+A value that is not an array is read as one name.
 It never throws synchronously, and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
 `TierTrack` and the seven components of issue #2448 never need it; `Kicker` and `Chip` were published with `load`, so call it for them before mounting.
-Call `load` once, keep the promise, and mount only after it has settled and Fabricate is ready:
+Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
 let published = null;
@@ -2253,19 +2254,19 @@ let published = null;
 Hooks.once('setup', () => {
   const fabUi = game.fabricate?.api?.ui;
   // Absent on a Fabricate that predates `load`, where `mount` also ignores `onFault`.
-  published = fabUi?.load?.(['Kicker', 'Chip']) ?? null;
+  // Settled to a boolean here: a name this Fabricate does not publish must not reject in a render.
+  published = fabUi?.load?.(['Kicker', 'Chip']).then(() => true, () => false) ?? null;
 });
 
 // In your ApplicationV2, once `fabricate.ready` has fired:
 async _onRender(context, options) {
   await super._onRender(context, options);
-  if (!published) return;
-  await published;
+  if (!(await published)) return;
   // Mount here, destroying any earlier handle first.
 }
 ```
 
-An ApplicationV2 `_onRender` may await the promise.
+An ApplicationV2 `_onRender` may await the promise, but handle its rejection where you keep it: Foundry awaits `_onRender`, so a rejection there fails the render and skips the `render` hooks.
 A navigation provider's `mount` callback may not, because it returns synchronously, so content drawn there mounts its published components when the kept promise settles.
 
 ### Ownership and theme

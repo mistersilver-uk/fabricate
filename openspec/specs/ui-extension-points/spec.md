@@ -368,10 +368,10 @@ Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive;
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
 - `describe(name)` returns a frozen `{ version, props, rest }`, where `props` is `{ <key>: { kind: 'data' | 'text', required: boolean } }` and `rest` says whether the component takes data attributes; it returns `null` for a name that is not published.
 - `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy() }`.
-- `load(names)` takes an array of published names and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
+- `load(names)` takes an array of published names, reads a value that is not an array as one name, and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 It resolves `undefined` once every named entry's code is loaded, which today is the next microtask, and rejects with the M3 `TypeError` for a name that is not published.
 It does not wait for `fabricate.ready`, so M2 still applies to `mount`.
-- A companion calls `load` once, keeps the promise, and mounts only after it has settled and Fabricate is ready.
+- A companion calls `load` once, keeps the promise, and mounts only after it has resolved and Fabricate is ready.
 - `api.ui` is bound at `init` and rebound at `ready` as the same object.
 It exists once Fabricate's own `init` listener has run, so a companion reads it in `setup` or later, never in its own `init`, and its `mount` throws until the `fabricate.ready` hook has fired.
 - `api.ui` is not a member of either navigation context, and neither context gains a component or a mount function.
@@ -549,7 +549,7 @@ This is defensive: Svelte 5.56 delivers no fault before its `mount` returns.
 - The target is left empty, and any fallback copy is the companion's.
 - `mount` takes an optional `onFault(error)`, called once when the mount faults, in a microtask after Fabricate has torn its own content down, and never inside `mount`, `update` or `destroy`.
 - By then the claim is released and `target` is empty, so a companion may mount into it from `onFault`.
-It does not mount the same input again unconditionally: a fault that repeats calls `onFault` again one microtask later, and the page cannot paint in between.
+It does not mount the same input again unconditionally: a fault that repeats calls `onFault` again in a later microtask of the same task, so the page cannot paint in between.
 - A throw from `onFault` is reported as a render failure under the entry's name and goes no further; a Promise it returns is ignored.
 - Without `onFault`, a fault is discovered only when `update` answers `false`.
 

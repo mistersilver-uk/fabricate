@@ -142,12 +142,20 @@ function createMountLifecycle({ runtime, report }) {
     if (claims.get(record.target) === record) claims.delete(record.target);
   }
 
+  // Answers whether the runtime's unmount returned; a throw is reported.
   function unmountQuietly(record) {
     try {
       runtime().unmount(record.instance);
+      return true;
     } catch (error) {
       report(FAULT_REPORT, record.name, error);
+      return false;
     }
+  }
+
+  // A faulted mount leaves its target empty even when the runtime's unmount fails part-way.
+  function unmountFaulted(record) {
+    if (!unmountQuietly(record)) record.target.replaceChildren?.();
   }
 
   function end(record) {
@@ -162,8 +170,8 @@ function createMountLifecycle({ runtime, report }) {
     if (!record.live) return;
     retire(record);
     report(FAULT_REPORT, record.name, error);
-    const deferred = record.instance ? null : () => record.instance && unmountQuietly(record);
-    if (!deferred) unmountQuietly(record);
+    const deferred = record.instance ? null : () => record.instance && unmountFaulted(record);
+    if (!deferred) unmountFaulted(record);
     queueFaultNotice(record, error, report, deferred);
   }
 

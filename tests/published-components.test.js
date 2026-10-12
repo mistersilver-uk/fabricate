@@ -682,6 +682,20 @@ describe('a mount made with onFault', () => {
     return { ...fake, target, seen, mount };
   }
 
+  it('is told with an empty target even when the runtime unmount throws', async () => {
+    const teardown = new Error('teardown threw');
+    const { mount, mounts, seen, reports, target } = watched({ unmountError: teardown });
+    mount();
+    mounts[0].props.onfault(new Error('render blew up'));
+    await drained();
+    assert.deepEqual(
+      seen.map(({ children }) => children),
+      [0]
+    );
+    assert.equal(reports.length, 2, 'the fault and the failed unmount are each reported once');
+    assert.equal(target.childNodes.length, 0);
+  });
+
   it('is told of a boundary fault once, in a microtask after the synchronous unmount', async () => {
     const { mount, mounts, events, seen } = watched();
     mount();
