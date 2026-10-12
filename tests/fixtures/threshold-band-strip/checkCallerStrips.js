@@ -12,13 +12,15 @@ const tone = (position) => ({
 });
 const between = (band, next) => `Threshold between ${band?.name || ''} and ${next?.name || ''}`;
 const ignore = () => {};
+/** The attributes carrying the `$props.id()` prefix. */
+const MASKED_IDS = new Set(['id', 'aria-describedby']);
 
 /**
  * The canonical form of a rendered node: comments and whitespace-only text dropped, attributes and
  * class tokens sorted, and the scope hash and `$props.id()` prefix masked, since those vary by build.
  */
 export function canonicalStrip(node) {
-  if (node.nodeType === 3) return node.textContent.trim();
+  if (node.nodeType === 3) return node.textContent.trim() === '' ? '' : node.textContent;
   if (node.nodeType !== 1) return '';
   const value = (attribute) =>
     attribute.name === 'class'
@@ -28,7 +30,9 @@ export function canonicalStrip(node) {
           .map((token) => token.replace(/^svelte-[a-z0-9]+$/, 'svelte-HASH'))
           .sort(byCodePoint)
           .join(' ')
-      : attribute.value.replace(/^.*-bands$/, 'ID-bands');
+      : MASKED_IDS.has(attribute.name)
+        ? attribute.value.replace(/^.*-bands$/, 'ID-bands')
+        : attribute.value;
   const attributes = [...node.attributes]
     .map((attribute) => ` ${attribute.name}="${value(attribute)}"`)
     .sort(byCodePoint)

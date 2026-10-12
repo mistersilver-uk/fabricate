@@ -58,6 +58,7 @@ describe("ThresholdBandStrip: the check callers' strip is frozen (issue 2431)", 
   for (const { name, props, html } of CHECK_CALLER_STRIPS) {
     it(`renders the ${name} check strip exactly as frozen`, async () => {
       const root = await harness.mount(props);
+      assert.equal(root.childElementCount, 1, 'the strip renders one root');
       assert.equal(canonicalStrip(root.firstElementChild), html);
     });
   }
