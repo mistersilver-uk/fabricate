@@ -5,9 +5,12 @@ import { describe, it } from 'node:test';
 import {
   ariaBoundsFor,
   bandDomain,
+  bandIndexAt,
   boundsFor,
   clampTo,
+  markerBandStep,
   numeric,
+  railSeeds,
   resolveBands,
   snapTo,
   trackMaxOf,
@@ -104,5 +107,78 @@ describe('rangeBarGeometry: the domain and the bounds', () => {
     assert.equal(snapTo(8.4, 2, 1), 8);
     assert.equal(snapTo(9, 2, 5), 7);
     assert.equal(snapTo(9, 2, 0), 9, 'a non-positive step snaps to whole units');
+  });
+});
+
+const DAY = [
+  { id: 'dawn', from: 4 },
+  { id: 'day', from: 8 },
+  { id: 'dusk', from: 17 },
+  { id: 'night', from: 21 },
+];
+
+describe('rangeBarGeometry: one band, for a binding that allows it', () => {
+  it('resolves a single band only when the caller lowers the minimum', () => {
+    assert.equal(resolveBands([{ from: 8 }]), null, 'the check bindings need two');
+    assert.deepEqual(
+      resolveBands([{ id: 'day', from: 8 }], 1).map((row) => row.id),
+      ['day']
+    );
+  });
+});
+
+describe('rangeBarGeometry: the band a value falls in, and stepping between bands', () => {
+  it('finds the band whose span holds a value, its start inclusive', () => {
+    const rows = resolveBands(DAY);
+    assert.deepEqual(
+      [4, 7.9, 8, 16.5, 17, 27.9].map((value) => bandIndexAt(value, rows)),
+      [0, 0, 1, 1, 2, 3]
+    );
+    assert.equal(bandIndexAt(3, rows), -1, 'before the first band is no band');
+  });
+
+  it('steps one band per arrow or page key, jumps with Home and End, and clamps', () => {
+    assert.equal(markerBandStep('ArrowRight', 1, 4), 2);
+    assert.equal(markerBandStep('ArrowUp', 1, 4), 2);
+    assert.equal(markerBandStep('PageUp', 1, 4), 2);
+    assert.equal(markerBandStep('ArrowLeft', 1, 4), 0);
+    assert.equal(markerBandStep('ArrowDown', 1, 4), 0);
+    assert.equal(markerBandStep('PageDown', 1, 4), 0);
+    assert.equal(markerBandStep('Home', 2, 4), 0);
+    assert.equal(markerBandStep('End', 0, 4), 3);
+    assert.equal(markerBandStep('ArrowRight', 3, 4), 3, 'clamped at the last band');
+    assert.equal(markerBandStep('ArrowLeft', 0, 4), 0, 'clamped at the first');
+    assert.equal(markerBandStep('Enter', 1, 4), null, 'an unrelated key is not swallowed');
+  });
+});
+
+describe('rangeBarGeometry: the rail seeds', () => {
+  it('seeds each band two steps wide or more at its midpoint, rounded down to the step', () => {
+    const rows = resolveBands([...DAY.slice(0, 3), { id: 'gloam', from: 20 }, DAY[3]]);
+    assert.deepEqual(
+      railSeeds(rows, 28, 1).map(({ band, value }) => [band.id, value]),
+      [
+        ['dawn', 6],
+        ['day', 12],
+        ['dusk', 18],
+        ['night', 24],
+      ],
+      'Gloam, one step wide, is left out'
+    );
+  });
+
+  it('seeds a two-step band at its start plus one step, and measures width in steps', () => {
+    const rows = resolveBands([
+      { id: 'a', from: 0 },
+      { id: 'b', from: 2 },
+    ]);
+    assert.deepEqual(
+      railSeeds(rows, 12, 1).map(({ value }) => value),
+      [1, 7]
+    );
+    assert.deepEqual(
+      railSeeds(rows, 12, 2).map(({ value }) => value),
+      [6]
+    );
   });
 });

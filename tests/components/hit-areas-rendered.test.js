@@ -157,6 +157,26 @@ const MOUNTS = Object.freeze({
       ),
     },
   },
+  /** The time-of-day bar's narrowest allowed band, three hours at a 326px track (issue 2431). */
+  rangeBar: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'start',
+      min: 4,
+      max: 28,
+      ticks: false,
+      addable: true,
+      railLabel: 'Add',
+      addLabel: (band) => `Add within ${band.name}`,
+      bands: [
+        { id: 'dawn', name: 'Dawn', from: 4 },
+        { id: 'day', name: 'Day', from: 8 },
+        { id: 'dusk', name: 'Dusk', from: 17 },
+        { id: 'night', name: 'Night', from: 20 },
+      ],
+      markers: [{ id: 'current', value: 18.5, label: 'Now', draggable: true, snap: 'band' }],
+    },
+  },
   componentChip: {
     name: 'Chip',
     props: {
@@ -166,6 +186,14 @@ const MOUNTS = Object.freeze({
         `<span style="display:contents"><span>Filter</span><button type="button" class="manager-component-chip-clear" aria-label="Clear">${GLYPH}</button></span>`
       ),
     },
+  },
+});
+
+/** What a mounted primitive renders besides itself, by name. */
+const MOUNT_DEPENDENCIES = Object.freeze({
+  ThresholdBandStrip: {
+    rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
+    compiledModules: [component('IconButton')],
   },
 });
 
@@ -199,7 +227,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
 @layer blocks{button{height:28px;overflow:hidden}}</style>
 <style>@layer modules {${readStylesheet()}}</style>
-${['Stepper', 'SelectionCheckbox', 'Chip']
+${['Stepper', 'SelectionCheckbox', 'Chip', 'ThresholdBandStrip']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}
 ${Object.values(PARENTS)
@@ -222,6 +250,7 @@ ${Object.values(PARENTS)
   <div data-case="tagPill" class="row">${markup.tagPill}</div>
   <div data-case="truncChip" class="row">${markup.truncChip}</div>
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
+  <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
   <div data-case="decorativeHost" class="row"><div class="host" role="option">${markup.decorative}<span>Text</span></div></div>
   <div data-case="pager" style="width:300px;margin:12px">${scoped(PAGER, PARENTS.inset)}</div>
@@ -246,7 +275,8 @@ before(async () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: `fabricate-hit-areas-${name}-`,
-      compiledModules: [component(name)],
+      rawModules: MOUNT_DEPENDENCIES[name]?.rawModules ?? [],
+      compiledModules: [component(name), ...(MOUNT_DEPENDENCIES[name]?.compiledModules ?? [])],
       componentPath: component(name),
     });
     await harness.setup();
@@ -693,6 +723,49 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     ]) {
       assert.equal(read(path).split(`class="${token}"`).length - 1, count, `${path}: ${token}`);
     }
+  });
+
+  it("keeps the range bar's dot and rail apart from its dividers at a three-hour band", async () => {
+    const bar = await tab.evaluate(() => {
+      const root = document.querySelector('[data-case="rangeBar"]');
+      const rect = (element) => {
+        const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+        return { left, top, right, bottom, width, height };
+      };
+      const centre = (element) => {
+        const box = element.getBoundingClientRect();
+        return [box.left + box.width / 2, box.top + box.height / 2];
+      };
+      const owns = (element) => {
+        const [x, y] = centre(element);
+        return element.contains(document.elementFromPoint(x, y));
+      };
+      const dot = root.querySelector('[data-band-strip-marker="current"]');
+      const dusk = root.querySelector('[data-band-strip-add="dusk"]');
+      const dividers = [...root.querySelectorAll('[data-band-strip-handle]')];
+      return {
+        dot: rect(dot),
+        rail: rect(dusk),
+        dividers: dividers.map(rect),
+        dotOwnsCentre: owns(dot),
+        railOwnsCentre: owns(dusk),
+        dividersOwnCentres: dividers.map(owns),
+      };
+    });
+    const overlaps = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    for (const [name, box] of [
+      ['dot', bar.dot],
+      ['rail button', bar.rail],
+    ]) {
+      assert.ok(box.width >= 24 && box.height >= 24, `${name}: ${JSON.stringify(box)}`);
+      for (const divider of bar.dividers) {
+        assert.ok(!overlaps(box, divider), `${name} meets a divider: ${JSON.stringify(divider)}`);
+      }
+    }
+    assert.ok(bar.dotOwnsCentre, 'the dot resolves at its own centre');
+    assert.ok(bar.railOwnsCentre, 'the rail button resolves at its own centre');
+    assert.deepEqual(bar.dividersOwnCentres, [true, true, true]);
   });
 
   it('finds the condition label field at 34px, whatever its own 20px declaration says', async () => {
