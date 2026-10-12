@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
+const { GatheringRichStateService } = await import('../src/systems/GatheringRichStateService.js');
 const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } =
   await import('./helpers/fullAuthoringFixture.js');
 
@@ -174,6 +175,44 @@ test('#699 keep-mode API-path round-trip preserves the gathering authoring bundl
   // Equivalence modulo the volatile envelope fields (spec.md:92).
   assert.deepEqual(second.gatheringEnvironments, first.gatheringEnvironments);
   assert.deepEqual(second.gatheringConfig, first.gatheringConfig);
+});
+
+// Issue 2431: a start hour is authored data, so the bundle carries it while `current` resets.
+test('time-of-day start hours survive export and import while the current time resets', async () => {
+  const fixture = buildFullAuthoringFixture();
+  const timeOfDay = fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].conditions.timeOfDay;
+  timeOfDay.values = [
+    { id: 'day', label: 'Day', icon: 'fas fa-sun', startHour: 6 },
+    { id: 'night', label: 'Night', icon: 'fas fa-moon', startHour: 0 },
+  ];
+  const exported = exportCurrent(makeHarness(fixture), FIXTURE_SYSTEM_ID);
+  const exportedTimeOfDay = exported.gatheringConfig.system.conditions.timeOfDay;
+  assert.equal(exportedTimeOfDay.current, 'day', 'the export resets the current time of day');
+  assert.deepEqual(
+    exportedTimeOfDay.values.map((option) => option.startHour),
+    [6, 0]
+  );
+
+  const target = makeHarness(fixture);
+  target.settings.delete('gatheringConfig');
+  const importer = new CompendiumImporter(target.systemManager, target.recipeManager, {
+    environmentStore: makeLazyEnvironmentStoreSeam({ store: target.environmentStore }),
+    getSetting: target.getSetting,
+    setSetting: target.setSetting,
+    isGM: () => true,
+  });
+  await importer.importFromPackData(prepareForImport(exported, 'keep'), { overwriteExisting: true });
+
+  const service = new GatheringRichStateService({ getSetting: target.getSetting });
+  const imported = service._config().systems[FIXTURE_SYSTEM_ID].conditions.timeOfDay;
+  assert.deepEqual(
+    imported.values.map((option) => [option.id, option.startHour]),
+    [
+      ['day', 6],
+      ['night', 0],
+    ],
+    'the imported start hours reach the gathering runtime'
+  );
 });
 
 // The composition root's own importer: its seams resolve each store LAZILY, its setting pair
