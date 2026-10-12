@@ -1997,6 +1997,32 @@ handle.update(nextProps); // Replaces every prop; it never merges.
 handle.destroy(); // Required on every path that ends the mount.
 ```
 
+A worked mount, in an ApplicationV2 of your own, names a `Meter` and keeps its handle:
+
+```javascript
+#meter = null;
+
+_onRender(context, options) {
+  super._onRender(context, options);
+  const fabUi = game.fabricate?.api?.ui;
+  if (fabUi?.schemaVersion !== 1 || !fabUi.components.includes('Meter')) return;
+  const target = this.element.querySelector('[data-hp-meter]'); // An empty element you own.
+  this.#meter?.destroy(); // A re-render replaced the old target.
+  this.#meter = fabUi.mount('Meter', {
+    target,
+    props: { label: 'Hit points', value: 14, max: 20, valueText: '14 of 20 hit points' },
+  });
+}
+
+async _preClose(options) {
+  this.#meter?.destroy();
+  await super._preClose(options);
+}
+```
+
+Draw the visible reading yourself, because `Meter` draws no figure.
+A later change goes through `this.#meter.update({ ... })` with every prop again.
+
 The published components, in publication order:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -2046,7 +2072,7 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
 `shape` is `round` or `square`.
 `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''`.
+`name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### Medallion
@@ -2059,10 +2085,10 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
 `glyph` is the ladder's glyph size for that rung: `10`, `11`, `12` or `15`.
 `alt` is as for `Avatar`.
-`tint` is a tag key as for `Avatar`, and it recolours the glyph alone.
+`tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
 `tone` and `ink` are each `''`, `success` or `danger`: both outrank `tint`, and `ink` outranks `tone` on the glyph.
-The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''`.
+The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
 ### FillBar
@@ -2103,8 +2129,8 @@ In a histogram the bars are hidden from assistive technology and each row is rea
 
 `StatBox` draws one figure over a micro-label in a bordered box.
 `value` is required and is the formatted figure.
-`label` is required and is drawn beneath it.
-`icon` is Font Awesome classes for an optional glyph before the figure.
+`label` is required.
+`icon` is optional Font Awesome classes for a glyph.
 `tone` is `default`, `info` or `danger`.
 The glyph is hidden from assistive technology and the tone is colour alone, so `label` must say what the figure is and what a `danger` or `info` tone means.
 
@@ -2142,6 +2168,7 @@ It returns a frozen `{ update(props), destroy() }`.
   A mount that is never destroyed leaks for the life of the page.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent or `''` throws `<name> requires a non-empty "<key>"`.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 If the component faults while rendering, updating or in an effect, Fabricate logs `Fabricate | Published component render failed:` with the name and the error, empties `target`, and the handle goes inert.

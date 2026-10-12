@@ -401,16 +401,16 @@ Each group states the accepted values of every key that entry publishes.
   - `size` is `26` or `32`, the portrait ladder, and defaults to `32`.
   - `shape` is `round` or `square`.
   - `tint` is one of `sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `ember`, `verdant`, `azure`, `bone` and `slate`.
-  - `name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''`.
+  - `name` is never announced and the initials are hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`Medallion`.**
   - `art` is an image path; a falsy one draws `icon`, Font Awesome classes whose default is `fas fa-scroll`.
   - `size` is required and is `22`, `26`, `30` or `38`, the art ladder.
   - `glyph` is the ladder's glyph for that rung: `10`, `11`, `12` or `15`.
   - `alt` is as for `Avatar`.
-  - `tint` is a tag key as for `Avatar`, and it recolours the glyph alone.
+  - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
   - `variant` is `''` or `glyph-chip`.
   - `tone` and `ink` are each `''`, `success` or `danger`; both outrank `tint`, and `ink` outranks `tone` on the glyph.
-  - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''`.
+  - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`FillBar`.**
   - `value` is 0–100, clamped.
   - `tone` is `success`, `warning`, `danger`, `info`, `accent` or `neutral`, and defaults to `success`.
