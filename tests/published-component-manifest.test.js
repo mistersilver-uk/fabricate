@@ -154,13 +154,16 @@ describe('each entry matches its component declaration', () => {
 
   it('walks static component imports, so an offender only an imported file carries is named', () => {
     const sources = {
-      'src/Entry.svelte': "<script>import Leaf from './parts/Leaf.svelte';</script><Leaf />",
+      'src/Entry.svelte':
+        '<script>import Leaf from \'./parts/Leaf.svelte\';</script><Leaf /><span class="visually-hidden"></span>',
+      'src/parts/Cycle.svelte': "<script>import Entry from '../Entry.svelte';</script><Entry />",
       'src/parts/Leaf.svelte':
-        "<script module>import Deep from '../deep/Deep.svelte';</script><Deep />",
+        "<script module>import Deep from '../deep/Deep.svelte';</script><script>import Cycle from './Cycle.svelte';</script><Deep /><Cycle />",
       'src/deep/Deep.svelte': '<style>:global(.fabricate-app) .a { color: red; }</style>',
     };
     const astOf = (file) => templateOf(file, sources[file]).ast;
     assert.deepEqual(closureDependencies('src/Entry.svelte', astOf), [
+      'src/Entry.svelte: .visually-hidden',
       'src/deep/Deep.svelte: app-root selector',
     ]);
   });

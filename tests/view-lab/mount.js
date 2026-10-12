@@ -702,12 +702,13 @@ async function mountManagerApp(content, params) {
   return { instance, services, props, store: props.store, tab: params.tab };
 }
 
+// view-lab-region:lab-specimens
 /**
  * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
- * shipped component directly, for props no shipped caller passes yet. Nothing in `src/` imports
- * them, so a specimen frame depicts a state no GM can reach, and its case label says so.
+ * shipped component, directly or through the published seam a companion calls (issue 2424), in a
+ * state no shipped caller draws. Nothing in `src/` imports them, so a specimen frame depicts a
+ * state no GM can reach, and its case label says so.
  */
-// view-lab-region:lab-specimens
 const LAB_SPECIMENS = Object.freeze({
   'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
   // Issue 2424: the published tier track, mounted through the seam a companion calls.

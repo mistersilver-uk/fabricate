@@ -5426,6 +5426,20 @@ test('the published component seam selects the tier track specimen it mounts', (
   }
 });
 
+test('every specimen case names a LAB_SPECIMENS key, and every key has a case', () => {
+  const region = parseMountRegions(labMountSource)?.find(
+    (candidate) => candidate.key === 'lab-specimens'
+  );
+  assert.ok(region, 'the specimen region must still parse for this claim to be about it');
+  const keys = labMountSource
+    .slice(region.start - 1, region.end)
+    .map((line) => /^\s*'([a-z0-9-]+)': \(\) => import\(/.exec(line)?.[1])
+    .filter(Boolean);
+  assert.ok(keys.length > 0, 'the specimen table must be non-empty or the claim is vacuous');
+  const named = VIEW_LAB_CASES.filter((c) => c.query?.specimen).map((c) => c.query.specimen);
+  assert.deepEqual([...new Set(named)].sort(byCodePoint), keys.sort(byCodePoint));
+});
+
 test('the seven mount.js regions the selector keys on are still marked in the file', () => {
   // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
   // selected — which is correct and invisible: the only symptom would be a capture job quietly
