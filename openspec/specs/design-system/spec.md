@@ -633,9 +633,25 @@ Membership of the primitive set is measured by independent Svelte importers thro
 - **THEN** the surviving rule is written at a position proved by a blocker walk over every intervening rule in the closed specificity band
 - **AND** the walk, both specificities, any adoption deferred because its specificity differs from its donor's, and the captured frame witnessing any specificity-lowering adoption are published with the change
 
+### Requirement: The module sheet is one ordered cascade imported from partials
+
+The module sheet's entry is `styles/fabricate.css`, the file `module.json` registers.
+The entry MUST contain only `@import url(...)` rules naming sibling `styles/fabricate-*.css` partials, in cascade order, and comments.
+Every partial MUST be imported by the entry exactly once.
+The module sheet's text is its partials joined in import order.
+In every other requirement, a mention of `styles/fabricate.css`, of a rule "in" it, or of an order "earlier" or "later" in it, means that whole imported cascade.
+A rule MUST be written in the partial that holds its cascade position, never in the entry.
+
+#### Scenario: A rule is added to the module sheet
+
+- **WHEN** a change adds or edits a rule in the module sheet
+- **THEN** it edits the partial that holds that cascade position, and the entry gains no rule
+- **AND** a gate that reads the module sheet's text reads it through `scripts/lib/stylesheetSource.js`
+
 ### Requirement: A component's own declaration outranks the module sheet, whatever the specificity
 
 `module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports an unlayered module stylesheet at `layer(modules)`.
+The partials that sheet `@import`s land in the same layer at the import point.
 A Svelte component's scoped block is injected as an ordinary UNLAYERED `<style>` at runtime.
 An unlayered declaration beats a layered one whatever the specificity, so for any property a component declares in its own scoped block, no rule in `styles/fabricate.css` can override it — not at (0,4,0) against the component's (0,2,0), and not at any specificity that can be written.
 

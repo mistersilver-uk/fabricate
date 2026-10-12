@@ -402,6 +402,13 @@ No Jest, Vitest, or Playwright.
 
 - Component-scoped `<style>` blocks handle per-component styles.
 - `styles/fabricate.css` contains shared/global rules (layout, admin panel, design tokens).
+- That file is the module sheet's entry: it holds only `@import` rules for the `styles/fabricate-*.css` partials, in cascade order, and a rule is written in the partial that holds its cascade position, which the comment above each import names.
+`tests/stylesheet-logical-file.test.js` holds the entry to imports and each partial to 4,000 lines.
+Each import is preceded by a comment naming the surfaces and shared families its partial holds, including a family kept there only to preserve its cascade position.
+A rule that extends an existing family is written beside that family's rules, in the partial that already holds them.
+A new family is written at the end of the partial whose entry comment names its surface, the later partial when two name it, and that comment gains the family when it is shared or belongs to another surface.
+A partial that would pass 4,000 lines is first split in two, in a commit of its own, at a top-level boundary between two families, with the new partial imported immediately after the old one and each import's comment naming what its partial now holds.
+That commit leaves the joined text of the module sheet byte-identical, so no rule moves.
 - Foundry core CSS classes (`flexrow`, `flexcol`) are used where appropriate.
 
 ### Foundry vs Fabricate CSS overrides
@@ -601,6 +608,7 @@ That is the steady-state rule, and it sits on top of the one-time reflow of the 
 ### CSS linting (Stylelint)
 
 `npm run lint:css` gates `styles/**/*.{css,scss}` (today: the global `styles/fabricate.css`).
+Since issue #1711 that is the module sheet's entry and each `styles/fabricate-*.css` partial, linted one file at a time, so the two checks that compare across partials, a repeated selector and a repeated `@keyframes` name, run over the joined text in `tests/stylesheet-source.test.js`.
 The config extends `stylelint-config-standard` and is tuned to enforce the dimensions a linter can actually check — each is mapped to its rule(s) in the header comment of `stylelint.config.js`:
 
 - **Quality** — invalid/unknown syntax, modern value notation, malformed selectors.
