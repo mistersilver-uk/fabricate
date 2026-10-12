@@ -328,6 +328,17 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
     assert.equal(dot().getAttribute('aria-valuetext'), 'Night');
   });
 
+  it('persists a quick reversal of the current marker against a deferred store', () => {
+    mountPanel();
+    key(dot(), 'ArrowRight');
+    key(dot(), 'ArrowLeft');
+    assert.deepEqual(calls, [
+      ['current', { timeOfDay: 'dusk', systemId: 'alchemy' }],
+      ['current', { timeOfDay: 'day', systemId: 'alchemy' }],
+    ]);
+    assert.equal(dot().getAttribute('aria-valuetext'), 'Day');
+  });
+
   it('draws no current marker for a current id that is not a value (i)', () => {
     mountPanel({ current: 'noon' });
     assert.ok(Boolean(bar()));

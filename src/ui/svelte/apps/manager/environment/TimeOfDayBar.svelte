@@ -40,6 +40,7 @@
 
   let drafts = $state.raw({ against: null, hours: {} });
   let currentDraft = $state.raw({ against: null, id: '' });
+  let committedCurrent = $state.raw({ against: null, id: '' });
 
   function readClock() {
     try {
@@ -124,7 +125,11 @@
     const band = bandAt(index);
     if (!band) return;
     currentDraft = { against: current, id: band.id };
-    if (phase === 'commit' && band.id !== current) onSetCurrent(band.id);
+    if (phase !== 'commit') return;
+    const persisted = committedCurrent.against === current ? committedCurrent.id : current;
+    if (band.id === persisted) return;
+    committedCurrent = { against: current, id: band.id };
+    onSetCurrent(band.id);
   }
 
   function addLabel(row) {
