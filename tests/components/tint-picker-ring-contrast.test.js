@@ -11,8 +11,8 @@ import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/style
 import {
   contrast,
   declaredToken,
-  flatten,
   propertiesOf,
+  stackGround,
   themePalettes,
 } from '../helpers/themePaletteContrast.js';
 
@@ -118,10 +118,6 @@ test("the library draws the shipped popover's cursor and hover as the sheet decl
   assert.deepEqual(drawnOutlines(), [outlineOf(CURSOR), outlineOf(HOVER)]);
 });
 
-/** A translucent stack's opaque ground in one palette, its tokens top first. */
-const groundOf = (tokens, [top, ...below]) =>
-  below.length > 0 ? flatten(tokens.get(top), groundOf(tokens, below)) : tokens.get(top);
-
 /** The cursor's ink on `stack` in each palette: the palettes under 3:1, and every ratio in words. */
 function cursorOn(stack) {
   const ink = declared(SHEET, CURSOR, 'outline').match(/^2px solid var\((--fab-[\w-]+)\)$/u)?.[1];
@@ -129,7 +125,7 @@ function cursorOn(stack) {
   assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
   const ratios = [...themes].map(([theme, tokens]) => [
     theme,
-    contrast(tokens.get(ink), groundOf(tokens, stack)),
+    contrast(tokens.get(ink), stackGround(tokens, stack)),
   ]);
   return {
     short: ratios
@@ -158,11 +154,20 @@ test('the cursor is under 3:1 on the popover ground in two palettes, debt owned 
   );
 });
 
-test("the cursor clears 3:1 on the inline strip's card ground in every palette", (t) => {
-  const stack = ['.fabricate-manager .manager-edit-card', '.fabricate-manager'].map((selector) =>
-    declaredToken(sheet, selector, 'background', SHEET)
-  );
-  const { short, lowest, figures } = cursorOn(stack);
-  t.diagnostic(`lowest cursor ratio on ${stack.join(' over ')} ${lowest}:1 (${figures})`);
-  assert.deepEqual(short, [], 'the inline cursor would be under WCAG 1.4.11 on its card');
-});
+/** Each inline caller's ground, as the sheet selectors that paint it, top first. */
+const INLINE_GROUNDS = {
+  EssenceIdentityTab: ['.fabricate-manager .manager-edit-card', '.fabricate-manager .manager-main'],
+  EssenceBulkEditPanel: [".fabricate-manager[data-manager-view='essences'] .manager-inspector"],
+  WorldEssenceEntryPage: [
+    ".fabricate-manager[data-manager-view='world-essence-entry'] .manager-main",
+  ],
+};
+
+for (const [caller, selectors] of Object.entries(INLINE_GROUNDS)) {
+  test(`the cursor clears 3:1 on the inline strip's ground in ${caller}, in every palette`, (t) => {
+    const stack = selectors.map((selector) => declaredToken(sheet, selector, 'background', SHEET));
+    const { short, lowest, figures } = cursorOn(stack);
+    t.diagnostic(`lowest cursor ratio on ${stack.join(' over ')} ${lowest}:1 (${figures})`);
+    assert.deepEqual(short, [], `the inline cursor would be under WCAG 1.4.11 in ${caller}`);
+  });
+}

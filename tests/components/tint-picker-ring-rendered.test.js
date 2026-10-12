@@ -171,6 +171,10 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
       const mist = await page.evaluate(stateOf, cell('mist'));
       assertFocusOutline(mist, '-2px', INSET);
       assert.equal(mist.ring, 'none');
+      assert.ok(
+        Math.min(...mist.inset) >= 3,
+        `the inline swatch sits ${mist.inset.join(', ')}px inside its cell, so the 2px cursor reaches it`
+      );
     } finally {
       await page.close();
     }
@@ -297,6 +301,7 @@ describe('the tint trigger and swatches, over a core button transition', () => {
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     const trigger = await page.evaluate(stateOf, TRIGGER);
+    assert.ok(!trigger.hover, 'the pointer is over the trigger, so hover could draw its ring');
     assertFocusOutline(trigger, '1px', 'the trigger opens a panel and is not a cell in the grid');
   });
 });
