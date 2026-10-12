@@ -491,7 +491,7 @@ const EXPECTED = {
   // subject is the numeral under it, so the name recedes a rung instead of competing.
   // Still the extracted card, and still shared with the editor grid.
   'bulk-essence-name': 11.52,
-  'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
+  'bulk-stepper-input': 11.5, // 11.5px mono — the shared Stepper, shared with the editor
   'bulk-dc-copy': 9.92, // 0.62rem
   // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
   // SWAPS PLACES with in the rail's bottom slot. The swap must not re-type the slot.
