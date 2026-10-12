@@ -244,6 +244,10 @@ test('composites render at double density while lab:check keeps its own context'
   const header = Buffer.alloc(24);
   header.write('IHDR', 12, 'latin1');
   header.writeUInt32BE(500, 16);
-  assert.equal(panelWidth(header), 250, 'a panel shows at its CSS size, one image pixel a device pixel');
+  assert.equal(
+    panelWidth(header),
+    250,
+    'a panel shows at its CSS size, one image pixel a device pixel'
+  );
   assert.equal(panelWidth(header, 1), 500);
 });
