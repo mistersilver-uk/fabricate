@@ -355,12 +355,13 @@ export const CLIP_PADDING_PX = 8;
 
 /**
  * The clip that shows a unit with everything it draws beyond its own box: the union of its rects
- * and its descendants', padded, then clamped to its entry and the viewport, in whole pixels.
+ * and its descendants', padded, then clamped to its entry and the document, in whole pixels.
  *
- * @param {{rects: object[], bounds: object, viewport: {width: number, height: number}}} box The
- *   element's rect first, then its descendants', its entry's rect, and the viewport.
+ * @param {{rects: object[], bounds: object, extent: {width: number, height: number}}} box The
+ *   element's rect first, then its descendants', its entry's rect, and the document's size, all in
+ *   document coordinates.
  */
-export function clipUnion({ rects, bounds, viewport }, padding = CLIP_PADDING_PX) {
+export function clipUnion({ rects, bounds, extent }, padding = CLIP_PADDING_PX) {
   const [own, ...descendants] = rects;
   const drawn = [own, ...descendants.filter((rect) => rect.width > 0 || rect.height > 0)];
   const left = Math.max(Math.min(...drawn.map((rect) => rect.x)) - padding, bounds.x, 0);
@@ -368,12 +369,12 @@ export function clipUnion({ rects, bounds, viewport }, padding = CLIP_PADDING_PX
   const right = Math.min(
     Math.max(...drawn.map((rect) => rect.x + rect.width)) + padding,
     bounds.x + bounds.width,
-    viewport.width
+    extent.width
   );
   const bottom = Math.min(
     Math.max(...drawn.map((rect) => rect.y + rect.height)) + padding,
     bounds.y + bounds.height,
-    viewport.height
+    extent.height
   );
   const [x, y] = [Math.floor(left), Math.floor(top)];
   return {
@@ -390,14 +391,16 @@ export function measureUnit({ entry, unit }, doc = document) {
   const element = unit === null ? spec : spec?.querySelectorAll('.unit')[unit];
   if (!element) return null;
   element.scrollIntoView({ block: 'center', inline: 'nearest' });
+  const { scrollX, scrollY } = doc.defaultView;
   const box = (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
-    return { x, y, width, height };
+    return { x: x + scrollX, y: y + scrollY, width, height };
   };
+  const { scrollWidth, scrollHeight } = doc.documentElement;
   return {
     rects: [element, ...element.querySelectorAll('*')].map(box),
     bounds: box(spec),
-    viewport: { width: doc.defaultView.innerWidth, height: doc.defaultView.innerHeight },
+    extent: { width: scrollWidth, height: scrollHeight },
   };
 }
 
@@ -519,11 +522,14 @@ async function bootLab(lab, baseUrl, state, { deadline, now = Date.now }) {
   return null;
 }
 
-/** Photograph an element clipped to everything it draws. */
+/** Photograph an element clipped to everything it draws, past the viewport when it is taller. */
 async function shoot(page, element, deadline) {
   const box = await bounded(page.evaluate(measureUnit, element), deadline);
   if (!box) throw new Error('the page has no such entry or unit');
-  return bounded(page.screenshot({ ...SCREENSHOT_OPTIONS, clip: clipUnion(box) }), deadline);
+  return bounded(
+    page.screenshot({ ...SCREENSHOT_OPTIONS, fullPage: true, clip: clipUnion(box) }),
+    deadline
+  );
 }
 
 async function captureUnit(unit, { reference, lab }, state, io) {

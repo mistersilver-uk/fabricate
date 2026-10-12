@@ -151,12 +151,12 @@ test('a page read that never settles is recorded as deadline, not left to the st
   );
 });
 
-test('the clip is the padded union of a unit and what it draws, clamped to its entry', () => {
+test('the clip is the padded union of a unit and what it draws, clamped to its entry and the document', () => {
   const rect = (x, y, width, height) => ({ x, y, width, height });
   const box = {
     rects: [rect(100, 100, 50, 20), rect(110, 104, 0, 0), rect(140, 104, 40, 12)],
     bounds: rect(90, 40, 200, 300),
-    viewport: { width: 1920, height: 1080 },
+    extent: { width: 1920, height: 4000 },
   };
   assert.deepEqual(clipUnion(box, 8), rect(92, 92, 96, 36), 'the overflowing suffix is inside');
   assert.deepEqual(
@@ -165,9 +165,9 @@ test('the clip is the padded union of a unit and what it draws, clamped to its e
     'the union stops at the entry, in whole pixels'
   );
   assert.deepEqual(
-    clipUnion({ ...box, bounds: rect(0, 0, 4000, 4000), viewport: { width: 160, height: 115 } }, 8),
+    clipUnion({ ...box, bounds: rect(0, 0, 4000, 4000), extent: { width: 160, height: 115 } }, 8),
     rect(92, 92, 68, 23),
-    'and at the viewport'
+    'and at the document'
   );
   assert.deepEqual(
     clipUnion({ ...box, rects: [rect(100, 100, 50, 20)] }, 0),
