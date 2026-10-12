@@ -139,6 +139,24 @@ function submitAdd() {
   flushSync();
 }
 
+/** A 240px track, so each of the default day's 24 hours is 10px wide from Dawn's 04:00. */
+function stubTrack() {
+  q('[data-band-strip-track]').getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 240,
+    height: 46,
+    right: 240,
+    bottom: 46,
+  });
+}
+
+/** One pointer event of `type` at `clientX` on `node`, flushed. */
+function pointer(node, type, clientX) {
+  node.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true }));
+  flushSync();
+}
+
 const clockAt = (hour, minute) => ({
   getWorldTimeComponents: () => ({ day: 3, hour, minute, hoursPerDay: 24, minutesPerHour: 60 }),
 });
@@ -292,29 +310,37 @@ describe('the time-of-day bar in Gathering Settings (issue 2431)', () => {
 
   it('persists a multi-step drag once, at the drop, against a deferred store', async () => {
     mountPanel();
-    const track = q('[data-band-strip-track]');
-    track.getBoundingClientRect = () => ({
-      left: 0,
-      top: 0,
-      width: 240,
-      height: 46,
-      right: 240,
-      bottom: 46,
-    });
+    stubTrack();
     const divider = handle('Day');
-    const pointer = (type, clientX) =>
-      divider.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true }));
-    pointer('pointerdown', 40);
-    pointer('pointermove', 60);
-    flushSync();
-    pointer('pointermove', 70);
-    flushSync();
+    pointer(divider, 'pointerdown', 40);
+    pointer(divider, 'pointermove', 60);
+    pointer(divider, 'pointermove', 70);
     assert.deepEqual(calls, [], 'a drag writes nothing');
     assert.equal(handle('Day').getAttribute('aria-valuenow'), '11', 'but draws its draft');
-    pointer('pointerup', 70);
-    flushSync();
+    pointer(divider, 'pointerup', 70);
     await tick();
     assert.deepEqual(calls, [['update', 'timeOfDay', 'day', { startHour: 11 }, 'alchemy']]);
+  });
+
+  it('writes nothing for a divider dragged back to where it started', () => {
+    mountPanel();
+    stubTrack();
+    const divider = handle('Day');
+    pointer(divider, 'pointerdown', 40);
+    pointer(divider, 'pointermove', 50);
+    pointer(divider, 'pointermove', 40);
+    pointer(divider, 'pointerup', 40);
+    assert.deepEqual(calls, [], 'Day still starts at its resolved 08:00');
+  });
+
+  it('persists a quick keyed reversal of a divider against a deferred store', () => {
+    mountPanel();
+    key(handle('Day'), 'ArrowRight');
+    key(handle('Day'), 'ArrowLeft');
+    assert.deepEqual(calls, [
+      ['update', 'timeOfDay', 'day', { startHour: 9 }, 'alchemy'],
+      ['update', 'timeOfDay', 'day', { startHour: 8 }, 'alchemy'],
+    ]);
   });
 
   it('moves the current marker two bands on two quick keypresses against a deferred store', () => {

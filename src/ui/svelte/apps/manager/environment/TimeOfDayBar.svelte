@@ -20,13 +20,20 @@
   Invariants:
   - A drag draws from a local draft and writes only on its commit; a draft lasts until `values` or
     `current` is replaced, so keyed commits against a deferred store still step from the last one;
+    a commit equal to the last value written, or to the stored one, writes nothing;
     `tests/components/time-of-day-bar-mounted.test.js`.
 -->
 <script>
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { formatList, subscribeWorldTime } from '../../../util/foundryBridge.js';
   import { localizeOr as text } from '../../../util/localizeOr.js';
-  import { hourText, shortHourText, timeOfDayBar, unrotateHour } from './timeOfDayBandModel.js';
+  import {
+    hourText,
+    shortHourText,
+    timeOfDayBar,
+    timeOfDayPeriods,
+    unrotateHour,
+  } from './timeOfDayBandModel.js';
 
   let {
     values = [],
@@ -39,6 +46,7 @@
   } = $props();
 
   let drafts = $state.raw({ against: null, hours: {} });
+  let committedHours = $state.raw({ against: null, hours: {} });
   let currentDraft = $state.raw({ against: null, id: '' });
   let committedCurrent = $state.raw({ against: null, id: '' });
 
@@ -112,13 +120,23 @@
 
   const bandAt = (index) => bar.bands.find((band) => band.index === index);
 
+  /** A period's start hour as last committed against `values`, else as `values` resolve it. */
+  function persistedStart(id) {
+    const hours = committedHours.against === values ? committedHours.hours : {};
+    if (Object.hasOwn(hours, id)) return hours[id];
+    return timeOfDayPeriods(values).find((period) => period.id === id)?.startHour ?? null;
+  }
+
   function changeDivider(patch, { phase }) {
     const band = bandAt(patch.index);
     if (!band) return;
     const hour = unrotateHour(patch.start, bar.hoursPerDay);
     const hours = drafts.against === values ? drafts.hours : {};
     drafts = { against: values, hours: { ...hours, [band.id]: hour } };
-    if (phase === 'commit') onSetStartHour(band.id, hour);
+    if (phase !== 'commit' || hour === persistedStart(band.id)) return;
+    const committed = committedHours.against === values ? committedHours.hours : {};
+    committedHours = { against: values, hours: { ...committed, [band.id]: hour } };
+    onSetStartHour(band.id, hour);
   }
 
   function changeCurrent({ index }, { phase }) {
