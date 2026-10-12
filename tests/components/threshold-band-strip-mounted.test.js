@@ -1092,7 +1092,9 @@ describe('ThresholdBandStrip: drag and commit phases on the handles', () => {
     const calls = [];
     const root = await harness.mount({
       ...CHECK_CALLER_STRIPS[0].props,
-      onChange: (patch, meta) => calls.push([patch, meta.phase]),
+      onChange: (patch, meta) => {
+        calls.push([patch, meta.phase]);
+      },
     });
     stubTrack(root, 250);
     const handle = handles(root)[1];
