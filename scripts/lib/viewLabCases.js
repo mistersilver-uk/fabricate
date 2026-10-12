@@ -777,7 +777,7 @@ const selectsOverrideIds = (ids) => (viewCase) =>
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
  */
-function isInertSourceLine(text) {
+export function isInertSourceLine(text) {
   return text.trim() === '' || INERT_LINE_PATTERN.test(text);
 }
 
@@ -785,7 +785,7 @@ function isInertSourceLine(text) {
  * @param {string} patch A unified diff.
  * @returns {string[]} Its lines, without the trailing blank a final newline produces.
  */
-function patchLines(patch) {
+export function patchLines(patch) {
   const lines = patch.split('\n');
   while (lines.length > 0 && lines.at(-1) === '') lines.pop();
   return lines;
@@ -825,12 +825,12 @@ function anchorOffsets(sourceLines, sequence) {
 }
 
 /** The regions one hunk touches, read from one candidate anchor. */
-function regionsTouchedAt(hunk, offset, regions) {
+function regionsTouchedAt(hunk, offset, regions, isInert) {
   const keys = new Set();
   let unattributable = false;
   let cursor = offset + 1;
   for (const { marker, text } of hunk) {
-    if (marker !== ' ' && !isInertSourceLine(text)) {
+    if (marker !== ' ' && !isInert(text)) {
       const region = regions.find((entry) => cursor >= entry.start && cursor <= entry.end);
       if (region) keys.add(region.key);
       else unattributable = true;
@@ -841,7 +841,7 @@ function regionsTouchedAt(hunk, offset, regions) {
 }
 
 /** The regions one hunk touches, located by content. */
-function regionsTouchedByHunk(hunk, sourceLines, regions) {
+function regionsTouchedByHunk(hunk, sourceLines, regions, isInert) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
   if (sequence.length === 0) return { keys: new Set(), unattributable: true };
 
@@ -850,7 +850,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   let anchored = false;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
     anchored = true;
-    const touched = regionsTouchedAt(hunk, offset, regions);
+    const touched = regionsTouchedAt(hunk, offset, regions, isInert);
     // A candidate that lands outside every region — a shared factory, a section banner, the
     // selection machinery itself — can move any frame, and the true edit may be that candidate, so
     // it has to widen.
@@ -862,7 +862,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
 }
 
 /** A patch's hunks, or null when it is missing, empty or malformed. */
-function parsePatch(patch) {
+export function parsePatch(patch) {
   return typeof patch === 'string' && patch.trim() !== '' ? parseHunks(patch) : null;
 }
 
@@ -871,13 +871,21 @@ function touchedRegionKeys(patch, readSource, readRegions) {
   return touchedHunkRegionKeys(parsePatch(patch), readSource(), readRegions());
 }
 
-/** The regions a file's parsed hunks touch, or nothing located when either input is missing. */
-function touchedHunkRegionKeys(hunks, sourceLines, regions) {
+/**
+ * The regions a file's parsed hunks touch, or nothing located when either input is missing. Each
+ * region is `{key, start, end}` over 1-based lines; `isInert` says which changed lines cannot matter.
+ */
+export function touchedHunkRegionKeys(
+  hunks,
+  sourceLines,
+  regions,
+  { isInert = isInertSourceLine } = {}
+) {
   if (!hunks || !regions) return { keys: new Set(), unattributable: true };
   const keys = new Set();
   let unattributable = false;
   for (const hunk of hunks) {
-    const touched = regionsTouchedByHunk(hunk, sourceLines, regions);
+    const touched = regionsTouchedByHunk(hunk, sourceLines, regions, isInert);
     unattributable ||= touched.unattributable;
     for (const key of touched.keys) keys.add(key);
   }
