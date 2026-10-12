@@ -1,5 +1,6 @@
 /** The progressive salvage stage list forwards every edit to the view that owns it (issue 1522). */
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from 'svelte';
@@ -10,6 +11,7 @@ import {
   cardText,
   componentCardHarness,
 } from '../helpers/componentEditViewModules.js';
+import { createLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const harness = componentCardHarness('ComponentSalvageStages');
 
@@ -87,16 +89,38 @@ describe('ComponentSalvageStages', () => {
     harness.remount();
   });
 
-  it('RED: the row Edit link’s tooltip names complications as well as difficulty', async () => {
-    const { target } = await mountWith();
+  it('RED: the row Edit link’s name and tooltip name complications as well as difficulty', async () => {
+    const en = createLangBackedI18n(resolve(import.meta.dirname, '../..'));
+    const { target } = await mountWith({ text: (key) => en.localize(key) });
+    const edit = stage(target, 2).querySelector('[data-salvage-result-edit]');
+    assert.equal(
+      edit.getAttribute('title'),
+      'Difficulty and complications are set on this component in its editor'
+    );
+    assert.equal(edit.getAttribute('aria-label'), 'Edit difficulty and complications on Dust');
+    harness.remount();
+  });
+
+  // GUARD: red when the yield's macro names are not passed to the list.
+  it('GUARD: the list’s trigger sentence names the macro the complication runs', async () => {
+    const [scrap, dust] = COMPONENTS;
+    const burst = {
+      ...dust.complications[0],
+      when: { stageMissed: true },
+      macroUuid: 'Macro.burst',
+    };
+    const { target } = await mountWith({
+      macroOptions: [{ uuid: 'Macro.burst', name: 'Shrapnel Burst' }],
+      componentOptions: [scrap, { ...dust, complications: [burst] }],
+    });
     assert.match(
-      stage(target, 2).querySelector('[data-salvage-result-edit]').getAttribute('title'),
-      /complications/i
+      stage(target, 2).querySelector('.fab-complication-row-body').getAttribute('title'),
+      /runs Shrapnel Burst/
     );
     harness.remount();
   });
 
-  // GUARD (re-pointed to the unified row hook): red when the salvage activity filter is dropped.
+  // GUARD: red when the salvage activity filter is dropped.
   it('GUARD: draws each stage’s DC and only its yield’s salvage complications', async () => {
     const { target } = await mountWith();
     assert.equal(

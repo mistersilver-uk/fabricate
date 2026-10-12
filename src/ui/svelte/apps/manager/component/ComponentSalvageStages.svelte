@@ -123,7 +123,7 @@
       data-keyboard-focus="true"
       aria-label={text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
-        'Edit {name}'
+        'Edit difficulty and complications on {name}'
       ).replace('{name}', componentName(result.componentId))}
       title={text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',

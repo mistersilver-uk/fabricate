@@ -3817,7 +3817,7 @@
             "ResultComponent": "Result component",
             "ComponentSearchPlaceholder": "Search components...",
             "NoComponentsDefined": "No components defined",
-            "EditResult": "Edit {name}",
+            "EditResult": "Edit difficulty and complications on {name}",
             "Difficulty": "Difficulty",
             "DifficultyUnset": "No difficulty",
             "NoResults": "No results in this set yet.",
