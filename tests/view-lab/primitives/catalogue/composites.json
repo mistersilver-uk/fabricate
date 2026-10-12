@@ -264,7 +264,7 @@
     "fixture": "TagAdderOpen",
     "slot": { "width": 745, "height": 287 },
     "data": { "typed": "wood" },
-    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone. A boxed slot, because the panel is portalled to the window. Measured: at 745 by 287 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 240 by 231, unclamped and unflipped; below 745 the stepper, `or…` and remove wrap to a second line, and 287 is the least height that holds the whole panel (286 clips it to 230). The panel keeps its 240px minimum, so the held `#Hardwood` and `#Seasoned-Heartwood-Planks` ellipsize beside their count chips.",
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone. A boxed slot, because the panel is portalled to the window. Measured: at 745 by 287 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 231, unclamped and unflipped; below 745 the stepper, `or…` and remove wrap to a second line, and 287 is the least height that holds the whole panel (286 clips it to 230). The tag panel opens at its 300px site minimum, so the held `#Hardwood` reads whole and only `#Seasoned-Heartwood-Planks` ellipsizes beside its count chip.",
     "props": {
       "value": {
         "kind": "tags",

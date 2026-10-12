@@ -1,6 +1,7 @@
 <!--
   A tag requirement row with its adder open and a query typed. The act clicks `+ Tag` and types the
-  row's query, nothing more, so the panel lists the matching tags, the held one selected.
+  row's query, nothing more, so the panel lists the matching tags, the held one selected and its
+  name whole at the site's 300px panel minimum.
 -->
 <script module>
   import { click, type, waitFor } from '../fixtureActs.js';
@@ -20,10 +21,13 @@
     );
     const options = [...(listbox?.querySelectorAll('[role="option"]') ?? [])];
     const held = listbox?.querySelectorAll('[role="option"][aria-selected="true"]') ?? [];
+    const heldName = held[0]?.querySelector('.manager-travel-option-name');
     return Boolean(
       searchOf(root)?.value &&
       options.length === 5 &&
       held.length === 1 &&
+      heldName &&
+      heldName.scrollWidth <= heldName.clientWidth &&
       options.every((option) => option.querySelector('.manager-travel-option-trailing'))
     );
   }
