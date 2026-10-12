@@ -3198,7 +3198,7 @@ const TIME_OF_DAY_BAR_MODULES = [
 test('a change confined to a time-of-day bar module selects the frames it determines', () => {
   const ids = (files) => mapChangedFilesToCases(files).map((viewCase) => viewCase.id);
   for (const [modulePath, alsoDetermined] of TIME_OF_DAY_BAR_MODULES) {
-    assert.ok(sourceFiles.includes(modulePath), `${modulePath} names no file under src/`);
+    assert.ok(existsSync(resolve(ROOT, modulePath)), `${modulePath} names no file under src/`);
     const selected = ids([modulePath]);
     const missing = ['manager-gathering-time-of-day-bar', ...alsoDetermined].filter(
       (id) => !selected.includes(id)
