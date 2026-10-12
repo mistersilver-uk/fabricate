@@ -24,8 +24,8 @@ const SUMMARY_ROW = `${MANAGER}/ComplicationSummaryRow.svelte`;
 const CONVERTED_ROWS = new Set(['IconFactRow', 'ComplicationEffectRow', 'ComplicationSummaryRow']);
 
 /**
- * The 15 hooked sites at `9b891d90b`, frozen. `rendered` is what the root's attribute is set from:
- * `true` for a bare hook, a quoted literal, or an expression where `dataValue || true` once stood.
+ * The 14 hooked sites, frozen. `rendered` is what the root's attribute is set from: `true` for a
+ * bare hook, a quoted literal, or an expression where `dataValue || true` once stood.
  */
 const SITES = Object.freeze([
   [
@@ -39,12 +39,6 @@ const SITES = Object.freeze([
     'ComplicationSummaryRow',
     'data-inventory-bulk-complication',
     'row.id || true',
-  ],
-  [
-    `${MANAGER}/component/ComponentSalvageStages.svelte`,
-    'ComplicationSummaryRow',
-    'data-salvage-stage-complication',
-    'complication.id || true',
   ],
   [
     `${MANAGER}/checks/CheckOutcomePreview.svelte`,
@@ -101,9 +95,9 @@ const SITES = Object.freeze([
     true,
   ],
   [
-    `${MANAGER}/recipe/RecipeStageComplicationBand.svelte`,
+    `${MANAGER}/StageComplicationList.svelte`,
     'ComplicationSummaryRow',
-    'data-recipe-result-complication',
+    'data-stage-complication',
     'complication.id || true',
   ],
   [
@@ -166,7 +160,8 @@ function hookOf({ row, attributes }, source) {
 }
 
 describe('row hook parity', () => {
-  it('keeps every frozen site at its attribute name and rendered value', () => {
+  // RED: the two GM read-only lists' rows are one shared row with one hook (issue 2445).
+  it('RED: keeps every frozen site at its attribute name and rendered value', () => {
     for (const file of new Set(SITES.map(([path]) => path))) {
       const source = readFileSync(resolve(repoRoot, file), 'utf8');
       const actual = rowTags(source)
@@ -180,7 +175,8 @@ describe('row hook parity', () => {
     }
   });
 
-  it('leaves no call site passing dataAttr or dataValue to a converted row', () => {
+  // GUARD: red when a call site passes `dataAttr` to a converted row.
+  it('GUARD: leaves no call site passing dataAttr or dataValue to a converted row', () => {
     const offenders = [];
     let scanned = 0;
     for (const [file, source] of Object.entries(collectSources(`${repoRoot}/src`))) {
@@ -196,7 +192,7 @@ describe('row hook parity', () => {
     assert.ok(scanned >= 15, `the scan reached ${scanned} converted-row tags, short of the table`);
     assert.deepEqual(offenders, []);
     const converted = SITES.filter(([, row]) => CONVERTED_ROWS.has(row));
-    assert.equal(converted.length, 15, 'the frozen table still names all fifteen sites');
+    assert.equal(converted.length, 14, 'the frozen table still names all fourteen sites');
   });
 });
 

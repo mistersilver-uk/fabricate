@@ -768,16 +768,16 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The strip is a full-bleed band in the row's body, beneath its line.
   A stage whose strip has no content draws no body box (`has-band` gates it), so a row without complications is the plain row.
   The gate is the strip's CONTENT for that stage, not the caller's mounting of it: both bodies mount it, so a presence gate would re-skin every progressive stage row in every world.
-- The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (`ui-entity-editors/spec.md` §Component Studio requirement 16).
+- The strip's placement and form are deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": on the player side it is a tensed band in the stage row's body that summarises the first entry plus "+N more", while on the GM side both studios list every entry read-only as a nested `SortableList` in the stage row's body (`ui-entity-editors/spec.md` §Component Studio requirement 16; `design-system/spec.md` "An ordered row opens in place to its editing body").
 - **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
-  Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
+  Severity is one vocabulary across every complication call site, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
   The band's own fill and top rule change with the tense; the tile does not.
 - **The badge's copy is tensed, and a resolved stage does not still forecast.**
   Before a resolution the badge reads in the future tense ("this can go wrong"); after one, a complication that did NOT fire reads a past-tense negative.
   A row that still says "this can go wrong" beneath a spent roll asserts something that is no longer true, and the player has no way to tell it from a row that is genuinely still pending.
   The design prototype does say it — its `fired` flag is derived from a stage being short, so a recovered stage keeps its forecast copy — and this rule deliberately overrides it.
 - **The player row renders the authored DESCRIPTION, and it WRAPS.**
-  The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
+  The GM read-only complication lists clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
   It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
   It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
 - **The band lies outside the drag source and carries no destructive or navigational control.**
@@ -1298,7 +1298,7 @@ The player's route to salvage.
   A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
   A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
   Each occurrence is marked on its own: a component staged twice whose complication fired on both entries renders BOTH strips fired, and one that fired on neither renders neither, because the resolution produces one fired record per firing and the marks follow the records one for one.
-  A component whose only complication is `gmOnly` therefore renders in both GM read-only strips and in neither player surface.
+  A component whose only complication is `gmOnly` therefore renders in both GM read-only complication lists and in neither player surface.
 - **Bulk selection unit.**
   The bulk gesture's unit is the **acting participation**, one unit per row, with no per-row quantity control; a run may span crafting systems and source actors (see §Bulk Salvage Execution).
   Brokenness does **not** block a row from a bulk queue — brokenness is about usability, not salvageability (see §Inventory Tab), and the prototype's "repair before salvaging" would block something Fabricate permits while naming a remedy Fabricate has no action for.
@@ -1332,7 +1332,7 @@ The player's route to salvage.
   The GM's state states authorship and nothing more — it is neither an error nor a refusal being announced.
   All three MUST come from the projection rather than be inferred in the panel from the reorder permission and the player-order flag together, which would be the block re-deriving the projection it exists to render.
   A row with no ordered stage list at all (a `simple` or `routed` row) has **no** provenance — no order exists for anyone to own — and publishes no forecast either, so no card renders that case.
-  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the six-call-site scaffold exists so the second one costs props rather than a component.
+  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the shared scaffold exists so the second one costs props rather than a component.
   It renders **no excluded-results note**, on the § Progressive Salvage Deltas rule that no player progressive surface builds any part of the exclusion vocabulary.
 - **Bulk yield preview.**
   The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.

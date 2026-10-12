@@ -12,6 +12,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 // The Overview cells and the ingredient row's kind control are the shared `<Select>` since issue
@@ -229,7 +230,9 @@ const RECIPE_COMPILED = [
   // accordion, the progressive result stage list and its complication band are all built on it.
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SortableList.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
+  // The read-only stage complication list's muted label (issue 2445).
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/apps/manager/StageComplicationList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
@@ -2948,11 +2951,16 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('progressive: a keyboard move reorders the group and announces the new position', async () => {
-    const { target, patches } = await mountProgressiveResults([
-      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
-      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
-    ]);
+  // GUARD: red when the announcement is read from the first region in the document.
+  it('GUARD: progressive: a keyboard move reorders the group and announces the new position', async () => {
+    // The herb authors a crafting complication, so its stage nests a list of its own.
+    const { target, patches } = await mountProgressiveResults(
+      [
+        { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+        { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+    );
     const rows = target.querySelectorAll('[data-recipe-result-row]');
     rows[1].querySelector('[data-sortable-move="up"]').click();
     await flushRender();
@@ -2964,7 +2972,11 @@ describe('RecipeEditView (mounted)', () => {
     );
     // The region is the shared list's (issue 1512), and so is the sentence: the shared reorder
     // helper writes it, so this surface no longer owns a key or a region of its own.
-    const status = target.querySelector('[data-sortable-list-status]');
+    // The OUTER list's region: a stage's nested complication list carries a region of its own
+    // that precedes this one in document order (issue 2445).
+    const outerList = rows[0].closest('ul.fabricate-sortable-list');
+    const status = outerList.nextElementSibling;
+    assert.ok(status.matches('[data-sortable-list-status]'), 'the region follows its own list');
     assert.equal(status.getAttribute('aria-live'), 'polite', 'the change is announced politely');
     // This harness installs no `game.i18n`, so the shared helper renders the KEY with its
     // interpolations rather than the English sentence; both spellings are accepted for that reason.
@@ -3170,7 +3182,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  // ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ───────────────────────────────────
+  // ── THE READ-ONLY COMPLICATION LIST (issues 1286, 2445) ─────────────────────────────
 
   const CRAFTING_COMPLICATION = Object.freeze({
     id: 'cx-1',
@@ -3205,10 +3217,11 @@ describe('RecipeEditView (mounted)', () => {
   ]);
 
   const stageStrips = (target) => [
-    ...target.querySelectorAll('[data-recipe-result-complications]'),
+    ...target.querySelectorAll('[data-stage-complications]'),
   ];
 
-  it('1286: a progressive stage whose component authors crafting complications grows a strip', async () => {
+  // RED: the nested list replaces the band, and its rows draw no severity tile (issue 2445).
+  it('RED 1286: a progressive stage whose component authors crafting complications nests a list', async () => {
     const { target } = await mountProgressiveResults(
       [
         { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
@@ -3217,12 +3230,15 @@ describe('RecipeEditView (mounted)', () => {
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
     const found = stageStrips(target);
-    assert.equal(found.length, 1, 'only the stage whose component authors one gets a strip');
-    assert.equal(found[0].getAttribute('data-recipe-result-complications'), 'cmp-herb');
+    assert.equal(found.length, 1, 'only the stage whose component authors one gets a list');
+    assert.equal(found[0].getAttribute('data-stage-complications'), 'cmp-herb');
+    assert.ok(found[0].matches('ul.fabricate-sortable-list'), 'a list of the shared list’s rows');
+    assert.equal(found[0].getAttribute('aria-label'), '1 complication on Mountain Herb');
+    assert.ok(!found[0].querySelector('.fab-complication-severity'), 'and no severity tile');
 
-    const rows = [...found[0].querySelectorAll('[data-recipe-result-complication]')];
+    const rows = [...found[0].querySelectorAll('[data-stage-complication]')];
     assert.deepEqual(
-      rows.map((row) => row.getAttribute('data-recipe-result-complication')),
+      rows.map((row) => row.getAttribute('data-stage-complication')),
       ['cx-1'],
       'a complication authored for salvage alone says nothing about a recipe stage, and ' +
         'listing it would tell the GM this result carries a consequence it does not'
@@ -3230,16 +3246,15 @@ describe('RecipeEditView (mounted)', () => {
     assert.match(rows[0].textContent, /The spring lets go/, 'the row names it');
     assert.match(rows[0].textContent, /When the award is missed/, 'and states when it fires');
     assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
-    // The severity WORD, which this prototype draws and the Component Studio's strip does
-    // not — the shared row takes it as a prop precisely so the two can differ.
+    // The severity WORD, as the chip alone (issue 2445).
     assert.match(rows[0].textContent, /Severe/, 'the severity is named, not only tinted');
     editHarness.remount();
   });
 
-  it('1286: the band is FULL-BLEED — the grip and the ordinal ride the stage line, not the card', async () => {
-    // The prototype's stage card is `flex-direction: column; overflow: hidden` with NO
-    // padding of its own: the padding is on an inner top ROW and the band is that row's
-    // sibling, so the band's `border-top` runs the full width and reads as a card DIVIDER.
+  // GUARD: red when the list is rendered in the `row` snippet beside the PickerRow, not in `body`.
+  it('GUARD 1286: the nested list sits in the row BODY — the grip and the ordinal ride the stage line', async () => {
+    // The stage row is a column whose line carries the grip, the ordinal and the padding, and
+    // whose body holds the read-only complication list (issue 2445).
     const { target } = await mountProgressiveResults(
       [
         { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
@@ -3248,66 +3263,68 @@ describe('RecipeEditView (mounted)', () => {
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
     const banded = target.querySelector(
-      '[data-recipe-result-row]:has([data-recipe-result-complications])'
+      '[data-recipe-result-row]:has([data-stage-complications])'
     );
-    assert.ok(Boolean(banded), 'the herb stage draws a band');
+    assert.ok(Boolean(banded), 'the herb stage draws a list');
 
-    // The line is the shared list's as of issue 1512, and so is the body the band renders into:
-    // the row is a column whose line carries the padding, which is what makes the band full-bleed.
+    // The line is the shared list's as of issue 1512, and so is the body the list renders into.
     const line = banded.querySelector('.fabricate-sortable-list-line');
-    assert.ok(Boolean(line), 'the row has a line of its own for the band to sit beneath');
+    assert.ok(Boolean(line), 'the row has a line of its own for the list to sit beneath');
     assert.ok(line.querySelector('[data-sortable-grip]'), 'the grip rides that line');
     assert.ok(line.querySelector('.fabricate-sortable-list-ordinal'), 'so does the ordinal');
     assert.ok(
-      !line.querySelector('[data-recipe-result-complications]'),
-      'the band is a sibling of the line, not part of it'
+      !line.querySelector('[data-stage-complications]'),
+      'the list is a sibling of the line, not part of it'
     );
     assert.equal(
       banded
-        .querySelector('[data-recipe-result-complications]')
+        .querySelector('[data-stage-complications]')
         .closest('.fabricate-sortable-list-body').parentElement,
       line.parentElement,
-      'the band sits in the list`s BODY, the line`s own sibling, which is what makes it full-width'
+      'the list sits in the row`s BODY, the line`s own sibling'
     );
 
     const plain = [...target.querySelectorAll('[data-recipe-result-row]')].find(
-      (row) => !row.querySelector('[data-recipe-result-complications]')
+      (row) => !row.querySelector('[data-stage-complications]')
     );
     assert.ok(plain.querySelector('[data-sortable-grip]'), 'an unbanded row still grips');
     editHarness.remount();
   });
 
-  it('1286: the stage row clips itself and puts its padding on its line, so a band reaches the edges', () => {
+  // GUARD: red when `.fabricate-sortable-list-row` loses its `overflow: hidden`.
+  it('GUARD 1286: the stage row clips itself and puts its padding on its line, beside its body', () => {
     // Stated in the sheet, not measurable from the mounted markup. The two `:has()` rules this read
     // are retired: the shared list's row is already a column that clips itself (issue 1512).
     const sheet = readStylesheet();
     const rowStart = sheet.indexOf('.fabricate-sortable-list-row {');
     assert.notEqual(rowStart, -1, 'the ordered row is still declared');
     const row = sheet.slice(rowStart, sheet.indexOf('}', rowStart));
-    assert.match(row, /flex-direction:\s*column/u, 'the row is a column, so the band is a sibling');
-    assert.match(row, /overflow:\s*hidden/u, "so the band's fill stays inside the row radius");
+    assert.match(row, /flex-direction:\s*column/u, 'the row is a column, so the body is a sibling');
+    assert.match(row, /overflow:\s*hidden/u, 'so nothing in the body squares off the row radius');
 
     const lineStart = sheet.indexOf('.fabricate-sortable-list-line {');
     assert.notEqual(lineStart, -1, 'and the line is declared');
     assert.match(
       sheet.slice(lineStart, sheet.indexOf('}', lineStart)),
       /padding:\s*var\(--fab-space-3\)/u,
-      'the LINE carries the row`s padding, which is what the band gives back'
+      'the LINE carries the row`s padding'
     );
   });
 
-  it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
-    // The trap: feeding the strip `forecastComplications`.
+  // GUARD: red when fed the player forecast projection.
+  it('GUARD 1286: the list is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
+    // The trap: feeding the list `forecastComplications`.
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
-    const row = stageStrips(target)[0].querySelector('[data-recipe-result-complication="cx-1"]');
-    assert.ok(row, 'the gmOnly complication renders on the GM strip');
+    const row = stageStrips(target)[0].querySelector('[data-stage-complication="cx-1"]');
+    assert.ok(row, 'the gmOnly complication renders on the GM list');
     editHarness.remount();
   });
 
-  it('1286: the strip edits nothing — the row is still the only route to the component', async () => {
+  // GUARD: red when the nested list is left reorderable (its grip and rocker are buttons).
+  it('GUARD 1286: the list edits nothing — the row is still the only route to the component', async () => {
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
@@ -3318,9 +3335,45 @@ describe('RecipeEditView (mounted)', () => {
       'no control at all: editing here would either write across an aggregate boundary or ' +
         'make "Save recipe" persist a Component change — the same ruling the DC badge takes'
     );
-    // The row's existing Edit link already targets the component that owns the strip.
+    // The row's existing Edit link already targets the component that owns the list.
     const edit = target.querySelector('[data-recipe-result-edit]');
     assert.equal(edit.getAttribute('data-recipe-result-edit'), 'cmp-herb');
+    editHarness.remount();
+  });
+
+  it('RED 1286: the stage row Edit names complications as well as difficulty', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const { target } = await mountProgressiveResults(
+        [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+        { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
+      );
+      const edit = target.querySelector('[data-recipe-result-edit]');
+      assert.equal(
+        edit.getAttribute('aria-label'),
+        'Edit difficulty and complications on the component — Mountain Herb'
+      );
+      assert.equal(
+        edit.getAttribute('title'),
+        'Edit difficulty and complications on the component'
+      );
+    } finally {
+      restoreI18n();
+      editHarness.remount();
+    }
+  });
+
+  // GUARD: red when the row's has-band is decided from the unfiltered list.
+  it('GUARD 1286: a stage whose component authors only salvage complications draws no body', async () => {
+    const [herb, water] = COMPLICATED_COMPONENT_OPTIONS;
+    const { target } = await mountProgressiveResults(
+      [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      { props: { componentOptions: [{ ...herb, complications: [herb.complications[1]] }, water] } }
+    );
+    const row = target.querySelector('[data-recipe-result-row]');
+    assert.equal(stageStrips(target).length, 0, 'no list');
+    assert.ok(!row.querySelector('.fab-kicker'), 'no Complications kicker');
+    assert.ok(!row.classList.contains('has-band'), 'and no has-band, so the body is hidden');
     editHarness.remount();
   });
 

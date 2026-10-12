@@ -296,9 +296,9 @@ function _buildManagedItemOptions(managedItems = []) {
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && {
       difficulty: item.difficulty,
     }),
-    // The authored complication list for the two GM read-only strips (issue 1286), not
-    // `forecastComplications`: that filters to `visibility: 'visible'`, the player view, while the
-    // authored default is `gmOnly`. Absence-preserving: a component with none carries no key.
+    // The authored complication list for the two GM read-only complication lists (issue 1286),
+    // not `forecastComplications`: that filters to `visibility: 'visible'`, the player view, while
+    // the authored default is `gmOnly`. Absence-preserving: a component with none carries no key.
     ...(Object.prototype.hasOwnProperty.call(item, 'complications') && {
       complications: _clonePlain(item.complications),
     }),

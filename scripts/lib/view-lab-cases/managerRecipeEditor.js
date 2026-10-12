@@ -7,6 +7,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   CHECKS_ROUTE_MODEL_PATTERN,
   REQUIREMENT_SUGGESTION,
+  STAGE_COMPLICATION_LIST_MATCH,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
@@ -932,6 +933,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      STAGE_COMPLICATION_LIST_MATCH,
     ],
   }),
   managerCase({
@@ -1511,6 +1513,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      STAGE_COMPLICATION_LIST_MATCH,
     ],
   }),
   // A progressive set's adder appends an unnamed stage, whose name field takes focus (issue 1773).

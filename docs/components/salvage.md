@@ -134,7 +134,7 @@ See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage
 
 When the system's salvage difficulty is set by a macro rather than a fixed number, **System default** says so instead of showing a number, because there is no single one to show.
 
-When the resolution mode is Progressive, each stage row also shows a read-only strip for any complications authored on that stage's own component.
+When the resolution mode is Progressive, each stage row also shows a read-only list for any complications authored on that stage's own component.
 See [Complications]({% link components/complications.md %}) to author them.
 
 ## Salvaging From the Inventory Tab

@@ -27,7 +27,7 @@
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import SortableList from '../../../components/SortableList.svelte';
-  import RecipeStageComplicationBand from './RecipeStageComplicationBand.svelte';
+  import StageComplicationList from '../StageComplicationList.svelte';
 
   let {
     group = {},
@@ -100,7 +100,7 @@
     return match?.name || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
   }
 
-  // The band's content, decided here because the same filter decides whether the row draws a body
+  // The list's content, decided here because the same filter decides whether the row draws a body
   // at all (issue 1512): `alwaysOpen` renders the body snippet for every row, so a stage whose
   // component authors no crafting complication would otherwise draw an empty padded box. The
   // unredacted authored list off the projection the difficulty badge reads, filtered to crafting
@@ -344,12 +344,10 @@
     </div>
   {:else}
     {#if progressive}
-      <!-- Progressive is an ordered list, so it is the shared one (issue 1512). The band is the
-           list's body rather than part of the row's content, because it is full-bleed, and
-           `alwaysOpen` renders it with no disclosure since a stage's band is not something a GM
-           opens. The delete is the list's own, so it trails the rocker as the specimen states;
-           `removeData` keeps `data-recipe-remove="result-item"`, the hook the mounted suites and
-           the smoke harness address a stage's delete by. -->
+      <!-- Progressive is an ordered list, so it is the shared one (issue 1512). `alwaysOpen` shows
+           each stage's read-only complication list in its body with no disclosure (issue 2445).
+           The delete is the list's own; `removeData` keeps `data-recipe-remove="result-item"`,
+           the hook the mounted suites and the smoke harness address a stage's delete by. -->
       <SortableList
         items={results}
         itemLabel={componentNameFor}
@@ -386,9 +384,10 @@
           </PickerRow>
         {/snippet}
         {#snippet body(item)}
-          <RecipeStageComplicationBand
+          <StageComplicationList
             complications={stageComplicationsFor(item)}
-            componentId={item?.componentId || ''}
+            ownerId={item?.componentId || ''}
+            ownerName={componentNameFor(item)}
           />
         {/snippet}
         {#snippet footer()}
@@ -436,10 +435,10 @@
       data-keyboard-focus="true"
       class="manager-recipe-stage-edit"
       data-recipe-result-edit={item.componentId}
-      aria-label={`${localizeOr('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${component.name}`}
+      aria-label={`${localizeOr('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty and complications on the component')} — ${component.name}`}
       title={localizeOr(
         'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
-        'Edit difficulty on the component'
+        'Edit difficulty and complications on the component'
       )}
       onclick={() => onOpenComponent(item.componentId)}
     >

@@ -118,7 +118,15 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "shared",
-      "why": "The complication summary row (5 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1509` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`. Scoped `shared` DESPITE its `apps/manager/` path, for the reason the first sentence already measures: two of its five callers are the player crafting and inventory applications."
+      "why": "The complication summary row (4 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1509` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`. Scoped `shared` DESPITE its `apps/manager/` path, for the reason the first sentence already measures: two of its four callers are the player crafting and inventory applications."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
+      "library": "<SortableList>",
+      "status": "shipped",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "The GM read-only complication list a progressive stage row's body renders (issue 2445): a muted `Kicker` over a nested, non-reorderable, unnumbered `SortableList` of `ComplicationSummaryRow`'s `readonly-gm` rows, drawing no band, tile or control. Two independent callers, measured by `componentImporters.js`: `component/ComponentSalvageStages` (the Component Studio's progressive salvage stages) and `recipe/RecipeResultGroupCard` (the Recipe Studio's progressive stages), which until this change drew the same meaning twice. The `<SortableList>` entry's read-only unit draws it, so `library` names that entry and `status` is `shipped`. Targeted: `manager-component-edit-salvage-narrow`, `manager-component-edit-salvage-stages-narrow`, `manager-component-complications-salvage-stage-strip`, `manager-recipe-complications-stage-strip`, `manager-recipe-edit-results-progressive` and `manager-recipe-edit-results-narrow` claim it by `sourceMatches`. Scoped `manager-only`: both callers are manager studios, and the list reads the GM's unredacted authored complications, which no player surface may show."
     },
     {
       "path": "src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte",

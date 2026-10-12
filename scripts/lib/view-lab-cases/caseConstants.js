@@ -72,6 +72,10 @@ export const COMPONENT_EDITOR_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/component\/Component(?:CategoryTagsCards|DifficultyCard|EssencesCard|IdentityStrip|SalvageStages|SalvageCard|RulesValidationTab)\.svelte$/,
 ];
 
+/** The GM read-only stage complication list both studios' stage rows render (issue 2445). */
+export const STAGE_COMPLICATION_LIST_MATCH =
+  /^src\/ui\/svelte\/apps\/manager\/StageComplicationList\.svelte$/;
+
 /** The trigger set every system Tool rules editor frame shares (issue 1373). */
 export const TOOL_EDITOR_SHELL_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,

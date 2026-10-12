@@ -108,7 +108,7 @@ const harness = createMountedComponentHarness({
     // The result group card renders the product's ONE ordered list (issue 1512) and the stage's
     // complication band through it.
     'src/ui/svelte/components/SortableList.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
+    'src/ui/svelte/apps/manager/StageComplicationList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
