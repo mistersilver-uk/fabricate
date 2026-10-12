@@ -128,6 +128,19 @@ describe('TierTrack (issue 2424)', () => {
     ]);
   });
 
+  for (const direction of ['ascending', 'descending']) {
+    it(`marks index 0 current when currentIndex is 0, ${direction}`, async () => {
+      const target = await mount({ tiers: TOWNS, currentIndex: 0, direction });
+      assert.deepEqual(currents(target), ['step', null, null, null]);
+      assert.deepEqual(
+        tiersOf(target).map(hiddenText),
+        direction === 'ascending'
+          ? ['You are here', 'Ahead', 'Ahead', 'Ahead']
+          : ['You are here', 'Reached', 'Reached', 'Reached']
+      );
+    });
+  }
+
   it('column, descending: the ladder keeps every valence on a reached rung', async () => {
     const target = await mount({
       tiers: LADDER,
@@ -216,8 +229,8 @@ describe('TierTrack (issue 2424)', () => {
     assert.deepEqual(valences(target), ['positive', 'neutral', 'neutral', null]);
     assert.deepEqual(tiersOf(target).map(toneOf), [
       ['is-positive'],
-      ['is-neutral'],
-      ['is-neutral'],
+      ['is-secondary'],
+      ['is-secondary'],
       [],
     ]);
   });
@@ -237,7 +250,15 @@ describe('TierTrack (issue 2424)', () => {
   }
 
   it('skips a tier that is not a plain object and keeps reading indices as passed', async () => {
-    const tiers = [{ name: 'Alpha' }, 'junk', { name: 'Gamma' }, null, ['Delta'], { name: 'Eta' }];
+    const tiers = [
+      { name: 'Alpha' },
+      'junk',
+      { name: 'Gamma' },
+      null,
+      ['Delta'],
+      new Date(0),
+      { name: 'Eta' },
+    ];
     const target = await mount({ tiers, currentIndex: 2 });
     assert.deepEqual(tiersOf(target).map(textOf), [
       'Alpha Reached',
@@ -246,6 +267,14 @@ describe('TierTrack (issue 2424)', () => {
     ]);
     assert.deepEqual(currents(target), [null, 'step', null]);
     assert.equal(target.querySelectorAll('.fa-chevron-right').length, 2, 'none after the last');
+  });
+
+  it('draws no chevron after the last drawn badge when trailing tiers are skipped', async () => {
+    const target = await mount({ tiers: [...TOWNS, null], currentIndex: 1 });
+    assert.deepEqual(
+      tiersOf(target).map((li) => Boolean(li.querySelector('.fa-chevron-right'))),
+      [true, true, true, false]
+    );
   });
 
   it('draws notes that are not an array as none', async () => {
@@ -277,5 +306,11 @@ describe('TierTrack (issue 2424)', () => {
       'You are here',
       'Ahead',
     ]);
+  });
+
+  it('redraws on an update that replaces the tiers and the direction', async () => {
+    const target = await mount({ tiers: TOWNS, currentIndex: 1 });
+    await harness.setProps({ tiers: TOWNS.slice(0, 2), direction: 'descending' });
+    assert.deepEqual(tiersOf(target).map(textOf), ['Thorpe Ahead', 'Hamlet You are here']);
   });
 });

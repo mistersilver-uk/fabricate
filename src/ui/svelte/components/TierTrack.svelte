@@ -85,8 +85,7 @@
 
 <div class={['fab-tier-track', isColumn ? 'is-column' : 'is-row', extraClass]} {...rest}>
   <ol class="fab-tier-track-list" role="list" aria-label={ariaLabel}>
-    <!-- ratchet-exempt(lint): unkeyed, so a repeated or absent id or name cannot fault the mount -->
-    {#each rungs as rung, index}
+    {#each rungs as rung, index (index)}
       {#if rung}
         <li
           class={[
@@ -114,11 +113,14 @@
                 {#if rung.figure}<span class="fab-tier-track-figure">{rung.figure}</span>{/if}
                 {#if rung.current}<span class="fab-tier-track-marker">{rung.state}</span>{/if}
               </div>
-              <!-- ratchet-exempt(lint): unkeyed, so a repeated note cannot fault the mount -->
-              {#each rung.notes as note}<p class="fab-tier-track-note">{note}</p>{/each}
+              {#each rung.notes as note, noteIndex (noteIndex)}
+                <p class="fab-tier-track-note">{note}</p>
+              {/each}
             </div>
           {:else}
-            <Chip tone={rung.valence ?? ''} icon={rung.current ? 'fas fa-location-dot' : ''}
+            <Chip
+              tone={rung.valence === 'neutral' ? 'secondary' : (rung.valence ?? '')}
+              icon={rung.current ? 'fas fa-location-dot' : ''}
               ><span class="fab-tier-track-name"
                 >{rung.name} <span class="fab-tier-track-hidden">{rung.state}</span></span
               ></Chip
@@ -199,7 +201,12 @@
     height: 7px;
     margin-top: var(--fab-space-1);
     border-radius: 50%;
-    background: var(--fab-bg-3);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--fab-text-subtle);
+  }
+
+  .fab-tier-track-dot:is(.is-positive, .is-negative, .is-neutral) {
+    box-shadow: none;
   }
 
   .fab-tier-track-dot.is-positive {
@@ -224,6 +231,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-chip);
+    line-height: 1.6;
   }
 
   .is-column .fab-tier-track-name {
