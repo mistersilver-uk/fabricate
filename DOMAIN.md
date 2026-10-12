@@ -1430,6 +1430,13 @@ A gathering field anchored to world time belongs to one of three ANCHOR families
 
 [Notes](docs/domain/terms.md#world-time-anchor)
 
+#### Time-of-Day Start Hour
+
+A time-of-day value's optional `startHour`: the whole hour of the world calendar's day at which that period begins, each period running to the next one's start so the periods tile the day.
+It is descriptive: it places a period on the clock and never gates, matches or changes the current time of day, which stays GM-selected.
+
+[Notes](docs/domain/terms.md#time-of-day-start-hour)
+
 #### Valid Id Basis
 
 The id sets a destructive pass derives from the live corpus before pruning anything naming an id outside them — `validRecipes`, `validSystems`, `validSalvageComponentsBySystem` and `validComponentIds`, which had no name until issue 1080, joined at issue 1308 by the two character-library sets and at issue 1359 by the three WORLD-SCOPE entity sets (component, essence and tool ids) and the two CATEGORY VOCABULARIES an icon map is pruned against.

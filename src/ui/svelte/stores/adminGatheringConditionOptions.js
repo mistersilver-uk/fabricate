@@ -1,8 +1,10 @@
 /**
  * The manager store's condition-option normalizers: a weather or time-of-day value's stable id,
- * label and icon as `createAdminStore` persists them. The gathering service keeps its own diverging
- * copy (`src/systems/normalize/gatheringConditionOptions.js`); the two are not merged.
+ * label and icon, and a time-of-day value's optional `startHour`, as `createAdminStore` persists
+ * them. The gathering service keeps its own diverging copy
+ * (`src/systems/normalize/gatheringConditionOptions.js`), which owns the shared start-hour rule.
  */
+import { withTimeOfDayStartHour } from '../../../systems/normalize/gatheringConditionOptions.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -63,7 +65,7 @@ export function normalizeGatheringConditionOption(kind, value) {
   const icon = normalizeEssenceIcon(
     isRecord ? value.icon : defaultGatheringConditionIcon(kind, id)
   );
-  return { id, label, icon };
+  return withTimeOfDayStartHour(kind, { id, label, icon }, value);
 }
 
 export function normalizeGatheringConditionOptions(kind, value) {
@@ -85,9 +87,12 @@ export function seedGatheringConditionOptions(kind, raw, defaults) {
   return normalizeGatheringConditionOptions(kind, defaults);
 }
 
-/** One option with a label and icon update merged on; its id never changes. */
+/**
+ * One option with a label, icon and, for a time of day, start-hour update merged on; its id never
+ * changes, and a start hour that normalizes to nothing clears the authored one.
+ */
 export function applyGatheringConditionUpdate(kind, option, updates) {
-  return {
+  const next = {
     ...option,
     label:
       updates.label === undefined
@@ -95,4 +100,7 @@ export function applyGatheringConditionUpdate(kind, option, updates) {
         : String(updates.label || '').trim() || option.label,
     icon: updates.icon === undefined ? option.icon : normalizeEssenceIcon(updates.icon),
   };
+  if (kind !== 'timeOfDay' || updates.startHour === undefined) return next;
+  delete next.startHour;
+  return withTimeOfDayStartHour(kind, next, updates);
 }

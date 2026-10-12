@@ -1,7 +1,8 @@
 /**
  * The gathering service's condition-option normalizers: a weather or time-of-day value's stable id,
- * label and Font Awesome icon. The manager store keeps its own diverging copy
- * (`adminGatheringConditionOptions.js`); the two are not merged.
+ * label and Font Awesome icon, and a time-of-day value's optional `startHour`. The manager store
+ * keeps its own diverging copy (`adminGatheringConditionOptions.js`) but shares the start-hour
+ * normalizer and default resolver exported here.
  */
 import { normalizeConditionId } from '../../utils/scalars.js';
 
@@ -26,6 +27,36 @@ const FALLBACK_CONDITION_ICONS = Object.freeze({
   weather: 'fas fa-cloud-sun',
   timeOfDay: 'fas fa-clock',
 });
+// Resolved on read for these ids only, never written back (gathering-and-harvesting req. 25).
+const DEFAULT_TIME_OF_DAY_START_HOURS = Object.freeze({ dawn: 4, day: 8, dusk: 17, night: 21 });
+
+/**
+ * A whole hour at or above zero, given as a number or a digit-only string, else `null`. `0` is
+ * midnight and is kept; `null`, `''` and `true` are absent, never coerced to `0`.
+ */
+export function normalizeTimeOfDayStartHour(value) {
+  if (typeof value === 'string' && !/^\d+$/.test(value)) return null;
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const hour = Number(value);
+  return Number.isSafeInteger(hour) && hour >= 0 ? hour : null;
+}
+
+/** A time-of-day option's own start hour, else its default id's, else `null`. */
+export function resolveTimeOfDayStartHour(option) {
+  const authored = normalizeTimeOfDayStartHour(option?.startHour);
+  if (authored !== null) return authored;
+  const id = String(option?.id ?? '');
+  return Object.hasOwn(DEFAULT_TIME_OF_DAY_START_HOURS, id)
+    ? DEFAULT_TIME_OF_DAY_START_HOURS[id]
+    : null;
+}
+
+/** `option` with a time-of-day value's authored start hour from `value`, or none. */
+export function withTimeOfDayStartHour(kind, option, value) {
+  if (kind !== 'timeOfDay' || !value || typeof value !== 'object') return option;
+  const startHour = normalizeTimeOfDayStartHour(value.startHour);
+  return startHour === null ? option : { ...option, startHour };
+}
 
 export function normalizeConditionIcon(icon, fallback) {
   const tokens = String(icon || '')
@@ -66,15 +97,19 @@ function normalizeConditionOption(kind, value) {
   if (!id) return null;
   const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
   const fallbackIcon = defaultConditionIcon(kind, id);
-  return {
-    id,
-    label: isRecord
-      ? rawLabel || conditionLabelFromId(id)
-      : /[A-Z]/.test(rawLabel)
-        ? rawLabel
-        : conditionLabelFromId(id),
-    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon),
-  };
+  return withTimeOfDayStartHour(
+    kind,
+    {
+      id,
+      label: isRecord
+        ? rawLabel || conditionLabelFromId(id)
+        : /[A-Z]/.test(rawLabel)
+          ? rawLabel
+          : conditionLabelFromId(id),
+      icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon),
+    },
+    value
+  );
 }
 
 export function normalizeConditionOptions(kind, value) {
