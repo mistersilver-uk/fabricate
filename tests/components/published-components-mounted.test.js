@@ -13,6 +13,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import {
+  FAULT_REPORT,
   PUBLISHED_ADAPTER as ADAPTER,
   PUBLISHED_COMPILED_MODULES,
   PUBLISHED_RAW_MODULES,
@@ -22,6 +23,7 @@ import {
   companionTarget,
   settle,
   shippedSeam,
+  underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -29,7 +31,6 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
 const COMPANION = 'tests/fixtures/published-components/companionReactivity.svelte.js';
 const MANIFEST_PATHS = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path);
-const FAULT_REPORT = 'Fabricate | Published component render failed:';
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -144,7 +145,6 @@ describe('a published component on the real runtime', () => {
     const target = companionTarget(targets);
     const handle = ui.mount('PublishedProbe', { target, props: {} });
     await settle();
-    assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
     assert.equal(getComputedStyle(target.querySelector('.probe')).position, 'relative');
     const hidden = getComputedStyle(target.querySelector('.probe-hidden'));
     assert.equal(hidden.position, 'absolute');
@@ -156,22 +156,14 @@ describe('a published component on the real runtime', () => {
   });
 
   it('resolves a token from :root[data-fabricate-theme] over its own fallback', async () => {
-    const root = document.documentElement;
-    const theme = document.createElement('style');
-    theme.textContent = ':root[data-fabricate-theme] { --fab-font-serif: ProbeFace; }';
-    document.head.append(theme);
-    root.setAttribute('data-fabricate-theme', 'probe');
-    try {
+    await underSheet(':root[data-fabricate-theme] { --fab-font-serif: ProbeFace; }', async () => {
       const ui = seam().publicApi;
       const target = companionTarget(targets);
       const handle = ui.mount('PublishedProbe', { target, props: {} });
       await settle();
       assert.equal(getComputedStyle(target.querySelector('.probe')).fontFamily, 'ProbeFace');
       handle.destroy();
-    } finally {
-      root.removeAttribute('data-fabricate-theme');
-      theme.remove();
-    }
+    });
   });
 });
 
@@ -220,7 +212,6 @@ const tierStates = (target) =>
 
 function mountTierTrack(props = {}) {
   const target = companionTarget(targets);
-  assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
   return { target, handle: shipped().mount('TierTrack', { target, props: tierProps(props) }) };
 }
 
@@ -318,13 +309,9 @@ describe('TierTrack through the seam', () => {
   });
 
   it('resolves its figure face and its inks from :root[data-fabricate-theme]', async () => {
-    const root = document.documentElement;
-    const theme = document.createElement('style');
-    theme.textContent =
+    const theme =
       ':root[data-fabricate-theme] { --fab-font-mono: ProbeMono; --fab-text-muted: rgb(1, 2, 3); --fab-text: rgb(4, 5, 6); }';
-    document.head.append(theme);
-    root.setAttribute('data-fabricate-theme', 'probe');
-    try {
+    await underSheet(theme, async () => {
       const { target, handle } = mountTierTrack({ layout: 'column' });
       await settle();
       const figure = getComputedStyle(target.querySelector('.fab-tier-track-figure'));
@@ -333,10 +320,7 @@ describe('TierTrack through the seam', () => {
       const current = target.querySelector(':scope [aria-current="step"] .fab-tier-track-name');
       assert.equal(getComputedStyle(current).color, 'rgb(4, 5, 6)');
       handle.destroy();
-    } finally {
-      root.removeAttribute('data-fabricate-theme');
-      theme.remove();
-    }
+    });
   });
 });
 

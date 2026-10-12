@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import {
+  FAULT_REPORT,
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
   PUBLISHED_RAW_MODULES,
@@ -18,10 +19,10 @@ import {
   companionTarget,
   settle,
   shippedSeam,
+  underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
-const FAULT_REPORT = 'Fabricate | Published component render failed:';
 const REFUSAL = 'Fabricate | published components: ';
 
 const harness = createMountedComponentHarness({
@@ -52,21 +53,6 @@ const ui = () =>
 function mountLeaf(name, props) {
   const target = companionTarget(targets);
   return { target, handle: ui().mount(name, { target, props }) };
-}
-
-/** Runs `run` with `css` in the document and a theme named on its root, then removes both. */
-async function underSheet(css, run) {
-  const root = document.documentElement;
-  const sheet = document.createElement('style');
-  sheet.textContent = css;
-  document.head.append(sheet);
-  root.setAttribute('data-fabricate-theme', 'probe');
-  try {
-    await run();
-  } finally {
-    root.removeAttribute('data-fabricate-theme');
-    sheet.remove();
-  }
 }
 
 before(async () => {

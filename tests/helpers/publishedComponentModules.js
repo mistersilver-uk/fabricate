@@ -9,6 +9,9 @@ import assert from 'node:assert/strict';
 export const PUBLISHED_SEAM = 'src/ui/publishedComponentSeam.js';
 export const PUBLISHED_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
+/** The first argument of the seam's report of a contained fault. */
+export const FAULT_REPORT = 'Fabricate | Published component render failed:';
+
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
   'src/ui/publishedComponentManifest.js',
@@ -44,6 +47,21 @@ export function companionTarget(shells) {
   shells.push(shell);
   assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
   return target;
+}
+
+/** Runs `run` with `css` in the document and a theme named on its root, then removes both. */
+export async function underSheet(css, run) {
+  const root = document.documentElement;
+  const sheet = document.createElement('style');
+  sheet.textContent = css;
+  document.head.append(sheet);
+  root.setAttribute('data-fabricate-theme', 'probe');
+  try {
+    await run();
+  } finally {
+    root.removeAttribute('data-fabricate-theme');
+    sheet.remove();
+  }
 }
 
 /** A fresh seam over the shipped manifest, registered with the adapter's own `components` table. */
