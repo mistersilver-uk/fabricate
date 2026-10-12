@@ -160,7 +160,11 @@
         {:else}
           <span class="manager-travel-option-name">{option.label}</span>
         {/if}
-        {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
+        {#if option.trailing}<Chip
+            class="manager-travel-option-trailing"
+            tone={option.trailingChip?.tone ?? 'disabled'}
+            mono={option.trailingChip?.mono === true}>{option.trailing}</Chip
+          >{/if}
         {#if option.trailingIcon}<i
             class={`manager-travel-option-marker ${option.trailingIcon}`}
             aria-hidden="true"
@@ -287,6 +291,11 @@
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
+  }
+
+  .manager-travel-option :global(.manager-travel-option-trailing) {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .manager-travel-popover.is-compact-option-rows {
