@@ -27,7 +27,7 @@
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import SortableList from '../../../components/SortableList.svelte';
-  import RecipeStageComplicationBand from './RecipeStageComplicationBand.svelte';
+  import StageComplicationList from '../StageComplicationList.svelte';
 
   let {
     group = {},
@@ -386,7 +386,7 @@
           </PickerRow>
         {/snippet}
         {#snippet body(item)}
-          <RecipeStageComplicationBand
+          <StageComplicationList
             complications={stageComplicationsFor(item)}
             componentId={item?.componentId || ''}
           />

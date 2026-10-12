@@ -6,10 +6,10 @@
   the row carries `has-band` at all. Read-only end to end.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localize } from '../../util/foundryBridge.js';
   // The one complication summary row (issue 1286), shared with the salvage strip, not copied.
-  import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
-  import { complicationSummary } from '../../../../model/complicationSummary.js';
+  import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
+  import { complicationSummary } from '../../../model/complicationSummary.js';
 
   let { complications = [], componentId = '' } = $props();
 

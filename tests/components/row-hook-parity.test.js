@@ -101,7 +101,7 @@ const SITES = Object.freeze([
     true,
   ],
   [
-    `${MANAGER}/recipe/RecipeStageComplicationBand.svelte`,
+    `${MANAGER}/StageComplicationList.svelte`,
     'ComplicationSummaryRow',
     'data-recipe-result-complication',
     'complication.id || true',

@@ -229,7 +229,7 @@ const RECIPE_COMPILED = [
   // accordion, the progressive result stage list and its complication band are all built on it.
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SortableList.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
+  'src/ui/svelte/apps/manager/StageComplicationList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',

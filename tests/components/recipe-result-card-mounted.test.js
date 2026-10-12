@@ -41,7 +41,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
+    'src/ui/svelte/apps/manager/StageComplicationList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     CARD_PATH,
   ],
