@@ -818,7 +818,7 @@ describe('the catalogue’s category filter reads the trimmed `defaults.category
       filter.options.map((option) => [option.value, option.label]),
       [
         ['all', 'All categories'],
-        [COMPONENT_CATEGORY_FILTER_NONE, 'No category'],
+        [COMPONENT_CATEGORY_FILTER_NONE, 'No world category'],
         ['Raw', 'Raw'],
         ['Refined', 'Refined'],
         ['Alpha', 'Alpha'],
@@ -835,6 +835,18 @@ describe('the catalogue’s category filter reads the trimmed `defaults.category
     assert.deepEqual(passes('Refined'), ['b'], 'the stored value is trimmed, nothing more');
     assert.deepEqual(passes('raw'), [], 'no case folding');
     assert.deepEqual(passes('ghost'), []);
+  });
+
+  it('trims the vocabulary so a padded value still matches and empties drop', () => {
+    const [padded] = componentCategoryFilter(
+      { categories: [' Raw ', '', '  '], entries: [entry('a', 'Raw')] },
+      phrase
+    );
+    assert.deepEqual(
+      padded.options.slice(2).map((option) => option.value),
+      ['Raw']
+    );
+    assert.ok(padded.matches(entry('a', 'Raw'), 'Raw'));
   });
 
   it('is withheld when no category exists anywhere', () => {

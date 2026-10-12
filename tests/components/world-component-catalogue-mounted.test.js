@@ -2759,7 +2759,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       await drain();
     }
 
-    it('offers the vocabulary after All and No category, and narrows the rows', async () => {
+    it('offers the vocabulary after All and No world category, and narrows the rows', async () => {
       const target = await harness.mount({
         scope: scopeFor(),
         actions: {},
@@ -2767,7 +2767,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       });
       assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
         'All categories',
-        'No category',
+        'No world category',
         'Raw',
         'Refined',
       ]);
@@ -2776,6 +2776,29 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.deepEqual(rowIds(target), ['coal']);
       await choose(target, '__none');
       assert.deepEqual(rowIds(target), ['orphan', 'resin'], 'only uncategorised rows');
+    });
+
+    it('offers a stray category and narrows the rows by it', async () => {
+      const target = await harness.mount({
+        scope: scopeFor({
+          defaults: [
+            { id: 'ingot', category: 'Refined' },
+            { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+            { id: 'resin', category: '  Stray  ' },
+          ],
+        }),
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
+        'All categories',
+        'No world category',
+        'Raw',
+        'Refined',
+        'Stray',
+      ]);
+      await choose(target, 'Stray');
+      assert.deepEqual(rowIds(target), ['resin']);
     });
 
     it('is withheld when the world has no category', async () => {
