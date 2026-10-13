@@ -341,7 +341,7 @@ With no Preview-as actor and an expression that is otherwise readable, the line 
 For a path the actor lacks it reads `{actor} has no value at {path}. The check cannot resolve for them.`, and for a formula that rolls dice or cannot be read it is the runtime's own refusal sentence.
 A resolved value draws no line, so the actor is named by the Preview-as picker and not beside the value.
 The reading describes the field, and is spoken once typing settles, never because the Preview-as actor changed.
-A stored document path, as the additional-dice path source is, is not an expression: it is read from the actor's stored data and not its roll data, and the field's reading for it is the stored number where one is stored and no active effect overrides it, and `Unresolved` otherwise.
+A stored document path, as the additional-dice path source is, is not an expression: it is read from the actor's stored data and not its roll data, and with an actor chosen the field's reading for a path that is set is the stored number where one is stored and no active effect overrides it, and `Unresolved` otherwise.
 The Difficulty card's static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
 The Comparison reads `At or under` / `Strictly under` under a roll-under check.
 Numeric and fractional values edit through the formatted `Stepper` (`ui-visual-style/spec.md` § Numeric entry), so a multiplier reads `×½` and stays directly typeable, including an off-list `×0.7`.

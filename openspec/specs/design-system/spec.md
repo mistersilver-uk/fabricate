@@ -999,7 +999,7 @@ The order is the next peer's control, then the previous peer's, then the nearest
 An editable set of tokens owes ONE `aria-live="polite"` summary BESIDE the row and never a region wrapped AROUND it: `aria-relevant` defaults to `additions text`, so a wrapping region announces each added token's entire subtree, its remove button's label included, and announces NOTHING AT ALL on a removal.
 The summary states NAMES as well as a count, because "3 selected" does not tell a non-sighted GM which three.
 A live region is also announced by its ROLE rather than by `aria-live` alone where the region and its text are INSERTED in one mutation, which is what a notice does: a live region created in the same mutation as its content is not announced and only its later updates are, while a live-region role is recognised on insertion.
-The chip that draws a reading as text is typed MUST NOT itself be a live region: the expression field speaks it through ONE visually hidden `role="status"` region beside its row, mounted while a resolver is passed and empty until an edit.
+The chip that draws a reading MUST NOT itself be a live region: the expression field speaks it through ONE visually hidden `role="status"` region beside its row, mounted while a resolver is passed and empty until an edit.
 The region is written once typing has settled, or once focus has returned to the field after a pressed token, and only where the edit changed the reading.
 A reading that changes for any other reason is not spoken, and empties the region so the next spoken reading is a change of text.
 The reading also describes the field, its id written ahead of the description the caller passes, and the group that names the tokens never holds it.
