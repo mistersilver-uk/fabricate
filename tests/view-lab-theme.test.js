@@ -23,6 +23,11 @@ const VARIANTS = Object.freeze({
   // Issue 2445: a stage's read-only complication rows on its `--fab-bg-1` card, parted by the border.
   'manager-component-edit-salvage-stages-narrow-hearth-herb':
     'manager-component-edit-salvage-stages-narrow',
+  // Issue 2416: the tint swatch's keyboard cursor on the palette with its weakest contrast.
+  'manager-gathering-biome-colour-popover-cursor-hearth-herb':
+    'manager-gathering-biome-colour-popover-cursor',
+  'manager-gathering-biome-colour-popover-cursor-selected-hearth-herb':
+    'manager-gathering-biome-colour-popover-cursor-selected',
   'manager-gathering-task-editor-normal-hearth-herb': 'manager-gathering-task-editor-normal',
   'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':

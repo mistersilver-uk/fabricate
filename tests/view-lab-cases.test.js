@@ -270,7 +270,7 @@ function navDeclarationScope(sources, template) {
  * compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
-const PRESS_KEYS = ['Enter', 'Space'];
+const PRESS_KEYS = ['Enter', 'Space', 'Tab'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the

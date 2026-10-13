@@ -9,6 +9,21 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+const BIOME_COLOUR_OPEN = [
+  'Gathering',
+  { selector: '#manager-gathering-nav-settings' },
+  { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
+];
+const BIOME_COLOUR_SOURCES = [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/];
+const biomeSwatch = (token) =>
+  `[data-manager-color-picker-popover] [data-manager-color-token="${token}"]`;
+const biomeSwatchPressed = (token, value) => ({
+  selector: biomeSwatch(token),
+  name: 'aria-pressed',
+  value,
+});
+const BIOME_COLOUR_CURSOR = [...BIOME_COLOUR_OPEN, { selector: biomeSwatch('sage'), press: 'Tab' }];
+
 export const CASES = Object.freeze([
   managerCase({
     // World > Travel is ungated (issue 1282).
@@ -398,22 +413,42 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    steps: [
-      'Gathering',
-      { selector: '#manager-gathering-nav-settings' },
-      { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
-    ],
+    steps: BIOME_COLOUR_OPEN,
     expectView: 'environments',
     expectSelector: '.fabricate-manager [data-manager-color-picker-popover] [role="group"]',
-    expectAttributes: [
-      {
-        selector: '[data-manager-color-picker-popover] [data-manager-color-token="sage"]',
-        name: 'aria-pressed',
-        value: 'true',
-      },
-    ],
+    expectAttributes: [biomeSwatchPressed('sage', 'true')],
     kinds: ['manager', 'environments'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // The swatch's keyboard cursor (issue 2416): Tab from the pressed Sage lands it on Mist.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover-cursor',
+    label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on Mist',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: BIOME_COLOUR_CURSOR,
+    themeVariants: ['hearth-herb'],
+    expectView: 'environments',
+    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
+    expectAttributes: [biomeSwatchPressed('sage', 'true'), biomeSwatchPressed('mist', 'false')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // The cursor and the selected ring on one cell: Space presses Mist under the cursor.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover-cursor-selected',
+    label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on pressed Mist',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [...BIOME_COLOUR_CURSOR, { selector: biomeSwatch('mist'), press: 'Space' }],
+    themeVariants: ['hearth-herb'],
+    expectView: 'environments',
+    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
+    expectAttributes: [biomeSwatchPressed('mist', 'true'), biomeSwatchPressed('sage', 'false')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
   }),
   // A Gathering Rules select open (issue 1777): the rewards rule, the card's first row, so the
   // ticked list drops below its trigger inside the inspector rail.
