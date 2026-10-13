@@ -14,8 +14,10 @@
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
  * Limit: rule 9 judges a `svelte:element` by its pinned tags, and does not see an attribute a
  * spread writes, so the `type` of a dynamic button is
- * `components/published-button-mounted.test.js`'s. A tag read through a template binding
- * (`{#each}`, `{@const}`) is not followed.
+ * `components/published-button-mounted.test.js`'s. A tag that reads a name a template block binds
+ * fails closed, as does a closure file that passes a child a prop its pinned tags rest on the
+ * default of; a child drawn through an alias, `svelte:component` or a re-exporting module is not
+ * followed.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -52,6 +54,7 @@ import { readDeclaration, templateOf } from './helpers/apiConvention.js';
 import { walkNodes } from './helpers/moduleAst.js';
 import { componentAstOf } from './helpers/parsedSource.js';
 import {
+  DYNAMIC_ELEMENTS,
   SHIPPED,
   byName,
   declarationsOf,
@@ -66,6 +69,8 @@ import {
   propLocals,
   publishedLocals,
   restElements,
+  restReads,
+  sameDeclarations,
   selectorsNaming,
   selectorsWithRules,
   selectorsOnAttribute,
@@ -558,17 +563,13 @@ const carries = (complex, pseudo) =>
   [...walkNodes(complex)].some(
     (part) => part.type === 'PseudoClassSelector' && part.name === pseudo
   );
-const byProperty = ([a], [b]) => byName(a, b);
-const sameDeclarations = (rule, declarations) =>
-  JSON.stringify(declarationsOf(rule).sort(byProperty)) ===
-  JSON.stringify([...declarations].sort(byProperty));
 const drawsOrStripsARing = (property) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 /**
  * Clause 1 of the reaching set: a selector has no compound above the root's own, and its rule sits
- * inside no `@container` and no other style rule, so it draws alike under any ancestor. A pinned
- * data-hook rule is not judged.
+ * inside no other style rule and no at-rule but `@media` and `@supports`, so it draws alike under
+ * any ancestor. A pinned data-hook rule is not judged.
  */
 function placementFaults(reaching, shape, hooks) {
   return reaching
@@ -576,7 +577,7 @@ function placementFaults(reaching, shape, hooks) {
     .flatMap(({ written, complex, within }) => {
       const compounds = compoundsOf(complex);
       const at = compounds.findLastIndex((compound) => classesOf(compound).includes(shape.root));
-      const holders = within.filter((holder) => holder === 'rule' || holder === '@container');
+      const holders = within.filter((holder) => holder !== '@media' && holder !== '@supports');
       return [
         ...(at > 0 ? [`${written} has a compound above the root's own`] : []),
         ...holders.map((holder) => `${written} sits inside ${holder}`),
@@ -810,12 +811,14 @@ const NO_REST_ELEMENT = 'rest lands on no element the gate can see';
 const MIXED_REST = 'rest lands on a control and on an element that is none';
 const UNSTATED_REST = "rest lands on a control and restOn is not 'control'";
 const OVERSTATED_REST = 'restOn is stated and rest lands on no control';
+const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
 
 /**
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
- * is, and a rest the gate sees on no element fails closed. Where rest lands on a control, every
- * `data-*` attribute written ahead of the spread is a name M13 refuses there.
+ * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
+ * Where rest lands on a control, every `data-*` attribute written ahead of the spread is a name M13
+ * refuses there.
  */
 function restOnFaults(entry, ast, dynamic = undefined) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
@@ -830,6 +833,7 @@ function restOnFaults(entry, ast, dynamic = undefined) {
     .flatMap(({ before }) => before)
     .filter((name) => !RESERVED_ON_A_CONTROL.test(name));
   return [
+    ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
     ...overridable.map(
@@ -923,6 +927,15 @@ describe('each entry matches its component declaration', () => {
     const files = closureComponents([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
     assert.ok(files.length >= 15, 'every shipped closure and the probe were read');
     assert.deepEqual(dynamicElementFaults(files), []);
+    const held = Object.values(DYNAMIC_ELEMENTS).flatMap(({ heldBy }) => (heldBy ? [heldBy] : []));
+    assert.ok(held.length > 0, 'a pin names a mounted clause');
+    for (const heldBy of held) {
+      const [file, title] = heldBy.split(': ');
+      const described = [...walkNodes(SHIPPED.module(file).ast)]
+        .filter((node) => node.type === 'CallExpression' && node.callee.name === 'describe')
+        .map((node) => node.arguments[0]?.value);
+      assert.ok(described.includes(title), `${heldBy} names a describe block of that file`);
+    }
   });
 
   it('pins every shipped callback key with how many arguments it forwards', () => {
@@ -1466,12 +1479,16 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(pinFaultsOf(pins, { file }), []);
   });
 
-  /** What `tagKeys` reads of `<svelte:element this={<tag>}>` under a script `body`, publishing `as`. */
-  const keysOf = (body, tag) => {
-    const source = `<script>${body}</script><svelte:element this={${tag}}></svelte:element>`;
-    const { ast } = templateOf('src/E.svelte', source);
+  /**
+   * The keys and faults `tagKeys` reads of `<svelte:element this={<tag>}>` under a script `body`,
+   * publishing `as`, the element drawn between `open` and `close`.
+   */
+  const keysOf = (body, tag, [open, close] = ['', '']) => {
+    const drawn = `${open}<svelte:element this={${tag}}></svelte:element>${close}`;
+    const { ast } = templateOf('src/E.svelte', `<script>${body}</script>${drawn}`);
     const [{ node }] = dynamicElements('src/E.svelte', ast);
-    return tagKeys(ast, node, new Map([['as', 'as']]));
+    const { keys, faults } = tagKeys(ast, node, new Map([['as', 'as']]));
+    return { keys, faults };
   };
   const PROPS = "let { as = 'p', other = 'p', ...rest } = $props();";
   const CANNOT_FOLLOW = (name) => `tag reads ${name}, which the gate cannot follow`;
@@ -1505,6 +1522,62 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`fails closed on a tag that reads ${claim}, which it cannot follow`, () => {
       assert.deepEqual(keysOf(body, tag), { keys: [], faults: [CANNOT_FOLLOW(name)] });
+    });
+  }
+
+  for (const [claim, open, close] of [
+    ['an {#each} item', '{#each [as] as host (host)}', '{/each}'],
+    ['an {#each} index', '{#each [as] as item, host (item)}', '{/each}'],
+    ['a {@const}', '{#if as}{@const host = as}', '{/if}'],
+    ['a snippet parameter', '{#snippet row(host)}', '{/snippet}'],
+    ['an {#await} value', '{#await as then host}', '{/await}'],
+  ]) {
+    it(`fails closed on a tag that reads ${claim}, which a template block binds`, () => {
+      assert.deepEqual(keysOf(PROPS, 'host', [open, close]), {
+        keys: [],
+        faults: [CANNOT_FOLLOW('host')],
+      });
+    });
+  }
+
+  it('fails closed on a tag that reads a prop a template block shadows', () => {
+    const shadowed = keysOf(PROPS, 'as', ['{#each [other] as as (as)}', '{/each}']);
+    assert.deepEqual(shadowed, { keys: [], faults: [CANNOT_FOLLOW('as')] });
+  });
+
+  const CHILD = 'src/E.svelte';
+  const UNKEYED = { [DYNAMIC]: { tags: ['span'], keys: [] } };
+  /** The pin faults of a child whose tag reads its prop `tagProp`, beside a parent that draws it as `drawn`. */
+  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag') => {
+    const sources = {
+      [CHILD]: `<script>let { ${tagProp} = 'span', ...rest } = $props();</script><svelte:element this={${tagProp}}></svelte:element>`,
+      'src/Parent.svelte': `<script>import Child from './E.svelte';</script>${drawn}`,
+    };
+    const published = { [CHILD]: new Map([['as', 'as']]) };
+    const files = Object.entries(sources).map(([file, source]) => ({
+      file,
+      ast: templateOf(file, source).ast,
+      published: published[file] ?? new Map(),
+    }));
+    return dynamicElementFaults(files, pins);
+  };
+  const PASSED = (name) =>
+    `src/Parent.svelte passes ${name} to ${CHILD}, whose pinned tags rest on its default`;
+
+  it('passes a parent that states no prop the child’s tag reads, and one that states a key the pin follows', () => {
+    assert.deepEqual(passedFaultsOf('<Child tone="x" />'), []);
+    const keyed = { [DYNAMIC]: { tags: ['span'], keys: ['as'], heldBy: 'a mounted clause' } };
+    assert.deepEqual(passedFaultsOf('<Child as="p" {...more} />', keyed, 'as'), []);
+  });
+
+  for (const [claim, drawn, faults] of [
+    ['the prop by name', '<Child tag="button" />', [PASSED('tag')]],
+    ['the prop from an expression', '<Child tag={kind} />', [PASSED('tag')]],
+    ['the prop by a binding', '<Child bind:tag={kind} />', [PASSED('tag')]],
+    ['a spread', '<Child {...more} />', [PASSED('a spread')]],
+  ]) {
+    it(`names a closure parent that passes a child ${claim} as a pin fault`, () => {
+      assert.deepEqual(passedFaultsOf(drawn), faults);
     });
   }
 
@@ -1565,6 +1638,25 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(restFaultsOf(pressed(' {...attrs}'), 'control', copied), [NO_REST_ELEMENT]);
     assert.deepEqual(restFaultsOf(pressed(' {...rest} data-open'), 'control'), []);
   });
+
+  for (const [claim, template, script] of [
+    [
+      'a $derived copy spread beside it',
+      ['<div {...rest}>', pressed(' {...attrs}'), '</div>'].join(''),
+      '<script>let { label, ...rest } = $props(); const attrs = $derived({ ...rest });</script>',
+    ],
+    ['a child component it is also spread on', '<div {...rest}><Child {...rest} /></div>', REST],
+    [
+      'a member read written on a control',
+      ['<div {...rest}>', pressed(" data-x={rest['data-x']}"), '</div>'].join(''),
+      REST,
+    ],
+    ['a second spread on the same element', '<div {...rest} {...rest}></div>', REST],
+  ]) {
+    it(`fails closed on rest that lands on a root and also reaches ${claim}`, () => {
+      assert.deepEqual(restFaultsOf(template, null, script), [UNFOLLOWED_REST]);
+    });
+  }
 
   it('judges a svelte:element the rest is spread on by its pinned tags', () => {
     const entry = { path: 'src/E.svelte', rest: true };
@@ -1970,15 +2062,22 @@ describe('the module sheet and every component style against the published Butto
     assert.deepEqual(ringFaults(reaching), []);
   });
 
-  it('holds the classes the census calls writable to the classes Button.svelte spells', () => {
+  it('holds the classes the census calls writable to the classes Button.svelte spells and a sheet rule names on the button', () => {
     const tokens = spelledStrings(entryNamed('Button').path, SHIPPED).flatMap((spelled) =>
       spelled.split(/\s+/)
     );
-    const classes = [...new Set(tokens)].filter((token) => /^(?:is|fab|fabricate)-/.test(token));
+    const onRoot = new Set(
+      shippedCensus(BUTTON, 'Button').flatMap(({ complex }) =>
+        compoundsOf(complex)
+          .map((compound) => classesOf(compound))
+          .filter((classes) => classes.includes(BUTTON.root))
+          .flat()
+      )
+    );
     assert.deepEqual(
-      classes.sort(byName),
+      [...new Set(tokens)].filter((token) => onRoot.has(token)).sort(byName),
       [BUTTON.root, ...BUTTON.writable, ...UNPUBLISHED_BUTTON_CLASSES].sort(byName),
-      'a class a published key writes is writable, and a writable class is one the file spells'
+      'a class the file spells that a rule names on the button is writable, or pinned unpublished'
     );
   });
 
@@ -2088,6 +2187,7 @@ describe('the module sheet and every component style against the published Butto
   it('passes a family of one-compound rules with one strip and one module ring', () => {
     assert.deepEqual(clauseFaults(''), []);
     assert.deepEqual(clauseFaults('@media (width > 1px) { .fabricate-button { gap: 0 } }'), []);
+    assert.deepEqual(clauseFaults('@supports (gap: 0) { .fabricate-button { gap: 0 } }'), []);
     assert.deepEqual(
       clauseFaults('.fabricate-manager .fabricate-button[data-hook] { gap: 0 }'),
       [],
@@ -2105,6 +2205,16 @@ describe('the module sheet and every component style against the published Butto
       'a rule inside @container',
       '@container fabricate-manager (width > 1px) { .fabricate-button.fabricate-button { gap: 0 } }',
       ['sheet.css: .fabricate-button.fabricate-button sits inside @container'],
+    ],
+    [
+      'a rule inside @scope',
+      '@scope (.fabricate-manager) { .fabricate-button.is-primary { gap: 0 } }',
+      ['sheet.css: .fabricate-button.is-primary sits inside @scope'],
+    ],
+    [
+      'a rule inside @layer',
+      '@layer late { .fabricate-button.is-ghost { gap: 0 } }',
+      ['sheet.css: .fabricate-button.is-ghost sits inside @layer'],
     ],
     [
       'a rule nested in another style rule',

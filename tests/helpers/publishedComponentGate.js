@@ -77,16 +77,19 @@ export function propLocals(ast) {
   return [];
 }
 
+/** Whether an identifier under `parent` is read as a name: no member name after a dot, and no object key. */
+function isNameRead(node, parent) {
+  const isMemberName =
+    parent?.type === 'MemberExpression' && parent.property === node && !parent.computed;
+  const isObjectKey = parent?.type === 'Property' && parent.key === node && !parent.computed;
+  return !isMemberName && !isObjectKey;
+}
+
 /** Every name an expression reads: no member name after a dot, and no object key. */
 export function referencedNames(expression) {
   const names = new Set();
   walkWithAncestors(expression, (node, ancestors) => {
-    if (node.type !== 'Identifier') return;
-    const parent = ancestors.at(-1);
-    const isMemberName =
-      parent?.type === 'MemberExpression' && parent.property === node && !parent.computed;
-    const isObjectKey = parent?.type === 'Property' && parent.key === node && !parent.computed;
-    if (!isMemberName && !isObjectKey) names.add(node.name);
+    if (node.type === 'Identifier' && isNameRead(node, ancestors.at(-1))) names.add(node.name);
   });
   return names;
 }
@@ -211,17 +214,40 @@ function scriptDeclarations(ast) {
   return declared;
 }
 
+/** What each template node that binds names binds: a pattern, or a name as a string. */
+const TEMPLATE_BINDERS = Object.freeze({
+  EachBlock: (node) => [node.context, node.index],
+  ConstTag: (node) => node.declaration.declarations.map(({ id }) => id),
+  SnippetBlock: (node) => [node.expression, ...node.parameters],
+  AwaitBlock: (node) => [node.value, node.error],
+  LetDirective: (node) => [node.name],
+});
+
+/** Every name a template block of one component binds, wherever in the template. */
+function templateBindings(ast) {
+  const bound = new Set();
+  for (const node of walkNodes(ast.fragment)) {
+    for (const binder of TEMPLATE_BINDERS[node.type]?.(node) ?? []) {
+      const names = typeof binder === 'string' ? [binder] : identifierNames(binder);
+      for (const name of names) bound.add(name);
+    }
+  }
+  return bound;
+}
+
 /**
- * The published keys a `svelte:element`'s `this` expression reads, to a fixed point, as
- * `{ keys, faults }`: a `const` is followed into its initialiser, `$derived` and `$derived.by`
- * included, and a function into its body. `published` is the entry's keys by local name. A name
- * declared any other way is the fault `tag reads <name>, which the gate cannot follow`, and a name
- * the scripts do not declare is a global.
+ * What a `svelte:element`'s `this` expression reads, to a fixed point, as `{ keys, props, faults }`:
+ * the published keys, and every prop by its key. A `const` is followed into its initialiser,
+ * `$derived` and `$derived.by` included, and a function into its body. `published` is the entry's
+ * keys by local name. A name declared any other way, or bound by a template block anywhere in the
+ * file, is the fault `tag reads <name>, which the gate cannot follow`; any other is a global.
  */
 export function tagKeys(ast, node, published) {
-  const props = new Set(propLocals(ast).map(({ local }) => local));
+  const locals = new Map(propLocals(ast).map(({ key, local }) => [local, key]));
   const declared = scriptDeclarations(ast);
+  const bound = templateBindings(ast);
   const keys = new Set();
+  const props = new Set();
   const faults = [];
   const seen = new Set();
   const queue = [...referencedNames(node.tag)];
@@ -229,15 +255,16 @@ export function tagKeys(ast, node, published) {
     const name = queue.pop();
     if (seen.has(name)) continue;
     seen.add(name);
-    if (props.has(name)) {
-      if (published.has(name)) keys.add(published.get(name));
-    } else if (declared.get(name)) {
-      queue.push(...referencedNames(declared.get(name)));
-    } else if (declared.has(name)) {
+    if (bound.has(name) || declared.get(name) === null) {
       faults.push(`tag reads ${name}, which the gate cannot follow`);
+    } else if (locals.has(name)) {
+      props.add(locals.get(name));
+      if (published.has(name)) keys.add(published.get(name));
+    } else if (declared.has(name)) {
+      queue.push(...referencedNames(declared.get(name)));
     }
   }
-  return { keys: [...keys].sort(byName), faults };
+  return { keys: [...keys].sort(byName), props: [...props].sort(byName), faults };
 }
 
 /** What one pin breaks against the element it names, in a file that spells `spelled`. */
@@ -258,28 +285,67 @@ function pinFaults(id, pin, read, spelled) {
   return faults;
 }
 
+/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
+function componentTags(file, ast) {
+  const imported = new Map();
+  const statements = [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
+  for (const statement of statements) {
+    if (statement.type !== 'ImportDeclaration' || !statement.source.value.startsWith('.')) continue;
+    const path = posix.join(posix.dirname(file), statement.source.value);
+    for (const specifier of statement.specifiers) imported.set(specifier.local.name, path);
+  }
+  return [...walkNodes(ast.fragment)]
+    .filter((node) => node.type === 'Component' && imported.has(node.name))
+    .map((node) => [imported.get(node.name), node]);
+}
+
+/**
+ * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
+ * naming those props by the child's path: it states one of them on the child's tag, or a spread.
+ */
+function passedFaults(file, ast, defaulted) {
+  return componentTags(file, ast).flatMap(([child, node]) => {
+    const keys = defaulted.get(child) ?? [];
+    if (keys.length === 0) return [];
+    return node.attributes
+      .filter(({ type, name }) => type === 'SpreadAttribute' || keys.includes(name))
+      .map(
+        ({ name = 'a spread' }) =>
+          `${file} passes ${name} to ${child}, whose pinned tags rest on its default`
+      );
+  });
+}
+
 /**
  * What the pins of `dynamic` break against the `svelte:element`s `files` draw, each file as
  * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
  * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
- * reads, a keyed pin that is not `open` states `heldBy`, and no file under `src/` is `open`.
+ * reads, a keyed pin that is not `open` states `heldBy`, no file under `src/` is `open`, and no
+ * file passes a child a prop its tag reads and its pin does not follow.
  */
 export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
   const faults = [];
   const drawn = new Set();
+  const defaulted = new Map();
   for (const { file, ast, published } of files) {
     const scripts = [ast.module, ast.instance, ast.fragment];
     const spelled = new Set(scripts.flatMap((part) => literalStrings(part)));
     for (const { id, node } of dynamicElements(file, ast)) {
       if (drawn.has(id)) faults.push(`${id} is drawn twice, so one pin would name two elements`);
       drawn.add(id);
-      if (Object.hasOwn(dynamic, id)) {
-        faults.push(...pinFaults(id, dynamic[id], tagKeys(ast, node, published), spelled));
-      } else faults.push(`${id} has no pin`);
+      if (!Object.hasOwn(dynamic, id)) {
+        faults.push(`${id} has no pin`);
+        continue;
+      }
+      const read = tagKeys(ast, node, published);
+      faults.push(...pinFaults(id, dynamic[id], read, spelled));
+      const unfollowed = read.props.filter((key) => !dynamic[id].keys.includes(key));
+      defaulted.set(file, [...(defaulted.get(file) ?? []), ...unfollowed]);
     }
   }
+  const passed = files.flatMap(({ file, ast }) => passedFaults(file, ast, defaulted));
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
-  return [...faults, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
+  return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
 }
 
 /** What rule 9 judges one element as: its tags, and whether any is focusable or a form control. */
@@ -354,6 +420,20 @@ export function restElements(ast) {
         .map(({ name }) => name);
       return [{ node, before }];
     });
+}
+
+/** How often one component reads its `$props()` rest local, the pattern that declares it apart. */
+export function restReads(ast) {
+  const rest = restLocal(ast);
+  let reads = 0;
+  for (const root of rest ? [ast.module, ast.instance, ast.fragment] : []) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== rest) return;
+      const parent = ancestors.at(-1);
+      if (parent?.type !== 'RestElement' && isNameRead(node, parent)) reads += 1;
+    });
+  }
+  return reads;
 }
 
 /** Every `.svelte` file under `dir`, recursively, by path. */
@@ -447,14 +527,18 @@ export function moduleRing() {
   return ring;
 }
 
-const FOCUS_STRIP = JSON.stringify([
-  ['box-shadow', 'none'],
-  ['outline', 'none'],
-]);
 const byProperty = ([a], [b]) => byName(a, b);
+/** Whether a rule declares exactly `declarations`, in any order. */
+export const sameDeclarations = (rule, declarations) =>
+  JSON.stringify(declarationsOf(rule).sort(byProperty)) ===
+  JSON.stringify([...declarations].sort(byProperty));
+
 /** Whether a rule declares exactly `outline: none` and `box-shadow: none`. */
 export const isStrip = (rule) =>
-  JSON.stringify(declarationsOf(rule).sort(byProperty)) === FOCUS_STRIP;
+  sameDeclarations(rule, [
+    ['outline', 'none'],
+    ['box-shadow', 'none'],
+  ]);
 
 let stylesheets;
 /** Every module sheet partial and every component `<style>` under `src/ui/svelte`, as `[file, css]`. */

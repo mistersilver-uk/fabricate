@@ -991,8 +991,8 @@ describe("Kicker's host element", () => {
   });
 
   // The clause `DYNAMIC_ELEMENTS` names for the kicker's pinned tags.
-  it('draws a <p> for an as outside its three hosts, a button included, so as draws no control', async () => {
-    for (const as of ['button', 'a', 'h1']) {
+  it('draws a <p> for an as outside its three hosts, every control tag included, so as draws no control', async () => {
+    for (const as of ['button', 'a', 'input', 'select', 'textarea', 'h1']) {
       const { target, handle } = mountLeaf('Kicker', { as, children: 'Standing' });
       await settle();
       assert.equal(target.children.length, 1, 'one root');
