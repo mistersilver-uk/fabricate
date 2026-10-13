@@ -326,6 +326,11 @@ describe('the additional-dice group reads, writes and links what pays for the di
       assert.equal(input.getAttribute('aria-describedby'), line(state).id);
       assert.equal(input.getAttribute('aria-invalid'), tone === 'warning' ? 'true' : 'false');
       assert.equal(input.getAttribute('aria-label'), 'Path on the crafting character');
+      assert.equal(
+        input.getAttribute('data-validation-target'),
+        'checks-additional-dice-path',
+        'the Validation route lands on this input'
+      );
     }
   });
 

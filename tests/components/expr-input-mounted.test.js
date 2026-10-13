@@ -22,6 +22,7 @@ import { parsedTemplates } from '../helpers/svelteTemplateScan.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const CCVF = 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -409,12 +410,15 @@ describe('ExprInput (issue 2465)', () => {
       [...new Set(tags.filter(({ spreads }) => spreads > 0).map(({ file }) => file))].sort((a, b) =>
         a.localeCompare(b)
       ),
-      [
-        'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
-        'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-      ],
+      [CCVF, 'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte'],
       'a spread can carry `tokens` or a retired prop unread; a new one is read by hand before it joins this list'
     );
+  });
+
+  it("hands a check's character value its validation address as a prop, never an attribute bag", () => {
+    const declared = declaredPropNames(templates.find(({ file }) => file === CCVF).source);
+    assert.ok(declared.includes('validationTarget'), declared.join(' '));
+    assert.ok(!declared.includes('inputAttrs'), 'the bag is banned on a member, and retired here');
   });
 
   it('left no hand-rolled row of tokens behind: no hook in a template, no rule in the sheet', () => {

@@ -10,7 +10,7 @@
   | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the reading resolves against. |
   | `label` | localized string | `''` | The input's accessible name; the field draws no visible caption. |
   | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the reading line, spelled out so each stays greppable. |
-  | `inputAttrs` | plain object | `{}` | Attributes for the input, such as its `data-validation-target`; never event handlers. |
+  | `validationTarget` | string | `''` | The Validation route's id for the input, written as its `data-validation-target` in either mode. |
   | `placeholder` | string | `'@skills.craft.value'` | The input's placeholder. |
   | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a plain stored-path input read through `character.readStored`. |
 
@@ -34,7 +34,7 @@
     character = null,
     label = '',
     hooks = {},
-    inputAttrs = {},
+    validationTarget = '',
     placeholder = '@skills.craft.value',
     documentPath = null,
     onChange = () => {},
@@ -82,7 +82,7 @@
       type="text"
       class={`manager-checks-value-path is-${resolution.tone}`}
       {...attr(hooks.expression)}
-      {...inputAttrs}
+      data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
       aria-describedby={resolutionId}
       aria-invalid={resolution.tone === 'danger' || resolution.tone === 'warning'
@@ -95,7 +95,7 @@
   {:else}
     <RollDataExpressionInput
       {...attr(hooks.expression)}
-      {...inputAttrs}
+      data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
       aria-describedby={resolution ? `${hintId} ${resolutionId}` : hintId}
       {value}
