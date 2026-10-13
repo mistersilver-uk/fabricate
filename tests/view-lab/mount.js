@@ -718,6 +718,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
   // Issue 2448's seven data-only leaves, then issue 2451's `Kicker` and `Chip`, by the same seam.
   'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
+  // Issue 2452: notices whose action reports each press through a callback, by the same seam.
+  'published-controls': () => import('./fixtures/PublishedControls.svelte'),
 });
 // view-lab-region:end
 

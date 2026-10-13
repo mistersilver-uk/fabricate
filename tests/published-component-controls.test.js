@@ -1,9 +1,10 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over each entry's import
  * closure: every `callback` key is called from an event handler; every focusable element is pinned
- * to the published key that draws it, to `'always'`, or to `null`; and a reached one draws its own
- * mark for keyboard focus and is named by the companion. The test-only probe runs beside the
- * shipped entries. A key's kind and `args` are `published-component-manifest.test.js`'s.
+ * to the published key that draws it, to `'always'`, or to `null`; a reached one draws its own
+ * mark for keyboard focus and is named by the companion; and no rule outside the published
+ * `Notice` styles its action button. The test-only probe runs beside the shipped entries. A key's
+ * kind and `args` are `published-component-manifest.test.js`'s.
  * Limit: reach reads the entry's own file and does not follow a derived guard, so the chip's
  * `null` pin rests on that gate's pin of its published keys.
  * Limit: the focus mark reads declarations; the computed half is `notice-mounted.test.js`'s. A mark
@@ -27,13 +28,17 @@ import {
   SHIPPED,
   attributeOf,
   byName,
+  everyStylesheet,
   focusableElements,
   importClosure,
   isComponent,
   propLocals,
+  selectorsNaming,
+  selectorsOnAttribute,
   staticText,
   syntheticReader,
   walkWithAncestors,
+  writtenSelector,
 } from './helpers/publishedComponentGate.js';
 import { styleRules } from './helpers/svelteStructureContract.js';
 
@@ -47,7 +52,7 @@ const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
 const FOCUSABLE_REACH = Object.freeze({
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
-  'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': null,
+  'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
 });
@@ -310,6 +315,25 @@ function controlFaults(entry, pins, reader = SHIPPED) {
   ]);
 }
 
+/** The notice's action button, by the class and the hook it writes, and the file that may style it. */
+const NOTICE_ACTION = Object.freeze({
+  path: 'src/ui/svelte/components/Notice.svelte',
+  classes: ['fab-notice-button'],
+  attributes: ['data-notice-action'],
+});
+
+/** Every selector of `sheets` outside `own` that names one of a part's classes or holds one of its attributes, as written. */
+function partSelectors(sheets, { classes, attributes }, own = new Set()) {
+  return sheets
+    .filter(([file]) => !own.has(file))
+    .flatMap(([file, css]) => [
+      ...classes.flatMap((name) =>
+        selectorsNaming(css, name).map((complex) => `${file}: ${writtenSelector(css, complex)}`)
+      ),
+      ...attributes.flatMap((name) => selectorsOnAttribute(file, css, name)),
+    ]);
+}
+
 describe('each published entry that draws a control', () => {
   for (const entry of ENTRIES) {
     it(`${entry.name} calls each callback key from an event handler, and nowhere else`, () => {
@@ -327,6 +351,12 @@ describe('each published entry that draws a control', () => {
   it('pins every focusable element the shipped closures draw, and no other', () => {
     const drawn = ENTRIES.flatMap((entry) => controlsOf(entry).map(({ id }) => id));
     assert.deepEqual([...new Set(drawn)].sort(byName), Object.keys(FOCUSABLE_REACH).sort(byName));
+  });
+
+  it('styles the notice action in no rule outside the notice, by its class or by its hook', () => {
+    const own = importClosure(NOTICE_ACTION.path, SHIPPED);
+    assert.ok(own.has(NOTICE_ACTION.path), 'the notice was read');
+    assert.deepEqual(partSelectors(everyStylesheet(), NOTICE_ACTION, own), []);
   });
 
   it('reads a module ring from the sheet that names button and draws an outline at an offset', () => {
@@ -479,6 +509,33 @@ describe('the focus mark clause', () => {
     assert.deepEqual(controlFaults(entry, pins, syntheticReader({ [E]: select })), [
       `${E}: select[data-press] is a <select>, which the module ring does not name`,
     ]);
+  });
+});
+
+describe('the parts clause', () => {
+  const sheet = (css, file = 'sheet.css') => [
+    [file, templateOf(file, `<style>${css}</style>`).ast.css],
+  ];
+
+  it('names a selector that names the action class, wherever in the selector', () => {
+    const css = '.fabricate .fab-notice-button, .fab-notice-buttons { gap: 0 }';
+    assert.deepEqual(partSelectors(sheet(css), NOTICE_ACTION), [
+      'sheet.css: .fabricate .fab-notice-button',
+    ]);
+  });
+
+  it('names a selector that holds the action hook, and no other attribute', () => {
+    const css = '.a [data-notice-action] > i, .b[data-notice-dismiss] { gap: 0 }';
+    assert.deepEqual(partSelectors(sheet(css), NOTICE_ACTION), [
+      'sheet.css: .a [data-notice-action] > i',
+    ]);
+  });
+
+  it('skips a selector in a file of the notice’s own closure', () => {
+    const own = new Set([NOTICE_ACTION.path]);
+    const css = '.fab-notice-button { gap: 0 }';
+    assert.deepEqual(partSelectors(sheet(css, NOTICE_ACTION.path), NOTICE_ACTION, own), []);
+    assert.equal(partSelectors(sheet(css), NOTICE_ACTION, own).length, 1);
   });
 });
 

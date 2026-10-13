@@ -69,6 +69,25 @@ const SLOT_BOX = 'display: contents';
 /** The portrait ladder's single mark, whose edge includes its border under Foundry's reset. */
 const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 
+/** The controls fixture's ground, and one of its sections by the key the fixture gives it. */
+const CONTROLS_GROUND = '[data-lab-controls]';
+const CONTROL_SECTION = (key) => `[data-lab-control="${key}"]`;
+const CONTROL = (key) => `${CONTROLS_GROUND} > ${CONTROL_SECTION(key)}`;
+const CONTROL_ACTION = (key) => `${CONTROL(key)} [data-notice-action]`;
+
+/** The ground once the first two steps have acted: the first notice redrawn, the second's count at one. */
+const ACTED_GROUND = [
+  CONTROLS_GROUND,
+  `:has(> ${CONTROL_SECTION('resume')} .fab-notice.is-success)`,
+  `:has(> ${CONTROL_SECTION('count')} .fab-notice[data-lab-presses="1"])`,
+].join('');
+
+/** Each notice `tests/view-lab/fixtures/PublishedControls.svelte` mounts, by its section's key. */
+const CONTROL_KEYS = Object.freeze(['resume', 'count', 'wide', 'hold', 'undo']);
+
+/** The action button's own box, type and ink, the same at every tone. */
+const ACTION_BUTTON = 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)';
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -186,6 +205,57 @@ export const CASES = Object.freeze([
     // Every component mounted here is a broad signal, routed here by its override: the seven
     // leaves (issue 2448), then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and
     // `Notice` (issue 2451).
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-controls-specimen',
+    label:
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [
+      { selector: CONTROL_ACTION('resume') },
+      { selector: CONTROL_ACTION('count'), press: 'Enter' },
+      { selector: CONTROL_ACTION('count'), press: 'Tab' },
+    ],
+    // All three acted states, none of which exists before its step: the first notice redrawn with
+    // no action, the second's count, and keyboard focus on the third's action.
+    expectSelector: `${ACTED_GROUND} > ${CONTROL_SECTION('wide')} [data-notice-action]:focus-visible`,
+    expectCenterHit: CONTROL_ACTION('wide'),
+    // Each notice inside the ground, and the ground inside the window, so a row the window clips
+    // fails the capture.
+    expectContained: [
+      ...CONTROL_KEYS.map((key) => ({
+        container: CONTROLS_GROUND,
+        target: `${CONTROL(key)} > div > .fab-notice`,
+      })),
+      { container: '.window-content', target: CONTROLS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // One button per tone once the first notice has lost its own: a control selector names
+        // one element.
+        ...['info', 'danger', 'warning', 'success'].map((tone) => ({
+          selector: `.fab-notice.is-${tone} [data-notice-action]`,
+          styles: ACTION_BUTTON,
+        })),
+        {
+          selector: `${CONTROL('resume')} .fab-notice.is-success .fab-notice-title`,
+          styles: 'color: var(--fab-success-text)',
+        },
+        {
+          selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+          styles: 'color: var(--fab-danger-text)',
+        },
+      ],
+    },
+    // The leaves specimen's window; `expectContained` holds the fixture's 592px ground inside
+    // `.window-content`.
+    position: { width: 1024, height: 720 },
+    kinds: ['manager', 'specimen'],
+    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

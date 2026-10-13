@@ -374,7 +374,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       Notice: {
         version: 1,
-        props: { tone: optional, title: required, detail: optional, icon: optional },
+        props: {
+          tone: optional,
+          title: required,
+          detail: optional,
+          icon: optional,
+          action: optional,
+          onAction: { kind: 'callback', required: false },
+        },
         rest: true,
         root: 'any',
       },
@@ -437,6 +444,31 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         `### ${name} in docs/api/index.md against its spec group`
       );
     }
+  });
+
+  it('states every value the spec names for an interactive component under Ownership and theme', () => {
+    const between = (text, from, to) => {
+      const start = text.indexOf(from);
+      const end = text.indexOf(to, start + 1);
+      assert.ok(start !== -1 && end !== -1, `${from.trim()}, then ${to.trim()}`);
+      return text.slice(start, end);
+    };
+    const specified = between(SPECIFIED, '\n### Interactive components\n', '\n### ');
+    const documented = between(DOCUMENTED, '\n### Ownership and theme\n', '\n## Data Persistence\n');
+    const tokens = [...new Set(specified.match(/`[^`]+`/gu))];
+    assert.ok(tokens.length > 15, 'the spec states its interactive rule in backticked values');
+    // The docs write a root bare, as their components table does, where the spec quotes it.
+    const stated = (token) =>
+      documented.includes(token) || documented.includes(token.replaceAll("'", ''));
+    assert.deepEqual(
+      tokens.filter((token) => !stated(token)),
+      [],
+      'each value the spec names for a control is named in the docs'
+    );
+    assert.ok(
+      !documented.includes('non-interactive'),
+      'the docs no longer say a published component is non-interactive'
+    );
   });
 
   it('publishes the canonical realm classes and the deprecated alias as the same class', () => {

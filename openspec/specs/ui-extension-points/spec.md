@@ -360,13 +360,13 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; bindables, callbacks, the overlay host, keyboard handling and the standalone style root for interactive primitives are the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; bindables, the overlay host and the standalone style root are the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
 - **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.**
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
-- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot', required: boolean } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
+- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required: boolean } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
 - `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key) }`.
 - `load(names)` takes an array of published names, reads a value that is not an array as one name, and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 It resolves `undefined` once every named entry's code is loaded, which today is the next microtask, and rejects with the M3 `TypeError` for a name that is not published.
@@ -378,7 +378,7 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot', required?, element? } }, rest, root }`, and Fabricate's runtime adapter binds each `path` to its component.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required?, element?, args? } }, rest, root }`, and Fabricate's runtime adapter binds each `path` to its component.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
 - The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
 - The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
@@ -388,11 +388,11 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
 - An element-ref bindable (`Chip`'s `element`) is never published.
-- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `action`, `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
+- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and a companion calls it for them before mounting.
-- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'` and `'slot'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
+- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'` and `'callback'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
@@ -426,6 +426,22 @@ It styles and attributes its own elements and never the slot element: a class, r
 A `<button>` the companion draws there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
 The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
+- A `callback` key takes a function, and `undefined` or absence omits it, so the component's own default applies; anything else is M17.
+A function is accepted only as the whole value of a `callback` key: anywhere else, at any depth, it is M10.
+- The component receives one forwarder per `callback` key, the same one for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
+- Fabricate calls the function with the arguments the entry's group states, in that order, and with nothing else.
+Each is a copy made with Fabricate's `$state.snapshot`: plain objects and arrays at every depth, a `Map`, `Set` or `Date` one level deep.
+At version 1 every stated argument is one of those or a primitive, so no event, DOM node or Fabricate object is passed.
+An argument the group does not state is not passed.
+- The call is synchronous, inside the user's event, after the component has finished its own state change, and under Fabricate's `untrack`, which covers Fabricate's runtime only.
+Every published callback is called from an event handler, never while Fabricate renders or runs an effect.
+A companion that is called back inside an effect of its own untracks its own reads.
+- The function's return value is ignored.
+A throw, or the rejection of a Promise it returns, is reported as `console.error('Fabricate | Published component callback failed:', name, key, error)` and goes no further: the mount stays live, it is not a fault, and `onFault` is not called.
+- The function may call `update` or `destroy` on its own handle, or `mount`, before it returns.
+An `update` made there is drawn on Fabricate's next flush, and a refusal it throws is reported as a callback failure unless the function catches it.
+- After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again.
+- A companion detects a callback key with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates the key refuses it.
 
 ### The required ancestor root
 
@@ -440,6 +456,38 @@ A Foundry 14 detached window's target is judged the same way.
 - A target inside a slot element that is not attached is judged from the mount that owns that element.
 - A companion's own window, a chat message and another module's sheet carry no Fabricate root, so they host `'any'` entries only.
 - Moving an entry to `'any'` later is a widening, so it is additive.
+
+### Interactive components
+
+- A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
+- A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
+- A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and stops no other key.
+The press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
+In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
+- A control consumes only the keys the platform gives its native element, and its group names any other.
+Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
+In any other ApplicationV2 window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off.
+- A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
+- A control's accessible name is text the companion passes through a key its group names, and Fabricate supplies none.
+- Fabricate moves no focus.
+An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
+The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
+Where the destination is drawn by the same change, the companion draws it first, focuses it, and then removes the control.
+- To return focus to a published control, after a dialog its press opened has closed, the companion focuses the focusable element inside `target` that the entry's group names; nothing else inside `target` is the companion's to select.
+- A press bubbles from the control as a `click`.
+A companion element above `target` that listens for `click` receives every press too.
+The companion keeps `target` out of any element of its own that carries `data-action`, and passes no `data-action` through rest to a component that draws a control: the window dispatches the nearest `data-action` above the press, and `close` closes it, as a DialogV2 button's own action name submits it.
+The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
+- A control is unavailable only through a key its group names.
+A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead.
+- A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
+A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
+- A control shows nothing under the pointer that it does not also show under keyboard focus.
+- A control's only motion is the fade of its own state change.
+Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
+- A control opens no tooltip at version 1, Fabricate's or Foundry's, and the companion passes no `title` or `data-tooltip`.
+A control whose face is a glyph alone is published only with a required key for its name, and its group says whether the pointer is shown that name.
 
 ### The issue 2448 components
 
@@ -581,19 +629,38 @@ Each group states the accepted values of every key that entry publishes.
   - `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
     It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
   - `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
+  - `action` is optional and is `{ label }`, drawing one button after the text; `label` is the button's whole accessible name, final display text.
+    An `action` with no non-empty `label`, or passed without `onAction`, draws no button.
+    The companion passes no other member: one this line does not state is private, and a function in it is M10.
+  - `onAction` is an optional callback, called with no argument each time the action button is pressed.
+  - The label is one line, never wrapped or clipped: where the notice is too narrow to hold it beside the text the button drops beneath, and a label wider than `target` overflows the notice, so the companion keeps it short.
+  - The button is drawn the same at every tone and takes no tone of its own, so a destructive action says so in `label`.
+    `danger` reports what is wrong and stops the reader's work; a notice that offers a retry or a resume passes `warning`.
+  - The button has no disabled and no busy state at version 1, and `onAction` is called on every press, a held Enter key included.
+    The companion ignores a press it is still handling and, where the wait is perceptible, says so with an `update` to `label`.
+  - Where several notices are shown at once, each `label` says what its action acts on, because the label is the button's whole name and nothing describes it.
   - It is a live region, `role="status"` with `aria-live="polite"`: a change to its text is announced, and most screen readers also announce one mounted with its text, though some do not, so a notice the reader must not miss also says it in `title`.
     An `update` that changes none of its text announces nothing.
     The companion mounts it when the thing happens and destroys it when it no longer holds, never as standing text.
     Every mount is a new announcement, so when the companion's content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), it keeps the notice through `update` where its `target` survives and does not mount an unchanged one again.
-    It takes no focus and moves none; where the act that caused it also moves focus, the companion moves focus first and mounts the notice after, because a focus change cancels polite speech.
+    It moves no focus, and takes none except on its action button; where the act that caused it also moves focus, the companion moves focus first and mounts the notice after, because a focus change cancels polite speech.
     Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
     Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
-  - It draws no control at version 1, neither an action nor a dismissal, so the companion removes it with `destroy`.
+  - Fabricate removes no notice on a timer, and a companion that does gives a notice that carries an action no time limit.
+  - The button's label is part of the live region: an `update` that changes it is announced, by some screen readers together with the whole notice, so the companion changes it only to report a change of state.
+  - An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
+    An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so the companion moves focus first, as `### Interactive components` states.
+    The button is the only focusable element inside `target`.
+    In a host that replaces its content on render (DialogV2, a Handlebars part) the button is a new element after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses the button.
+    The keyboard ring is the accent, 2px outside the button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
+  - It draws no dismissal at version 1, so the companion removes it with `destroy`.
   - The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
     The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
     At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
     So the companion says in `title` whatever the reader must not miss.
-  - It inherits `target`'s face.
+  - The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so the companion never mounts a notice with an action inside a tinted panel.
+    Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: the companion passes a verb phrase.
+  - It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
 - **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
 
 ### Mounting and its refusals
@@ -614,13 +681,14 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
 | M9 | A `required` prop is absent or `''` | `<name> requires a non-empty "<key>"` |
-| M10 | A function at any depth, a callback or a snippet | `functions are phase 2 (issue 2427)` |
+| M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
 | M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean | `"<key>" is not a data attribute` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
+| M17 | A `callback` key holding a value that is not a function | `"<key>" must be a function` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
@@ -629,7 +697,7 @@ Otherwise `mount` destroys the stale entry first, then checks that the target is
 
 ### Updating and destroying
 
-- **`update(props)` is validated with M7 to M15 and is atomic**: when it throws, the previous props stay rendered.
+- **`update(props)` is validated with M7 to M15 and M17 and is atomic**: when it throws, the previous props stay rendered.
 - `update` replaces the props and never merges them, so an omitted key reads `undefined` and the component's default applies, and nothing remounts.
 - `update` returns `true` once accepted, with the DOM reflecting it after the next flush, and `false` after `destroy` or a fault.
 - `update` writes the host's props under Fabricate's `untrack`, so a call from inside a `$derived` on Fabricate's own runtime is not an unsafe mutation.
@@ -672,7 +740,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - `.fab-*` and `manager-*` classes and `svelte-*` hashes are private: a companion selects none, and writes no `manager-*` class on an element it owns, `target` included.
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
-- A published component draws only its declared content and, inside a content slot, the companion's own, and adds no premium signal.
+- A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
 It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus, and makes no network request except to load an image path the companion passes.
 - A published component is not a live region unless its group says it is.
 - **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
@@ -727,9 +795,15 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** its root carries `role="status"` and `aria-live="polite"`
 - **AND** after an `update` that changes `title` the same root carries the new text
 
+#### Scenario: A callback
+
+- **WHEN** a companion mounts `Notice` with `action` and `onAction` and the user presses the action button
+- **THEN** Fabricate calls `onAction` once, with no argument
+- **AND** when `onAction` throws, Fabricate reports it, the notice stays drawn, and `update` still answers `true`
+
 #### Scenario: A malformed request
 
-- **WHEN** the name is unpublished, a prop key is unpublished, a required prop is empty, or a value is a function
+- **WHEN** the name is unpublished, a prop key is unpublished, a required prop is empty, or a function is passed where no callback is published
 - **THEN** `mount` throws its fixed `TypeError`, and nothing is rendered
 
 #### Scenario: An occupied target

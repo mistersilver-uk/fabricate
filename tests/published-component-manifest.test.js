@@ -616,7 +616,11 @@ describe('each entry matches its component declaration', () => {
         .filter(([, spec]) => spec.kind === 'callback')
         .map(([key, spec]) => `${entry.name}.${key}: ${spec.args ?? 0}`)
     );
-    assert.deepEqual(shipped, [], 'a forwarded argument needs a mounted clause on its type');
+    assert.deepEqual(
+      shipped,
+      ['Notice.onAction: 0'],
+      'a forwarded argument needs a mounted clause on its type'
+    );
   });
 
   it('spells no sheet-named class in an any closure but the four pinned: the Chip pair, and the EmptyState and Notice roots', () => {
@@ -1327,7 +1331,7 @@ describe('the module sheet and every component style against the published Notic
     );
     assert.deepEqual(
       publishedShapeOf('Notice'),
-      [['tone', 'title', 'detail', 'icon'], 'any'],
+      [['tone', 'title', 'detail', 'icon', 'action', 'onAction'], 'any'],
       'a published key that writes a class reopens cannotMatchPublished'
     );
   });

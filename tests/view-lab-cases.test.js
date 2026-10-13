@@ -385,9 +385,16 @@ test('every case claiming a gathering/travel leaf also claims the rail that rend
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
-/** Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix. */
+/**
+ * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
+ * mount page, its companion stand-in, and the one specimen fixture whose case acts on what it mounts.
+ */
 const LAB_HOOK = /^(?:data-)?lab-/;
-const labHarnessSource = ['tests/view-lab/mount.js', 'tests/view-lab/labCompanionRoll.js']
+const labHarnessSource = [
+  'tests/view-lab/mount.js',
+  'tests/view-lab/labCompanionRoll.js',
+  'tests/view-lab/fixtures/PublishedControls.svelte',
+]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
 
@@ -1020,6 +1027,24 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fab-notice', styles: 'display: flex; background-color: var(--fab-warning-soft)' },
     { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
     { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
+  ],
+  // The published controls (issue 2452): the action button at each tone at its own box, type and
+  // ink, then the redrawn notice's success title and the default tone's danger title in their own
+  // inks, under the fixture's azure.
+  'manager-published-controls-specimen': [
+    ...['info', 'danger', 'warning', 'success'].map((tone) => ({
+      selector: `.fab-notice.is-${tone} [data-notice-action]`,
+      styles: 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)',
+    })),
+    {
+      selector:
+        '[data-lab-controls] > [data-lab-control="resume"] .fab-notice.is-success .fab-notice-title',
+      styles: 'color: var(--fab-success-text)',
+    },
+    {
+      selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+      styles: 'color: var(--fab-danger-text)',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5500,16 +5525,20 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects both specimens it mounts', () => {
+test('every published component seam module, and the host, selects the three specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
-  assert.ok(modules.length >= 4, 'the seam, its prop kinds, its manifest and its adapter');
+  assert.ok(
+    modules.length >= 5,
+    'the seam, its prop kinds, its callbacks, its manifest and its adapter'
+  );
   for (const file of [...modules, 'src/ui/svelte/published/PublishedComponentHost.svelte']) {
     const selected = selectedIds([file], {});
     for (const id of [
       'manager-published-tier-track-specimen',
       'manager-published-leaves-specimen',
+      'manager-published-controls-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
@@ -5621,6 +5650,61 @@ test('the leaves specimen mounts every published component but TierTrack and che
       .map(({ target }) => target),
     nested.map((pair) => `${hostRoot(pair)} [data-nested="${pair[1]}"] > *`),
     'the nested entries directly follow the per-section ones'
+  );
+});
+
+test('the controls specimen mounts through the seam and presses what it mounts: a click, Enter and Tab', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedControls.svelte';
+  const { instance, fragment } = componentAstOf(FIXTURE);
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'ImportDeclaration' && /publishedComponentSeam\.js$/.test(node.source.value)
+    ),
+    'the fixture imports the page-session seam'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Notice'
+    ),
+    'and mounts Notice through its mount'
+  );
+  for (const hook of ['data-lab-controls', 'data-lab-control']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit, expectContained } = getCaseById(
+    'manager-published-controls-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => step.press ?? 'click'),
+    ['click', 'Enter', 'Tab'],
+    'a pointer press, a keyboard press, and a move of keyboard focus'
+  );
+  assert.ok(
+    steps.every((step) => step.selector.endsWith('[data-notice-action]')),
+    'each step acts on an action button the fixture mounted'
+  );
+  const focused = '[data-lab-control="wide"] [data-notice-action]';
+  assert.ok(
+    expectSelector.endsWith(`${focused}:focus-visible`) && expectCenterHit.endsWith(focused),
+    'the frame is taken with keyboard focus on the action whose centre is hit-tested'
+  );
+  assert.equal(
+    expectContained.length,
+    6,
+    'five notices in the ground, and the ground in the window'
   );
 });
 

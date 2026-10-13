@@ -1979,7 +1979,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks and the first control; bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2042,7 +2042,7 @@ The published components, in publication order:
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
-| `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon` | yes |
+| `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2256,37 +2256,93 @@ It is not a Foundry notification: it is drawn in your element, and `ui.notificat
 `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
 It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
 `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
+`action` is optional and is `{ label }`, drawing one button after the text; `label` is the button's whole accessible name, final display text.
+An `action` with no non-empty `label`, or passed without `onAction`, draws no button.
+Pass no other member: one this line does not state is private, and a function in it throws `"action" must not hold a function`.
+`onAction` is an optional callback, called with no argument each time the action button is pressed.
+The label is one line, never wrapped or clipped: where the notice is too narrow to hold it beside the text the button drops beneath, and a label wider than `target` overflows the notice, so keep it short.
+The button is drawn the same at every tone and takes no tone of its own, so a destructive action says so in `label`.
+`danger` reports what is wrong and stops the reader's work; a notice that offers a retry or a resume passes `warning`.
+The button has no disabled and no busy state at version 1, and `onAction` is called on every press, a held Enter key included.
+Ignore a press you are still handling and, where the wait is perceptible, say so with an `update` to `label`.
+Where several notices are shown at once, each `label` says what its action acts on, because the label is the button's whole name and nothing describes it.
 It is a live region, `role="status"` with `aria-live="polite"`: a change to its text is announced, and most screen readers also announce one mounted with its text, though some do not, so a notice the reader must not miss also says it in `title`.
 An `update` that changes none of its text announces nothing.
 Mount it when the thing happens and destroy it when it no longer holds, never as standing text.
 Every mount is a new announcement, so when your content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), keep the notice through `update` where its `target` survives and do not mount an unchanged one again.
-It takes no focus and moves none; where the act that caused it also moves focus, move focus first and mount the notice after, because a focus change cancels polite speech.
+It moves no focus, and takes none except on its action button; where the act that caused it also moves focus, move focus first and mount the notice after, because a focus change cancels polite speech.
 Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
 Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
-It draws no control at version 1, neither an action nor a dismissal, so remove it with `destroy`.
+Fabricate removes no notice on a timer, so if you do, give a notice that carries an action no time limit.
+The button's label is part of the live region: an `update` that changes it is announced, by some screen readers together with the whole notice, so change it only to report a change of state.
+An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
+An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The button is the only focusable element inside `target`.
+In a host that replaces its content on render (DialogV2, a Handlebars part) the button is a new element after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus the button.
+The keyboard ring is the accent, 2px outside the button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
+It draws no dismissal at version 1, so remove it with `destroy`.
 The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
 The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
 At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
 So say in `title` whatever the reader must not miss.
-It inherits `target`'s face.
+The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so never mount a notice with an action inside a tinted panel of your own.
+Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: pass a verb phrase.
+It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
 The notice's own figures are private, and so are its `accent` tone and what it draws for a tone outside its set.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 `data-notice-*` names are the notice's own: a value you pass under one overwrites what the notice writes.
-Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+Do not pass `data-action`: the window dispatches every click inside the notice to it (`close` closes the window), each press of its action button among them.
 For a tooltip pass `data-tooltip-text`, not `data-tooltip` or `data-tooltip-html`, which Foundry reads as HTML; it opens on pointer hover only, so it never says what the title and the detail do not.
+It stays open while the pointer is over the action button.
+
+A worked action, the bar that holds a stage after a failed check, drawn on its card's own ground and never inside a tinted panel:
+
+```javascript
+// After `load(['Notice'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the callback refuses `action` and `onAction`: draw your own bar there.
+if (fabUi?.describe?.('Notice')?.props.onAction?.kind !== 'callback') return;
+
+const held = { tone: 'warning', title: 'This stage is held by the failed check.' };
+let allowing = false;
+
+function onAction() {
+  if (allowing) return; // A second press, or a held Enter key, while the write is under way.
+  allowing = true;
+  notice.update({ ...held, action: { label: 'Allowing another attempt…' }, onAction });
+  allowAnotherAttempt(); // Your own world write; handle its failure yourself.
+}
+
+const notice = fabUi.mount('Notice', {
+  target,
+  props: { ...held, action: { label: 'Allow another attempt' }, onAction },
+});
+
+// Later, when the hold has cleared and you have drawn the roll control it gives way to:
+rollControl.focus(); // First: `destroy` removes the focused button, and Fabricate moves no focus.
+notice.destroy();
+```
 
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
 `describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
-A prop's `kind` is `data`, `text` or `slot`.
+A prop's `kind` is `data`, `text`, `slot` or `callback`.
 A `data` prop takes plain data, and the component receives a copy.
 A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
 A `text` prop that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a required one refuses `''`.
 A `slot` prop is a content slot, a place where the component draws your own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it, and it is never required.
+A `callback` prop takes a function, and `undefined` or absence omits it, so the component's own default applies.
+The component receives one forwarder for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
+Fabricate calls your function with the arguments the component's section states, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
+The call is synchronous, inside the user's event, after the component has finished its own state change; a published callback is never called while Fabricate renders or runs an effect.
+It runs under Fabricate's `untrack`, which covers Fabricate's runtime only, so if you are called back inside an effect of your own, untrack your own reads.
+Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush.
+After `destroy`, a fault, or an `update` that omits the prop, Fabricate does not call the function again.
+Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates it refuses the prop.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
@@ -2301,7 +2357,9 @@ It returns a frozen `{ update(props), destroy(), slot(key) }`.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
   A component whose root is not `any` also needs that Fabricate ancestor above `target`: otherwise `mount` throws `<name> needs a Fabricate window ancestor` or `<name> needs a Fabricate manager ancestor`, before it claims the target.
-- `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with no function at any depth and no cycle.
+- `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with a function only as a callback prop's value and no cycle.
+  A function anywhere else, at any depth, throws `"<key>" must not hold a function`, naming the prop that holds it.
+  A `callback` prop holds a function, and anything else there throws `"<key>" must be a function`.
   A `text` prop holds a string, and anything else there throws `"<key>" must be a string`.
   A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean.
@@ -2385,6 +2443,10 @@ const handle = fabUi.mount('Kicker', {
 });
 ```
 
+What a callback prop's function returns is ignored.
+A throw, or the rejection of a Promise it returns, is logged as `Fabricate | Published component callback failed:` with the name, the prop and the error, and goes no further: the mount stays live, it is not a fault, and `onFault` is not called.
+A refusal that an `update` throws inside your function is reported the same way unless you catch it.
+
 `load(names)` takes an array of published names and returns a Promise.
 A value that is not an array is read as one name.
 It never throws synchronously, and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
@@ -2438,9 +2500,36 @@ A later move between windows is not carried to a mount, and a theme change made 
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-- A published component is non-interactive: it takes no focus and has no accessible name beyond what you pass.
-- A required label is yours to localise.
-- Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
+
+- A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
+- A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and stops no other key.
+  The press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
+  In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
+- A control consumes only the keys the platform gives its native element, and its section names any other.
+  Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
+  In any other ApplicationV2 window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off.
+- A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
+- A control's accessible name is text you pass through a prop its section names, and Fabricate supplies none.
+- Fabricate moves no focus.
+  An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
+  The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
+  Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.
+- To return focus to a published control, after a dialog its press opened has closed, focus the focusable element inside `target` that the component's section names; nothing else inside `target` is yours to select.
+- A press bubbles from the control as a `click`.
+  An element of yours above `target` that listens for `click` receives every press too.
+  Keep `target` out of any element of your own that carries `data-action`, and pass no `data-action` through rest to a component that draws a control: the window dispatches the nearest `data-action` above the press, and `close` closes it, as a DialogV2 button's own action name submits it.
+  Keep `target` out of a `<label>`, an `<a>` and a `<button>` of your own.
+- A control is unavailable only through a prop its section names.
+  A natively `disabled` control leaves the tab order and cannot take focus, so never disable the control that holds focus: ignore the press instead.
+- A control that shows a state (pressed, checked, selected, current) takes it from a `data` prop and exposes it in the accessibility tree as well as in colour.
+  A press reports through the callback, and the control shows the new state when your `update` passes it; its section says where a native control changes itself first.
+- A control shows nothing under the pointer that it does not also show under keyboard focus.
+- A control's only motion is the fade of its own state change.
+  Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
+- A control opens no tooltip at version 1, Fabricate's or Foundry's, so pass no `title` or `data-tooltip` to one.
+  A control whose face is a glyph alone is published only with a required prop for its name, and its section says whether the pointer is shown that name.
 
 ## Data Persistence
 

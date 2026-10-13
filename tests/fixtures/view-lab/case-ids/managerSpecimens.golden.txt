@@ -1,3 +1,4 @@
 manager-bulk-edit-panel-shell-specimen
 manager-published-tier-track-specimen
 manager-published-leaves-specimen
+manager-published-controls-specimen
