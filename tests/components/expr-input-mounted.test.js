@@ -60,8 +60,8 @@ const RETIRED_CLASSES = Object.freeze([
   'manager-checks-formula-tokens',
 ]);
 
-/** The planned-migrations row that names what the entry specifies and the file does not ship. */
-const MIGRATION_SUBJECT = 'Expression field reading';
+/** The planned-migrations row that names what still holds the entry at target: the file's place. */
+const MIGRATION_SUBJECT = 'Expression field placement';
 
 /** The entry's status, the prop names its API list sets in bold, and the migration subjects. */
 function readEntry() {

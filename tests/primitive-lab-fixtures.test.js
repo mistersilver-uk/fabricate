@@ -43,6 +43,7 @@ const isShippedPrimitive = (resolved) =>
 const IMPORTABLE = Object.freeze([
   'tests/view-lab/primitives/fixtureActs.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/util/statusChipTone.js',
 ]);

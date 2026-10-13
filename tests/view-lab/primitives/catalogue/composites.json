@@ -4,15 +4,21 @@
     "cap": "expression — resolved only where an actor is in scope",
     "draws": ".k-field.mono",
     "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
+    "fixture": "ExprInputReading",
     "undrawn": {
       "Expression": "the field’s accessible name; the drawing draws the field alone",
-      "Add a term": "the token row’s accessible name; the drawing draws the tokens alone"
+      "Add a term": "the token row’s accessible name; the drawing draws the tokens alone",
+      "Unresolved": "the caller’s statement for an expression that does not reduce; the drawing draws one that does"
     },
     "props": {
-      "value": "1d20 + @prof + @abilities.dex.mod",
+      "value": "@prof + @abilities.dex.mod + 8",
       "aria-label": "Expression",
       "tokens": ["@prof", "@abilities.dex.mod", "@skills.cra.rank"],
       "tokensLabel": "Add a term"
+    },
+    "data": {
+      "rollData": { "prof": 3, "abilities": { "dex": { "mod": 2 } } },
+      "unresolvedKey": "FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved"
     }
   },
   {
