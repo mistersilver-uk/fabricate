@@ -33,7 +33,7 @@ This page is the reference for that syntax, wherever you meet it.
 | [World › Rules & Resources › Modifiers]({% link world/rules/modifiers.md %}) | **Minimum** and **Maximum** bounds | A whole number |
 | [World › Rules & Resources › Character Prerequisites]({% link world/rules/character-prerequisites.md %}) | **Property path** | Roll-data path |
 | [World › Rules & Resources › Currency]({% link world/rules/currency.md %}) | **Actor data path**, under that spend strategy only | Actor data path |
-| [Tools]({% link tools.md %}) | **Bonus expression** | Roll expression, and the one field that adds `@` for you |
+| [Tools]({% link tools.md %}) | **Bonus to the check** | A [modifier](#modifiers-and-modifier-references) picked from the library, whose roll expression the Tool takes as written |
 | [Tools]({% link tools.md %}) | **Dice expression** and **Break below** | Roll expression, and a number the roll must stay at or above |
 | [Gathering › Settings]({% link gathering/settings.md %}) | **Maximum stamina**, **Starting stamina**, **Amount per interval** | Roll expression |
 | [Gathering › Tasks]({% link gathering/tasks.md %}) | **Stamina cost** | A whole number, 0 or more — **not** an expression |
@@ -77,9 +77,9 @@ The paths differ from one game system to the next.
 When no character is resolved, every `@` term reads as **0** rather than erroring.
 That matters in two places: a check preview with no actor selected shows every roll-data key as zero, and a gathering formula evaluated before a character is chosen does the same.
 
-### The leading `@`, and the one field that adds it for you
+### The leading `@`
 
-Almost every expression field is a **plain text field**: what you type is stored byte for byte.
+Every expression field is a **plain text field**: what you type is stored byte for byte.
 So a character-data path needs its own `@`, and a number or a die must not have one.
 
 | You want | You type |
@@ -89,11 +89,9 @@ So a character-data path needs its own `@`, and a number or a die must not have 
 | A d4 | `1d4` |
 | All three added together | `@abilities.med.mod + 2 + 1d4` |
 
-{: .warning }
-> **The Tool Studio's Bonus expression field is the exception.**
-> It stores roll-data paths with `@` for you, so you enter the path **without** one — `abilities.str.mod`, not `@abilities.str.mod`.
-> A number or a dice expression still goes in as-is.
-> The field's own hint states this, and nowhere else in Fabricate behaves this way.
+{: .note }
+> **No field adds the `@` for you.**
+> A Tool's check bonus is not typed at all: it is picked from the Modifiers library and takes that entry's expression as written.
 
 ### Dice
 
@@ -450,7 +448,6 @@ Two Fabricate surfaces will also tell you before you commit:
 | The expression contributes nothing at all | The dice engine refused it. Check for a capitalised function name, a decimal without its leading zero, or a dice count above 999 |
 | A character-data term behaves as 0 | The path is wrong for this game system, or no character is resolved yet. Test it with `/r` |
 | A prerequisite is never met | The same cause. An unknown path falls back to `0` or `false`, so a typo reads as an unmet condition rather than an error |
-| A tool bonus silently contributes 0 | The Tool Studio adds `@` only to a **bare path**. A compound entry such as `abilities.str.mod + 2` gets none, so its path term reads as 0. Write the compound with its own `@` |
 | Stamina always starts at 0 | The expression resolved negative, and stamina is floored at 0 |
 | A dice-count expression fails intermittently | The count reached 0 or went negative. Guard it with `max(1, …)` |
 | A modifier never exceeds a small number | It has a maximum bound set. Empty means no limit, but a bound of 0 is a real limit of zero |
