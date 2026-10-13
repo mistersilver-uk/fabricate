@@ -477,7 +477,7 @@ In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter a
 Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
-Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): each is a name Fabricate's own stylesheet draws from, and the first draws the keyboard ring on a control that does not hold focus.
+Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, and Fabricate supplies none.
 - Fabricate moves no focus.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
@@ -726,7 +726,7 @@ Each group states the accepted values of every key that entry publishes.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side.
     The companion leaves that much inside any edge of its own that clips, a scrolling container's among them, and insets a `fullWidth` button's `target` by as much.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not against `--fab-bg-3`.
-  - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet draws a button from, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
+  - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The button therefore opens no tooltip and keeps its own cursor, so a hint goes in the label or in text beside the button, where a keyboard user reads it too.
   - The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
@@ -755,7 +755,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
-| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet draws from, `data-validation-focused` or `data-essence-sort-direction` | `"<key>" is not a data attribute`, or `"<key>" is reserved on <name>` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction` | `"<key>" is not a data attribute`, or `"<key>" is reserved on <name>` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |

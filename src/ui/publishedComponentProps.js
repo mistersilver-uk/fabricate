@@ -13,8 +13,8 @@ const ATTRIBUTE_TYPES = new Set(['string', 'number', 'boolean']);
  * control's own keyboard mark (`data-keyboard-focus`), or be read off the control by Foundry: a
  * window action on a press (`data-action`), a cursor at the next pointer release (`data-cursor`),
  * a tooltip on pointer entry (`data-tooltip` and every name that starts `data-tooltip-`); or
- * because Fabricate's own stylesheet draws a button from it (`data-validation-focused`, which
- * draws the keyboard ring, and `data-essence-sort-direction`).
+ * because Fabricate's own stylesheet reads it off its own buttons (`data-validation-focused`,
+ * which draws the keyboard ring under a Fabricate root, and `data-essence-sort-direction`).
  */
 export const RESERVED_ON_A_CONTROL =
   /^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/;
