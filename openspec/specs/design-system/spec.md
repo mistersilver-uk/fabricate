@@ -925,11 +925,12 @@ A programmatic `.focus()` that follows a pointer activation matches `:focus` and
 
 The expression field (`RollDataExpressionInput`) draws no box, so the faces of its input that a box carries are its host's.
 Its rest face is `Field`'s box, the recipe row's amount box, or the manager's free-text baseline.
-Its focus-visible ring is the module's inset text-field ring.
+Its focus-visible ring is the module's inset text-field ring, drawn by the module's baseline rule for a text input (`styles/fabricate-base.css`), which `Field` restates for a bare host, and never by this component.
 Its disabled face is the manager baseline's `:disabled` rule, so a host outside a manager root owes one.
 Its invalid face is the caller's own rule on `[aria-invalid='true']`, since neither `Field`'s box nor the manager's baseline draws one.
-No text input draws a hover face at this head.
+No text input draws a hover face.
 It declares `disabled`, which disables its input and every token together and leaves its reading drawn, and it takes the invalid state as `aria-invalid` on its rest spread.
+A host MUST stack the input and its row in a column that states the gap between them, as `Field` does at 6px, and MUST host the field outside a `<label>` when it passes `tokens` or `resolve`, because a label would take every token, the reading and the status text into the field's name.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
