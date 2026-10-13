@@ -128,7 +128,8 @@ describe('1286 EmptyState — variant contract', () => {
     await harness.setProps({ compact: true, fill: true, hint: 'No matching runs' });
     assert.ok(panelOf(target).classList.contains('is-fill'));
     assert.equal(panelOf(target).textContent.trim(), 'No matching runs');
-    for (const declaration of [/width:\s*100%/, /height:\s*100%/, /min-height:\s*0/]) assert.match(ruleBody('.manager-empty.is-fill'), declaration);
+    for (const declaration of [/width:\s*100%/, /height:\s*100%/, /min-height:\s*0/])
+      assert.match(ruleBody('.manager-empty.is-fill'), declaration);
     harness.remount();
   });
 
@@ -209,13 +210,18 @@ describe('1286 EmptyState — variant contract', () => {
     return faces;
   }
 
-  it('draws the note title in the host UI face, and in a literal face with no Foundry variable', async () => {
-    assert.deepEqual(
-      await noteFaces('body { --font-body: ProbeBody; font-family: var(--font-body); }'),
-      ['ProbeBody', 'ProbeBody'],
-      'the face a Fabricate window inherits from body, where Foundry defines no --font-primary'
+  it('draws the note title in its parent face, not the serif the base heading states', async () => {
+    const [title, parent] = await noteFaces('body { font-family: ProbeBody; }');
+    assert.equal(parent, 'ProbeBody');
+    // happy-dom keeps the keyword rather than resolving it to the parent's value.
+    assert.equal(title, 'inherit', 'states the parent face, not the base heading serif');
+  });
+
+  it('keeps inheriting the parent face when :root also defines --font-primary', async () => {
+    const [title, parent] = await noteFaces(
+      'body { font-family: ProbeBody; } :root { --font-primary: ProbeFace; }'
     );
-    assert.equal((await noteFaces(':root { --font-primary: ProbeFace; }'))[0], 'ProbeFace');
-    assert.equal((await noteFaces(''))[0], 'sans-serif');
+    assert.equal(parent, 'ProbeBody');
+    assert.equal(title, 'inherit', 'the note title reads no --font-primary');
   });
 });

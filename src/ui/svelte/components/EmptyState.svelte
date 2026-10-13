@@ -255,7 +255,7 @@
      floor `openspec/specs/design-system/spec.md` states. */
   .manager-empty.is-note h3 {
     color: var(--fab-text-muted);
-    font-family: var(--font-body, var(--font-primary, sans-serif));
+    font-family: inherit;
     font-size: 10px;
     font-weight: 500;
     line-height: 1.4;
