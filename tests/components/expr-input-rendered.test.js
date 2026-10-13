@@ -5,13 +5,11 @@
  * keyboard, and reads what its status region says and what the engine's accessibility tree holds.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { getModifierExpressionSuggestions } from '../../src/config/modifierExpressionSuggestions.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createViteFixtureServer, pressPointerOn } from '../helpers/vite-fixture-server.js';
 
@@ -78,15 +76,6 @@ const CASES = Object.freeze({
   },
 });
 
-const staticPage = (hosts) => `<!doctype html><html><head><meta charset="utf-8">
-<style>${readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
-<style>@layer modules {${readStylesheet()}}</style>
-<style>${scopedComponentCss(resolve(repoRoot, RDE)).css}</style>
-<style>${scopedComponentCss(resolve(repoRoot, CHIP)).css}</style>
-</head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
-${hosts.join('\n')}
-</div></body></html>`;
-
 const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@expr-input-styles/' });
 
 before(async () => {
@@ -96,18 +85,6 @@ before(async () => {
 after(async () => {
   await fixtureServer.stop();
 });
-
-/** What a `--fab-*` colour token computes to under the page's manager root. */
-function colourOf(page, token) {
-  return page.evaluate((name) => {
-    const probe = document.createElement('i');
-    probe.style.color = `var(${name})`;
-    document.querySelector('.fabricate-manager').append(probe);
-    const { color } = getComputedStyle(probe);
-    probe.remove();
-    return color;
-  }, token);
-}
 
 describe('ExprInput, drawn (issue 2465)', () => {
   let tab;
@@ -136,7 +113,7 @@ describe('ExprInput, drawn (issue 2465)', () => {
       harness.teardown();
     }
     tab = await fixtureServer.newPage({ viewport: { width: 1280, height: 900 } });
-    await tab.setContent(staticPage(hosts), { waitUntil: 'load' });
+    await tab.setContent(staticComponentPage([RDE, CHIP], hosts), { waitUntil: 'load' });
   });
 
   /** Every token of one case, as the figures the clauses below read. */

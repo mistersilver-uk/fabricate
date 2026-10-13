@@ -78,8 +78,7 @@
 
 <div class="manager-checks-value-field">
   {#if documentPath}
-    <input
-      type="text"
+    <RollDataExpressionInput
       class={`manager-checks-value-path is-${resolution.tone}`}
       {...attr(hooks.expression)}
       data-validation-target={validationTarget || undefined}
@@ -90,7 +89,7 @@
         : 'false'}
       {value}
       {placeholder}
-      oninput={(event) => onChange(event.currentTarget.value)}
+      {onChange}
     />
   {:else}
     <RollDataExpressionInput
@@ -152,17 +151,11 @@
     color: var(--fab-warning-text);
   }
 
-  .manager-checks-value-path {
-    font-family: var(--fab-font-mono);
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  .manager-checks-value-field .manager-checks-value-path.is-danger[aria-invalid='true'] {
+  .manager-checks-value-field :global(.manager-checks-value-path.is-danger[aria-invalid='true']) {
     border-color: var(--fab-danger-border);
   }
 
-  .manager-checks-value-field .manager-checks-value-path.is-warning[aria-invalid='true'] {
+  .manager-checks-value-field :global(.manager-checks-value-path.is-warning[aria-invalid='true']) {
     border-color: var(--fab-warning-border);
   }
 </style>
