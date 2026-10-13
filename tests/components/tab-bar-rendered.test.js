@@ -10,6 +10,7 @@ import { after, before, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { readDesignLibrary } from '../helpers/designLibrary.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -109,8 +110,11 @@ ${Object.entries(markup)
 ).join('\n')}
 </body></html>`;
 
-/** Every strip on the page: its box, its host's probes, and each tab's box, paint and marks. */
-function readStrips() {
+/**
+ * Every strip on the page: its box, its host's probes, and each tab's box, paint and marks. With
+ * `entryHeading`, the strips are the ones that library entry draws.
+ */
+function readStrips(entryHeading) {
   const box = (element) => {
     const { left, right, bottom, height } = element.getBoundingClientRect();
     return { left, right, bottom, height };
@@ -149,21 +153,29 @@ function readStrips() {
       count: readCount(button.querySelector('.manager-editor-tab-count')),
     };
   };
-  return [...document.querySelectorAll('[data-mount]')].map((mount) => {
-    const strip = mount.querySelector('[role="tablist"]');
-    return {
-      key: mount.dataset.mount,
-      line: mount.parentElement.dataset.hostLine,
-      strip: box(strip),
-      probes: Object.fromEntries(
-        [...mount.querySelectorAll('[data-probe]')].map((probe) => [
-          probe.dataset.probe,
-          getComputedStyle(probe).color,
-        ])
-      ),
-      tabs: [...strip.querySelectorAll('[role="tab"]')].map(readTab),
-    };
+  const read = (strip, mount) => ({
+    key: mount?.dataset.mount,
+    line: mount?.parentElement.dataset.hostLine,
+    strip: box(strip),
+    probes: Object.fromEntries(
+      [...(mount?.querySelectorAll('[data-probe]') ?? [])].map((probe) => [
+        probe.dataset.probe,
+        getComputedStyle(probe).color,
+      ])
+    ),
+    tabs: [...strip.children].map(readTab),
   });
+  if (!entryHeading) {
+    return [...document.querySelectorAll('[data-mount]')].map((mount) =>
+      read(mount.querySelector('[role="tablist"]'), mount)
+    );
+  }
+  const entry = [...document.querySelectorAll('.spec')].find(
+    (spec) => spec.querySelector(':scope .spec-head h4')?.textContent === entryHeading
+  );
+  return [...entry.querySelector(':scope .stage > div').children]
+    .filter((child) => getComputedStyle(child).display === 'flex')
+    .map((strip) => read(strip, null));
 }
 
 async function mountedMarkup() {
@@ -192,11 +204,15 @@ let browser;
 let tab;
 let core;
 let strips;
+let drawn;
 
 before(async () => {
   const markup = await mountedMarkup();
   browser = await chromium.launch();
   tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await tab.route(/^https?:/u, (route) => route.abort());
+  await tab.setContent(readDesignLibrary());
+  drawn = await tab.evaluate(readStrips, '<PageHeader> <TabBar>');
   await tab.setContent(page(markup), { waitUntil: 'load' });
   core = await tab.evaluate(() => ({
     root: getComputedStyle(document.documentElement).fontSize,
@@ -372,4 +388,22 @@ it('reads the count and the idle label at 4.5:1 or over on bg-2 in every palette
   assert.equal(grounds.size, themes.length, 'each palette paints its own ground');
   // A reading under the floor is issue 2368's ink debt: record it here, never loosen the floor.
   assert.deepEqual(under, []);
+});
+
+it('draws the entry’s tabs at the mounted tab’s box, type, weight and height', () => {
+  const [current, idle] = strips[0].tabs;
+  const shape = ({ paint, weight, box: { height } }) => ({ ...paint, weight, height });
+  assert.deepEqual([current.current, idle.current], [true, false]);
+  assert.deepEqual(
+    drawn.map(({ tabs }) => tabs.length),
+    [TABS.length, TABS.length],
+    'the entry draws two strips of four tabs'
+  );
+  for (const [stripIndex, strip] of drawn.entries()) {
+    for (const [index, tabDrawn] of strip.tabs.entries()) {
+      const at = `drawn strip ${stripIndex + 1}, tab ${index + 1}`;
+      assert.deepEqual(shape(tabDrawn), shape(index === 0 ? current : idle), at);
+      assert.ok(near(tabDrawn.box.bottom, strip.strip.bottom), `${at} ends off its strip’s edge`);
+    }
+  }
 });
