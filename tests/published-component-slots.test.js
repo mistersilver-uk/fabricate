@@ -1,0 +1,350 @@
+/**
+ * The published component seam's content slots (issue 2451), driven through its factory with the
+ * fake runtime: the `slot` kind and M15, the slot element's creation, life and removal,
+ * `handle.slot`, and the teardown of mounts nested in a slot element. The real Svelte runtime is
+ * `components/published-slots-mounted.test.js`'s.
+ */
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import {
+  FAULT_REPORT,
+  FakeTarget,
+  ZETA,
+  drained,
+  fakeDocument,
+  refusal,
+  seamWith,
+  zetaProps,
+} from './helpers/publishedComponentFakes.js';
+
+// A `<div>` and a `<span>` content slot beside a `text` and a `data` key.
+const PANEL = Object.freeze({
+  name: 'Panel',
+  path: 'src/ui/svelte/components/Panel.svelte',
+  version: 1,
+  props: {
+    title: { kind: 'text' },
+    body: { kind: 'slot' },
+    aside: { kind: 'slot', element: 'span' },
+    rank: { kind: 'data' },
+  },
+  rest: true,
+  component: Object.freeze({ role: 'Panel' }),
+});
+
+const panelSeam = (options = {}) => seamWith({ table: [PANEL, ZETA], ...options });
+
+/** A seam and a target whose document logs each `remove()` into the runtime's `events`. */
+function logged(options = {}) {
+  const fake = panelSeam(options);
+  const document = fakeDocument(fake.events);
+  const targetIn = (parent = null) => {
+    const target = new FakeTarget('div', document);
+    parent?.append(target);
+    return target;
+  };
+  return { ...fake, document, targetIn };
+}
+
+describe('a slot key', () => {
+  it('M15: refuses a value that is not a boolean, and creates nothing', () => {
+    const { ui, mounts } = panelSeam();
+    for (const value of [3, 'yes', '', null, { on: true }, [true]]) {
+      for (const key of ['body', 'aside']) {
+        const target = new FakeTarget();
+        assert.throws(
+          () => ui.mount('Panel', { target, props: { [key]: value } }),
+          refusal(`"${key}" is a slot and takes true or false`)
+        );
+        assert.equal(target.ownerDocument.created.length, 0);
+      }
+    }
+    assert.equal(mounts.length, 0);
+  });
+
+  it('M10: refuses a function, as on a data key', () => {
+    const { ui } = panelSeam();
+    assert.throws(
+      () => ui.mount('Panel', { target: new FakeTarget(), props: { body: () => true } }),
+      refusal('functions are phase 2 (issue 2427)')
+    );
+  });
+
+  it('reads undefined, false and absence as not requested, so no element is created', () => {
+    const { ui, mounts } = panelSeam();
+    for (const props of [{}, { body: undefined }, { body: false, aside: false }]) {
+      const target = new FakeTarget();
+      const handle = ui.mount('Panel', { target, props });
+      assert.equal(target.ownerDocument.created.length, 0);
+      assert.equal(handle.slot('body'), null);
+      assert.deepEqual(mounts.at(-1).props.initial, props, 'each value reaches the host as passed');
+      assert.deepEqual(mounts.at(-1).instance.slotsAtMount, { body: null, aside: null });
+    }
+  });
+
+  it('hands the host each key that is not data by its kind, frozen', () => {
+    const { ui, mounts } = panelSeam();
+    ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    const [{ props: hostProps }] = mounts;
+    assert.deepEqual(hostProps.kinds, { title: 'text', body: 'slot', aside: 'slot' });
+    assert.ok(Object.isFrozen(hostProps.kinds));
+    assert.deepEqual(
+      hostProps.initial,
+      { body: true },
+      'a requested slot reaches the host as true'
+    );
+  });
+
+  it("creates each requested element from the target's document, before the runtime mounts", () => {
+    const { ui, mounts } = panelSeam();
+    const target = new FakeTarget();
+    const handle = ui.mount('Panel', { target, props: { body: true, aside: true } });
+    const [body, aside] = target.ownerDocument.created;
+    assert.equal(target.ownerDocument.created.length, 2);
+    assert.equal(body.localName, 'div', 'a <div> by default');
+    assert.equal(aside.localName, 'span', "the entry's own element");
+    for (const element of [body, aside]) {
+      assert.deepEqual(element.style, { display: 'contents' });
+      assert.equal(element.parentNode, null, 'the host attaches it, not the seam');
+    }
+    assert.equal(handle.slot('body'), body);
+    assert.equal(handle.slot('aside'), aside);
+    const { slotsAtMount } = mounts[0].instance;
+    assert.equal(slotsAtMount.body, body, "the host's slots answers it inside the runtime's mount");
+    assert.equal(slotsAtMount.aside, aside);
+  });
+
+  it('answers null for a key never requested, and for a key that is no slot', () => {
+    const { ui } = panelSeam();
+    const handle = ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    for (const key of ['aside', 'title', 'rank', 'nope', 'toString', undefined]) {
+      assert.equal(handle.slot(key), null, String(key));
+    }
+  });
+
+  it('creates an element first requested by update before setProps, and keeps it thereafter', () => {
+    const { ui, mounts } = panelSeam();
+    const target = new FakeTarget();
+    const handle = ui.mount('Panel', { target, props: {} });
+    const [{ instance, props: hostProps }] = mounts;
+    assert.equal(handle.update({ body: true }), true);
+    const [body] = target.ownerDocument.created;
+    assert.equal(handle.slot('body'), body);
+    assert.equal(instance.slotsAtUpdate[0].body, body, 'in place inside setProps');
+    assert.equal(handle.update({ body: false }), true);
+    assert.equal(handle.slot('body'), body, 'still that element while it is not requested');
+    assert.equal(hostProps.slots('body'), body);
+    assert.equal(body.removals, 0, 'the host detaches it, not the seam');
+    assert.equal(handle.update({ body: true, title: 'Again' }), true);
+    assert.equal(handle.slot('body'), body, 'the same element once requested again');
+    assert.equal(target.ownerDocument.created.length, 1, 'created once');
+    assert.deepEqual(instance.updates, [
+      { body: true },
+      { body: false },
+      { body: true, title: 'Again' },
+    ]);
+  });
+
+  it('applies an update atomically: a refused one creates no element and renders nothing', () => {
+    const { ui, mounts } = panelSeam();
+    const target = new FakeTarget();
+    const handle = ui.mount('Panel', { target, props: {} });
+    assert.throws(
+      () => handle.update({ body: 'yes' }),
+      refusal('"body" is a slot and takes true or false')
+    );
+    assert.throws(
+      () => handle.update({ body: true, title: 7 }),
+      refusal('"title" must be a string')
+    );
+    assert.throws(
+      () => handle.update({ body: true, 'aria-x': 'y' }),
+      refusal('"aria-x" is not a data attribute')
+    );
+    assert.equal(target.ownerDocument.created.length, 0);
+    assert.equal(handle.slot('body'), null);
+    assert.deepEqual(mounts[0].instance.updates, []);
+  });
+
+  it('answers null from slot after destroy, after a fault, and on the inert handle', async () => {
+    const destroyed = panelSeam();
+    const first = destroyed.ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    assert.notEqual(first.slot('body'), null);
+    first.destroy();
+    assert.equal(first.slot('body'), null);
+
+    const faulted = panelSeam();
+    const second = faulted.ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    faulted.mounts[0].props.onfault(new Error('render blew up'));
+    assert.equal(second.slot('body'), null);
+    assert.equal(faulted.mounts[0].props.slots('body'), null, "and from the host's slots");
+
+    const refused = panelSeam({ mountError: new Error('runtime refused') });
+    const inert = refused.ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    assert.deepEqual(Object.keys(inert), ['update', 'destroy', 'slot']);
+    assert.equal(inert.slot('body'), null);
+    await drained();
+  });
+
+  it('answers null from slot inside the unmount that destroy runs', () => {
+    const seen = [];
+    const mounted = {};
+    const { ui } = panelSeam({
+      onUnmount: () => {
+        seen.push(mounted.handle.slot('body'));
+      },
+    });
+    mounted.handle = ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
+    mounted.handle.destroy();
+    assert.deepEqual(seen, [null]);
+  });
+});
+
+describe('a slot element at the end of its mount', () => {
+  const requested = { body: true, aside: true };
+  const removalsOf = (target) => target.ownerDocument.created.map((element) => element.removals);
+
+  it('is removed after the unmount on destroy', () => {
+    const { ui, events, targetIn } = logged();
+    const target = targetIn();
+    const handle = ui.mount('Panel', { target, props: requested });
+    target.append(handle.slot('body'));
+    handle.destroy();
+    assert.deepEqual(events, ['unmount', 'remove', 'remove']);
+    assert.deepEqual(removalsOf(target), [1, 1]);
+    assert.ok(!target.contains(target.ownerDocument.created[0]), 'it has left the target');
+    handle.destroy();
+    assert.deepEqual(removalsOf(target), [1, 1], 'a second destroy removes nothing more');
+  });
+
+  it('is removed after the unmount on a boundary fault', () => {
+    const { ui, mounts, events, targetIn } = logged();
+    const target = targetIn();
+    ui.mount('Panel', { target, props: requested });
+    mounts[0].props.onfault(new Error('render blew up'));
+    assert.deepEqual(events, ['unmount', 'remove', 'remove']);
+    assert.deepEqual(removalsOf(target), [1, 1]);
+  });
+
+  it('is removed after the deferred unmount on a fault inside the runtime call', async () => {
+    const { ui, events, targetIn } = logged({ faultDuringMount: new Error('during mount') });
+    const target = targetIn();
+    ui.mount('Panel', { target, props: requested });
+    assert.deepEqual(events, [], 'nothing before the microtask');
+    await drained();
+    assert.deepEqual(events, ['unmount', 'remove', 'remove']);
+    assert.deepEqual(removalsOf(target), [1, 1]);
+  });
+
+  it('is removed on a synchronous runtime throw, which has no instance to unmount', async () => {
+    const { ui, events, targetIn } = logged({ mountError: new Error('runtime refused') });
+    const target = targetIn();
+    ui.mount('Panel', { target, props: requested });
+    assert.deepEqual(events, ['remove', 'remove']);
+    assert.deepEqual(removalsOf(target), [1, 1]);
+    await drained();
+    assert.deepEqual(removalsOf(target), [1, 1]);
+  });
+});
+
+describe('a mount nested in a slot element', () => {
+  /** An outer `Panel` with its `body` requested, and a `Zeta` mounted by `place(slot)`'s target. */
+  function nested(place, options = {}) {
+    const fake = logged(options);
+    const outerTarget = fake.targetIn();
+    const outer = fake.ui.mount('Panel', { target: outerTarget, props: { body: true } });
+    const slot = outer.slot('body');
+    const innerFaults = [];
+    const inner = fake.ui.mount('Zeta', {
+      target: place(slot, fake),
+      props: zetaProps(),
+      onFault: (error) => {
+        innerFaults.push(error);
+      },
+    });
+    return { ...fake, outer, inner, slot, innerFaults };
+  }
+
+  const PLACES = [
+    ['a child of the slot element', (slot, { targetIn }) => targetIn(slot)],
+    ['a grandchild of the slot element', (slot, { targetIn }) => targetIn(targetIn(slot))],
+    ['the slot element itself', (slot) => slot],
+  ];
+  for (const [where, place] of PLACES) {
+    it(`is ended before the outer unmount when its target is ${where}`, () => {
+      const { seam, outer, inner, slot, mounts, unmounts, events } = nested(place);
+      assert.equal(seam.liveMountCount(), 2);
+      outer.destroy();
+      assert.deepEqual(events, ['unmount', 'unmount', 'remove']);
+      assert.equal(unmounts[0], mounts[1].instance, 'the nested mount first');
+      assert.equal(unmounts[1], mounts[0].instance);
+      assert.equal(slot.removals, 1, 'then the slot element is removed');
+      assert.equal(inner.update(zetaProps()), false);
+      assert.equal(seam.liveMountCount(), 0);
+      inner.destroy();
+      assert.equal(unmounts.length, 2, 'a dead nested handle unmounts nothing more');
+    });
+  }
+
+  it('leaves a mount outside the slot element live', () => {
+    const { seam, ui, outer, targetIn, unmounts } = nested((slot, { targetIn: make }) =>
+      make(slot)
+    );
+    const beside = ui.mount('Zeta', { target: targetIn(), props: zetaProps() });
+    const sibling = ui.mount('Panel', { target: targetIn(), props: { body: true } });
+    outer.destroy();
+    assert.equal(unmounts.length, 2);
+    assert.equal(beside.update(zetaProps()), true);
+    assert.notEqual(sibling.slot('body'), null);
+    assert.equal(seam.liveMountCount(), 2);
+  });
+
+  it('ends three levels innermost first, each slot element after its own unmount', () => {
+    const { seam, ui, events, mounts, unmounts, targetIn } = logged();
+    const a = ui.mount('Panel', { target: targetIn(), props: { body: true } });
+    const b = ui.mount('Panel', { target: targetIn(a.slot('body')), props: { body: true } });
+    mounts[1].target.append(b.slot('body'));
+    const c = ui.mount('Zeta', { target: targetIn(b.slot('body')), props: zetaProps() });
+    a.destroy();
+    assert.deepEqual(
+      unmounts,
+      [mounts[2].instance, mounts[1].instance, mounts[0].instance],
+      'innermost first'
+    );
+    assert.deepEqual(events, ['unmount', 'unmount', 'remove', 'unmount', 'remove']);
+    assert.equal(b.slot('body'), null);
+    assert.equal(c.update(zetaProps()), false);
+    assert.equal(seam.liveMountCount(), 0);
+  });
+
+  it('is ended, not faulted, when the outer mount faults: its own onFault is never called', async () => {
+    const outerFaults = [];
+    const fake = logged();
+    const outer = fake.ui.mount('Panel', {
+      target: fake.targetIn(),
+      props: { body: true },
+      onFault: (error) => {
+        outerFaults.push(error);
+      },
+    });
+    const innerFaults = [];
+    const inner = fake.ui.mount('Zeta', {
+      target: fake.targetIn(outer.slot('body')),
+      props: zetaProps(),
+      onFault: (error) => {
+        innerFaults.push(error);
+      },
+    });
+    const error = new Error('render blew up');
+    fake.mounts[0].props.onfault(error);
+    assert.deepEqual(fake.events, ['unmount', 'unmount', 'remove']);
+    assert.equal(fake.unmounts[0], fake.mounts[1].instance, 'the nested mount first');
+    await drained();
+    assert.deepEqual(outerFaults, [error]);
+    assert.deepEqual(innerFaults, []);
+    assert.deepEqual(fake.reports, [[FAULT_REPORT, 'Panel', error]]);
+    assert.equal(inner.update(zetaProps()), false);
+    assert.equal(fake.seam.liveMountCount(), 0);
+  });
+});

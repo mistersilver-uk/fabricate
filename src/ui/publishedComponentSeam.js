@@ -1,15 +1,16 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
- * Fabricate primitive into an element it owns and gets back `{ update, destroy }`, and is told of
- * a contained fault through `onFault` (issue 2451). Plain JS, so the public API binds it without
- * Svelte; the runtime adapter registers the host, `mount` and `unmount`.
+ * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot }`, draws its
+ * own content in a content slot, and is told of a contained fault through `onFault` (issue 2451).
+ * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
+ * `mount` and `unmount`.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
 
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
-const INERT_HANDLE = Object.freeze({ update: () => false, destroy: () => {} });
+const INERT_HANDLE = Object.freeze({ update: () => false, destroy: () => {}, slot: () => null });
 
 const isElementNode = (target) => target?.nodeType === 1;
 const isFabricateReady = () => globalThis.game?.fabricate?.ready === true;
@@ -64,6 +65,58 @@ function queueFaultNotice(record, fault, report, first = null) {
   });
 }
 
+function newRecord(entry, target, onFault) {
+  const slots = new Map();
+  return { name: entry.name, target, live: true, instance: null, root: null, onFault, slots };
+}
+
+/** Gives each `slot` key holding `true` its element, once; the element is kept while live. */
+function requestSlots(entry, record, props) {
+  for (const [key, spec] of Object.entries(entry.props)) {
+    if (spec.kind !== 'slot' || props[key] !== true || record.slots.has(key)) continue;
+    const element = record.target.ownerDocument.createElement(spec.element ?? 'div');
+    element.style.display = 'contents';
+    record.slots.set(key, element);
+  }
+}
+
+function detachSlots(record) {
+  for (const element of record.slots.values()) element.remove();
+  record.slots.clear();
+}
+
+/** Every other live mount whose target sits in one of `record`'s slot elements, or is one. */
+function nestedIn(record, live) {
+  const elements = [...record.slots.values()];
+  return [...live].filter(
+    (other) => other !== record && elements.some((element) => element.contains(other.target))
+  );
+}
+
+/** What the host receives beside its component; `slots` answers a requested key's element. */
+function hostPropsFor(entry, record, initial, onfault) {
+  return {
+    initial,
+    onfault,
+    kinds: contentKinds(entry),
+    slots: (key) => record.slots.get(key) ?? null,
+  };
+}
+
+function handleFor(entry, record, end) {
+  return Object.freeze({
+    update(props) {
+      if (!record.live) return false;
+      const next = copyProps(entry, props);
+      requestSlots(entry, record, next);
+      record.instance.setProps(next);
+      return true;
+    },
+    destroy: () => end(record),
+    slot: (key) => (record.live ? (record.slots.get(key) ?? null) : null),
+  });
+}
+
 /**
  * The claim and lifecycle of every mount on one seam: `runtime()` reads the registered runtime and
  * `report` receives each fault.
@@ -95,10 +148,17 @@ function createMountLifecycle({ runtime, report }) {
     if (!unmountQuietly(record)) record.target.replaceChildren?.();
   }
 
+  // A retired mount's nested mounts end first, and its slot elements leave after its own unmount.
+  function close(record, unmount) {
+    for (const nested of nestedIn(record, live)) end(nested);
+    unmount(record);
+    detachSlots(record);
+  }
+
   function end(record) {
     if (!record.live) return;
     retire(record);
-    unmountQuietly(record);
+    close(record, unmountQuietly);
   }
 
   // A fault inside the runtime call precedes its instance, so that unmount waits a microtask.
@@ -107,45 +167,33 @@ function createMountLifecycle({ runtime, report }) {
     if (!record.live) return;
     retire(record);
     report(FAULT_REPORT, record.name, error);
-    const deferred = record.instance ? null : () => record.instance && unmountFaulted(record);
-    if (!deferred) unmountFaulted(record);
+    const unmountLate = () => close(record, () => record.instance && unmountFaulted(record));
+    const deferred = record.instance ? null : unmountLate;
+    if (!deferred) close(record, unmountFaulted);
     queueFaultNotice(record, error, report, deferred);
   }
 
-  function handleFor(entry, record) {
-    return Object.freeze({
-      update(props) {
-        if (!record.live) return false;
-        record.instance.setProps(copyProps(entry, props));
-        return true;
-      },
-      destroy: () => end(record),
-    });
-  }
-
   function start(entry, target, initial, onFault) {
-    const record = { name: entry.name, target, live: true, instance: null, root: null, onFault };
+    const record = newRecord(entry, target, onFault);
     claims.set(target, record);
     live.add(record);
+    requestSlots(entry, record, initial);
     const { components, host, mount } = runtime();
-    const props = {
-      component: components[entry.path],
-      initial,
-      onfault: (e) => fault(record, e),
-      kinds: contentKinds(entry),
-    };
+    const onfault = (error) => fault(record, error);
+    const component = components[entry.path];
+    const props = { component, ...hostPropsFor(entry, record, initial, onfault) };
     try {
       record.instance = mount(host, { target, props });
     } catch (error) {
       retire(record);
       report(FAULT_REPORT, entry.name, error);
-      target.replaceChildren?.();
+      close(record, () => target.replaceChildren?.());
       queueFaultNotice(record, error, report);
       return INERT_HANDLE;
     }
     if (!record.live) return INERT_HANDLE;
     record.root = target.lastChild;
-    return handleFor(entry, record);
+    return handleFor(entry, record, end);
   }
 
   // A claim holds only while its root is still inside the target; a stale one is destroyed first.

@@ -9,6 +9,9 @@ export const PROBE_ENTRY = Object.freeze({
     throwAt: Object.freeze({ kind: 'data' }),
     explode: Object.freeze({ kind: 'data' }),
     note: Object.freeze({ kind: 'text' }),
+    aside: Object.freeze({ kind: 'slot', element: 'span' }),
+    body: Object.freeze({ kind: 'slot' }),
+    bodyAs: Object.freeze({ kind: 'data' }),
   }),
   rest: true,
 });

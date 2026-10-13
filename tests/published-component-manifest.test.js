@@ -8,7 +8,7 @@
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
- * forwarded `text` key fails closed and a forwarded `data` key is not seen.
+ * forwarded `text` or `slot` key fails closed and a forwarded `data` key is not seen.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and takes on
  * trust that no extension target sits under a `CHIP_LAYOUT_ANCESTORS` class.
  */
@@ -84,22 +84,41 @@ function propLocals(ast) {
   return [];
 }
 
-/** Every local a `{@render}` tag calls, with each call's argument count and whether it is `?.()`. */
+/** Every render tag beneath an `{#each}` or a `{#key}`, where one tag can hold several branches. */
+function repeatedRenderTags(ast) {
+  const repeated = new Set();
+  for (const block of walkNodes(ast.fragment)) {
+    if (block.type !== 'EachBlock' && block.type !== 'KeyBlock') continue;
+    for (const node of walkNodes(block)) if (node.type === 'RenderTag') repeated.add(node);
+  }
+  return repeated;
+}
+
+/**
+ * Every local a `{@render}` tag calls, with each call's argument count, whether it is `?.()`, and
+ * whether an `{#each}` or `{#key}` holds it.
+ */
 function renderedLocals(ast) {
   const called = new Map();
+  const repeated = repeatedRenderTags(ast);
   for (const node of walkNodes(ast.fragment)) {
     if (node.type !== 'RenderTag') continue;
     const call =
       node.expression.type === 'ChainExpression' ? node.expression.expression : node.expression;
     if (call.callee?.type !== 'Identifier') continue;
     const calls = called.get(call.callee.name) ?? [];
-    calls.push({ args: call.arguments.length, optional: call.optional === true });
+    calls.push({
+      args: call.arguments.length,
+      optional: call.optional === true,
+      repeated: repeated.has(node),
+    });
     called.set(call.callee.name, calls);
   }
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot']);
+const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** What a `text` key's render calls break: drawn at least once, bare, and `?.()` unless required. */
 function textRenderFaults(key, spec, calls) {
@@ -110,6 +129,29 @@ function textRenderFaults(key, spec, calls) {
   }
   if (spec.required !== true && calls.some((call) => !call.optional)) {
     faults.push(`${key} is an optional text key rendered without ?.`);
+  }
+  return faults;
+}
+
+/**
+ * What a `slot` key's spec and render calls break: `{ kind, element? }` with a `<div>` or
+ * `<span>` element, drawn by exactly one bare `?.()` render tag that no `{#each}` or `{#key}`
+ * holds, so the one slot element is drawn once and never taken in turn.
+ */
+function slotFaults(key, spec, calls) {
+  const faults = [];
+  if (spec.required !== undefined) faults.push(`${key} is a slot key that states required`);
+  if (spec.element !== undefined && !SLOT_ELEMENTS.has(spec.element)) {
+    faults.push(`${key} is a slot key whose element is ${spec.element}`);
+  }
+  if (calls.length === 0) faults.push(`${key} is a slot key no render tag draws`);
+  if (calls.length > 1) faults.push(`${key} is a slot key more than one render tag draws`);
+  if (calls.some((call) => call.args > 0)) {
+    faults.push(`${key} is a slot key rendered with an argument`);
+  }
+  if (calls.some((call) => !call.optional)) faults.push(`${key} is a slot key rendered without ?.`);
+  if (calls.some((call) => call.repeated)) {
+    faults.push(`${key} is a slot key rendered inside {#each} or {#key}`);
   }
   return faults;
 }
@@ -132,6 +174,10 @@ function declarationFaults(entry, ast) {
     if (prop.bindable) faults.push(`${key} is $bindable`);
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
+    if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
+    if (spec.kind !== 'slot' && spec.element !== undefined) {
+      faults.push(`${key} states element, which only a slot key takes`);
+    }
     if (spec.kind === 'data' && calls.length > 0) {
       faults.push(`${key} is a data key rendered as a snippet`);
     }
@@ -318,7 +364,10 @@ describe('each entry matches its component declaration', () => {
       { key: 'body', local: 'body', bindable: false },
       { key: 'value', local: 'value', bindable: true },
     ]);
-    assert.deepEqual([...renderedLocals(ast)], [['body', [{ args: 0, optional: true }]]]);
+    assert.deepEqual(
+      [...renderedLocals(ast)],
+      [['body', [{ args: 0, optional: true, repeated: false }]]]
+    );
   });
 
   const SYNTHETIC = templateOf(
@@ -363,7 +412,12 @@ describe('each entry matches its component declaration', () => {
       ['body is an optional text key rendered without ?.'],
     ],
     ['a data key with a render tag', { note: data }, ['note is a data key rendered as a snippet']],
-    ['a slot kind', { note: { kind: 'slot' } }, ['note has the unshipped kind slot']],
+    ['a callback kind', { note: { kind: 'callback' } }, ['note has the unshipped kind callback']],
+    [
+      'element on a key that is no slot',
+      { label: { kind: 'data', element: 'div' } },
+      ['label states element, which only a slot key takes'],
+    ],
     ['a key the component does not declare', { missing: data }, ['missing is not a declared prop']],
     [
       'a required that is not a boolean',
@@ -373,6 +427,67 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names ${claim} as a fault`, () => {
       assert.deepEqual(faultsOf(props), faults);
+    });
+  }
+
+  const SLOTTED = templateOf(
+    'Slotted.svelte',
+    [
+      '<script>',
+      '  let { clean, twice, bare, given, listed, keyed, unused } = $props();',
+      '</script>',
+      '<div>{@render clean?.()}{@render twice?.()}{@render twice?.()}{@render bare()}</div>',
+      '{@render given?.(1)}',
+      '{#each [1] as item (item)}<p>{@render listed?.()}</p>{/each}',
+      '{#key clean}<p>{@render keyed?.()}</p>{/key}',
+    ].join('\n')
+  ).ast;
+  const slot = { kind: 'slot' };
+  const slotFaultsOf = (props) => declarationFaults({ props }, SLOTTED);
+
+  it('passes a slot key one bare ?.() render tag draws, at either element', () => {
+    assert.deepEqual(slotFaultsOf({ clean: slot }), []);
+    for (const element of ['div', 'span']) {
+      assert.deepEqual(slotFaultsOf({ clean: { kind: 'slot', element } }), []);
+    }
+  });
+
+  for (const [claim, props, faults] of [
+    ['no render tag draws', { unused: slot }, ['unused is a slot key no render tag draws']],
+    [
+      'two render tags draw',
+      { twice: slot },
+      ['twice is a slot key more than one render tag draws'],
+    ],
+    [
+      'rendered with an argument',
+      { given: slot },
+      ['given is a slot key rendered with an argument'],
+    ],
+    ['rendered without ?.', { bare: slot }, ['bare is a slot key rendered without ?.']],
+    [
+      'rendered inside {#each}',
+      { listed: slot },
+      ['listed is a slot key rendered inside {#each} or {#key}'],
+    ],
+    [
+      'rendered inside {#key}',
+      { keyed: slot },
+      ['keyed is a slot key rendered inside {#each} or {#key}'],
+    ],
+    [
+      'that states required',
+      { clean: { kind: 'slot', required: false } },
+      ['clean is a slot key that states required'],
+    ],
+    [
+      'whose element is a <p>',
+      { clean: { kind: 'slot', element: 'p' } },
+      ['clean is a slot key whose element is p'],
+    ],
+  ]) {
+    it(`names a slot key ${claim} as a fault`, () => {
+      assert.deepEqual(slotFaultsOf(props), faults);
     });
   }
 

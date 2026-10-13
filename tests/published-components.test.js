@@ -1,8 +1,8 @@
 /**
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
  * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
- * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. The real
- * Svelte runtime is the mounted suite's.
+ * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
+ * slots are `published-component-slots.test.js`'s, and the real Svelte runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -11,24 +11,20 @@ import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
   ALPHA,
+  FAULT_REPORT,
   FakeTarget,
   HOST,
   PREFIX,
   TABLE,
   ZETA,
   ZETA_COMPONENT,
+  drained,
   exactly,
   fakeRuntime,
   refusal,
   seamWith,
+  zetaProps,
 } from './helpers/publishedComponentFakes.js';
-
-const FAULT_REPORT = 'Fabricate | Published component render failed:';
-
-const zetaProps = (overrides = {}) => ({ label: 'Rank', items: [{ id: 'a' }], ...overrides });
-
-/** Past every queued microtask, however many each one queues in turn. */
-const drained = () => new Promise((done) => setTimeout(done, 0));
 
 describe('the published-components descriptor', () => {
   it('is frozen, with exactly its five members and schema version 1', () => {
@@ -305,7 +301,7 @@ describe('a live mount', () => {
     const [{ host, props: hostProps }] = mounts;
     assert.equal(host, HOST);
     assert.equal(hostProps.component, ZETA_COMPONENT);
-    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds']);
+    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds', 'slots']);
     assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
     assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
@@ -313,7 +309,7 @@ describe('a live mount', () => {
     assert.notEqual(hostProps.initial.items, props.items, 'copied at every depth');
     props.items[0].id = 'mutated';
     assert.equal(hostProps.initial.items[0].id, 'a', 'copied at call time');
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
   });
 
@@ -548,7 +544,7 @@ describe('a faulted mount', () => {
     const target = new FakeTarget();
     const handle = ui.mount('Zeta', { target, props: zetaProps() });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
     assert.equal(handle.update(zetaProps()), false);
     handle.destroy();
@@ -710,7 +706,7 @@ describe('a mount made with onFault', () => {
 });
 
 describe('registration', () => {
-  for (const kind of ['snippet', 'slot']) {
+  for (const kind of ['snippet', 'callback']) {
     it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
       const unknown = { ...ALPHA, props: { body: { kind } } };
       const seam = createPublishedComponents({ table: [unknown], isReady: () => true });

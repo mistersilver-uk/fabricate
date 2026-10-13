@@ -43,13 +43,23 @@ function copyText(value, key) {
   return value;
 }
 
+/** One `slot` value: a boolean as passed, `undefined` as absent, a function M10, else M15. */
+function copySlot(value, key) {
+  if (typeof value === 'function') throw refuse('functions are phase 2 (issue 2427)');
+  if (value !== undefined && typeof value !== 'boolean') {
+    throw refuse(`"${key}" is a slot and takes true or false`);
+  }
+  return value;
+}
+
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */
 export const SHIPPED_KINDS = Object.freeze({
   data: (value, key) => copyData(value, key, new Set()),
   text: copyText,
+  slot: copySlot,
 });
 
-/** The validated copy one mount or update renders: M7, M8, M10-M14, then M9. */
+/** The validated copy one mount or update renders: M7, M8, M10-M15, then M9. */
 export function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
   const copy = {};

@@ -1,6 +1,6 @@
 /**
  * The fake runtime the published component seam's plain suites drive it with (issue 2451): three
- * table entries, a DOM-shaped target, a recording runtime, and the refusal matcher.
+ * table entries, a DOM-shaped node and its document, a recording runtime, and the refusal matcher.
  */
 import assert from 'node:assert/strict';
 
@@ -55,10 +55,34 @@ export function refusal(tail) {
   };
 }
 
-/** A DOM-shaped target: `nodeType` 1, children, and `contains`. */
+/** A document whose `createElement` answers a `FakeTarget`; `events` logs each `remove()`. */
+export function fakeDocument(events = []) {
+  const document = {
+    created: [],
+    events,
+    createElement(tag) {
+      const node = new FakeTarget(tag, document);
+      document.created.push(node);
+      return node;
+    },
+  };
+  return document;
+}
+
+/**
+ * A DOM-shaped node: `nodeType` 1, a tag, a plain `style`, children that may be plain objects, a
+ * deep and inclusive `contains`, and a `remove()` it counts. It has no `closest`.
+ */
 export class FakeTarget {
   nodeType = 1;
   childNodes = [];
+  parentNode = null;
+  style = {};
+  removals = 0;
+  constructor(localName = 'div', ownerDocument = fakeDocument()) {
+    this.localName = localName;
+    this.ownerDocument = ownerDocument;
+  }
   get firstChild() {
     return this.childNodes[0] ?? null;
   }
@@ -66,21 +90,49 @@ export class FakeTarget {
     return this.childNodes.at(-1) ?? null;
   }
   contains(node) {
-    return this.childNodes.includes(node);
+    const holds = (child) => child === node || child.contains?.(node) === true;
+    return node === this || this.childNodes.some(holds);
+  }
+  append(node) {
+    detach(node);
+    node.parentNode = this;
+    this.childNodes.push(node);
+  }
+  remove() {
+    this.removals += 1;
+    this.ownerDocument.events.push('remove');
+    detach(this);
   }
   replaceChildren() {
     this.childNodes.length = 0;
   }
 }
 
+function detach(node) {
+  const siblings = node.parentNode?.childNodes ?? [];
+  if (siblings.includes(node)) siblings.splice(siblings.indexOf(node), 1);
+  node.parentNode = null;
+}
+
+/** What the host's `slots` answers for each `slot` key, read at the moment of the call. */
+const slotsSeen = (props) =>
+  Object.fromEntries(
+    Object.keys(props.kinds)
+      .filter((key) => props.kinds[key] === 'slot')
+      .map((key) => [key, props.slots(key)])
+  );
+
 /**
  * A recording runtime: `mount` appends a root and captures the host's fault callback, and `events`
  * logs each `unmount` beside whatever the test pushes. With both errors it faults, then throws.
+ * An instance keeps what `slots` answered inside `mount` and inside each `setProps`, and
+ * `onUnmount(instance)` runs inside each `unmount`.
  */
 export function fakeRuntime({
   mountError = null,
   faultDuringMount = null,
   unmountError = null,
+  onUnmount = null,
 } = {}) {
   const mounts = [];
   const unmounts = [];
@@ -98,8 +150,11 @@ export function fakeRuntime({
         target,
         root: { role: 'root' },
         updates: [],
+        slotsAtMount: slotsSeen(props),
+        slotsAtUpdate: [],
         setProps(next) {
           instance.updates.push(next);
+          instance.slotsAtUpdate.push(slotsSeen(props));
         },
       };
       target.childNodes.push(instance.root);
@@ -110,6 +165,7 @@ export function fakeRuntime({
     unmount(instance) {
       unmounts.push(instance);
       events.push('unmount');
+      onUnmount?.(instance);
       if (unmountError) throw unmountError;
       const at = instance.target.childNodes.indexOf(instance.root);
       if (at !== -1) instance.target.childNodes.splice(at, 1);
@@ -126,3 +182,14 @@ export function seamWith({ table = TABLE, isReady = () => true, ...runtimeOption
   const seam = createPublishedComponents({ table, isReady, ...fake.runtime });
   return { ...fake, seam, ui: seam.publicApi };
 }
+
+export const FAULT_REPORT = 'Fabricate | Published component render failed:';
+
+export const zetaProps = (overrides = {}) => ({
+  label: 'Rank',
+  items: [{ id: 'a' }],
+  ...overrides,
+});
+
+/** Past every queued microtask, however many each one queues in turn. */
+export const drained = () => new Promise((done) => setTimeout(done, 0));

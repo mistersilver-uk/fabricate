@@ -1,14 +1,16 @@
 <!--
   A test-only published component (issue 2426): it draws `text` after an optional `leading` node,
-  faults on demand at init, in an effect or on an update that sets `explode`, and clips its hidden
-  text with its own style. `note` is its one snippet, the seam's `text` kind, drawn over a literal
-  fallback.
+  faults on demand at init, in an effect, in that effect's cleanup or on an update that sets
+  `explode`, and clips its hidden text with its own style. `note` is its `text` snippet, drawn over
+  a literal fallback. `aside` and `body` are its content slots (issue 2451): `aside` inside the
+  paragraph, `body` inside a host whose element `bodyAs` names.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
     init: new Error('probe init fault'),
     effect: new Error('probe effect fault'),
     explode: new Error('probe update fault'),
+    teardown: new Error('probe teardown fault'),
   });
 </script>
 
@@ -21,13 +23,20 @@
     throwAt = null,
     explode = false,
     note = undefined,
+    aside = undefined,
+    body = undefined,
+    bodyAs = 'div',
     ...rest
   } = $props();
 
   if (untrack(() => throwAt) === 'init') throw PROBE_FAULTS.init;
 
   $effect(() => {
-    if (throwAt === 'effect') throw PROBE_FAULTS.effect;
+    const at = throwAt;
+    if (at === 'effect') throw PROBE_FAULTS.effect;
+    return () => {
+      if (at === 'teardown') throw PROBE_FAULTS.teardown;
+    };
   });
 
   function guard(value) {
@@ -42,7 +51,9 @@
   <span class="probe-note"
     >{#if note}{@render note?.()}{:else}NO NOTE{/if}</span
   >
+  <span class="probe-aside">{@render aside?.()}</span>
 </p>
+<svelte:element this={bodyAs} class="probe-body">{@render body?.()}</svelte:element>
 
 <style>
   .probe {
