@@ -3473,9 +3473,10 @@ export function registerChecksCases() {
     // `@ingredients` resolved against NOTHING. A GM clicked the chip.
     await mountChecks([], routedCraftingOptions('1d20'));
     await openChecksActivity('crafting');
-    const chips = [...target.querySelectorAll('[data-check-formula-token]')];
-    assert.ok(chips.length > 0, 'the formula field offers quick-add chips');
-    const offered = chips.map((chip) => chip.getAttribute('data-check-formula-token'));
+    const formulaField = target.querySelector('[data-check-roll-formula]').parentElement;
+    const chips = [...formulaField.querySelectorAll('.fab-expr-input-token')];
+    assert.ok(chips.length > 0, 'the formula field offers quick-add tokens');
+    const offered = chips.map((chip) => chip.textContent);
     assert.ok(
       !offered.includes('@ingredients'),
       `@ingredients resolves against nothing and must never be offered again: ${offered.join(', ')}`

@@ -879,7 +879,10 @@ describeValidationAddressPairing({
   // same shape: `SegmentedControl` stamps the literal onto its radio from an option prop, so no
   // `data-validation-target="checks-advantage-mode"` is ever written together in one file.
   // `checks-advantage-bonus` sits directly on its own `<input>`, so it is not deferred.
+  // `checks-roll-formula` rides the expression field's tag from a script constant, and
+  // `check-formula-card-mounted` proves the stamp lands on that field's `<input>`.
   focusProvenElsewhere: [
+    'checks-roll-formula',
     'checks-target-expression',
     'checks-count-base',
     'checks-count-threshold',

@@ -678,19 +678,3 @@ export function outcomeThresholdLabels(type, column, text) {
   }
   return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
 }
-
-/** The prototype's reference-kind glyphs, each a Font Awesome Free name, first match wins. */
-const FORMULA_TOKEN_KINDS = Object.freeze([
-  [/^\d*d\d+/i, 'fas fa-dice-d20'],
-  [/^@prof\b/, 'fas fa-medal'],
-  [/^@abilities\./, 'fas fa-hand'],
-  [/^@ingredients\b/, 'fas fa-flask'],
-  [/^@(?:details\.)?level\b/, 'fas fa-arrow-up-9-1'],
-]);
-
-/** A quick formula token's kind glyph (a die, proficiency, an ability…), or `''` for a kind the
- *  prototype draws none for. */
-export function formulaTokenIcon(token) {
-  const source = String(token ?? '').trim();
-  return FORMULA_TOKEN_KINDS.find(([pattern]) => pattern.test(source))?.[1] ?? '';
-}

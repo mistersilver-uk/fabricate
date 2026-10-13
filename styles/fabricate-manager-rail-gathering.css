@@ -471,51 +471,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The formula token quick-add row (issue 1096): a wrap of small mono chips under the formula field. */
-.fabricate-manager .manager-checks-formula-tokens {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-  margin-top: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-checks-formula-token {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  width: auto;
-  height: 26px;
-  min-height: 26px;
-  padding: 0 var(--fab-space-2);
-  border: 1px dashed var(--fab-border-strong);
-  border-radius: 7px;
-  color: var(--fab-text-muted);
-  background: var(--fab-bg-1);
-  font-family: var(--fab-font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  line-height: normal;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-checks-formula-token > i {
-  font-size: 8px;
-  opacity: 0.6;
-}
-
-/* The token's kind glyph (a die, an ability…) at full ink, beside the quieter `+` verb. */
-.fabricate-manager .manager-checks-formula-token > i.is-kind {
-  font-size: 9px;
-  opacity: 1;
-}
-
-.fabricate-manager .manager-checks-formula-token:hover {
-  border-color: var(--fab-accent);
-  color: var(--fab-text);
-}
-
 .fabricate-tabs .manager-editor-tab-dot {
   flex: 0 0 auto;
   display: inline-block;

@@ -38,6 +38,8 @@ const RETIRED_PROPS = Object.freeze(['sigil', 'dataField', 'inputAttrs']);
 const RETIRED_HOOKS = Object.freeze([
   'data-world-modifier-suggestion',
   'data-world-modifier-suggestions',
+  'data-check-formula-token',
+  'data-check-formula-tokens',
 ]);
 
 /** Classes those rows were drawn by, which no rule in the module sheet may name again. */
@@ -45,6 +47,9 @@ const RETIRED_CLASSES = Object.freeze([
   'manager-tag-suggestion',
   'manager-modifier-expression-suggestion',
   'manager-modifier-expression-suggestions',
+  'manager-checks-formula-input',
+  'manager-checks-formula-token',
+  'manager-checks-formula-tokens',
 ]);
 
 /** The planned-migrations row that names what the entry specifies and the file does not ship. */
@@ -325,10 +330,10 @@ describe('ExprInput (issue 2465)', () => {
     const tags = callSiteTags();
     assert.equal(
       new Set(tags.map(({ file }) => file)).size,
-      4,
-      "four files render it; a fifth importer updates this count and the manifest row's `why`, which names them"
+      5,
+      "five files render it; a sixth importer updates this count and the manifest row's `why`, which names them"
     );
-    assert.ok(tags.length >= 4, `only ${tags.length} tags were read`);
+    assert.ok(tags.length >= 5, `only ${tags.length} tags were read`);
     assert.deepEqual(
       tags
         .filter(({ names }) => names.some((name) => RETIRED_PROPS.includes(name)))

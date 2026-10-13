@@ -642,10 +642,13 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-check-formula-average-withheld="die-modifiers"]',
+    // The Formula card's token row at the floor width: a token owns its own centre.
+    expectCenterHit: '.fab-expr-input-token',
     position: { width: 1024, height: 640 },
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
     ],
     kinds: ['manager', 'checks', 'responsive'],
   }),

@@ -169,7 +169,7 @@ describe('the product axis switches losslessly (N1)', () => {
       '[data-check-roll-formula]',
       '[data-check-formula-average]',
       '[data-check-formula-average-withheld]',
-      '[data-check-formula-tokens]',
+      '.fab-expr-input-row',
     ]) {
       assert.ok(!state.root.querySelector(selector), `${selector} does not render in count`);
     }
