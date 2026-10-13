@@ -464,11 +464,9 @@
                          whatever is typed turns `1d4` into `@1d4`. So the leading `@` is the
                          GM's to write, and the PLACEHOLDER has to teach that. -->
                     <RollDataExpressionInput
-                      dataField="world-modifier"
-                      inputAttrs={{ 'data-world-modifier-field': 'expression' }}
+                      data-world-modifier-field="expression"
                       value={entry.expression}
                       placeholder="@abilities.med.mod"
-                      sigil={false}
                       onChange={(expression) => onUpdate(entry.id, { expression })}
                     />
                     <small class="manager-muted" data-world-modifier-expression-hint>

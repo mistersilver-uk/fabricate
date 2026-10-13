@@ -16,23 +16,6 @@ export function stripExpressionSigil(expression) {
     .replace(/^@/, '');
 }
 
-const BARE_ROLL_DATA_PATH = /^[A-Za-z_][\w.]*$/;
-const SIGIL_ROLL_DATA_PATH = /^@[A-Za-z_][\w.]*$/;
-
-/** A pure roll-data path loses its `@` for display; any formula stays byte-for-byte visible. */
-export function displayRollDataExpression(expression) {
-  const clean = String(expression ?? '').trim();
-  return SIGIL_ROLL_DATA_PATH.test(clean) ? clean.slice(1) : clean;
-}
-
-/** Restore `@` on a pure path; dice, constants, functions and compound formulas pass unchanged. */
-export function toStoredRollDataExpression(input) {
-  const clean = String(input ?? '').trim();
-  if (!clean) return '';
-  if (clean.startsWith('@')) return clean;
-  return BARE_ROLL_DATA_PATH.test(clean) ? `@${clean}` : clean;
-}
-
 function expressionToPath(expression) {
   return stripExpressionSigil(expression);
 }

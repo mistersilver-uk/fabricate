@@ -1806,10 +1806,7 @@ describe('Tool Studio editor (mounted)', () => {
       ['prerequisites', 'bonus']
     );
     // THE BONUS IS A PICK FROM THE WORLD LIBRARY.
-    assert.ok(
-      !root.querySelector('[data-roll-data-expression="tool-bonus"]'),
-      'no free-text bonus expression field'
-    );
+    assert.ok(!root.querySelector('.fab-expr-input'), 'no free-text bonus expression field');
     assert.equal(root.querySelector('[data-tool-bonus-preset]'), null);
     root.querySelector('.manager-tool-prerequisite-list input[value="strong"]').click();
     root.querySelector('input[name="tool-gate-mode"][value="bonus"]').click();

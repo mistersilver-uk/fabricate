@@ -302,6 +302,11 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
       .getAttribute('aria-describedby')
       .split(' ');
     assert.ok(described.includes(line.id), 'the field is described by its resolution line');
+    const field = state.root.querySelector('[data-check-target-expression]');
+    assert.equal(field.getAttribute('aria-label'), 'Character value', 'the field is named');
+    const hint = state.root.querySelector('[data-check-target-expression-hint]');
+    assert.ok(hint?.id, 'the syntax hint exists');
+    assert.ok(described.includes(hint.id), 'the field is described by its syntax hint');
   });
 
   it('states each refusal the character value meets in its own words', async () => {

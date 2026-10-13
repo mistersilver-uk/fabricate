@@ -166,21 +166,17 @@
   />
   {#if rolled}
     <RollDataExpressionInput
-      sigil={false}
       value={stored}
       placeholder="1d4+1"
       {disabled}
-      inputAttrs={{
-        'data-recipe-option-formula': '',
-        'aria-label':
-          amount.formulaAriaLabel ||
-          named('FABRICATE.Admin.Manager.Recipe.RolledAmountFor', 'Rolled amount for {name}'),
-        title: text(
-          'FABRICATE.Admin.Manager.Recipe.RolledAmountHint',
-          'A dice expression such as 1d4+1, rolled when the result is awarded. A missing character value counts as 0.'
-        ),
-        ...invalidAttrs,
-      }}
+      data-recipe-option-formula=""
+      aria-label={amount.formulaAriaLabel ||
+        named('FABRICATE.Admin.Manager.Recipe.RolledAmountFor', 'Rolled amount for {name}')}
+      title={text(
+        'FABRICATE.Admin.Manager.Recipe.RolledAmountHint',
+        'A dice expression such as 1d4+1, rolled when the result is awarded. A missing character value counts as 0.'
+      )}
+      {...invalidAttrs}
       onChange={writeFormula}
     />
   {:else}

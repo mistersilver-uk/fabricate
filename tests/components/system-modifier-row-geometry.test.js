@@ -18,6 +18,9 @@ import test, { after, before } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { walkNodes } from '../helpers/moduleAst.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
+import { attributeValue } from '../helpers/svelteStructureContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
@@ -149,11 +152,11 @@ const FIELD_FIXTURE = `
           <span>Expression</span>
           <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
         </label>
-        <label class="manager-tool-bonus-field" data-case="capped">
-          <span>Bonus expression</span>
-          <div class="manager-prerequisite-path-input manager-roll-data-expression-input">
+        <label class="fabricate-field manager-prerequisite-path" data-case="capped">
+          <span class="visually-hidden">Property path</span>
+          <div class="manager-prerequisite-path-input">
             <span class="manager-prerequisite-at" aria-hidden="true">@</span>
-            <input type="text" data-roll-data-expression="tool-bonus" value="prof" />
+            <input type="text" data-prerequisite-path value="abilities.int.mod" />
           </div>
         </label>
       </div>
@@ -161,31 +164,35 @@ const FIELD_FIXTURE = `
   </section>
 </div>`;
 
+const EXPRESSION_FIELD = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const PREREQUISITES_CARD = 'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
+const ELEMENT_TYPES = Object.freeze(['RegularElement', 'SvelteElement', 'Component']);
+const classTokens = (node) =>
+  node.type === 'RegularElement'
+    ? (attributeValue(node, 'class') ?? '').split(/\s+/u).filter(Boolean)
+    : [];
+
 test('the un-capped expression field renders as an ordinary field, with no affix seam', async () => {
-  // THE FIXTURE IS ANCHORED TO THE COMPONENT.
-  const component = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte'),
-    'utf8'
+  // The fixture is anchored to the two templates it mirrors, by their parsed markup.
+  const field = [...walkNodes(componentAstOf(EXPRESSION_FIELD).fragment)];
+  assert.deepEqual(
+    field.filter((node) => ELEMENT_TYPES.includes(node.type)).map((node) => node.name),
+    ['input'],
+    'the expression field is one bare input: no wrapper to inset it and no cap beside it'
   );
-  const markup = component.slice(component.indexOf('{#snippet field()}'));
-  const branch = markup.indexOf('{:else}');
-  assert.ok(branch > -1, 'the component still branches on `sigil`');
   assert.ok(
-    markup.slice(0, branch).includes('manager-prerequisite-path-input'),
-    'the SIGIL branch still renders the affix wrapper, which is what the un-capped branch is ' +
-      'measured AGAINST below'
+    field.every((node) => node.type !== 'IfBlock'),
+    'and it has no second form to branch into'
   );
-  // THE TOOL STUDIO NO LONGER DEPENDS ON IT.
-  assert.ok(
-    !markup.slice(branch).includes('manager-prerequisite-path-input'),
-    'and the un-capped branch renders a BARE input: the wrapper is the prerequisite field’s ' +
-      'affix layout, and a field with no affix that keeps it draws the seam this test is about'
+  const wrapper = [...walkNodes(componentAstOf(PREREQUISITES_CARD).fragment)].find((node) =>
+    classTokens(node).includes('manager-prerequisite-path-input')
   );
-  // Scoped to the MARKUP, not the whole file.
-  assert.ok(
-    !markup.includes('is-formula'),
-    'and the dead `is-formula` hook is gone from the markup: a class the sheet has no rule for ' +
-      'reads as a fix and is not one'
+  assert.deepEqual(
+    (wrapper?.fragment.nodes ?? [])
+      .filter((node) => ELEMENT_TYPES.includes(node.type))
+      .map((node) => [node.name, ...classTokens(node)]),
+    [['span', 'manager-prerequisite-at'], ['input']],
+    'the prerequisites card still draws the affix wrapper the capped case is measured in'
   );
 
   const context = await browser.newContext({
@@ -235,7 +242,7 @@ test('the un-capped expression field renders as an ordinary field, with no affix
         'draw one around it'
     );
 
-    // THE NON-VACUITY HALF. The capped shape is the Tool Studio's, unchanged by this work.
+    // The non-vacuity half: the capped shape is the prerequisites card's property path.
     assert.ok(
       Math.abs(fields.capped.inset - fields.label.inset) > 0.5,
       'the capped shape still insets its input behind a cap ' +

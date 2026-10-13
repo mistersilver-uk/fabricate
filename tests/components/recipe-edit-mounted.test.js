@@ -96,7 +96,7 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   // The result rows' catalogue, amount error and add rule (issue 1516).
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
-  // The row's amount slot imports the roll-expression field, which reads these display helpers.
+  // Surplus: nothing this tree renders imports the copy module (issue 2465).
   'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',

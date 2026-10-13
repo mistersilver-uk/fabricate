@@ -94,14 +94,10 @@
     />
   {:else}
     <RollDataExpressionInput
-      sigil={false}
-      dataField={hooks.expression ? hooks.expression.replace(/^data-/u, '') : ''}
-      inputAttrs={{
-        ...attr(hooks.expression),
-        ...inputAttrs,
-        'aria-label': label,
-        'aria-describedby': resolution ? `${hintId} ${resolutionId}` : hintId,
-      }}
+      {...attr(hooks.expression)}
+      {...inputAttrs}
+      aria-label={label || undefined}
+      aria-describedby={resolution ? `${hintId} ${resolutionId}` : hintId}
       {value}
       {placeholder}
       {onChange}
