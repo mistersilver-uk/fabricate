@@ -21,6 +21,7 @@ import {
   varReferencesIn,
 } from '../helpers/styleBlockScan.js';
 import { attributeValue } from '../helpers/svelteStructureContract.js';
+import { attributeNamed } from '../helpers/svelteTemplateScan.js';
 import { propertiesOf } from '../helpers/themePaletteContrast.js';
 
 const SHEET = 'styles/fabricate.css';
@@ -55,20 +56,29 @@ const FAMILY = Object.freeze({
   current: familyRule(`.${ROOT} .${DEFAULT_BUTTON}.is-active`),
 });
 
+/** Whether a class prop is anything but one static string, which the sites below could not read. */
+const isComputed = (node, prop) => {
+  const attribute = attributeNamed(node, prop);
+  if (!attribute) return false;
+  const [chunk, ...rest] = Array.isArray(attribute.value) ? attribute.value : [attribute.value];
+  return rest.length > 0 || chunk?.type !== 'Text';
+};
+
 const classTokens = (node, prop) =>
   new Set((attributeValue(node, prop) ?? '').split(' ').filter(Boolean));
 
 /** Each `<EditorTabs>` render site that passes a literal container or button class. */
-const callSites = sourceAstEntriesUnder('src/ui/svelte')
+const allSites = sourceAstEntriesUnder('src/ui/svelte')
   .filter(([file]) => file.endsWith('.svelte'))
   .flatMap(([file, ast]) =>
     renderedNodes(ast, 'EditorTabs').map((node) => ({
       file,
+      computed: ['containerClass', 'buttonClass'].filter((prop) => isComputed(node, prop)),
       container: classTokens(node, 'containerClass'),
       button: classTokens(node, 'buttonClass'),
     }))
-  )
-  .filter(({ container, button }) => container.size + button.size > 0);
+  );
+const callSites = allSites.filter(({ container, button }) => container.size + button.size > 0);
 const passed = (prop) => callSites.flatMap((site) => [...site[prop]]);
 const callerContainers = new Set([DEFAULT_CONTAINER, ...passed('container')]);
 const tabClasses = new Set([DEFAULT_BUTTON, ...passed('button')]);
@@ -174,6 +184,16 @@ test('every drawn tab count takes the shipped count’s ink, and the kit’s its
   );
 });
 
+test('no <EditorTabs> call site passes a computed container or button class', () => {
+  assert.ok(allSites.length >= callSites.length, 'the call sites are read');
+  assert.deepEqual(
+    allSites
+      .filter(({ computed }) => computed.length > 0)
+      .map(({ file, computed }) => `${file} ${computed}`),
+    []
+  );
+});
+
 test('each family selector list names a class every caller passes', () => {
   assert.ok(callSites.length >= 7, `only ${callSites.length} call sites pass a class`);
   assert.ok(passed('button').length >= 3, 'the button vocabularies are read');
@@ -205,7 +225,11 @@ function drawsATab(selector) {
     .slice(0, -1)
     .some((compound) => compoundClasses(compound).some((name) => strips.has(name)));
   if (!under) return false;
-  return isButton(subject) || (/^span(?![\w-])/u.test(subject) && isButton(compounds.at(-2)));
+  return (
+    isButton(subject) ||
+    compoundClasses(subject).length === 0 ||
+    (/^span(?![\w-])/u.test(subject) && isButton(compounds.at(-2)))
+  );
 }
 
 /** The rules beside the family that may draw a tab: danger, the font floor, focus, and PR 2’s valid mark. */

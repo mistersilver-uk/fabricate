@@ -18,7 +18,7 @@ import {
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { rulesIn, styleTextFor } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { contrast, themePalettes } from '../helpers/themePaletteContrast.js';
+import { contrast, flatten, themePalettes } from '../helpers/themePaletteContrast.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
@@ -74,6 +74,8 @@ const PROBED = Object.freeze([
   '--fab-danger-text',
   '--fab-danger-border',
   '--fab-bg-2',
+  '--fab-surface-soft',
+  '--fab-surface',
 ]);
 const PROBES = PROBED.map(
   (token) => `<span data-probe="${token}" style="color:var(${token})"></span>`
@@ -89,6 +91,8 @@ const TAB = Object.freeze({
 });
 const TAB_HEIGHT = 46;
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+/** Narrower than four tabs need on one row (about 400px), so the strip must wrap. */
+const NARROW_WIDTH = 266;
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
@@ -108,6 +112,7 @@ ${Object.entries(markup)
   .join('\n')}
 </div>`
 ).join('\n')}
+<div data-narrow style="width:${NARROW_WIDTH}px">${MANAGER[0]}${markup.default}${MANAGER[1]}</div>
 </body></html>`;
 
 /**
@@ -151,6 +156,9 @@ function readStrips(entryHeading) {
       border: style.borderBottomColor,
       gaps: parts.slice(1).map((part, index) => part.left - parts[index].right),
       count: readCount(button.querySelector('.manager-editor-tab-count')),
+      chips: [...button.querySelectorAll('.manager-chip')].map(
+        (chip) => getComputedStyle(chip).minHeight
+      ),
     };
   };
   const read = (strip, mount) => ({
@@ -176,6 +184,16 @@ function readStrips(entryHeading) {
   return [...entry.querySelector(':scope .stage > div').children]
     .filter((child) => getComputedStyle(child).display === 'flex')
     .map((strip) => read(strip, null));
+}
+
+/** The strip in the narrow wrapper: its horizontal extent, and each tab's row and extent. */
+function readNarrow() {
+  const strip = document.querySelector('[data-narrow] [role="tablist"]');
+  const box = (element) => {
+    const { top, left, right, height } = element.getBoundingClientRect();
+    return { top, left, right, height };
+  };
+  return { strip: box(strip), tabs: [...strip.children].map(box) };
 }
 
 async function mountedMarkup() {
@@ -204,6 +222,7 @@ let browser;
 let tab;
 let core;
 let strips;
+let narrow;
 let drawn;
 
 before(async () => {
@@ -219,6 +238,7 @@ before(async () => {
     button: getComputedStyle(document.querySelector('[data-core-button]')).height,
   }));
   strips = await tab.evaluate(readStrips);
+  narrow = await tab.evaluate(readNarrow);
 });
 
 after(async () => {
@@ -314,6 +334,26 @@ it('draws every tab 46px tall and flush, its bottom edge on its strip’s, in ev
   }
 });
 
+it('wraps to a further row when narrow, rather than shrinking a tab', () => {
+  assert.equal(narrow.tabs.length, TABS.length);
+  const rows = new Set(narrow.tabs.map(({ top }) => Math.round(top * 100) / 100));
+  assert.ok(rows.size >= 2, `the ${NARROW_WIDTH}px strip drew ${rows.size} row`);
+  for (const [index, drawn] of narrow.tabs.entries()) {
+    assert.equal(drawn.height, TAB_HEIGHT, `tab ${index + 1} height`);
+    assert.ok(drawn.left >= narrow.strip.left - 0.01, `tab ${index + 1} starts before its strip`);
+    assert.ok(drawn.right <= narrow.strip.right + 0.01, `tab ${index + 1} ends after its strip`);
+  }
+});
+
+it('draws a tab’s issue chip at the chip’s own 20px minimum height', () => {
+  let chipped = 0;
+  eachTab((strip, drawn) => {
+    chipped += drawn.chips.length;
+    for (const minHeight of drawn.chips) assert.equal(minHeight, '20px', named(strip, drawn));
+  });
+  assert.ok(chipped > 0, 'no tab drew a chip');
+});
+
 it('sets each mark 6px after what precedes it', () => {
   for (const strip of strips) {
     const expected = { ...MARK_COUNTS, ...MOUNTS[strip.key].marks };
@@ -359,7 +399,7 @@ function paletteForm(computed) {
   return `rgb(${red} ${green} ${blue} / ${Number(alpha) * 100}%)`;
 }
 
-/** The count's and the idle label's computed inks and the `--fab-bg-2` ground, under one palette. */
+/** The inks a tab draws and the grounds it can stand on, computed under one palette. */
 function readThemed(theme) {
   const mount = document.querySelector('[data-mount="default"]');
   mount.firstElementChild.dataset.fabricateTheme = theme;
@@ -367,11 +407,20 @@ function readThemed(theme) {
   return {
     count: ink('[role="tab"]:not(.is-active) .manager-editor-tab-count'),
     label: ink('[role="tab"]:not(.is-active) > span'),
+    current: ink('[role="tab"].is-active > span'),
     ground: ink('[data-probe="--fab-bg-2"]'),
+    soft: ink('[data-probe="--fab-surface-soft"]'),
+    surface: ink('[data-probe="--fab-surface"]'),
   };
 }
 
-it('reads the count and the idle label at 4.5:1 or over on bg-2 in every palette', async (t) => {
+/**
+ * A reading under 4.5:1 is recorded here by palette and part, never loosened: it is issue 2368's
+ * ink debt, not this change's. Empty while every reading holds.
+ */
+const ISSUE_2368_EXCEPTIONS = new Set();
+
+it('reads the tab inks at 4.5:1 or over on bg-2 and on the soft well over surface, in every palette', async (t) => {
   const themes = [...themePalettes(rulesIn(styleTextFor('styles/fabricate.css', sheet))).keys()];
   assert.equal(themes.length, 7, `the sheet declares ${themes.length} palettes, not seven`);
   const under = [];
@@ -379,14 +428,25 @@ it('reads the count and the idle label at 4.5:1 or over on bg-2 in every palette
   for (const theme of themes) {
     const themed = await tab.evaluate(readThemed, theme);
     grounds.add(themed.ground);
-    for (const part of ['count', 'label']) {
-      const ratio = contrast(paletteForm(themed[part]), paletteForm(themed.ground));
-      t.diagnostic(`${theme} ${part}: ${ratio.toFixed(2)}:1 on --fab-bg-2`);
-      if (ratio < 4.5) under.push(`${theme} ${part} ${ratio.toFixed(2)}:1`);
+    const bg2 = paletteForm(themed.ground);
+    const well = flatten(paletteForm(themed.soft), paletteForm(themed.surface));
+    const readings = [
+      ['count', 'count', bg2, '--fab-bg-2'],
+      ['label', 'label', bg2, '--fab-bg-2'],
+      ['current label', 'current', bg2, '--fab-bg-2'],
+      ['count', 'count', well, '--fab-surface-soft over --fab-surface'],
+      ['label', 'label', well, '--fab-surface-soft over --fab-surface'],
+    ];
+    for (const [part, key, ground, name] of readings) {
+      const ratio = contrast(paletteForm(themed[key]), ground);
+      const reading = `${theme} ${part} on ${name}`;
+      t.diagnostic(`${reading}: ${ratio.toFixed(2)}:1`);
+      if (ratio < 4.5 && !ISSUE_2368_EXCEPTIONS.has(reading)) {
+        under.push(`${reading} ${ratio.toFixed(2)}:1`);
+      }
     }
   }
   assert.equal(grounds.size, themes.length, 'each palette paints its own ground');
-  // A reading under the floor is issue 2368's ink debt: record it here, never loosen the floor.
   assert.deepEqual(under, []);
 });
 
