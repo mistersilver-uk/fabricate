@@ -918,10 +918,7 @@ export const CASES = Object.freeze([
     expectNoHorizontalOverflow: SALVAGE_LIST,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [
-      ...SALVAGE_ROW_SOURCES,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-    ],
+    sourceMatches: SALVAGE_ROW_SOURCES,
   }),
   // A cleared stage searches again in place (issue 1516): its suggestion list opens beneath it,
   // inside the editor's form, and its last suggestion must own its pointer target.

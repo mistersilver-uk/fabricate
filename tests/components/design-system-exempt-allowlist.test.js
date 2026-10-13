@@ -201,6 +201,10 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte': 3 },
   ],
   [
+    'the spread is `hooks.expression`, the one `data-*` name its caller spells, or nothing',
+    { 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte': 2 },
+  ],
+  [
     'the spread is the one `labelDataAttr` hook the caller names, or nothing',
     { 'src/ui/svelte/components/StatBox.svelte': 1 },
   ],

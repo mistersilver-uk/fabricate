@@ -3,7 +3,7 @@
     "spec": "<ExprInput> <RequirementChooser>",
     "cap": "expression — resolved only where an actor is in scope",
     "draws": ".k-field.mono",
-    "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
+    "path": "src/ui/svelte/components/RollDataExpressionInput.svelte",
     "fixture": "ExprInputReading",
     "undrawn": {
       "Expression": "the field’s accessible name; the drawing draws the field alone",

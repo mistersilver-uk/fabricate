@@ -650,7 +650,6 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
     ],
     kinds: ['manager', 'checks', 'responsive'],
   }),
@@ -671,10 +670,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager .manager-checks-formula:has([data-check-formula-average="10.5"])',
     expectCenterHit: '.fab-expr-input-token',
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
     kinds: ['manager', 'checks'],
   }),
   managerCase({
@@ -699,10 +695,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-check-attribute-fields]' +
       ':has([data-expr-input-reading="unresolved"]:text-is("Unresolved"))' +
       ':has([data-check-target-resolution="unresolved"]:has-text("@skills.craft.value"))',
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
     kinds: ['manager', 'checks'],
   }),
   // The first open-panel frame in the checks studio (issue 1510), and the only way to photograph a
@@ -2140,10 +2133,7 @@ export const CASES = Object.freeze([
       ':has([data-check-count-base-mode-option="value"].is-active)' +
       ':has([data-check-count-row-base] [data-expr-input-reading="resolved"])' +
       ' [data-check-count-actor-line="resolved"]',
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   authoringCase({
     id: 'manager-checks-v3-count-under',
@@ -2394,10 +2384,7 @@ export const CASES = Object.freeze([
       PATH_READING('resolved', '= 2') +
       ':has([data-check-additional-dice-label-field])' +
       ':has([data-check-additional-dice-max])',
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-path-narrow',

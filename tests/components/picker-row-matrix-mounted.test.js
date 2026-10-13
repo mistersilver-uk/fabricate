@@ -50,7 +50,7 @@ const harness = createMountedComponentHarness({
     ...KIND_MENU_COMPILED_MODULES,
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
     'src/ui/svelte/components/Field.svelte',

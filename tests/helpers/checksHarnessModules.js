@@ -226,7 +226,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker.
   'src/ui/svelte/components/SearchablePopover.svelte',
   // The shared one-of-n picker (issue 1510). The checks studio renders it at each converted select

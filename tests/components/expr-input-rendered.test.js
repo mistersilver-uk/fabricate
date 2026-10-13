@@ -14,7 +14,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import { createViteFixtureServer, pressPointerOn } from '../helpers/vite-fixture-server.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const RDE = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
 const CHIP = 'src/ui/svelte/components/Chip.svelte';
 
 /** Rounding tolerance for a fractional rect. */

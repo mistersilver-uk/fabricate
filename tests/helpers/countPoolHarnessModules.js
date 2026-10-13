@@ -39,7 +39,7 @@ export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',

@@ -21,7 +21,7 @@ import { attributeValue } from '../helpers/svelteStructureContract.js';
 import { parsedTemplates } from '../helpers/svelteTemplateScan.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const RDE = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
 const CCVF = 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte';
 
 const harness = createMountedComponentHarness({
@@ -421,7 +421,7 @@ describe('ExprInput (issue 2465)', () => {
       [...new Set(tags.filter(({ spreads }) => spreads > 0).map(({ file }) => file))].sort((a, b) =>
         a.localeCompare(b)
       ),
-      [CCVF, 'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte'],
+      [CCVF],
       'a spread can carry `tokens` or a retired prop unread; a new one is read by hand before it joins this list'
     );
   });

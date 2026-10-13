@@ -32,7 +32,7 @@
   import Field from '../../../components/Field.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import CheckCountPoolFields from './CheckCountPoolFields.svelte';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
   import { countComparisonPhrase, interpolate, underComparisonPhrase } from './checksCopy.js';

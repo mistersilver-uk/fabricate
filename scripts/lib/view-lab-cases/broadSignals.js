@@ -572,6 +572,26 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
   ]),
+  // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
+  'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([
+    'manager-system-edit-lists',
+    'manager-checks-stacked-floor',
+    'manager-checks-formula-card',
+    'manager-checks-character-value-unresolved',
+    'manager-checks-parity-under-attribute',
+    'manager-checks-v3-count-over-narrow',
+    'manager-checks-v3-count-additional-dice-path',
+    'manager-recipe-edit-results-rolled',
+    'manager-recipe-edit-results-rolled-narrow',
+    'manager-component-edit-salvage-rolled-narrow',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-recipe-edit-results-group-rolled-upto-repeats-narrow',
+    'manager-recipe-edit-results-group-rolled-overlap',
+    'manager-recipe-edit-results-group-rolled-overlap-narrow',
+    'manager-recipe-edit-results-group-failure-role',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',

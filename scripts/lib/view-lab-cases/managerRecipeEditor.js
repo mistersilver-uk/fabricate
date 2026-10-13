@@ -65,7 +65,6 @@ const CONVERT_ROW = (set, n, kind) => [
 const GROUP_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\//,
-  /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
 ]);
 
 /** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
@@ -1071,10 +1070,7 @@ export const CASES = Object.freeze([
       ...(position && { position }),
       ...(themeVariants.length > 0 && { themeVariants }),
       kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],
-      sourceMatches: [
-        /^src\/ui\/svelte\/apps\/manager\/recipe\//,
-        /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-      ],
+      sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\//],
     })
   ),
   // A result naming no component (an item-only one, the one way a result row is unnamed) opens the

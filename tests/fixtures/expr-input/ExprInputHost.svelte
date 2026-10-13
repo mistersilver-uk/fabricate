@@ -1,6 +1,6 @@
 <!-- A caller holding the expression field's value, reporting every write it receives (issue 2465). -->
 <script>
-  import RollDataExpressionInput from '../../../src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../src/ui/svelte/components/RollDataExpressionInput.svelte';
 
   let {
     initialValue = '',
