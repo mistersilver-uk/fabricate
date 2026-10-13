@@ -176,8 +176,6 @@
   overflow-y: auto;
 }
 
-/* The roll-data chips (`WorldModifiersTab`) keep the option's box under their own class. */
-.fabricate-manager .manager-tag-suggestion,
 .fabricate-typeahead-option.fabricate-typeahead-option {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
@@ -193,8 +191,6 @@
   text-align: left;
 }
 
-.fabricate-manager .manager-tag-suggestion:hover,
-.fabricate-manager .manager-tag-suggestion:focus-visible,
 .fabricate-typeahead-option.fabricate-typeahead-option:hover,
 .fabricate-typeahead-option.fabricate-typeahead-option:focus-visible {
   background: var(--fab-surface-raised);

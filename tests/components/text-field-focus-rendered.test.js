@@ -38,10 +38,13 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
     <span class="manager-recipe-option-search is-typing" data-case="typing">
       <input type="text" value="iron" />
     </span>
-    <div class="manager-checks-formula-input" data-case="formula">
-      <i class="fas fa-dice" aria-hidden="true"></i>
-      <input placeholder="1d20 + @abilities.int.mod" />
-    </div>
+    <label class="fabricate-field manager-prerequisite-path" data-case="path">
+      <span class="visually-hidden">Property path</span>
+      <div class="manager-prerequisite-path-input">
+        <span class="manager-prerequisite-at" aria-hidden="true">@</span>
+        <input type="text" data-prerequisite-path placeholder="abilities.int.mod" />
+      </div>
+    </label>
     <div data-case="scroller" style="overflow:auto;width:320px">
       <input type="text" placeholder="Bonus" style="display:block;width:100%;box-sizing:border-box" />
       <input type="checkbox" />
@@ -120,7 +123,7 @@ const token = (name) =>
     name
   );
 
-for (const wrapper of ['option', 'formula']) {
+for (const wrapper of ['option', 'path']) {
   test(`the ${wrapper} field's empty caret box fills its wrapper and lights it`, async () => {
     const { focused, rested } = await measureFocused(`[data-case="${wrapper}"] input`);
     const accent = await token('accent');

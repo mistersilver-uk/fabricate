@@ -1498,54 +1498,20 @@
   margin: 0;
 }
 
-/* ── The FORMULA card ── Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the suggestion chips (issue 1096). */
+/* ── The FORMULA card ── Stacked parts: the expression field in a field shell, with its row of tokens and the `avg` line beneath, then the `WHAT ACTUALLY GETS ROLLED` inset (issues 1096, 2465). */
 .fabricate-manager .manager-checks-formula {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-/* The input WELL, not the input: the field is borderless inside a bordered row that also carries the leading dice glyph and the trailing average, so the three read as one control rather than as a control with two decorations beside it. */
-.fabricate-manager .manager-checks-formula-input {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  height: 38px;
-  padding: 0 var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-surface-soft);
-}
-
 /* A wrapper-drawn field lights the wrapper: the borderless input inside draws no ring of its own. */
-.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field):focus-within {
+.fabricate-manager :is(.manager-prerequisite-path-input, .manager-component-entry-alias-field):focus-within {
   border-color: var(--fab-accent);
 }
 
-.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field) input:focus-visible {
+.fabricate-manager :is(.manager-prerequisite-path-input, .manager-component-entry-alias-field) input:focus-visible {
   outline: none;
-}
-
-.fabricate-manager .manager-checks-formula-input > i {
-  flex: 0 0 auto;
-  color: var(--fab-accent);
-  font-size: 12px;
-}
-
-.fabricate-manager .manager-checks-formula-input input {
-  flex: 1 1 auto;
-  align-self: stretch;
-  width: auto;
-  min-width: 0;
-  height: auto;
-  padding: 1px var(--fab-space-2xs);
-  border: 0;
-  color: var(--fab-text);
-  background: transparent;
-  font-family: var(--fab-font-mono);
-  font-size: 13.5px;
-  font-weight: 500;
 }
 
 /* The reading, not a control: no border, no fill, and quiet enough that it never competes with the expression it qualifies. */
@@ -2075,25 +2041,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
-}
-
-/* ── Roll-data suggestion chips under the expression ── The CHIP is the shipped `.manager-tag-suggestion` — same 16px-glyph-plus-label grid, same success-tinted hover — so this row and the modifier typeahead speak with one voice (issue 1096). */
-.fabricate-manager .manager-modifier-expression-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  min-width: 0;
-}
-
-/* Three classes (0,3,0) to clear the base chip's `border: 0`, transparent fill and in-panel 6px corner at (0,2,0); a standalone 28px chip takes 7. */
-.fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
-  flex: 0 1 auto;
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  background: var(--fab-bg-2);
-  font-family: var(--fab-font-mono, monospace);
-  font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-character-modifier-actions {

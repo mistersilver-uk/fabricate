@@ -10,7 +10,6 @@ import {
   COUNT_POOL_RAW_MODULES,
 } from '../helpers/countPoolHarnessModules.js';
 import { planModifierPlacement } from '../../src/systems/checkModifierRouter.js';
-import { formulaTokenIcon } from '../../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -200,19 +199,21 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
   });
 });
 
-// ── The suggestion chips, THROUGH THE RENDERED CONTROL ────────────────────────────────
-describe('a suggestion chip appends its term when CLICKED', () => {
-  it('appends to an authored formula with a joining +', async () => {
+// ── The token row, through the rendered control ───────────────────────────────────────
+describe('a formula token inserts its term when clicked (issue 2465)', () => {
+  const TOKEN = '.fab-expr-input-token';
+
+  it('joins an authored formula with a +', async () => {
     const emitted = [];
     const target = await harness.mount({
       rollFormula: '1d20',
       foundrySystemId: '',
       onChange: (patch) => emitted.push(patch),
     });
-    const chip = target.querySelector('[data-check-formula-token]');
-    assert.ok(chip, 'at least one suggestion chip renders');
+    const chip = target.querySelector(TOKEN);
+    assert.ok(chip, 'at least one token renders');
     assert.equal(chip.tagName, 'BUTTON', 'it is a real button, not a click-handled span');
-    const token = chip.dataset.checkFormulaToken;
+    const token = chip.textContent;
     chip.click();
     assert.equal(emitted.length, 1, 'the click reached the handler');
     assert.equal(emitted.at(-1).rollFormula, `1d20 + ${token}`);
@@ -221,45 +222,75 @@ describe('a suggestion chip appends its term when CLICKED', () => {
   it('yields the term alone when the formula is empty, never a leading +', async () => {
     const emitted = [];
     const target = await harness.mount({ rollFormula: '', onChange: (patch) => emitted.push(patch) });
-    const chip = target.querySelector('[data-check-formula-token]');
+    const chip = target.querySelector(TOKEN);
     chip.click();
-    assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);
+    assert.equal(emitted.at(-1).rollFormula, chip.textContent);
+  });
+
+  it('completes a formula that already ends in +, rather than writing a second one', async () => {
+    const emitted = [];
+    const target = await harness.mount({
+      rollFormula: '1d20 +',
+      onChange: (patch) => {
+        emitted.push(patch);
+      },
+    });
+    const chip = target.querySelector(TOKEN);
+    chip.click();
+    assert.deepEqual(emitted, [{ rollFormula: `1d20 + ${chip.textContent}` }]);
+  });
+
+  it('offers the active world’s terms in a row the card names', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', foundrySystemId: 'dnd5e' });
+    assert.deepEqual(
+      [...target.querySelectorAll(TOKEN)].map((chip) => chip.textContent),
+      ['@abilities.int.mod', '@abilities.wis.mod', '@skills.sur.total', '2', '1d4']
+    );
+    assert.equal(
+      target.querySelector('.fab-expr-input-row').getAttribute('aria-label'),
+      lookup('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTokensLabel')
+    );
   });
 });
 
-describe('a suggestion chip carries its reference kind glyph (issue 2005, prototype)', () => {
-  it('draws the prototype kind glyph after the + verb, and none for a kind it has no glyph for', async () => {
-    const target = await harness.mount({ rollFormula: '1d20', foundrySystemId: 'dnd5e' });
-    const kinds = Object.fromEntries(
-      [...target.querySelectorAll('[data-check-formula-token]')].map((chip) => [
-        chip.dataset.checkFormulaToken,
-        [...(chip.querySelector('[data-check-formula-token-kind]')?.classList ?? [])]
-          .filter((token) => token.startsWith('fa'))
-          .join(' '),
-      ])
-    );
-    assert.deepEqual(kinds, {
-      '@abilities.int.mod': 'fas fa-hand',
-      '@abilities.wis.mod': 'fas fa-hand',
-      '@skills.sur.total': '',
-      2: '',
-      '1d4': 'fas fa-dice-d20',
-    });
-    const chip = target.querySelector('[data-check-formula-token="1d4"]');
-    assert.deepEqual(
-      [...chip.children].map((child) => child.tagName),
-      ['I', 'I', 'SPAN'],
-      'the + verb, then the kind glyph, then the term'
+describe('the formula card stacks the field, its tokens, the average and the inset (issue 2465)', () => {
+  /** Whether `later` follows `earlier` in document order. */
+  const follows = (earlier, later) =>
+    Boolean(earlier.compareDocumentPosition(later) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('draws the token row under the field, then the average, then the inset', async () => {
+    const target = await harness.mount({ rollFormula: '1d20 + 2', foundrySystemId: 'dnd5e' });
+    const field = target.querySelector('[data-check-roll-formula]');
+    const row = target.querySelector('.fab-expr-input-row');
+    const average = target.querySelector('[data-check-formula-average]');
+    const inset = target.querySelector('[data-check-formula-resolved]');
+    assert.ok(field && row && average && inset, 'the four parts render');
+    assert.ok(row.previousElementSibling === field, 'the row is the field’s next sibling');
+    assert.ok(follows(row, average), 'the average follows the row');
+    assert.ok(follows(average, inset), 'and the inset follows the average');
+    assert.ok(!inset.contains(row) && !follows(inset, row), 'no row sits in or beneath the inset');
+    assert.equal(target.querySelectorAll('.fab-expr-input-row').length, 1, 'and there is one row');
+  });
+
+  it('draws the field in a field shell, with no glyph and no reading inside its box', async () => {
+    const target = await harness.mount({ rollFormula: '1d20 + 2' });
+    const field = target.querySelector('[data-check-roll-formula]');
+    const shell = field.parentElement;
+    assert.ok(shell.matches('div.fabricate-field'), 'the shell is a `div` field, named by the card');
+    assert.ok(!target.querySelector('.fa-dice'), 'no dice glyph is drawn');
+    assert.ok(
+      target.querySelector('[data-check-formula-average]').parentElement === shell,
+      'the average is the shell’s own line, a sibling of the field'
     );
   });
 
-  it('maps every prototype kind to its Font Awesome Free glyph', () => {
-    assert.deepEqual(
-      ['@prof', '@abilities.wis.mod', '@ingredients', '@level', '1d4', '@skills.sur.total', '2'].map(
-        formulaTokenIcon
-      ),
-      ['fas fa-medal', 'fas fa-hand', 'fas fa-flask', 'fas fa-arrow-up-9-1', 'fas fa-dice-d20', '', '']
-    );
+  it('keeps the Validation route’s address on the input itself', async () => {
+    const target = await harness.mount({ rollFormula: '1d20' });
+    const addressed = target.querySelector('[data-validation-target="checks-roll-formula"]');
+    assert.ok(Boolean(addressed), 'the address resolves');
+    assert.equal(addressed.tagName, 'INPUT', 'to a natively focusable control');
+    assert.ok(addressed.hasAttribute('data-check-roll-formula'), 'which is the formula field');
+    assert.ok(addressed.classList.contains('fab-expr-input'), 'drawn by the expression field');
   });
 });
 

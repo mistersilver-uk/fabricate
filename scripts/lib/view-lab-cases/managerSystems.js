@@ -350,6 +350,8 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-roll-note="hb-mod-luck"])',
+    // The open editor's row of tokens: a token owns its own centre.
+    expectCenterHit: '.fab-expr-input-token',
     position: { width: 1280, height: 980 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],

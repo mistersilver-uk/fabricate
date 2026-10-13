@@ -148,10 +148,10 @@ const FIELD_FIXTURE = `
           <span>Label</span>
           <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
-        <label class="fabricate-field" data-case="plain">
+        <div class="fabricate-field" data-case="plain">
           <span>Expression</span>
           <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
-        </label>
+        </div>
         <label class="fabricate-field manager-prerequisite-path" data-case="capped">
           <span class="visually-hidden">Property path</span>
           <div class="manager-prerequisite-path-input">
@@ -174,15 +174,29 @@ const classTokens = (node) =>
 
 test('the un-capped expression field renders as an ordinary field, with no affix seam', async () => {
   // The fixture is anchored to the two templates it mirrors, by their parsed markup.
-  const field = [...walkNodes(componentAstOf(EXPRESSION_FIELD).fragment)];
-  assert.deepEqual(
-    field.filter((node) => ELEMENT_TYPES.includes(node.type)).map((node) => node.name),
-    ['input'],
-    'the expression field is one bare input: no wrapper to inset it and no cap beside it'
+  const { fragment } = componentAstOf(EXPRESSION_FIELD);
+  const roots = fragment.nodes.filter(
+    (node) => ELEMENT_TYPES.includes(node.type) || node.type === 'IfBlock'
   );
-  assert.ok(
-    field.every((node) => node.type !== 'IfBlock'),
-    'and it has no second form to branch into'
+  assert.deepEqual(
+    roots.map((node) => (node.type === 'IfBlock' ? '{#if}' : node.name)),
+    ['input', '{#if}'],
+    "the template's root elements are the input, then one `{#if}`, and nothing wraps the input"
+  );
+  const [, branch] = roots;
+  assert.deepEqual(
+    [branch.consequent, branch.alternate].flatMap((arm) =>
+      (arm?.nodes ?? [])
+        .filter((node) => ELEMENT_TYPES.includes(node.type))
+        .map((node) => [node.name, ...classTokens(node)])
+    ),
+    [['div', 'fab-expr-input-row']],
+    'the `{#if}` holds the one row of tokens, which stands after the input and never beside it'
+  );
+  assert.equal(
+    [...walkNodes(fragment)].filter((node) => node.type === 'IfBlock').length,
+    1,
+    'and it is the single `{#if}`: the field has no second form to branch into'
   );
   const wrapper = [...walkNodes(componentAstOf(PREREQUISITES_CARD).fragment)].find((node) =>
     classTokens(node).includes('manager-prerequisite-path-input')

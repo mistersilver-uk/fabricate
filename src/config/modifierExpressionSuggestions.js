@@ -53,16 +53,3 @@ export function getModifierExpressionSuggestions(foundrySystemId) {
     ...SYSTEM_AGNOSTIC_SUGGESTIONS.map((suggestion) => ({ ...suggestion, systemSpecific: false })),
   ];
 }
-
-// A trailing arithmetic operator (or an opening bracket) the GM has already typed.
-const TRAILING_OPERATOR = /[+\-*/(]$/;
-
-/** Append a suggested term to an authored expression. */
-export function appendModifierExpressionTerm(current, term) {
-  const base = String(current ?? '').trim();
-  const addition = String(term ?? '').trim();
-  if (!addition) return base;
-  if (!base) return addition;
-  if (TRAILING_OPERATOR.test(base)) return `${base} ${addition}`;
-  return `${base} + ${addition}`;
-}

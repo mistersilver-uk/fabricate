@@ -6676,6 +6676,7 @@
             "OutcomeNoSuccess": "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
             "FormulaTitle": "Formula",
             "FormulaLabel": "Formula",
+            "FormulaTokensLabel": "Add a term to this formula",
             "ProgressiveLead": "Resolves to a numeric value, not a pass or fail. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.",
             "AwardModeTitle": "Award mode",
             "AwardEqual": "Equal",

@@ -28,8 +28,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/components/stepperLabels.js',
-    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
-    // preset bundle it reads.
+    // The expression tokens' derivation (issue 1096) and the per-Foundry-system preset bundle
+    // it reads.
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     // The unified modifier library's bounds pair and roll classification (issue 1117).
@@ -413,6 +413,9 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     },
   ]);
 
+  /** A token the expression field draws in its row. */
+  const TOKEN = '.fab-expr-input-token';
+
   async function openEditor(props = {}) {
     const root = await harness.mount({ library: BOUNDED, ...props });
     const row = root.querySelector('[data-world-modifier="mod-flat"]');
@@ -562,32 +565,57 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     assert.ok(note, 'the error surface is not a casualty of the relayout');
   });
 
-  // DEFECT 3. Roll-data suggestion chips under the expression, which APPEND.
-  it('offers roll-data suggestion chips under the expression, derived from the active world', async () => {
+  // DEFECT 3. The expression field's tokens, derived from the active world, which append.
+  it('offers roll-data tokens under the expression, derived from the active world', async () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
 
-    const chips = [...row.querySelectorAll('[data-world-modifier-suggestion]')];
-    assert.ok(chips.length > 0, 'the expression carries a suggestion row');
+    const chips = [...row.querySelectorAll(TOKEN)];
+    assert.ok(chips.length > 0, 'the expression carries a row of tokens');
     const terms = chips.map((chip) => chip.textContent.trim());
     assert.ok(terms.includes('@abilities.wis.mod'), 'a dnd5e world is offered dnd5e roll data');
     assert.ok(terms.includes('1d4'), 'and the system-agnostic terms beside it');
 
-    const suggestions = row.querySelector('[data-world-modifier-suggestions="mod-flat"]');
+    const suggestions = row.querySelector('.fab-expr-input-row');
     const expression = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(
       Boolean(
         expression.compareDocumentPosition(suggestions) &
         globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
       ),
-      'the chips sit UNDER the field they fill in'
+      'the tokens sit under the field they fill in'
+    );
+    assert.equal(
+      suggestions.getAttribute('aria-label'),
+      'Add a term to this expression',
+      'and the row is a group the caller names'
+    );
+  });
+
+  it('names the expression field by its caption alone, and describes it by the hint', async () => {
+    const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
+    const host = expression.closest('.fabricate-field');
+    assert.equal(host.tagName, 'DIV', 'a `<label>` host would name the field by every token');
+
+    const referenced = (attribute) =>
+      globalThis.window.document.querySelector(`#${expression.getAttribute(attribute)}`);
+    assert.equal(referenced('aria-labelledby').textContent.trim(), 'Expression');
+    const hint = row.querySelector('[data-world-modifier-expression-hint]');
+    assert.ok(referenced('aria-describedby') === hint, 'the hint describes the field');
+
+    const tokens = row.querySelector('.fab-expr-input-row');
+    assert.ok(host.contains(tokens) && host.contains(hint), 'the row and the hint share the shell');
+    assert.ok(
+      Boolean(
+        tokens.compareDocumentPosition(hint) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the row sits between the field and its hint'
     );
   });
 
   it('offers the pf2e paths in a pf2e world, so the row is not one hard-coded list', async () => {
     const { row } = await openEditor({ foundrySystemId: 'pf2e' });
-    const terms = [...row.querySelectorAll('[data-world-modifier-suggestion]')].map((chip) =>
-      chip.textContent.trim()
-    );
+    const terms = [...row.querySelectorAll(TOKEN)].map((chip) => chip.textContent.trim());
     assert.ok(
       terms.includes('@actor.system.abilities.wis.mod'),
       'the pf2e wisdom path, which is a different string from the dnd5e one'
@@ -604,10 +632,8 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       },
     });
 
-    const die = [...row.querySelectorAll('[data-world-modifier-suggestion]')].find(
-      (chip) => chip.textContent.trim() === '1d4'
-    );
-    assert.ok(die, 'the 1d4 chip is present');
+    const die = [...row.querySelectorAll(TOKEN)].find((chip) => chip.textContent.trim() === '1d4');
+    assert.ok(die, 'the 1d4 token is present');
     die.dispatchEvent(clickEvent());
     await flushRender();
 
@@ -654,7 +680,9 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
     const expression = row.querySelector('[data-world-modifier-field="expression"]');
 
-    const chip = row.querySelector('[data-world-modifier-suggestion]');
+    const chip = row.querySelector(TOKEN);
+    // Focus first, as a real press leaves it: a dispatched click moves no focus of its own.
+    chip.focus();
     chip.dispatchEvent(clickEvent());
     await flushRender();
 

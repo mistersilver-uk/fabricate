@@ -1,0 +1,33 @@
+<!-- A caller holding the expression field's value, reporting every write it receives (issue 2465). -->
+<script>
+  import RollDataExpressionInput from '../../../src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+
+  let {
+    initialValue = '',
+    tokens = [],
+    shell = false,
+    disabled = false,
+    echo = (next) => next,
+    onWrite = () => {},
+  } = $props();
+  // svelte-ignore state_referenced_locally
+  let value = $state(initialValue);
+
+  function write(next) {
+    value = echo(next);
+    onWrite(next);
+  }
+</script>
+
+<button type="button" data-before>Before the field</button>
+<div class={shell ? 'fabricate-field' : ''} data-host>
+  <span id="expr-input-caption">Expression</span>
+  <RollDataExpressionInput
+    aria-labelledby="expr-input-caption"
+    {value}
+    {tokens}
+    {disabled}
+    tokensLabel="Add a term"
+    onChange={write}
+  />
+</div>

@@ -5,11 +5,14 @@
     "draws": ".k-field.mono",
     "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
     "undrawn": {
-      "Expression": "the field’s accessible name; the drawing draws the field alone"
+      "Expression": "the field’s accessible name; the drawing draws the field alone",
+      "Add a term": "the token row’s accessible name; the drawing draws the tokens alone"
     },
     "props": {
       "value": "1d20 + @prof + @abilities.dex.mod",
-      "aria-label": "Expression"
+      "aria-label": "Expression",
+      "tokens": ["@prof", "@abilities.dex.mod", "@skills.cra.rank"],
+      "tokensLabel": "Add a term"
     }
   },
   {
