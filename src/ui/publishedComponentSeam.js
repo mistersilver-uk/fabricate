@@ -132,20 +132,22 @@ function createMountLifecycle({ runtime, report }) {
     if (claims.get(record.target) === record) claims.delete(record.target);
   }
 
-  // Answers whether the runtime's unmount returned; a throw is reported.
+  // A throw is reported, and so is a rejection: the handler goes straight onto what the runtime
+  // returned, so a Promise settled inside the call reports before the fault notice queued after it.
   function unmountQuietly(record) {
+    const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
     try {
-      runtime().unmount(record.instance);
-      return true;
+      const result = runtime().unmount(record.instance);
+      if (typeof result?.then === 'function') result.then(undefined, reportFailure);
     } catch (error) {
-      report(FAULT_REPORT, record.name, error);
-      return false;
+      reportFailure(error);
     }
   }
 
-  // A faulted mount leaves its target empty even when the runtime's unmount fails part-way.
+  // A faulted mount leaves its target empty at once, however the runtime's unmount ended.
   function unmountFaulted(record) {
-    if (!unmountQuietly(record)) record.target.replaceChildren?.();
+    unmountQuietly(record);
+    record.target.replaceChildren?.();
   }
 
   // A retired mount's nested mounts end first, and its slot elements leave after its own unmount.

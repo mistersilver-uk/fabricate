@@ -1,9 +1,9 @@
 /**
  * The published component seam's content slots on Fabricate's real Svelte runtime (issue 2451),
  * drawing the test-only probe into bare companion-owned targets: the slot element inside its
- * private wrapper, its detach and re-attach, a host element replaced around it, and the teardown
- * of a published mount nested in it. The fake runtime's order and timing clauses are
- * `published-component-slots.test.js`'s.
+ * private wrapper, its detach and re-attach, a host element replaced around it, the teardown of a
+ * published mount nested in it, and a teardown that throws during the unmount. The fake runtime's
+ * order and timing clauses are `published-component-slots.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -277,5 +277,25 @@ describe('a published mount nested in a slot element on the real runtime', () =>
     assert.equal(inner.update({}), false);
     assert.equal(innerTarget.childNodes.length, 0);
     assert.deepEqual(reports, []);
+  });
+});
+
+describe('a published teardown that throws on the real runtime', () => {
+  it('is reported once after destroy returns, and goes no further', async () => {
+    const instance = seam();
+    const target = companionTarget(targets);
+    const handle = instance.publicApi.mount('PublishedProbe', {
+      target,
+      props: { throwAt: 'teardown' },
+    });
+    await settle();
+    assert.doesNotThrow(() => handle.destroy());
+    assert.deepEqual(reports, [], 'a rejected unmount is reported a microtask later');
+    assert.equal(instance.liveMountCount(), 0);
+    await settle();
+    assert.equal(reports.length, 1);
+    assert.deepEqual(reports[0].slice(0, 2), [FAULT_REPORT, 'PublishedProbe']);
+    assert.ok(reports[0][2] === probe.PROBE_FAULTS.teardown, "the probe's own Error");
+    assert.equal(handle.update({}), false);
   });
 });

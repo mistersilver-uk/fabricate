@@ -35,9 +35,9 @@ export const COMPONENTS = Object.freeze({
 export const publishedComponentRuntime = Object.freeze({
   host: PublishedComponentHost,
   mount: (host, options) => untrack(() => mount(host, options)),
-  unmount: (instance) => {
-    unmount(instance);
-  },
+  // Svelte's own Promise, never an `async` wrapper or `{ outro: true }`: the seam reports its
+  // rejection, and either would move that report after `onFault` or let the throw escape.
+  unmount: (instance) => unmount(instance),
 });
 
 // ratchet-exempt(lint): main.js imports this module for its registration, as appFactory's apps do.

@@ -67,16 +67,18 @@ export async function underSheet(css, run) {
 
 /**
  * Passes `record` every error thrown past the seam until the returned function is called: Node's
- * uncaught exceptions, and those happy-dom traps in its timers and microtasks and reports on its
- * own window, which never reach `process`.
+ * uncaught exceptions and unhandled rejections, and those happy-dom traps in its timers and
+ * microtasks and reports on its own window, which never reach `process`.
  */
 export function recordEscapes(record) {
   const view = document.defaultView;
   const trapped = (event) => record(event.error);
   process.on('uncaughtException', record);
+  process.on('unhandledRejection', record);
   view.addEventListener('error', trapped);
   return () => {
     process.off('uncaughtException', record);
+    process.off('unhandledRejection', record);
     view.removeEventListener('error', trapped);
   };
 }

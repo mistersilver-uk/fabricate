@@ -126,13 +126,15 @@ const slotsSeen = (props) =>
  * A recording runtime: `mount` appends a root and captures the host's fault callback, and `events`
  * logs each `unmount` beside whatever the test pushes. With both errors it faults, then throws.
  * An instance keeps what `slots` answered inside `mount` and inside each `setProps`, and
- * `onUnmount(instance)` runs inside each `unmount`.
+ * `onUnmount(instance)` runs inside each `unmount`. With `unmountResult` an `unmount` leaves its
+ * root in place and returns what that function answers.
  */
 export function fakeRuntime({
   mountError = null,
   faultDuringMount = null,
   unmountError = null,
   onUnmount = null,
+  unmountResult = null,
 } = {}) {
   const mounts = [];
   const unmounts = [];
@@ -167,8 +169,10 @@ export function fakeRuntime({
       events.push('unmount');
       onUnmount?.(instance);
       if (unmountError) throw unmountError;
+      if (unmountResult) return unmountResult();
       const at = instance.target.childNodes.indexOf(instance.root);
       if (at !== -1) instance.target.childNodes.splice(at, 1);
+      return undefined;
     },
     report: (...args) => {
       reports.push(args);

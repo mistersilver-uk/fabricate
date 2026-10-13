@@ -1,11 +1,11 @@
 /**
  * The published component seam's content slots (issue 2451), driven through its factory with the
  * fake runtime: the `slot` kind and M15, the slot element's creation, life and removal,
- * `handle.slot`, and the teardown of mounts nested in a slot element. The real Svelte runtime is
- * `components/published-slots-mounted.test.js`'s.
+ * `handle.slot`, the teardown of mounts nested in a slot element, and a runtime `unmount` that
+ * rejects. The real Svelte runtime is `components/published-slots-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
   FAULT_REPORT,
@@ -346,5 +346,105 @@ describe('a mount nested in a slot element', () => {
     assert.deepEqual(fake.reports, [[FAULT_REPORT, 'Panel', error]]);
     assert.equal(inner.update(zetaProps()), false);
     assert.equal(fake.seam.liveMountCount(), 0);
+  });
+});
+
+describe('a runtime whose unmount returns a rejected Promise', () => {
+  const teardown = new Error('teardown rejected');
+  const rejecting = (options = {}) =>
+    seamWith({ unmountResult: () => Promise.reject(teardown), ...options });
+
+  let unhandled;
+  const recordUnhandled = (reason) => {
+    unhandled.push(reason);
+  };
+  beforeEach(() => {
+    unhandled = [];
+    process.on('unhandledRejection', recordUnhandled);
+  });
+  afterEach(() => {
+    process.off('unhandledRejection', recordUnhandled);
+  });
+
+  it('reports the rejection once after destroy, with the claim released', async () => {
+    const { seam, ui, reports } = rejecting();
+    const target = new FakeTarget();
+    const handle = ui.mount('Zeta', { target, props: zetaProps() });
+    handle.destroy();
+    assert.deepEqual(reports, [], 'a rejection is reported a microtask later');
+    assert.equal(seam.liveMountCount(), 0);
+    await drained();
+    assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', teardown]]);
+    assert.deepEqual(unhandled, []);
+    assert.throws(
+      () => ui.mount('Zeta', { target, props: zetaProps() }),
+      refusal('target must be empty'),
+      'the leftover root is content, not a held claim'
+    );
+  });
+
+  it('reports the fault and the rejection before onFault on a boundary fault, the target empty', async () => {
+    const { ui, mounts, reports } = rejecting();
+    const target = new FakeTarget();
+    const seen = [];
+    const onFault = () => {
+      seen.push({ children: target.childNodes.length, reports: reports.length });
+    };
+    ui.mount('Zeta', { target, props: zetaProps(), onFault });
+    const error = new Error('render blew up');
+    mounts[0].props.onfault(error);
+    assert.equal(target.childNodes.length, 0, 'emptied as the unmount call returns');
+    await drained();
+    assert.deepEqual(reports, [
+      [FAULT_REPORT, 'Zeta', error],
+      [FAULT_REPORT, 'Zeta', teardown],
+    ]);
+    assert.deepEqual(seen, [{ children: 0, reports: 2 }]);
+    assert.deepEqual(unhandled, []);
+  });
+
+  it('finds the target empty in onFault on a fault inside the runtime call', async () => {
+    const error = new Error('during mount');
+    const { ui, reports } = rejecting({ faultDuringMount: error });
+    const target = new FakeTarget();
+    const seen = [];
+    const onFault = () => {
+      seen.push(target.childNodes.length);
+    };
+    ui.mount('Zeta', { target, props: zetaProps(), onFault });
+    await drained();
+    assert.deepEqual(seen, [0]);
+    assert.deepEqual(reports, [
+      [FAULT_REPORT, 'Zeta', error],
+      [FAULT_REPORT, 'Zeta', teardown],
+    ]);
+    assert.deepEqual(unhandled, []);
+  });
+
+  it('leaves a mount made into the target after the faulted unmount returned in place', async () => {
+    const { ui, mounts } = rejecting();
+    const target = new FakeTarget();
+    ui.mount('Zeta', { target, props: zetaProps() });
+    mounts[0].props.onfault(new Error('render blew up'));
+    const again = ui.mount('Zeta', { target, props: zetaProps({ label: 'Again' }) });
+    await drained();
+    assert.equal(target.childNodes.length, 1, 'the rejection handler empties nothing');
+    assert.equal(target.firstChild, mounts[1].instance.root);
+    assert.equal(again.update(zetaProps()), true);
+    assert.deepEqual(unhandled, []);
+  });
+
+  it('skips a return that is no thenable', async () => {
+    // ratchet-exempt(lint): a `then` that is no function is the return under test.
+    const thenIsNoFunction = { then: true };
+    for (const result of [null, 0, 'done', {}, thenIsNoFunction]) {
+      const { ui, mounts, reports } = seamWith({ unmountResult: () => result });
+      ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps() }).destroy();
+      ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps() });
+      mounts[1].props.onfault(new Error('render blew up'));
+      await drained();
+      assert.equal(reports.length, 1, 'only the fault itself is reported');
+    }
+    assert.deepEqual(unhandled, []);
   });
 });
