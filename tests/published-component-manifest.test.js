@@ -16,8 +16,9 @@
  * Limit: the card census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
- * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
- * forwarded `text` or `slot` key fails closed and a forwarded `data` key is not seen.
+ * local, not a snippet forwarded to a child or read through an alias; a forwarded `text` or `slot`
+ * key fails closed and a forwarded `data` key is not seen. It matches by name, so it does not see
+ * a `{@const}` that shadows the local, nor a local tested in an `{#if}` other than its own guard.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
@@ -120,22 +121,43 @@ function repeatedRenderTags(ast) {
   return repeated;
 }
 
+const renderCall = (tag) =>
+  tag.expression.type === 'ChainExpression' ? tag.expression.expression : tag.expression;
+
 /**
- * Every local a `{@render}` tag calls, with each call's argument count, whether it is `?.()`, and
- * whether an `{#each}` or `{#key}` holds it.
+ * Every render tag in the consequent of an `{#if}` whose whole test is the local the tag calls.
+ * An `{:else if}` is no guard: its consequent is drawn only while every earlier test is false.
+ */
+function guardedRenderTags(ast) {
+  const guarded = new Set();
+  for (const block of walkNodes(ast.fragment)) {
+    if (block.type !== 'IfBlock' || block.elseif || block.test.type !== 'Identifier') continue;
+    for (const node of walkNodes(block.consequent)) {
+      if (node.type !== 'RenderTag') continue;
+      const { callee } = renderCall(node);
+      if (callee?.type === 'Identifier' && callee.name === block.test.name) guarded.add(node);
+    }
+  }
+  return guarded;
+}
+
+/**
+ * Every local a `{@render}` tag calls, with each call's argument count, whether it is `?.()`,
+ * whether its own `{#if}` guards it, and whether a repeating block holds it.
  */
 function renderedLocals(ast) {
   const called = new Map();
   const repeated = repeatedRenderTags(ast);
+  const guarded = guardedRenderTags(ast);
   for (const node of walkNodes(ast.fragment)) {
     if (node.type !== 'RenderTag') continue;
-    const call =
-      node.expression.type === 'ChainExpression' ? node.expression.expression : node.expression;
+    const call = renderCall(node);
     if (call.callee?.type !== 'Identifier') continue;
     const calls = called.get(call.callee.name) ?? [];
     calls.push({
       args: call.arguments.length,
       optional: call.optional === true,
+      guarded: guarded.has(node),
       repeated: repeated.has(node),
     });
     called.set(call.callee.name, calls);
@@ -146,23 +168,30 @@ function renderedLocals(ast) {
 const SHIPPED_KINDS = new Set(['data', 'text', 'slot']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
-/** What a `text` key's render calls break: drawn at least once, bare, and `?.()` unless required. */
+/** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
+const toleratesAbsence = (call) => call.optional || call.guarded;
+
+/**
+ * What a `text` key's render calls break: drawn at least once, bare, and `?.()` or guarded unless
+ * required.
+ */
 function textRenderFaults(key, spec, calls) {
   const faults = [];
   if (calls.length === 0) faults.push(`${key} is a text key no render tag draws`);
   if (calls.some((call) => call.args > 0)) {
     faults.push(`${key} is a text key rendered with an argument`);
   }
-  if (spec.required !== true && calls.some((call) => !call.optional)) {
-    faults.push(`${key} is an optional text key rendered without ?.`);
+  if (spec.required !== true && !calls.every(toleratesAbsence)) {
+    faults.push(`${key} is an optional text key rendered without ?. or an {#if} guard`);
   }
   return faults;
 }
 
 /**
  * What a `slot` key's spec and render calls break: `{ kind, element? }` with a `<div>` or
- * `<span>` element, drawn by exactly one bare `?.()` render tag that no `{#each}`, `{#key}`,
- * `{#snippet}` or component holds, so the one slot element is drawn once and never taken in turn.
+ * `<span>` element, drawn by exactly one bare render tag, `?.()` or guarded, that no `{#each}`,
+ * `{#key}`, `{#snippet}` or component holds, so the one slot element is drawn once and never taken
+ * in turn.
  */
 function slotFaults(key, spec, calls) {
   const faults = [];
@@ -175,7 +204,9 @@ function slotFaults(key, spec, calls) {
   if (calls.some((call) => call.args > 0)) {
     faults.push(`${key} is a slot key rendered with an argument`);
   }
-  if (calls.some((call) => !call.optional)) faults.push(`${key} is a slot key rendered without ?.`);
+  if (!calls.every(toleratesAbsence)) {
+    faults.push(`${key} is a slot key rendered without ?. or an {#if} guard`);
+  }
   if (calls.some((call) => call.repeated)) {
     faults.push(`${key} is a slot key rendered inside {#each}, {#key}, {#snippet} or a component`);
   }
@@ -259,6 +290,23 @@ const CARD = Object.freeze({
   ancestors: new Set(['manager-checks-rail', 'manager-inspector']),
   drawsChildren: true,
 });
+const EMPTY = Object.freeze({
+  root: 'manager-empty',
+  writable: new Set(['is-filtered']),
+  ancestors: new Set([
+    'manager-task-required-tools-scroll',
+    'journal-detail-pane',
+    'manager-scoped-list-inspector-scroll',
+  ]),
+  drawsChildren: true,
+});
+/** `is-accent` is writable because a private `tone` value still writes it. */
+const NOTICE = Object.freeze({
+  root: 'fab-notice',
+  writable: new Set(['is-danger', 'is-warning', 'is-info', 'is-success', 'is-accent']),
+  ancestors: new Set(),
+  drawsChildren: true,
+});
 
 const classesOf = (compound) =>
   compound.selectors.filter((part) => part.type === 'ClassSelector').map((part) => part.name);
@@ -287,10 +335,11 @@ function compoundsOf(complex) {
 /**
  * Whether no element a published component draws at `shape.root` can match `complex`: its root
  * compound takes a class the published keys cannot write or `:disabled`, or an earlier compound is
- * a pinned ancestor, or a later one needs a descendant the mount cannot hold. A root that draws no
- * children holds no classed descendant; one that draws the companion's holds none classed
- * `manager-*` unless a published closure spells that class. An attribute selector never makes a
- * selector safe, and anything else fails closed.
+ * a pinned ancestor, or a later one needs a descendant the mount cannot hold. `drawsChildren` is
+ * `false` for a root whose published keys draw no classed descendant, which only `Chip` is; any
+ * other root holds no descendant classed `manager-*` unless a published closure spells that class.
+ * An attribute selector never makes a selector safe, and anything else fails closed, a root named
+ * only inside `:has()` included.
  */
 function cannotMatchPublished(complex, shape, spelled = new Set()) {
   const { root, writable, ancestors, drawsChildren } = shape;
@@ -312,20 +361,30 @@ function cannotMatchPublished(complex, shape, spelled = new Set()) {
   return unwritable || disabled || classedChild || pinnedAncestor;
 }
 
-/** Every selector of one parsed stylesheet that names `root`, wherever in the selector. */
-function selectorsNaming(css, root) {
+/** Every selector of one parsed stylesheet with a part `test` passes, wherever in the selector. */
+function selectorsHolding(css, test) {
   const found = [];
   for (const node of walkNodes(css)) {
     if (node.type !== 'Rule') continue;
     for (const complex of node.prelude.children) {
-      const names = [...walkNodes(complex)].some(
-        (part) => part.type === 'ClassSelector' && part.name === root
-      );
-      if (names) found.push(complex);
+      if ([...walkNodes(complex)].some(test)) found.push(complex);
     }
   }
   return found;
 }
+
+const selectorsNaming = (css, root) =>
+  selectorsHolding(css, (part) => part.type === 'ClassSelector' && part.name === root);
+
+/** A selector as its stylesheet writes it. */
+const writtenSelector = (css, complex) =>
+  css.content.styles.slice(complex.start - css.content.start, complex.end - css.content.start);
+
+/** Every selector of one parsed stylesheet with an attribute selector named `name`, as written. */
+const selectorsOnAttribute = (file, css, name) =>
+  selectorsHolding(css, (part) => part.type === 'AttributeSelector' && part.name === name).map(
+    (complex) => `${file}: ${writtenSelector(css, complex)}`
+  );
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
@@ -359,12 +418,34 @@ function flatSelector(complex) {
     .join(' ');
 }
 
-/** Every selector of one parsed stylesheet that names the card root, as `{ selector, safe }`. */
-function cardSelectors(file, css, spelled) {
-  return selectorsNaming(css, CARD.root).map((complex) => ({
-    selector: `${file}: ${flatSelector(complex)}`,
-    safe: cannotMatchPublished(complex, CARD, spelled),
-  }));
+const holdsGlobal = (node) =>
+  [...walkNodes(node)].some(
+    (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
+  );
+
+/** Whether `:global` reaches `complex`: in a part of its own, or in a rule that nests it. */
+function reachedByGlobal(css, complex) {
+  const nests = ({ type, block }) =>
+    type === 'Rule' && block.start <= complex.start && complex.end <= block.end;
+  return (
+    holdsGlobal(complex) ||
+    [...walkNodes(css)].some((rule) => nests(rule) && holdsGlobal(rule.prelude))
+  );
+}
+
+/**
+ * Every selector of one parsed stylesheet that names `shape.root`, as `{ selector, written, safe }`:
+ * spelled flat, and as its sheet writes it. A selector in a file of `own`, the entry's closure, is
+ * scoped to that component's own elements, so it is skipped unless `:global` reaches it.
+ */
+function censusSelectors(file, css, shape, { spelled, own = new Set() } = {}) {
+  return selectorsNaming(css, shape.root)
+    .filter((complex) => !own.has(file) || reachedByGlobal(css, complex))
+    .map((complex) => ({
+      selector: `${file}: ${flatSelector(complex)}`,
+      written: `${file}: ${writtenSelector(css, complex)}`,
+      safe: cannotMatchPublished(complex, shape, spelled),
+    }));
 }
 
 /** Every `.svelte` file under `dir`, recursively, by path. */
@@ -639,7 +720,7 @@ describe('each entry matches its component declaration', () => {
     ]);
     assert.deepEqual(
       [...renderedLocals(ast)],
-      [['body', [{ args: 0, optional: true, repeated: false }]]]
+      [['body', [{ args: 0, optional: true, guarded: false, repeated: false }]]]
     );
   });
 
@@ -682,7 +763,7 @@ describe('each entry matches its component declaration', () => {
     [
       'an optional text key rendered without ?.',
       { body: { kind: 'text' } },
-      ['body is an optional text key rendered without ?.'],
+      ['body is an optional text key rendered without ?. or an {#if} guard'],
     ],
     ['a data key with a render tag', { note: data }, ['note is a data key rendered as a snippet']],
     ['a callback kind', { note: { kind: 'callback' } }, ['note has the unshipped kind callback']],
@@ -739,7 +820,11 @@ describe('each entry matches its component declaration', () => {
       { given: slot },
       ['given is a slot key rendered with an argument'],
     ],
-    ['rendered without ?.', { bare: slot }, ['bare is a slot key rendered without ?.']],
+    [
+      'rendered without ?.',
+      { bare: slot },
+      ['bare is a slot key rendered without ?. or an {#if} guard'],
+    ],
     [
       'rendered inside {#each}',
       { listed: slot },
@@ -773,6 +858,55 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names a slot key ${claim} as a fault`, () => {
       assert.deepEqual(slotFaultsOf(props), faults);
+    });
+  }
+
+  const GUARDED = templateOf(
+    'Guarded.svelte',
+    [
+      '<script>',
+      '  let { plain, boxed, note, a: first, b: second, other, alt, chained, negated, joined,',
+      '    foreign, twice, given, listed } = $props();',
+      '</script>',
+      '{#if plain}{@render plain()}{/if}',
+      '{#if boxed}<span>{@render boxed()}</span>{/if}',
+      '{#if note}{@render note()}{/if}',
+      '{#if first}{@render first()}{/if}',
+      '{#if b}{@render second()}{/if}',
+      '{#if alt}<p></p>{:else}{@render alt()}{/if}',
+      '{#if other}<p></p>{:else if chained}{@render chained()}{/if}',
+      '{#if !negated}{@render negated()}{/if}',
+      '{#if joined && other}{@render joined()}{/if}',
+      '{#if other}{@render foreign()}{/if}',
+      '{#if twice}{@render twice()}{@render twice()}{/if}',
+      '{#if given}{@render given(1)}{/if}',
+      '{#if listed}{#each [1] as item (item)}{@render listed()}{/each}{/if}',
+    ].join('\n')
+  ).ast;
+  const guardFaultsOf = (props) => declarationFaults({ props }, GUARDED);
+  const UNGUARDED = 'is a slot key rendered without ?. or an {#if} guard';
+  const REPEATED = 'is a slot key rendered inside {#each}, {#key}, {#snippet} or a component';
+
+  it('passes a slot key and an optional text key whose bare render tag its own {#if} guards', () => {
+    assert.deepEqual(guardFaultsOf({ plain: slot }), [], 'directly in the consequent');
+    assert.deepEqual(guardFaultsOf({ boxed: slot }), [], 'inside an element in the consequent');
+    assert.deepEqual(guardFaultsOf({ note: { kind: 'text' } }), [], 'an optional text key');
+    assert.deepEqual(guardFaultsOf({ a: slot }), [], 'a renamed local, guarded by its local name');
+  });
+
+  for (const [claim, key, fault] of [
+    ['in the alternate of its own {#if}', 'alt', UNGUARDED],
+    ['under {:else if}, which an earlier test can hide', 'chained', UNGUARDED],
+    ['under a test that negates it', 'negated', UNGUARDED],
+    ['under a test that joins it with another expression', 'joined', UNGUARDED],
+    ['under a test that names another local', 'foreign', UNGUARDED],
+    ['under a test that names the key and not its renamed local', 'b', UNGUARDED],
+    ['twice in one guard', 'twice', 'is a slot key more than one render tag draws'],
+    ['with an argument in its guard', 'given', 'is a slot key rendered with an argument'],
+    ['under {#each} in its guard', 'listed', REPEATED],
+  ]) {
+    it(`names a slot key rendered ${claim} as a fault`, () => {
+      assert.deepEqual(guardFaultsOf({ [key]: slot }), [`${key} ${fault}`]);
     });
   }
 
@@ -1017,6 +1151,16 @@ describe('each entry matches its component declaration', () => {
   });
 });
 
+/** One census over `css`, read as a stylesheet named `sheet.css`. */
+const syntheticCensus = (shape, css, options = {}) =>
+  censusSelectors(
+    'sheet.css',
+    templateOf('sheet.css', `<style>${css}</style>`).ast.css,
+    shape,
+    options
+  );
+const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector }) => selector);
+
 describe('the module sheet against the published Chip', () => {
   it('names the chip root in 18 selectors, none of which a published chip can match', () => {
     const selectors = stylesheetSources().parts.flatMap(({ file, text }) =>
@@ -1079,7 +1223,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(sheets.length, 14, 'the fourteen partials');
     assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
     const selectors = [...sheets, ...blocks].flatMap(([file, css]) =>
-      cardSelectors(file, css, spelled)
+      censusSelectors(file, css, CARD, { spelled })
     );
     assert.deepEqual(
       selectors.filter(({ safe }) => !safe).map(({ selector }) => selector),
@@ -1100,10 +1244,7 @@ describe('the module sheet and every component style against the published Inspe
   });
 
   const SPELLED = new Set(['manager-chip']);
-  const unsafeCardSelectors = (css) =>
-    cardSelectors('sheet.css', templateOf('sheet.css', `<style>${css}</style>`).ast.css, SPELLED)
-      .filter(({ safe }) => !safe)
-      .map(({ selector }) => selector);
+  const unsafeCardSelectors = (css) => unsafeOf(syntheticCensus(CARD, css, { spelled: SPELLED }));
 
   for (const [claim, selector] of [
     ['a class no published key writes', '.fabricate-card.manager-checks-card'],
@@ -1136,4 +1277,85 @@ describe('the module sheet and every component style against the published Inspe
       assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), [`sheet.css: ${flat}`]);
     });
   }
+});
+
+describe("a census of EmptyState's root class", () => {
+  const unsafe = (css) => unsafeOf(syntheticCensus(EMPTY, css));
+
+  for (const [claim, selector] of [
+    ['a state class no published key writes', '.manager-empty.is-compact'],
+    [
+      'the required-tools scroll above it',
+      '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty',
+    ],
+    ['the journal detail pane above it', '.journal-detail-pane > :global(.manager-empty)'],
+    [
+      'the scoped list inspector above it',
+      '.manager-scoped-list-inspector-scroll.is-resting > :global(.manager-empty)',
+    ],
+  ]) {
+    it(`admits a selector that needs ${claim}`, () => {
+      assert.equal(syntheticCensus(EMPTY, `${selector} { flex: 1 }`).length, 1);
+      assert.deepEqual(unsafe(`${selector} { flex: 1 }`), []);
+    });
+  }
+
+  for (const selector of [
+    '.manager-empty',
+    '.manager-empty.is-filtered',
+    '.manager-empty > div > p',
+  ]) {
+    it(`refuses ${selector}, which nothing keeps off a published panel or its content`, () => {
+      assert.deepEqual(unsafe(`${selector} { flex: 1 }`), [`sheet.css: ${selector}`]);
+    });
+  }
+
+  it('skips a scoped selector in the entry’s own file, and judges one :global reaches', () => {
+    const own = { own: new Set(['sheet.css']) };
+    const scoped = '.manager-empty p { margin: 0 }';
+    assert.deepEqual(syntheticCensus(EMPTY, scoped, own), []);
+    assert.deepEqual(unsafe(scoped), ['sheet.css: .manager-empty p'], 'judged in any other file');
+    for (const css of [
+      '.manager-empty :global(p) { margin: 0 }',
+      ':global { .manager-empty p { margin: 0 } }',
+    ]) {
+      assert.deepEqual(unsafeOf(syntheticCensus(EMPTY, css, own)), ['sheet.css: .manager-empty p']);
+    }
+  });
+});
+
+describe("a census of Notice's root class", () => {
+  const unsafe = (css) => unsafeOf(syntheticCensus(NOTICE, css));
+
+  it('admits a selector that needs a state class no published key writes', () => {
+    assert.equal(syntheticCensus(NOTICE, '.fab-notice.is-compact { gap: 0 }').length, 1);
+    assert.deepEqual(unsafe('.fab-notice.is-compact { gap: 0 }'), []);
+  });
+
+  for (const selector of [
+    '.fab-notice',
+    '.fab-notice.is-warning',
+    '.fabricate .fab-notice .fab-notice-title',
+    '.fab-notice > i',
+  ]) {
+    it(`refuses ${selector}, which nothing keeps off a published notice or its parts`, () => {
+      assert.deepEqual(unsafe(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);
+    });
+  }
+
+  it('fails closed on a root named only inside :has(), which only its written form spells', () => {
+    assert.deepEqual(syntheticCensus(NOTICE, '.a:has(.fab-notice) { padding: 0 }'), [
+      { selector: 'sheet.css: .a:has', written: 'sheet.css: .a:has(.fab-notice)', safe: false },
+    ]);
+  });
+
+  it('names a selector that holds a data-notice-tone attribute, and no other', () => {
+    const { css } = templateOf(
+      'sheet.css',
+      '<style>.a[data-notice-tone="warning"] .b, .c[data-notice] { gap: 0 }</style>'
+    ).ast;
+    assert.deepEqual(selectorsOnAttribute('sheet.css', css, 'data-notice-tone'), [
+      'sheet.css: .a[data-notice-tone="warning"] .b',
+    ]);
+  });
 });
