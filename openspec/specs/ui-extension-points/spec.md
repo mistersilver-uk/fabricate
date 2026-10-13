@@ -489,13 +489,13 @@ The companion keeps `target` out of any element of its own that carries `data-ac
 Where the entry's rest keys land on the control itself, `data-action` is refused (M13): the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
 The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
 - A control is unavailable only through a key its group names.
-A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the bullet above orders.
+A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the "Fabricate moves no focus" bullet orders.
 Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
 In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
-Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): Foundry copies its value into the pressed element's inline `cursor` at the next pointer release and deletes the attribute.
+Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is the fade of its own state change.
 Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
@@ -686,27 +686,28 @@ Each group states the accepted values of every key that entry publishes.
   - It is the design system's button: a labelled native `<button>` that is pressed to do one thing.
   - `children` is required and is the label, final display text, and the button's whole accessible name.
     The button hugs its label on one line while it has the room.
-    Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
+    Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
     A label of white space alone draws a button with no name, so the companion never passes one.
     The button draws no glyph: a leading glyph and a glyph-only button are not published at version 1.
-  - `onclick` is a required callback, called with no argument each time the button is pressed, a held Enter key included.
+  - `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
     The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
   - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
     It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
-    Each names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; and `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
+    Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; and `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
     A verb that both destroys and cautions is `danger`.
     A `dashed` label starts with its verb, as "Add tier", because no plus glyph is drawn.
-    A visual role is colour and edge alone and reaches no assistive technology, so the label says the verb.
+    A visual role is drawn and never announced: it reaches no assistive technology, so the label says the verb.
     A destructive press is confirmed by the companion, in a dialog of Foundry's, before anything is written; Fabricate's arm-then-confirm state is private.
   - `fullWidth` is `true` or `false`.
     The companion gives `target` `display: flex`, as for an inline mark: the button then hugs its label, and `true` spans `target`.
-    In a block `target` a `dashed` button spans it whatever `fullWidth` holds.
+    In a block `target` a `dashed` button hugs its label too, as every native button does, so only `fullWidth: true` spans `target`.
   - `disabled` is `true` or `false`.
     `true` draws the button as unavailable whatever the visual role, takes the button out of the tab order and stops every press, so `onclick` is not called.
     It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button, and it opens no tooltip, so nothing at the button can say why.
     A verb the user is refused for a reason stays enabled, and its press answers with the reason, in a `Notice` or a notification of the companion's.
     The unavailable label is not held to the contrast floor.
     The companion never passes `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work leaves the button enabled.
+  - Fabricate coerces neither `fullWidth` nor `disabled` to a boolean, so only `true` and `false` are in the contract: the string `'false'` spans `target` and disables the button.
   - The button has no busy state at version 1.
     While a press is being handled the companion leaves the button enabled, ignores every further press, a held Enter key's repeats among them, and where the wait is perceptible passes `children` that say so.
     A change to a focused button's label is not reliably announced, so the companion announces the outcome itself, with a `Notice` or a live region of its own.
@@ -723,13 +724,14 @@ Each group states the accepted values of every key that entry publishes.
     In a host that replaces its content on render the button is a new element after every render, as `Notice`'s is.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side.
     The companion leaves that much inside any edge of its own that clips, a scrolling container's among them, and insets a `fullWidth` button's `target` by as much.
-    It clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not against `--fab-bg-3`.
+    The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not against `--fab-bg-3`.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor` and every `data-tooltip` name are refused (M13).
-  - The label of an enabled button clears the 4.5:1 small-text floor at rest in every role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every role but `primary`, which falls short of it there in the `foundry-native` palette.
+    The button therefore opens no tooltip and keeps its own cursor, so a hint goes in the label or in text beside the button, where a keyboard user reads it too.
+  - The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
-    On `--fab-bg-3` every role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
+    On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
   - `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: the companion passes a verb phrase.
-- **Private:** what the button draws for a role outside its set; its height, corner, padding, type size and weight; each role's colours and edge beyond what this group states, the success family `primary` is drawn in among them; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
 
 ### Mounting and its refusals
 
