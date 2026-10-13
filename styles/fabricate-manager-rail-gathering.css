@@ -2857,10 +2857,15 @@
 
 .fabricate-color-picker .manager-color-picker-trigger:hover,
 .fabricate-color-picker .manager-color-picker-trigger:focus-visible,
-.fabricate-color-picker-popover .manager-color-preset:hover,
-.fabricate-color-picker-popover .manager-color-preset:focus-visible {
+.fabricate-color-picker-popover .manager-color-preset:hover {
   outline: 2px solid var(--fab-accent);
   outline-offset: 1px;
+}
+
+/* A swatch's keyboard cursor is the picker's inset outline, and follows the hover rule so a focused swatch under the pointer keeps it (issue 2416). */
+.fabricate-color-picker-popover .manager-color-preset:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-color-picker-popover.manager-color-picker-popover {
@@ -2888,7 +2893,7 @@
   border: 1px solid var(--fab-border);
 }
 
-/* A selected swatch is an inset ring at 3:1 on its fill, apart from the outset focus ring (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
+/* A selected swatch is an inset ring at 3:1 on its fill, apart from the hover and cursor outlines (issue 2257); `tint-picker-ring-contrast.test.js` measures both inks. */
 .fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch {
   box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
 }

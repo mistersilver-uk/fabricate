@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(design-system): the maintainer ruled on 2026-10-11 that the swatch's keyboard cursor must be the picker's inset outline and its hover the outline alone, never a fill, so this row returns to target until the sheet draws the inset cursor, owned by issue 2416 (library.html, the target popover specimen) -->
+<!-- ratchet-exempt(design-system): the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row stays target only until the panel is recomposed onto the search popover's grid form, owned by issue 2459 (library.html, the target popover specimen) -->
 <!--
   The manager's colour palette and the library's `<TintPicker>` specimen, rendered as a popover by
   three pickers and inline by two editors; `TintPickerButton.svelte` is its single-caller trigger.

@@ -270,7 +270,7 @@ function navDeclarationScope(sources, template) {
  * compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
-const PRESS_KEYS = ['Enter', 'Space'];
+const PRESS_KEYS = ['Enter', 'Space', 'Tab'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -961,7 +961,9 @@ const NON_VERB_CONTROLS = Object.freeze({
   ],
   // The published leaves (issue 2448): both portrait states and the 26px art rung on their ladder
   // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
-  // its own ink on a danger ground.
+  // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
+  // size and ink, the rail's and the card's column, the card's box, and each slot element and its
+  // wrapper taking no box (issue 2451).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -970,11 +972,33 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',
       styles: 'width: 26px; height: 26px; border-radius: 7px',
     },
-    { selector: '.fab-meter-hidden', styles: 'position: absolute; width: 1px; height: 1px' },
+    {
+      selector: '.fab-meter[aria-valuetext] > .fab-meter-hidden',
+      styles: 'position: absolute; width: 1px; height: 1px',
+    },
     {
       selector: '.fab-stat-box:has(.has-icon) .fab-kicker',
       styles: 'font-size: 8.5px; color: var(--fab-text-muted)',
     },
+    { selector: '.fab-kicker.is-accent', styles: 'font-size: 8.5px; color: var(--fab-accent)' },
+    {
+      selector: '.manager-chip.is-warning.is-list',
+      styles: 'font-size: 9px; color: var(--fab-warning-text)',
+    },
+    {
+      selector: '.manager-chip.is-neutral.is-list',
+      styles: 'font-size: 9px; color: var(--fab-text-muted)',
+    },
+    { selector: '.fab-rail', styles: 'display: flex; row-gap: 8px' },
+    {
+      selector: '.fabricate-card',
+      styles:
+        'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+    },
+    { selector: '.fab-rail > div', styles: 'display: contents' },
+    { selector: '.fab-rail > div > div', styles: 'display: contents' },
+    { selector: '.fabricate-card > div', styles: 'display: contents' },
+    { selector: '.fabricate-card > div > div', styles: 'display: contents' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5455,13 +5479,12 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('the published component seam selects both specimens it mounts', () => {
-  for (const file of [
-    'src/ui/publishedComponentSeam.js',
-    'src/ui/publishedComponentManifest.js',
-    'src/ui/publishedComponents.svelte.js',
-    'src/ui/svelte/published/PublishedComponentHost.svelte',
-  ]) {
+test('every published component seam module, and the host, selects both specimens it mounts', () => {
+  const modules = readdirSync(resolve(ROOT, 'src/ui'))
+    .filter((name) => /^publishedComponent.*\.js$/.test(name))
+    .map((name) => `src/ui/${name}`);
+  assert.ok(modules.length >= 4, 'the seam, its prop kinds, its manifest and its adapter');
+  for (const file of [...modules, 'src/ui/svelte/published/PublishedComponentHost.svelte']) {
     const selected = selectedIds([file], {});
     for (const id of [
       'manager-published-tier-track-specimen',
@@ -5472,12 +5495,60 @@ test('the published component seam selects both specimens it mounts', () => {
   }
 });
 
-test('the leaves specimen mounts every issue 2448 leaf and checks the containment of each mount', () => {
+test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
     .find((declarator) => declarator.id.name === 'MOUNTS');
-  const mounted = mounts.init.arguments[0].elements.map((mount) => mount.elements[0].value);
+  const nameOf = (mount) => mount.elements[0].value;
+  const outer = mounts.init.arguments[0].elements;
+  const hasType = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => hasType(child, test)));
+  const { fragment } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
+  assert.ok(
+    hasType(
+      fragment,
+      (node) => node.type === 'Attribute' && node.name === 'data-published' && node.value !== true
+    ),
+    'the fixture writes data-published on a section'
+  );
+  assert.ok(
+    hasType(
+      instance,
+      (node) =>
+        node.type === 'MemberExpression' &&
+        node.property?.name === 'nested' &&
+        node.object?.property?.name === 'dataset'
+    ),
+    'the fixture writes dataset.nested on each nested target'
+  );
+  const mounted = outer.map(nameOf);
+  const nested = outer.flatMap((mount) =>
+    (mount.elements[2]?.elements ?? []).map((inner) => [nameOf(mount), nameOf(inner)])
+  );
+  const meterMounts = [
+    ...outer,
+    ...outer.flatMap((mount) => mount.elements[2]?.elements ?? []),
+  ].filter((mount) => nameOf(mount) === 'Meter');
+  assert.equal(
+    meterMounts.filter((mount) =>
+      mount.elements[1].properties.some((property) => property.key.name === 'valueText')
+    ).length,
+    1,
+    'exactly one Meter mount carries valueText, so .fab-meter[aria-valuetext] names one element'
+  );
+  assert.deepEqual(
+    nested,
+    [
+      ['Rail', 'Meter'],
+      ['Rail', 'InfoStrip'],
+      ['InspectorCard', 'Kicker'],
+      ['InspectorCard', 'StatBox'],
+    ],
+    'the mounts the fixture makes inside a content slot, in fixture order'
+  );
   assert.deepEqual(
     [...new Set(mounted)].sort(byCodePoint),
     PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
@@ -5486,10 +5557,34 @@ test('the leaves specimen mounts every issue 2448 leaf and checks the containmen
     'every published component but TierTrack, which has its own specimen, and no other'
   );
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
+  const [{ container: ground }] = expectContained;
+  const wrappedChip = `${ground} > section > div > .manager-chip:not(.is-list)`;
   assert.deepEqual(
-    expectContained.map(({ target }) => /:nth-child\((\d+)\)/.exec(target)[1]),
+    expectContained.flatMap(({ target }) => /:nth-child\((\d+)\)/.exec(target)?.[1] ?? []),
     Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
     'one containment check per section, in fixture order'
+  );
+  const HOST_ROOTS = { Rail: '.fab-rail', InspectorCard: '.fabricate-card' };
+  const hostRoot = (host) =>
+    `${ground} > section[data-published="${host}"] > div > ${HOST_ROOTS[host]}`;
+  assert.deepEqual(
+    expectContained.filter(({ target }) => !target.includes(':nth-child(')),
+    [
+      ...nested.map(([host, name]) => ({
+        container: hostRoot(host),
+        target: `${hostRoot(host)} [data-nested="${name}"] > *`,
+      })),
+      { container: wrappedChip, target: `${wrappedChip} > span` },
+      { container: '.window-content', target: ground },
+    ],
+    'then each nested root inside its host root, the wrapped label inside its chip, and the ground inside the window'
+  );
+  assert.deepEqual(
+    expectContained
+      .slice(mounted.length, mounted.length + nested.length)
+      .map(({ target }) => target),
+    nested.map(([host, name]) => `${hostRoot(host)} [data-nested="${name}"] > *`),
+    'the nested entries directly follow the per-section ones'
   );
 });
 

@@ -1,6 +1,6 @@
 /**
  * What the published-component mounted suites share (issue 2448): the harness lists of the seam,
- * its adapter and every shipped entry's import closure, and the bare-target helpers. Each list is
+ * its adapter and every shipped entry's import closure, and the target helpers. Each list is
  * one frozen literal with no nested bracket, because
  * `tests/components/mounted-harness-primitive-allowlist.test.js` reads a roster's paths as text.
  */
@@ -14,6 +14,7 @@ export const FAULT_REPORT = 'Fabricate | Published component render failed:';
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
+  'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentManifest.js',
   'src/ui/svelte/util/dropRateTier.js',
 ]);
@@ -32,19 +33,27 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/BandedBar.svelte',
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/components/InfoStrip.svelte',
+  'src/ui/svelte/components/Rail.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */
 export const settle = () => new Promise((done) => setTimeout(done, 0));
 
-/** An empty target in a companion's own shell, under no Fabricate root; `shells` collects it for removal. */
-export function companionTarget(shells) {
+/** An empty target in a shell carrying `classes`, a Fabricate window frame's by default; `shells` collects it for removal. */
+export function fabricateTarget(shells, classes = 'fabricate') {
   const shell = document.createElement('section');
-  shell.className = 'companion-sheet';
+  shell.className = classes;
   const target = document.createElement('div');
   shell.append(target);
   document.body.append(shell);
   shells.push(shell);
+  return target;
+}
+
+/** An empty target in a companion's own shell, under no Fabricate root; `shells` collects it for removal. */
+export function companionTarget(shells) {
+  const target = fabricateTarget(shells, 'companion-sheet');
   assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
   return target;
 }
@@ -66,16 +75,18 @@ export async function underSheet(css, run) {
 
 /**
  * Passes `record` every error thrown past the seam until the returned function is called: Node's
- * uncaught exceptions, and those happy-dom traps in its timers and microtasks and reports on its
- * own window, which never reach `process`.
+ * uncaught exceptions and unhandled rejections, and those happy-dom traps in its timers and
+ * microtasks and reports on its own window, which never reach `process`.
  */
 export function recordEscapes(record) {
   const view = document.defaultView;
   const trapped = (event) => record(event.error);
   process.on('uncaughtException', record);
+  process.on('unhandledRejection', record);
   view.addEventListener('error', trapped);
   return () => {
     process.off('uncaughtException', record);
+    process.off('unhandledRejection', record);
     view.removeEventListener('error', trapped);
   };
 }

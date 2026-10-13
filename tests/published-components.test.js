@@ -1,135 +1,55 @@
 /**
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
- * frozen descriptor, every fixed refusal, replace-not-merge and atomic updates, destroy, the claim
- * on a target, and the fault path. The real Svelte runtime is the mounted suite's.
+ * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
+ * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
+ * slots and the required root are `published-component-slots.test.js`'s, and the real Svelte
+ * runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
-const PREFIX = 'Fabricate | published components: ';
-const FAULT_REPORT = 'Fabricate | Published component render failed:';
-const HOST = Object.freeze({ role: 'host' });
-const ZETA_COMPONENT = Object.freeze({ role: 'Zeta' });
-const ALPHA_COMPONENT = Object.freeze({ role: 'Alpha' });
-
-// Two entries out of alphabetical order, so `components` must keep table order.
-const ZETA = Object.freeze({
-  name: 'Zeta',
-  path: 'src/ui/svelte/components/Zeta.svelte',
-  version: 3,
-  props: { label: { kind: 'data', required: true }, items: { kind: 'data' } },
-  rest: true,
-  component: ZETA_COMPONENT,
-});
-const ALPHA = Object.freeze({
-  name: 'Alpha',
-  path: 'src/ui/svelte/components/Alpha.svelte',
-  version: 1,
-  props: { value: { kind: 'data' } },
-  rest: false,
-  component: ALPHA_COMPONENT,
-});
-const TABLE = Object.freeze([ZETA, ALPHA]);
-
-const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-const exactly = (message) => new RegExp(`^${escape(message)}$`);
-
-function refusal(tail) {
-  return (error) => {
-    assert.ok(error instanceof TypeError, `a TypeError, not ${error?.constructor?.name}`);
-    assert.match(error.message, exactly(PREFIX + tail));
-    return true;
-  };
-}
-
-/** A DOM-shaped target: `nodeType` 1, children, and `contains`. */
-class FakeTarget {
-  nodeType = 1;
-  childNodes = [];
-  get firstChild() {
-    return this.childNodes[0] ?? null;
-  }
-  get lastChild() {
-    return this.childNodes.at(-1) ?? null;
-  }
-  contains(node) {
-    return this.childNodes.includes(node);
-  }
-  replaceChildren() {
-    this.childNodes.length = 0;
-  }
-}
-
-/** A recording runtime: `mount` appends a root and captures the host's fault callback. */
-function fakeRuntime({ mountError = null, faultDuringMount = null, unmountError = null } = {}) {
-  const mounts = [];
-  const unmounts = [];
-  const reports = [];
-  const runtime = {
-    host: HOST,
-    mount(host, { target, props }) {
-      if (mountError) {
-        target.childNodes.push({ role: 'partial' });
-        throw mountError;
-      }
-      const instance = {
-        target,
-        root: { role: 'root' },
-        updates: [],
-        setProps(next) {
-          instance.updates.push(next);
-        },
-      };
-      target.childNodes.push(instance.root);
-      mounts.push({ host, target, props, instance });
-      if (faultDuringMount) props.onfault(faultDuringMount);
-      return instance;
-    },
-    unmount(instance) {
-      unmounts.push(instance);
-      if (unmountError) throw unmountError;
-      const at = instance.target.childNodes.indexOf(instance.root);
-      if (at !== -1) instance.target.childNodes.splice(at, 1);
-    },
-    report: (...args) => {
-      reports.push(args);
-    },
-  };
-  return { runtime, mounts, unmounts, reports };
-}
-
-function seamWith({ table = TABLE, isReady = () => true, ...runtimeOptions } = {}) {
-  const fake = fakeRuntime(runtimeOptions);
-  const seam = createPublishedComponents({ table, isReady, ...fake.runtime });
-  return { ...fake, seam, ui: seam.publicApi };
-}
-
-const zetaProps = (overrides = {}) => ({ label: 'Rank', items: [{ id: 'a' }], ...overrides });
+import {
+  ALPHA,
+  FAULT_REPORT,
+  FakeTarget,
+  HOST,
+  PREFIX,
+  TABLE,
+  ZETA,
+  ZETA_COMPONENT,
+  drained,
+  exactly,
+  fakeRuntime,
+  refusal,
+  seamWith,
+  zetaProps,
+} from './helpers/publishedComponentFakes.js';
 
 describe('the published-components descriptor', () => {
-  it('is frozen, with exactly its four members and schema version 1', () => {
+  it('is frozen, with exactly its five members and schema version 1', () => {
     const { ui } = seamWith();
-    assert.deepEqual(Object.keys(ui), ['schemaVersion', 'components', 'describe', 'mount']);
+    assert.deepEqual(Object.keys(ui), ['schemaVersion', 'components', 'describe', 'mount', 'load']);
     assert.equal(ui.schemaVersion, 1);
     assert.ok(Object.isFrozen(ui));
   });
 
   it('lists the published names frozen and in table order, never sorted', () => {
     const { ui } = seamWith();
-    assert.deepEqual(ui.components, ['Zeta', 'Alpha']);
+    assert.deepEqual(ui.components, ['Zeta', 'Alpha', 'Titled']);
     assert.ok(Object.isFrozen(ui.components));
   });
 
-  it('describes an entry as a frozen version, data props and rest, with nothing else', () => {
+  it('describes an entry as a frozen version, its props by kind, rest and root, with nothing else', () => {
     const { ui } = seamWith();
     const described = ui.describe('Zeta');
-    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest']);
+    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root']);
     assert.deepEqual(described, {
       version: 3,
       props: { label: { kind: 'data', required: true }, items: { kind: 'data', required: false } },
       rest: true,
+      root: 'any',
     });
     assert.ok(Object.isFrozen(described));
     assert.ok(Object.isFrozen(described.props));
@@ -138,6 +58,12 @@ describe('the published-components descriptor', () => {
       version: 1,
       props: { value: { kind: 'data', required: false } },
       rest: false,
+      root: 'any',
+    });
+    assert.deepEqual(ui.describe('Titled').props, {
+      title: { kind: 'text', required: true },
+      note: { kind: 'text', required: false },
+      rank: { kind: 'data', required: false },
     });
   });
 
@@ -378,13 +304,15 @@ describe('a live mount', () => {
     const [{ host, props: hostProps }] = mounts;
     assert.equal(host, HOST);
     assert.equal(hostProps.component, ZETA_COMPONENT);
-    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault']);
+    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds', 'slots']);
+    assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
+    assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
     assert.notEqual(hostProps.initial, props);
     assert.notEqual(hostProps.initial.items, props.items, 'copied at every depth');
     props.items[0].id = 'mutated';
     assert.equal(hostProps.initial.items[0].id, 'a', 'copied at call time');
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
   });
 
@@ -484,6 +412,98 @@ describe('a live mount', () => {
   });
 });
 
+describe('a text key', () => {
+  const titled = (overrides = {}) => ({ title: 'Standing', ...overrides });
+
+  it('hands the host the kinds that are not data, frozen, and each string as passed', () => {
+    const { ui, mounts } = seamWith();
+    const props = titled({ note: '<b>raw</b>', rank: 2 });
+    ui.mount('Titled', { target: new FakeTarget(), props });
+    const [{ props: hostProps }] = mounts;
+    assert.deepEqual(hostProps.kinds, { title: 'text', note: 'text' });
+    assert.ok(Object.isFrozen(hostProps.kinds));
+    assert.deepEqual(hostProps.initial, props);
+  });
+
+  it('M14: refuses a value that is not a string', () => {
+    const { ui, mounts } = seamWith();
+    for (const value of [3, null, true, { text: 'x' }, ['x']]) {
+      for (const key of ['title', 'note']) {
+        assert.throws(
+          () => ui.mount('Titled', { target: new FakeTarget(), props: titled({ [key]: value }) }),
+          refusal(`"${key}" must be a string`)
+        );
+      }
+    }
+    assert.equal(mounts.length, 0);
+  });
+
+  it('M10: refuses a function, as on a data key', () => {
+    const { ui } = seamWith();
+    assert.throws(
+      () => ui.mount('Titled', { target: new FakeTarget(), props: titled({ note: () => 'x' }) }),
+      refusal('functions are phase 2 (issue 2427)')
+    );
+  });
+
+  it('reads undefined as absent, so an optional key passes and a required one is M9', () => {
+    const { ui, mounts } = seamWith();
+    ui.mount('Titled', { target: new FakeTarget(), props: titled({ note: undefined }) });
+    assert.equal(mounts[0].props.initial.note, undefined);
+    ui.mount('Titled', { target: new FakeTarget(), props: titled({ note: '' }) });
+    assert.equal(mounts[1].props.initial.note, '', "an optional '' is the host's to omit");
+    for (const props of [{}, { title: undefined }, { title: '' }]) {
+      assert.throws(
+        () => ui.mount('Titled', { target: new FakeTarget(), props }),
+        refusal('Titled requires a non-empty "title"')
+      );
+    }
+  });
+
+  it('applies an update atomically: a refused one leaves the previous props rendered', () => {
+    const { ui, mounts } = seamWith();
+    const handle = ui.mount('Titled', { target: new FakeTarget(), props: titled() });
+    assert.throws(() => handle.update(titled({ note: 4 })), refusal('"note" must be a string'));
+    assert.throws(() => handle.update({ title: 7 }), refusal('"title" must be a string'));
+    assert.throws(
+      () => handle.update({ note: 'x' }),
+      refusal('Titled requires a non-empty "title"')
+    );
+    assert.deepEqual(mounts[0].instance.updates, []);
+    assert.equal(handle.update(titled({ title: 'Next' })), true);
+    assert.deepEqual(mounts[0].instance.updates, [{ title: 'Next' }]);
+  });
+});
+
+describe('load', () => {
+  it('resolves undefined for published names, before ready and before registration', async () => {
+    const seam = createPublishedComponents({ table: TABLE, isReady: () => false });
+    for (const names of [[], ['Zeta'], 'Zeta', ['Zeta', 'Titled']]) {
+      let loading;
+      assert.doesNotThrow(() => {
+        loading = seam.publicApi.load(names);
+      });
+      assert.ok(loading instanceof Promise, 'a Promise');
+      assert.equal(await loading, undefined);
+    }
+  });
+
+  it('rejects with M3 for the first name that is not published, and throws nothing', async () => {
+    const { ui } = seamWith();
+    for (const [args, missing] of [
+      [[['Zeta', 'Nope', 'Zip']], 'Nope'],
+      [['toString'], 'toString'],
+      [[], 'undefined'],
+    ]) {
+      let loading;
+      assert.doesNotThrow(() => {
+        loading = ui.load(...args);
+      });
+      await assert.rejects(loading, refusal(`"${missing}" is not published`));
+    }
+  });
+});
+
 describe('a faulted mount', () => {
   it('reports once, unmounts once, releases the claim and goes inert', () => {
     const { seam, ui, mounts, unmounts, reports } = seamWith();
@@ -505,9 +525,12 @@ describe('a faulted mount', () => {
 
   it('defers the unmount to a microtask when the fault arrives inside the runtime call', async () => {
     const error = new Error('during mount');
-    const { seam, ui, unmounts, reports } = seamWith({ faultDuringMount: error });
+    const { seam, ui, unmounts, reports, events } = seamWith({ faultDuringMount: error });
     const target = new FakeTarget();
-    const handle = ui.mount('Zeta', { target, props: zetaProps() });
+    const onFault = () => {
+      events.push('onFault');
+    };
+    const handle = ui.mount('Zeta', { target, props: zetaProps(), onFault });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
     assert.equal(handle.update(zetaProps()), false);
     assert.equal(seam.liveMountCount(), 0);
@@ -515,6 +538,7 @@ describe('a faulted mount', () => {
     await Promise.resolve();
     assert.equal(unmounts.length, 1);
     assert.equal(target.childNodes.length, 0);
+    assert.deepEqual(events, ['unmount', 'onFault'], 'one callback unmounts, then notifies');
   });
 
   it('reports a synchronous runtime throw and answers an inert handle on an empty target', () => {
@@ -523,7 +547,7 @@ describe('a faulted mount', () => {
     const target = new FakeTarget();
     const handle = ui.mount('Zeta', { target, props: zetaProps() });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
     assert.equal(handle.update(zetaProps()), false);
     handle.destroy();
@@ -533,25 +557,205 @@ describe('a faulted mount', () => {
   });
 });
 
+describe('a mount made with onFault', () => {
+  /** A seam, a target, and an `onFault` logging itself with what it saw of the target and handle. */
+  function watched(runtimeOptions = {}) {
+    const fake = seamWith(runtimeOptions);
+    const target = new FakeTarget();
+    const seen = [];
+    const mounted = {};
+    const onFault = (error) => {
+      fake.events.push('onFault');
+      seen.push({
+        error,
+        children: target.childNodes.length,
+        update: mounted.handle?.update(zetaProps()),
+      });
+    };
+    const mount = (name = 'Zeta', props = zetaProps()) => {
+      mounted.handle = fake.ui.mount(name, { target, props, onFault });
+      return mounted.handle;
+    };
+    return { ...fake, target, seen, mount };
+  }
+
+  it('is told with an empty target even when the runtime unmount throws', async () => {
+    const teardown = new Error('teardown threw');
+    const { mount, mounts, seen, reports, target } = watched({ unmountError: teardown });
+    mount();
+    mounts[0].props.onfault(new Error('render blew up'));
+    await drained();
+    assert.deepEqual(
+      seen.map(({ children }) => children),
+      [0]
+    );
+    assert.equal(reports.length, 2, 'the fault and the failed unmount are each reported once');
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('is told of a boundary fault once, in a microtask after the synchronous unmount', async () => {
+    const { mount, mounts, events, seen } = watched();
+    mount();
+    const error = new Error('render blew up');
+    mounts[0].props.onfault(error);
+    events.push('returned');
+    assert.deepEqual(events, ['unmount', 'returned'], 'never inside the fault delivery');
+    await drained();
+    assert.deepEqual(events, ['unmount', 'returned', 'onFault']);
+    assert.deepEqual(seen, [{ error, children: 0, update: false }]);
+    mounts[0].props.onfault(new Error('a second fault'));
+    await drained();
+    assert.equal(seen.length, 1, 'a second fault tells it nothing');
+  });
+
+  it('is told of a fault inside the runtime call after the deferred unmount', async () => {
+    const error = new Error('during mount');
+    const { mount, events, seen } = watched({ faultDuringMount: error });
+    mount();
+    events.push('returned');
+    assert.deepEqual(events, ['returned'], 'never inside mount');
+    await drained();
+    assert.deepEqual(events, ['returned', 'unmount', 'onFault']);
+    assert.deepEqual(seen, [{ error, children: 0, update: false }]);
+  });
+
+  it('is told of a synchronous runtime throw after mount returns, the target empty', async () => {
+    const error = new Error('runtime refused');
+    const { mount, events, seen, unmounts } = watched({ mountError: error });
+    mount();
+    events.push('returned');
+    assert.deepEqual(events, ['returned']);
+    await drained();
+    assert.deepEqual(events, ['returned', 'onFault']);
+    assert.deepEqual(seen, [{ error, children: 0, update: false }]);
+    assert.equal(unmounts.length, 0, 'this path has no instance to unmount');
+  });
+
+  it('is told once, of the fault, when the runtime faults and then throws', async () => {
+    const fault = new Error('during mount');
+    const thrown = new Error('runtime refused');
+    const { mount, events, seen, reports } = watched({
+      faultDuringMount: fault,
+      mountError: thrown,
+    });
+    mount();
+    await drained();
+    assert.deepEqual(events, ['onFault']);
+    assert.deepEqual(seen, [{ error: fault, children: 0, update: false }]);
+    assert.deepEqual(reports, [
+      [FAULT_REPORT, 'Zeta', fault],
+      [FAULT_REPORT, 'Zeta', thrown],
+    ]);
+  });
+
+  it('is not told of a destroy, of a stale claim a new mount ended, or of a refusal', async () => {
+    const { mount, ui, target, events, seen } = watched();
+    mount().destroy();
+    mount();
+    target.childNodes.length = 0;
+    ui.mount('Zeta', { target, props: zetaProps() }).destroy();
+    assert.throws(() => mount('Zeta', {}), refusal('Zeta requires a non-empty "label"'));
+    assert.throws(() => mount('Nope'), refusal('"Nope" is not published'));
+    await drained();
+    assert.deepEqual(events, ['unmount', 'unmount', 'unmount']);
+    assert.deepEqual(seen, []);
+  });
+
+  it('lets the companion mount into the emptied target from inside it', async () => {
+    const { ui, mounts } = seamWith();
+    const target = new FakeTarget();
+    let again;
+    ui.mount('Zeta', {
+      target,
+      props: zetaProps(),
+      onFault: () => {
+        again = ui.mount('Zeta', { target, props: zetaProps({ label: 'Fallback' }) });
+      },
+    });
+    mounts[0].props.onfault(new Error('render blew up'));
+    await drained();
+    assert.equal(again.update(zetaProps()), true, 'the claim was released before the notice');
+    assert.equal(mounts.length, 2);
+  });
+
+  it('ignores an onFault that is not a function', async () => {
+    for (const runtimeOptions of [{}, { mountError: new Error('runtime refused') }]) {
+      const { ui, mounts, reports } = seamWith(runtimeOptions);
+      ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps(), onFault: 'x' });
+      mounts[0]?.props.onfault(new Error('render blew up'));
+      await drained();
+      assert.equal(reports.length, 1, 'only the fault itself is reported');
+    }
+  });
+
+  it('reports a throw from it as one more render failure under the entry name', async () => {
+    const { ui, mounts, reports } = seamWith();
+    const thrown = new Error('the companion handler threw');
+    const throws = () => {
+      throw thrown;
+    };
+    for (const onFault of [throws, () => Promise.resolve('ignored')]) {
+      ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps(), onFault });
+    }
+    const error = new Error('render blew up');
+    for (const { props } of mounts) props.onfault(error);
+    await drained();
+    assert.deepEqual(reports, [
+      [FAULT_REPORT, 'Zeta', error],
+      [FAULT_REPORT, 'Zeta', error],
+      [FAULT_REPORT, 'Zeta', thrown],
+    ]);
+  });
+});
+
 describe('registration', () => {
-  it('refuses a manifest entry with a non-data prop kind, naming phase 2', () => {
-    const snippet = { ...ALPHA, props: { body: { kind: 'snippet' } } };
-    const seam = createPublishedComponents({ table: [snippet], isReady: () => true });
-    assert.throws(
-      () => seam.register({ ...fakeRuntime().runtime, components: {} }),
-      (error) => {
-        assert.equal(error.constructor, Error);
-        assert.match(
-          error.message,
-          exactly(`${PREFIX}Alpha "body" is a snippet prop; only data props ship before issue 2427`)
-        );
-        return true;
-      }
-    );
-    assert.throws(
-      () => seam.publicApi.mount('Alpha', { target: new FakeTarget() }),
-      (error) => exactly(`${PREFIX}not registered`).test(error.message)
-    );
+  for (const kind of ['snippet', 'callback']) {
+    it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
+      const unknown = { ...ALPHA, props: { body: { kind } } };
+      const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Alpha "body" has an unknown kind "${kind}"`)
+          );
+          return true;
+        }
+      );
+      assert.throws(
+        () => seam.publicApi.mount('Alpha', { target: new FakeTarget() }),
+        (error) => exactly(`${PREFIX}not registered`).test(error.message)
+      );
+    });
+  }
+
+  for (const [root, written] of [
+    ['window', 'window'],
+    [undefined, 'undefined'],
+    ['Any', 'Any'],
+    ['toString', 'toString'],
+  ]) {
+    it(`refuses a manifest entry whose root is ${written}, naming the entry and the root`, () => {
+      const unknown = { ...ALPHA, root };
+      const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(error.message, exactly(`${PREFIX}Alpha has an unknown root "${written}"`));
+          return true;
+        }
+      );
+    });
+  }
+
+  it('registers each shipped root, and describes it', () => {
+    for (const root of ['any', 'fabricate', 'manager']) {
+      const { ui } = seamWith({ table: [{ ...ALPHA, root }] });
+      assert.equal(ui.describe('Alpha').root, root);
+    }
   });
 
   it('refuses a second registration, keeping the first runtime', () => {

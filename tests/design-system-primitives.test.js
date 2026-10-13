@@ -418,6 +418,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
   // it.
   const expectations = [
     [
+      'src/ui/svelte/components/TintPicker.svelte',
+      'manager-gathering-biome-colour-popover-cursor',
+      'the one frame that draws the keyboard cursor on a swatch that is not pressed',
+    ],
+    [
+      'src/ui/svelte/components/TintPicker.svelte',
+      'manager-gathering-biome-colour-popover-cursor-selected',
+      'the one frame that draws the cursor and the selected ring on one swatch',
+    ],
+    [
       'src/ui/svelte/components/IconPicker.svelte',
       'manager-system-edit-lists',
       'the one case whose steps click an icon-picker trigger — everything this primitive presents ' +
@@ -686,6 +696,8 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
     'InfoStrip',
     'Kicker',
     'Chip',
+    'Rail',
+    'InspectorCard',
   ]) {
     const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
       (viewCase) => viewCase.id

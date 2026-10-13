@@ -32,7 +32,7 @@ const SPECIFIED = readFileSync(
   resolve(import.meta.dirname, '../openspec/specs/ui-extension-points/spec.md'),
   'utf8'
 );
-const COMPONENTS_TABLE_HEADER = '| Component | Version | Props | Rest |';
+const COMPONENTS_TABLE_HEADER = '| Component | Version | Root | Props | Rest |';
 
 const member = (name, length) => ({ set: 'prototypeProperties', name, length });
 const published = (set, ...names) => names.map((name) => ({ set, name }));
@@ -158,12 +158,18 @@ function recordingFacade() {
   return { facade, calls };
 }
 
-/** The docs row a described published component must carry: name, version, props and rest. */
-function documentedComponentRow(name, { version, props, rest }) {
-  const cells = Object.entries(props).map(([key, spec]) =>
-    spec.required ? `\`${key}\` (required)` : `\`${key}\``
-  );
-  return `| \`${name}\` | ${version} | ${cells.join(', ') || '—'} | ${rest ? 'yes' : 'no'} |`;
+/**
+ * The docs row a described published component must carry: name, version, root, props and rest.
+ * A prop cell notes its kind unless it is `data`, then `required`.
+ */
+function documentedComponentRow(name, { version, props, rest, root }) {
+  const cells = Object.entries(props).map(([key, spec]) => {
+    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : ''];
+    const noted = notes.filter(Boolean).join(', ');
+    return noted ? `\`${key}\` (${noted})` : `\`${key}\``;
+  });
+  const published = cells.join(', ') || '—';
+  return `| \`${name}\` | ${version} | \`${root}\` | ${published} | ${rest ? 'yes' : 'no'} |`;
 }
 
 /** `api.ui` as a fresh bind publishes it. */
@@ -181,18 +187,23 @@ function documentedComponentSections() {
   return DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
 }
 
-/** Each top-level bullet under the spec's issue 2448 heading that one component names, by name. */
+/**
+ * Each top-level bullet one component names under the spec's issue 2448 and issue 2451 headings,
+ * by name and in the order the spec states them.
+ */
 function specifiedComponentGroups() {
-  const start = SPECIFIED.indexOf('\n### The issue 2448 components\n');
-  const end = SPECIFIED.indexOf('\n### ', start + 1);
-  assert.ok(start !== -1 && end !== -1, 'the issue 2448 components, then another heading');
-  const bullets = SPECIFIED.slice(start, end).split(/^- \*\*/mu);
-  return new Map(
-    bullets.flatMap((group) => {
-      const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
-      return name ? [[name, group]] : [];
-    })
-  );
+  const groups = ['2448', '2451'].flatMap((issue) => {
+    const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
+    const end = SPECIFIED.indexOf('\n### ', start + 1);
+    assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
+    return SPECIFIED.slice(start, end)
+      .split(/^- \*\*/mu)
+      .flatMap((group) => {
+        const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
+        return name ? [[name, group]] : [];
+      });
+  });
+  return new Map(groups);
 }
 
 /** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
@@ -225,7 +236,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
   });
 
-  it('publishes exactly the pinned components, each described as pinned, and documents them', () => {
+  it('publishes exactly the pinned components, each described as pinned with its root, and documents them', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
@@ -238,9 +249,15 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'BandedBar',
       'StatBox',
       'InfoStrip',
+      'Kicker',
+      'Chip',
+      'Rail',
+      'InspectorCard',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
+    const requiredText = { kind: 'text', required: true };
+    const slot = { kind: 'slot', required: false };
     assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
       TierTrack: {
         version: 1,
@@ -256,6 +273,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           hint: optional,
         },
         rest: true,
+        root: 'any',
       },
       Avatar: {
         version: 1,
@@ -268,6 +286,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           tint: optional,
         },
         rest: false,
+        root: 'any',
       },
       Medallion: {
         version: 1,
@@ -283,11 +302,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ink: optional,
         },
         rest: false,
+        root: 'any',
       },
       FillBar: {
         version: 1,
         props: { value: optional, tone: optional, color: optional, density: optional },
         rest: true,
+        root: 'any',
       },
       Meter: {
         version: 1,
@@ -299,23 +320,56 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           label: required,
         },
         rest: true,
+        root: 'any',
       },
       BandedBar: {
         version: 1,
         props: { rows: required, direction: optional, density: optional },
         rest: true,
+        root: 'any',
       },
       StatBox: {
         version: 1,
         props: { value: required, label: required, icon: optional, tone: optional },
         rest: true,
+        root: 'any',
       },
       InfoStrip: {
         version: 1,
         props: { label: required, facts: required, badge: optional },
         rest: true,
+        root: 'any',
+      },
+      Kicker: {
+        version: 1,
+        props: { as: optional, tone: optional, children: requiredText },
+        rest: true,
+        root: 'any',
+      },
+      Chip: {
+        version: 1,
+        props: { tone: optional, density: optional, children: requiredText },
+        rest: true,
+        root: 'any',
+      },
+      Rail: {
+        version: 1,
+        props: { label: optional, children: slot },
+        rest: true,
+        root: 'any',
+      },
+      InspectorCard: {
+        version: 1,
+        props: { children: slot },
+        rest: true,
+        root: 'fabricate',
       },
     });
+    assert.deepEqual(
+      Object.keys(ui),
+      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
+      'the descriptor a bind publishes, `load` last'
+    );
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);
@@ -323,7 +377,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.deepEqual(
       rows,
       ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
-      'one documented row per published component, in publication order, with all four cells'
+      'one documented row per published component, in publication order, with all five cells'
     );
   });
 
