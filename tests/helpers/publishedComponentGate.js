@@ -1,9 +1,10 @@
 /**
  * What the published component gates share (issue 2452): the three parses a gate reads of a file,
- * an entry's import closure, a component's declared props, admission rule 9's scan of one
- * component with each element's hook and guards, and every stylesheet a published root's
- * selectors are read from. `tests/published-component-manifest.test.js` and
- * `tests/published-component-controls.test.js` import them.
+ * an entry's import closure, a component's declared props, the pinned tags of each
+ * `svelte:element`, admission rule 9's scan of one component with each element's hook and guards,
+ * and every stylesheet a published root's selectors are read from.
+ * `tests/published-component-manifest.test.js` and `tests/published-component-controls.test.js`
+ * import them.
  */
 import assert from 'node:assert/strict';
 import { posix, resolve } from 'node:path';
@@ -12,8 +13,10 @@ import { stylesheetSources } from '../../scripts/lib/stylesheetSource.js';
 
 import { templateOf } from './apiConvention.js';
 import {
+  identifierNames,
   importedModules,
   lazilyImportedModules,
+  literalStrings,
   parseModule,
   walkNodes,
   walkWithAncestors,
@@ -88,8 +91,20 @@ export function referencedNames(expression) {
   return names;
 }
 
+/** An entry's published keys by the local name its component declares each under. */
+export function publishedLocals(entry, ast) {
+  return new Map(
+    propLocals(ast)
+      .filter(({ key }) => Object.hasOwn(entry.props, key))
+      .map(({ key, local }) => [local, key])
+  );
+}
+
 const FOCUSABLE_TAGS = new Set(['button', 'a']);
 const FORM_CONTROLS = new Set(['button', 'input', 'select', 'textarea']);
+
+/** Whether an element of this tag is focusable or a form control whatever else it states. */
+export const isControlTag = (tag) => FOCUSABLE_TAGS.has(tag) || FORM_CONTROLS.has(tag);
 
 export const attributeOf = (element, name) =>
   element.attributes.find((attribute) => attribute.type === 'Attribute' && attribute.name === name);
@@ -132,31 +147,176 @@ function guardNames(ancestors) {
 }
 
 /**
+ * Each `svelte:element` a shipped closure or the probe draws, by `<file>: svelte:element<hook>`:
+ * the `tags` it can draw through the seam and the published `keys` its tag follows. A keyed pin
+ * names in `heldBy` the mounted clause that passes the key a value outside `tags` and reads a
+ * pinned tag back; `open` marks a tag a published key drives unfiltered, which only the test probe
+ * may be.
+ */
+export const DYNAMIC_ELEMENTS = Object.freeze({
+  'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
+  'src/ui/svelte/components/Kicker.svelte: svelte:element': {
+    tags: ['h3', 'p', 'span'],
+    keys: ['as'],
+    heldBy: "tests/components/published-leaves-mounted.test.js: Kicker's host element",
+  },
+  'tests/fixtures/published-components/PublishedProbe.svelte: svelte:element': {
+    tags: ['div'],
+    keys: ['bodyAs'],
+    open: true,
+  },
+});
+
+/** Every `svelte:element` one parsed file draws, as `{ id, node }`. */
+export function dynamicElements(file, ast) {
+  return [...walkNodes(ast.fragment)]
+    .filter((node) => node.type === 'SvelteElement')
+    .map((node) => ({ id: `${file}: ${node.name}${hookOf(node)}`, node }));
+}
+
+const isCallTo = (node, name) => node?.type === 'CallExpression' && node.callee?.name === name;
+
+/** What a tag that reads one declarator's names is followed into: a plain `const`'s initialiser, else `null`. */
+function followedInto(statement, declarator) {
+  const plain = statement.kind === 'const' && declarator.id.type === 'Identifier';
+  return plain && !isCallTo(declarator.init, '$state') ? declarator.init : null;
+}
+
+/**
+ * Each name a component's scripts declare at their top level, beside what a tag that reads it is
+ * followed into: a `const`'s initialiser or a function, and `null` for a name the gate cannot
+ * follow (a `let`, a `$state`, an import, a class, a destructured name, the rest local).
+ */
+function scriptDeclarations(ast) {
+  const declared = new Map();
+  const statements = [ast.module, ast.instance]
+    .flatMap((script) => script?.content?.body ?? [])
+    .map((statement) => statement.declaration ?? statement);
+  for (const statement of statements) {
+    if (statement.type === 'FunctionDeclaration') declared.set(statement.id.name, statement);
+    if (statement.type === 'ClassDeclaration') declared.set(statement.id.name, null);
+    for (const specifier of statement.specifiers ?? []) declared.set(specifier.local.name, null);
+    for (const declarator of statement.declarations ?? []) {
+      const props = isCallTo(declarator.init, '$props');
+      const bound = props
+        ? declarator.id.properties.filter((property) => property.type === 'RestElement')
+        : [declarator.id];
+      for (const name of bound.flatMap((pattern) => [...identifierNames(pattern)])) {
+        declared.set(name, followedInto(statement, declarator));
+      }
+    }
+  }
+  return declared;
+}
+
+/**
+ * The published keys a `svelte:element`'s `this` expression reads, to a fixed point, as
+ * `{ keys, faults }`: a `const` is followed into its initialiser, `$derived` and `$derived.by`
+ * included, and a function into its body. `published` is the entry's keys by local name. A name
+ * declared any other way is the fault `tag reads <name>, which the gate cannot follow`, and a name
+ * the scripts do not declare is a global.
+ */
+export function tagKeys(ast, node, published) {
+  const props = new Set(propLocals(ast).map(({ local }) => local));
+  const declared = scriptDeclarations(ast);
+  const keys = new Set();
+  const faults = [];
+  const seen = new Set();
+  const queue = [...referencedNames(node.tag)];
+  while (queue.length > 0) {
+    const name = queue.pop();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    if (props.has(name)) {
+      if (published.has(name)) keys.add(published.get(name));
+    } else if (declared.get(name)) {
+      queue.push(...referencedNames(declared.get(name)));
+    } else if (declared.has(name)) {
+      faults.push(`tag reads ${name}, which the gate cannot follow`);
+    }
+  }
+  return { keys: [...keys].sort(byName), faults };
+}
+
+/** What one pin breaks against the element it names, in a file that spells `spelled`. */
+function pinFaults(id, pin, read, spelled) {
+  const faults = [
+    ...pin.tags
+      .filter((tag) => !spelled.has(tag))
+      .map((tag) => `${id} pins <${tag}>, which its file does not spell`),
+    ...read.faults.map((fault) => `${id} ${fault}`),
+  ];
+  if (pin.keys.join(',') !== read.keys.join(',')) {
+    faults.push(`${id} pins the keys [${pin.keys}], and its tag follows [${read.keys}]`);
+  }
+  if (pin.keys.length > 0 && !pin.open && !pin.heldBy) {
+    faults.push(`${id} follows a published key and names no mounted clause in heldBy`);
+  }
+  if (pin.open && id.startsWith('src/')) faults.push(`${id} is open in a shipped file`);
+  return faults;
+}
+
+/**
+ * What the pins of `dynamic` break against the `svelte:element`s `files` draw, each file as
+ * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
+ * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
+ * reads, a keyed pin that is not `open` states `heldBy`, and no file under `src/` is `open`.
+ */
+export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
+  const faults = [];
+  const drawn = new Set();
+  for (const { file, ast, published } of files) {
+    const scripts = [ast.module, ast.instance, ast.fragment];
+    const spelled = new Set(scripts.flatMap((part) => literalStrings(part)));
+    for (const { id, node } of dynamicElements(file, ast)) {
+      if (drawn.has(id)) faults.push(`${id} is drawn twice, so one pin would name two elements`);
+      drawn.add(id);
+      if (Object.hasOwn(dynamic, id)) {
+        faults.push(...pinFaults(id, dynamic[id], tagKeys(ast, node, published), spelled));
+      } else faults.push(`${id} has no pin`);
+    }
+  }
+  const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
+  return [...faults, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
+}
+
+/** What rule 9 judges one element as: its tags, and whether any is focusable or a form control. */
+function judgedAs(node, pin) {
+  const tags = node.type === 'SvelteElement' ? pin?.tags : [node.name];
+  if (!tags) return null;
+  const focusable =
+    tags.some((tag) => FOCUSABLE_TAGS.has(tag)) || Boolean(attributeOf(node, 'tabindex'));
+  return { tags, focusable, control: tags.some((tag) => FORM_CONTROLS.has(tag)) };
+}
+
+/**
  * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
  * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
- * `name`. Answers each element it judged beside each fault, both as `<file>: <tag> …`, and each
- * judged element as `{ id, node, guards }`, its `id` being `<file>: <tag>[<hook>]`.
+ * `name`. A `svelte:element` is judged once, as the union of its pinned tags, and one with no pin
+ * is a fault; its `type` is a mounted suite's. Answers each element it judged beside each fault,
+ * both as `<file>: <tag> …`, and each judged element as `{ id, node, guards, tags }`, its `id`
+ * being `<file>: <tag>[<hook>]`.
  */
-export function focusableElements(file, ast) {
+export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
   const judged = [];
   const faults = [];
   const elements = [];
   walkWithAncestors(ast.fragment, (node, ancestors) => {
-    if (node.type !== 'RegularElement') return;
-    const focusable = FOCUSABLE_TAGS.has(node.name) || Boolean(attributeOf(node, 'tabindex'));
-    const control = FORM_CONTROLS.has(node.name);
-    if (!focusable && !control) return;
+    if (node.type !== 'RegularElement' && node.type !== 'SvelteElement') return;
+    const id = `${file}: ${node.name}${hookOf(node)}`;
+    const as = judgedAs(node, dynamic[id]);
+    if (!as) faults.push(`${file}: ${node.name} has no pinned tags`);
+    if (!as || (!as.focusable && !as.control)) return;
     const states = (name, value) => staticText(attributeOf(node, name)) === value;
     judged.push(`${file}: ${node.name}`);
-    const id = `${file}: ${node.name}${hookOf(node)}`;
-    elements.push({ id, node, guards: guardNames(ancestors) });
-    if (focusable && !states('data-keyboard-focus', 'true')) {
+    elements.push({ id, node, guards: guardNames(ancestors), tags: as.tags });
+    if (as.focusable && !states('data-keyboard-focus', 'true')) {
       faults.push(`${file}: ${node.name} does not state data-keyboard-focus="true"`);
     }
     if (node.name === 'button' && !states('type', 'button')) {
       faults.push(`${file}: button does not state type="button"`);
     }
-    if (control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
+    if (as.control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
   });
   return { judged, faults, elements };
 }

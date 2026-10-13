@@ -11,7 +11,8 @@
  * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
  * adds a mounted clause on each argument's type.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
- * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
+ * Limit: rule 9 judges a `svelte:element` by its pinned tags, and does not see an attribute a
+ * spread writes. A tag read through a template binding (`{#each}`, `{@const}`) is not followed.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -42,14 +43,18 @@ import { componentAstOf } from './helpers/parsedSource.js';
 import {
   SHIPPED,
   byName,
+  dynamicElementFaults,
+  dynamicElements,
   everyStylesheet,
   focusableElements,
   importClosure,
   isComponent,
   propLocals,
+  publishedLocals,
   selectorsNaming,
   selectorsOnAttribute,
   syntheticReader,
+  tagKeys,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
 import { readsGlobal } from './helpers/svelteStructureContract.js';
@@ -544,14 +549,27 @@ function publishedManagerClasses() {
 }
 
 /** Rule 9 over an entry's whole closure: every element judged, and every fault. */
-function closureFocusables(path, reader = SHIPPED) {
+function closureFocusables(path, reader = SHIPPED, dynamic = undefined) {
   const scans = [...importClosure(path, reader)]
     .filter(isComponent)
-    .map((file) => focusableElements(file, reader.component(file)));
+    .map((file) => focusableElements(file, reader.component(file), dynamic));
   return {
     judged: scans.flatMap((scan) => scan.judged),
     faults: scans.flatMap((scan) => scan.faults),
   };
+}
+
+/**
+ * Every component file of `entries`' closures, once, as `{ file, ast, published }`: `published`
+ * is the keys of the entry whose own file it is, by local name, and empty for any other file.
+ */
+function closureComponents(entries, reader = SHIPPED) {
+  const files = new Set(entries.flatMap((entry) => [...importClosure(entry.path, reader)]));
+  return [...files].filter(isComponent).map((file) => {
+    const ast = reader.component(file);
+    const entry = entries.find(({ path }) => path === file);
+    return { file, ast, published: entry ? publishedLocals(entry, ast) : new Map() };
+  });
 }
 
 describe('the manifest', () => {
@@ -608,6 +626,12 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Notice.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
+  });
+
+  it('pins every svelte:element the shipped closures and the probe draw, by the tags and the published keys its file states', () => {
+    const files = closureComponents([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
+    assert.ok(files.length >= 15, 'every shipped closure and the probe were read');
+    assert.deepEqual(dynamicElementFaults(files), []);
   });
 
   it('pins every shipped callback key with how many arguments it forwards', () => {
@@ -1028,6 +1052,168 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names ${claim} as a rule 9 fault`, () => {
       assert.deepEqual(focusOf(markup).faults, [`src/E.svelte: ${fault}`]);
+    });
+  }
+
+  const DYNAMIC = 'src/E.svelte: svelte:element';
+  const MARKED = ' data-keyboard-focus="true"';
+  const UNMARKED = `${DYNAMIC} does not state data-keyboard-focus="true"`;
+  /** Rule 9 over one `svelte:element` that states `attributes`, pinned to `tags` or unpinned. */
+  const dynamicFocusOf = (attributes, tags) =>
+    closureFocusables(
+      'src/E.svelte',
+      syntheticReader({
+        'src/E.svelte': ['<svelte:element this={tag}', attributes, '>x</svelte:element>'].join(''),
+      }),
+      tags ? { [DYNAMIC]: { tags, keys: [] } } : {}
+    );
+
+  for (const [claim, attributes, tags, judged, faults] of [
+    ['a marked svelte:element pinned to button', MARKED, ['button'], [DYNAMIC], []],
+    ['an unmarked one pinned to button', '', ['button'], [DYNAMIC], [UNMARKED]],
+    [
+      'one pinned to button whose data-keyboard-focus is not static',
+      ' data-keyboard-focus={on}',
+      ['button'],
+      [DYNAMIC],
+      [UNMARKED],
+    ],
+    ['one pinned to tags that draw no control', '', ['p', 'span'], [], []],
+    [
+      'a marked one pinned to p that states tabindex',
+      `${MARKED} tabindex="0"`,
+      ['p'],
+      [DYNAMIC],
+      [],
+    ],
+    ['one with no pin', MARKED, null, [], [`${DYNAMIC} has no pinned tags`]],
+    [
+      'a named one pinned to button',
+      `${MARKED} name="q"`,
+      ['button'],
+      [DYNAMIC],
+      [`${DYNAMIC} states name`],
+    ],
+    [
+      'one pinned to a link and a span, judged once as their union',
+      '',
+      ['a', 'span'],
+      [DYNAMIC],
+      [UNMARKED],
+    ],
+  ]) {
+    it(`judges ${claim} by its pinned tags`, () => {
+      assert.deepEqual(dynamicFocusOf(attributes, tags), { judged, faults });
+    });
+  }
+
+  const HOSTED = [
+    "let { as = 'p', ...rest } = $props();",
+    "const HOSTS = new Set(['p', 'span']);",
+    "const host = $derived(HOSTS.has(as) ? as : 'p');",
+  ].join(' ');
+  /** The pin faults of one file whose script is `body` and whose template is `template`, publishing `as`. */
+  const pinFaultsOf = (pins, { body = HOSTED, template, file = 'src/E.svelte' } = {}) => {
+    const drawn = template ?? '<svelte:element this={host}></svelte:element>';
+    const { ast } = templateOf(file, `<script>${body}</script>${drawn}`);
+    return dynamicElementFaults([{ file, ast, published: new Map([['as', 'as']]) }], pins);
+  };
+  const HELD = { tags: ['p', 'span'], keys: ['as'], heldBy: 'a mounted clause' };
+
+  it('passes a pin whose tags its file spells and whose keys its tag follows', () => {
+    assert.deepEqual(pinFaultsOf({ [DYNAMIC]: HELD }), []);
+  });
+
+  for (const [claim, pins, options, faults] of [
+    [
+      'a pinned id no file draws',
+      { [DYNAMIC]: HELD, 'src/Gone.svelte: svelte:element': HELD },
+      {},
+      ['src/Gone.svelte: svelte:element is pinned and no file draws it'],
+    ],
+    ['a drawn element with no pin', {}, {}, [`${DYNAMIC} has no pin`]],
+    [
+      'a pinned tag the file does not spell',
+      { [DYNAMIC]: { ...HELD, tags: ['h3', 'p'] } },
+      {},
+      [`${DYNAMIC} pins <h3>, which its file does not spell`],
+    ],
+    [
+      'two hookless elements in one file',
+      { [DYNAMIC]: HELD },
+      { template: '<svelte:element this={host} /><svelte:element this={host} />' },
+      [`${DYNAMIC} is drawn twice, so one pin would name two elements`],
+    ],
+    [
+      'an open pin on a shipped file',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: ['as'], open: true } },
+      {},
+      [`${DYNAMIC} is open in a shipped file`],
+    ],
+    [
+      'a keyed pin that names no mounted clause',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: ['as'] } },
+      {},
+      [`${DYNAMIC} follows a published key and names no mounted clause in heldBy`],
+    ],
+    [
+      'a pin whose keys differ from what its tag follows',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: [] } },
+      {},
+      [`${DYNAMIC} pins the keys [], and its tag follows [as]`],
+    ],
+  ]) {
+    it(`names ${claim} as a pin fault`, () => {
+      assert.deepEqual(pinFaultsOf(pins, options), faults);
+    });
+  }
+
+  it('admits an open pin on a test fixture, which no shipped closure reaches', () => {
+    const file = 'tests/fixtures/Probe.svelte';
+    const id = `${file}: svelte:element`;
+    const pins = { [id]: { tags: ['p', 'span'], keys: ['as'], open: true } };
+    assert.deepEqual(pinFaultsOf(pins, { file }), []);
+  });
+
+  /** What `tagKeys` reads of `<svelte:element this={<tag>}>` under a script `body`, publishing `as`. */
+  const keysOf = (body, tag) => {
+    const source = `<script>${body}</script><svelte:element this={${tag}}></svelte:element>`;
+    const { ast } = templateOf('src/E.svelte', source);
+    const [{ node }] = dynamicElements('src/E.svelte', ast);
+    return tagKeys(ast, node, new Map([['as', 'as']]));
+  };
+  const PROPS = "let { as = 'p', other = 'p', ...rest } = $props();";
+  const CANNOT_FOLLOW = (name) => `tag reads ${name}, which the gate cannot follow`;
+
+  for (const [claim, body, tag, keys] of [
+    ['the published prop itself', PROPS, 'as', ['as']],
+    ['one $derived', `${PROPS} const host = $derived(as);`, 'host', ['as']],
+    [
+      'two levels of $derived',
+      `${PROPS} const first = $derived(as); const host = $derived(first ?? 'p');`,
+      'host',
+      ['as'],
+    ],
+    ['$derived.by', `${PROPS} const host = $derived.by(() => as);`, 'host', ['as']],
+    ['a function the tag calls', `${PROPS} function tagFor() { return as; }`, 'tagFor()', ['as']],
+    ['an unpublished prop', PROPS, 'other', []],
+    ['a constant that reads no prop', `${PROPS} const host = 'p';`, 'host', []],
+    ['a literal', PROPS, "'p'", []],
+  ]) {
+    it(`follows a tag that reads ${claim} to the published keys behind it`, () => {
+      assert.deepEqual(keysOf(body, tag), { keys, faults: [] });
+    });
+  }
+
+  for (const [claim, body, tag, name] of [
+    ['a let', `${PROPS} let host = as;`, 'host', 'host'],
+    ['a $state', `${PROPS} const host = $state(as);`, 'host', 'host'],
+    ['an import', `import { host } from './host.js'; ${PROPS}`, 'host', 'host'],
+    ['the rest local', PROPS, "rest['data-tag']", 'rest'],
+    ['a destructured name', `${PROPS} const { host } = pick(as);`, 'host', 'host'],
+  ]) {
+    it(`fails closed on a tag that reads ${claim}, which it cannot follow`, () => {
+      assert.deepEqual(keysOf(body, tag), { keys: [], faults: [CANNOT_FOLLOW(name)] });
     });
   }
 

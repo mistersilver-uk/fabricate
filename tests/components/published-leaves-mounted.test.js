@@ -967,6 +967,19 @@ describe("Kicker's host element", () => {
     assert.deepEqual(reports, []);
   });
 
+  // The clause `DYNAMIC_ELEMENTS` names for the kicker's pinned tags.
+  it('draws a <p> for an as outside its three hosts, a button included, so as draws no control', async () => {
+    for (const as of ['button', 'a', 'h1']) {
+      const { target, handle } = mountLeaf('Kicker', { as, children: 'Standing' });
+      await settle();
+      assert.equal(target.children.length, 1, 'one root');
+      assert.equal(target.children[0].localName, 'p', `as: '${as}'`);
+      assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
+      handle.destroy();
+    }
+    assert.deepEqual(reports, []);
+  });
+
   it('draws 8.5px upper case in a literal face, with no Foundry variable defined', async () => {
     const { target, handle } = mountLeaf('Kicker', { children: 'Standing' });
     await settle();
