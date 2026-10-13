@@ -963,7 +963,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
-  // wrapper taking no box (issue 2451).
+  // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
+  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -999,6 +1000,26 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fab-rail > div > div', styles: 'display: contents' },
     { selector: '.fabricate-card > div', styles: 'display: contents' },
     { selector: '.fabricate-card > div > div', styles: 'display: contents' },
+    {
+      selector: '.manager-empty:not(.is-filtered)',
+      styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+    },
+    { selector: '.manager-empty:not(.is-filtered) > div', styles: 'display: flex; row-gap: 8px' },
+    {
+      selector: '.manager-empty:not(.is-filtered) > div > i',
+      styles: 'width: 46px; height: 46px',
+    },
+    { selector: '.manager-empty:not(.is-filtered) > div > div', styles: 'display: contents' },
+    { selector: '.manager-empty:not(.is-filtered) > div > div > div', styles: 'display: contents' },
+    {
+      selector: '.manager-empty h3',
+      styles: 'color: var(--fab-text-secondary); font-size: 13px',
+    },
+    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
+    { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    { selector: '.fab-notice', styles: 'display: flex; background-color: var(--fab-warning-soft)' },
+    { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
+    { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5525,8 +5546,22 @@ test('the leaves specimen mounts every published component but TierTrack and che
     'the fixture writes dataset.nested on each nested target'
   );
   const mounted = outer.map(nameOf);
+  const isFiltered = (mount) =>
+    mount.elements[1].properties.some(
+      ({ key, value }) => key.name === 'filtered' && value.value === true
+    );
+  const HOST_ROOTS = {
+    Rail: () => '.fab-rail',
+    InspectorCard: () => '.fabricate-card',
+    EmptyState: (mount) =>
+      isFiltered(mount) ? '.manager-empty.is-filtered' : '.manager-empty:not(.is-filtered)',
+  };
   const nested = outer.flatMap((mount) =>
-    (mount.elements[2]?.elements ?? []).map((inner) => [nameOf(mount), nameOf(inner)])
+    (mount.elements[2]?.elements ?? []).map((inner) => [
+      nameOf(mount),
+      nameOf(inner),
+      HOST_ROOTS[nameOf(mount)](mount),
+    ])
   );
   const meterMounts = [
     ...outer,
@@ -5542,12 +5577,14 @@ test('the leaves specimen mounts every published component but TierTrack and che
   assert.deepEqual(
     nested,
     [
-      ['Rail', 'Meter'],
-      ['Rail', 'InfoStrip'],
-      ['InspectorCard', 'Kicker'],
-      ['InspectorCard', 'StatBox'],
+      ['Rail', 'Meter', '.fab-rail'],
+      ['Rail', 'InfoStrip', '.fab-rail'],
+      ['InspectorCard', 'Kicker', '.fabricate-card'],
+      ['InspectorCard', 'StatBox', '.fabricate-card'],
+      ['EmptyState', 'Chip', '.manager-empty:not(.is-filtered)'],
+      ['EmptyState', 'Chip', '.manager-empty.is-filtered'],
     ],
-    'the mounts the fixture makes inside a content slot, in fixture order'
+    'the mounts the fixture makes inside a content slot, in fixture order, each with its host root'
   );
   assert.deepEqual(
     [...new Set(mounted)].sort(byCodePoint),
@@ -5564,15 +5601,14 @@ test('the leaves specimen mounts every published component but TierTrack and che
     Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
     'one containment check per section, in fixture order'
   );
-  const HOST_ROOTS = { Rail: '.fab-rail', InspectorCard: '.fabricate-card' };
-  const hostRoot = (host) =>
-    `${ground} > section[data-published="${host}"] > div > ${HOST_ROOTS[host]}`;
+  const hostRoot = ([host, , root]) =>
+    `${ground} > section[data-published="${host}"] > div > ${root}`;
   assert.deepEqual(
     expectContained.filter(({ target }) => !target.includes(':nth-child(')),
     [
-      ...nested.map(([host, name]) => ({
-        container: hostRoot(host),
-        target: `${hostRoot(host)} [data-nested="${name}"] > *`,
+      ...nested.map((pair) => ({
+        container: hostRoot(pair),
+        target: `${hostRoot(pair)} [data-nested="${pair[1]}"] > *`,
       })),
       { container: wrappedChip, target: `${wrappedChip} > span` },
       { container: '.window-content', target: ground },
@@ -5583,7 +5619,7 @@ test('the leaves specimen mounts every published component but TierTrack and che
     expectContained
       .slice(mounted.length, mounted.length + nested.length)
       .map(({ target }) => target),
-    nested.map(([host, name]) => `${hostRoot(host)} [data-nested="${name}"] > *`),
+    nested.map((pair) => `${hostRoot(pair)} [data-nested="${pair[1]}"] > *`),
     'the nested entries directly follow the per-section ones'
   );
 });

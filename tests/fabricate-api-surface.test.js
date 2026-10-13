@@ -253,6 +253,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Chip',
       'Rail',
       'InspectorCard',
+      'EmptyState',
+      'Notice',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -363,6 +365,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: { children: slot },
         rest: true,
         root: 'fabricate',
+      },
+      EmptyState: {
+        version: 1,
+        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
+        rest: true,
+        root: 'any',
+      },
+      Notice: {
+        version: 1,
+        props: { tone: optional, title: required, detail: optional, icon: optional },
+        rest: true,
+        root: 'any',
       },
     });
     assert.deepEqual(

@@ -383,13 +383,15 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 - The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
 - The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
 - The published set continues with `Rail` and `InspectorCard` (issue 2451), in that order.
+- The published set continues with `EmptyState` and `Notice` (issue 2451), in that order.
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
-- A component may declare props it does not publish: `class`, a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
+- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
 - An element-ref bindable (`Chip`'s `element`) is never published.
-- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
+- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `action`, `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
+- `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail` and `InspectorCard` were published with `load` (issue 2451), and a companion calls it for them before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and a companion calls it for them before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'` and `'slot'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
@@ -421,6 +423,8 @@ That happens when the content slot is omitted and requested again, when an `upda
 In a `<span>` content slot what it appends is phrasing content, a `<span>` for a mount target.
 It styles and attributes its own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
 - Focusable content a companion draws in a content slot is the companion's to mark `data-keyboard-focus="true"`.
+A `<button>` the companion draws there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
+The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
 
 ### The required ancestor root
@@ -548,7 +552,47 @@ Each group states the accepted values of every key that entry publishes.
   - It is an unnamed `<section>` with no role and takes no heading of its own; the companion heads its content, for example with a `Kicker`, as `h3` where it heads the whole card.
   - A card is never nested in a card: the design system has two container levels, and the second, the well, is not yet published.
   - The card never moves its content slot while it is requested.
-- **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors.
+- **`EmptyState`.**
+  - It is the design system's empty state (`<Empty>` in the library): a dashed panel that says what is absent and holds the way out.
+  - `title` is optional final display text, the short statement of what is absent, drawn as a level-3 heading.
+    The companion passes it only where a level-3 heading fits its outline: under a heading for the region the panel sits in, and not inside a card or rail the companion has itself headed at level 3.
+  - `hint` is optional final display text, the sentence beneath the title.
+    The companion passes a title, a hint or both; with neither the panel is an empty box.
+  - `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
+  - `filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, and the companion passes `hint` alone with it.
+    The hint is plain text, so a search term in it takes no emphasis.
+  - `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
+    It is the way out of the dead end, a control or a link, and what is drawn there is the companion's own.
+    Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so the companion states the ink of any text it draws there.
+  - It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is the companion's.
+  - It draws no fill, so it sits on `target`'s ground.
+    The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+    The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so the companion passes a `title` that says what is absent and keeps the hint to what supports it.
+    At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
+  - The title states its own serif face, and the hint inherits `target`'s.
+  - The panel never moves its content slot while it is requested.
+- **`Notice`.**
+  - It is the design system's notice: what just happened or is wrong right now, which goes away.
+    It is not a standing statement: a rule that is always true is not a notice.
+  - `title` is required and is the sentence that names what happened, final display text.
+  - `detail` is optional final display text, a second line that says what to do next.
+  - `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
+    It repaints the edge, the fill, the glyph and the title, and is colour alone, so the title says the state.
+  - `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
+  - It is a live region, `role="status"` with `aria-live="polite"`: assistive technology announces it when it is mounted and when an `update` changes its text.
+    An `update` that changes none of its text announces nothing.
+    The companion mounts it when the thing happens and destroys it when it no longer holds, never as standing text.
+    Every mount is a new announcement, so when the companion's content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), it keeps the notice through `update` where its `target` survives and does not mount an unchanged one again.
+    It takes no focus and moves none; where the act that caused it also moves focus, the companion moves focus first and mounts the notice after, because a focus change cancels polite speech.
+    Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
+    Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
+  - It draws no control at version 1, neither an action nor a dismissal, so the companion removes it with `destroy`.
+  - The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+    The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
+    At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
+    So the companion says in `title` whatever the reader must not miss.
+  - It inherits `target`'s face.
+- **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
 
 ### Mounting and its refusals
 
@@ -628,6 +672,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, and adds no premium signal.
 It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus, and makes no network request except to load an image path the companion passes.
+- A published component is not a live region unless its group says it is.
 - **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
 - Tokens resolve from `:root[data-fabricate-theme]`, which Fabricate's theme sets on `documentElement`.
 - **A published component whose `root` is `'any'` states everything it needs in its own `<style>`**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or a `--font-primary` read whose fallback does not end in a literal.
@@ -673,6 +718,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 - **WHEN** a companion mounts `InspectorCard` into a target with no `.fabricate` ancestor
 - **THEN** `mount` throws `InspectorCard needs a Fabricate window ancestor`, and nothing is rendered
+
+#### Scenario: A notice announces
+
+- **WHEN** a companion mounts `Notice` with a `title`
+- **THEN** its root carries `role="status"` and `aria-live="polite"`
+- **AND** after an `update` that changes `title` the same root carries the new text
 
 #### Scenario: A malformed request
 

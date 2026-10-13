@@ -1,10 +1,10 @@
 /**
- * Issue 2448's seven published leaves, and issue 2451's `Kicker`, `Chip`, `Rail` and
- * `InspectorCard`, on Fabricate's real Svelte runtime, each through a fresh seam registered with
- * the adapter's own table, into a bare companion target or the shell its root needs: mount, update
- * on one root and destroy; the seam's refusal of an unpublished or missing prop; a `text` key drawn
- * as text and a `slot` key filled; and what each `any` leaf draws from its own stylesheet under no
- * Fabricate ancestor.
+ * Issue 2448's seven published leaves, and issue 2451's `Kicker`, `Chip`, `Rail`, `InspectorCard`,
+ * `EmptyState` and `Notice`, on Fabricate's real Svelte runtime, each through a fresh seam
+ * registered with the adapter's own table, into a bare companion target or the shell its root
+ * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
+ * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; and what
+ * each `any` leaf draws from its own stylesheet under no Fabricate ancestor.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -177,9 +177,29 @@ const LEAVES = Object.freeze([
     read: (root) => root.children.length,
     drawn: [0, 1],
   },
+  {
+    name: 'EmptyState',
+    root: '.manager-empty',
+    props: { title: 'No factions yet' },
+    next: { title: 'No standing yet' },
+    read: (root) => root.querySelector('h3').textContent,
+    drawn: ['No factions yet', 'No standing yet'],
+  },
+  {
+    name: 'Notice',
+    root: '.fab-notice',
+    props: { title: 'Over the limit' },
+    next: { title: 'Back under the limit' },
+    read: (root) => root.querySelector('.fab-notice-title').textContent,
+    drawn: ['Over the limit', 'Back under the limit'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
+
+/** A node's authored classes, without Svelte's scope hash. */
+const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
+const FOCUSABLE = 'button, a, input, [tabindex]';
 
 function requiredKeysOf(name) {
   const { props } = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
@@ -206,6 +226,7 @@ describe('each published leaf through the seam', () => {
       assert.equal(read(node), drawn[1]);
       handle.destroy();
       assert.equal(target.childNodes.length, 0);
+      await settle();
       assert.deepEqual(reports, []);
     });
   }
@@ -227,6 +248,17 @@ describe('a key a leaf does not publish', () => {
     ['Chip', 'element', 'is not a data attribute'],
     ['Rail', 'class', 'is not a data attribute'],
     ['InspectorCard', 'class', 'is not a data attribute'],
+    ['EmptyState', 'contextClass', 'is not a data attribute'],
+    ['EmptyState', 'compact', 'is not a data attribute'],
+    ['EmptyState', 'inline', 'is not a data attribute'],
+    ['EmptyState', 'field', 'is not a data attribute'],
+    ['EmptyState', 'fill', 'is not a data attribute'],
+    ['EmptyState', 'note', 'is not a data attribute'],
+    ['Notice', 'action', 'is not a data attribute'],
+    ['Notice', 'dismissable', 'is not a data attribute'],
+    ['Notice', 'dismissLabel', 'is not a data attribute'],
+    ['Notice', 'blocking', 'is not a data attribute'],
+    ['Notice', 'evidence', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -257,6 +289,35 @@ describe('a required prop', () => {
         });
       }
     }
+  }
+});
+
+describe('the order a rest entry refuses in', () => {
+  const FUNCTION = 'functions are phase 2 (issue 2427)';
+  for (const [claim, name, props, refusal] of [
+    [
+      'a function inside an unpublished key before the key (M10), and a missing title last',
+      'Notice',
+      { action: { label: 'Review', onClick: () => {} } },
+      FUNCTION,
+    ],
+    [
+      'an unpublished key holding data (M13) before a missing title (M9)',
+      'Notice',
+      { action: { label: 'Review' } },
+      '"action" is not a data attribute',
+    ],
+    ['a function for its unpublished evidence (M10)', 'Notice', { evidence: () => {} }, FUNCTION],
+    ['a function for its content slot (M10)', 'EmptyState', { children: () => {} }, FUNCTION],
+  ]) {
+    it(`${name} refuses ${claim}, and renders nothing`, () => {
+      const target = targetFor(name);
+      assert.throws(() => ui().mount(name, { target, props }), {
+        name: 'TypeError',
+        message: `${REFUSAL}${refusal}`,
+      });
+      assert.equal(target.childNodes.length, 0);
+    });
   }
 });
 
@@ -333,27 +394,31 @@ describe('a text key through the shipped seam', () => {
     const chip = target.querySelector('.manager-chip');
     assert.equal(chip.localName, 'span');
     assert.deepEqual(
-      [...chip.classList].filter((name) => !name.startsWith('svelte-')),
+      authoredClasses(chip),
       ['manager-chip', 'is-warning', 'is-list'],
       'the root class, then only what the published keys write'
     );
     assert.ok(!chip.hasAttribute('role') && !chip.hasAttribute('tabindex'), 'no role, no focus');
-    assert.ok(!target.querySelector('button, a, input, [tabindex]'), 'nothing focusable');
+    assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
     handle.destroy();
   });
 });
 
-const SLOT_LEAVES = ['Rail', 'InspectorCard'];
+/** Each leaf that publishes a content slot, and the element of its own that draws it. */
+const SLOT_LEAVES = [
+  ['Rail', '.fab-rail'],
+  ['InspectorCard', '.fabricate-card'],
+  ['EmptyState', '.manager-empty > div'],
+];
 
 describe('a slot key through the shipped seam', () => {
-  for (const name of SLOT_LEAVES) {
-    it(`${name} hands back a <div> slot element, drawn inside its root when mount returns`, async () => {
-      const { target, handle } = mountLeaf(name, { children: true });
+  for (const [name, drawnIn] of SLOT_LEAVES) {
+    it(`${name} hands back a <div> slot element, drawn one private wrapper below ${drawnIn} when mount returns`, async () => {
+      const { target, handle } = mountLeaf(name, { ...propsOf(name), children: true });
       const slot = handle.slot('children');
       assert.equal(slot.localName, 'div');
-      const root = target.firstElementChild;
-      assert.ok(root.contains(slot), 'inside the root');
-      assert.ok(slot.parentElement.parentElement === root, 'one private wrapper below the root');
+      assert.ok(target.firstElementChild.contains(slot), 'inside the root');
+      assert.ok(slot.parentElement.parentElement === target.querySelector(drawnIn), drawnIn);
       handle.destroy();
       assert.equal(target.childNodes.length, 0);
       await settle();
@@ -367,7 +432,8 @@ describe('a slot key through the shipped seam', () => {
     ]) {
       it(`${name} refuses ${what} for its content slot (M15), and renders nothing`, () => {
         const target = targetFor(name);
-        assert.throws(() => ui().mount(name, { target, props: { children: value } }), {
+        const props = { ...propsOf(name), children: value };
+        assert.throws(() => ui().mount(name, { target, props }), {
           name: 'TypeError',
           message: `${REFUSAL}"children" is a slot and takes true or false`,
         });
@@ -378,7 +444,7 @@ describe('a slot key through the shipped seam', () => {
     it(`${name} draws a Kicker mounted in its content slot, and its destroy ends both`, async () => {
       const seam = ui();
       const target = targetFor(name);
-      const outer = seam.mount(name, { target, props: { children: true } });
+      const outer = seam.mount(name, { target, props: { ...propsOf(name), children: true } });
       const inner = target.ownerDocument.createElement('div');
       outer.slot('children').append(inner);
       const kicker = seam.mount('Kicker', { target: inner, props: { children: 'Renown' } });
@@ -429,6 +495,150 @@ describe('Rail under a bare ancestor', () => {
       assert.equal(label.color, 'rgb(1, 2, 3)');
       assert.equal(label.fontSize, '8.5px');
       assert.equal(label.textTransform, 'uppercase');
+      handle.destroy();
+    });
+  });
+});
+
+describe('EmptyState under a bare ancestor', () => {
+  /** The panel's one element child, the column that spaces its content. */
+  const columnOf = (target) => target.querySelector('.manager-empty').firstElementChild;
+
+  it('draws the panel and nothing in its column with no props, and is no live region', async () => {
+    const { target, handle } = mountLeaf('EmptyState', {});
+    const panel = target.querySelector('.manager-empty');
+    assert.deepEqual(authoredClasses(panel), ['manager-empty']);
+    assert.ok(!panel.hasAttribute('role') && !panel.hasAttribute('aria-live'), 'no role');
+    assert.equal(columnOf(target).children.length, 0);
+    assert.equal(columnOf(target).textContent.trim(), '');
+    await settle();
+    assert.deepEqual(reports, []);
+    handle.destroy();
+  });
+
+  it('draws a glyph tile, a level-3 title and a hint, and writes filtered as its one state class', () => {
+    const { target, handle } = mountLeaf('EmptyState', {
+      icon: 'fas fa-feather',
+      title: 'No factions yet',
+      hint: 'Add a faction to begin.',
+      filtered: true,
+      children: true,
+    });
+    assert.deepEqual(authoredClasses(target.querySelector('.manager-empty')), [
+      'manager-empty',
+      'is-filtered',
+    ]);
+    const [glyph, title, hint, wrapper] = columnOf(target).children;
+    assert.deepEqual(
+      [glyph, title, hint, wrapper].map((node) => node.localName),
+      ['i', 'h3', 'p', 'div']
+    );
+    assert.equal(glyph.getAttribute('aria-hidden'), 'true');
+    assert.equal(title.textContent, 'No factions yet');
+    assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable, whatever its published keys');
+    handle.destroy();
+  });
+
+  it('draws a requested content slot left empty as one wrapper holding the slot element, neither taking a box', async () => {
+    const { target, handle } = mountLeaf('EmptyState', { children: true });
+    const column = columnOf(target);
+    const slot = handle.slot('children');
+    assert.equal(column.children.length, 1, 'one wrapper');
+    const [wrapper] = column.children;
+    assert.ok(wrapper.children.length === 1 && wrapper.children[0] === slot, 'the slot element');
+    assert.equal(wrapper.style.display, 'contents');
+    assert.equal(slot.style.display, 'contents');
+    assert.equal(slot.childNodes.length, 0);
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  it('detaches its content slot when it is omitted, and attaches the same element when it is requested again', async () => {
+    const seam = ui();
+    const target = companionTarget(targets);
+    const title = 'No factions yet';
+    const handle = seam.mount('EmptyState', { target, props: { title, children: true } });
+    const slot = handle.slot('children');
+    const inner = target.ownerDocument.createElement('div');
+    slot.append(inner);
+    const chip = seam.mount('Chip', { target: inner, props: { children: 'Locked' } });
+    await settle();
+    const column = columnOf(target);
+
+    assert.equal(handle.update({ title }), true);
+    await settle();
+    assert.deepEqual(
+      [...column.children].map((child) => child.localName),
+      ['h3'],
+      'the column holds the heading alone'
+    );
+    assert.ok(handle.slot('children') === slot, 'the same slot element');
+    assert.equal(slot.isConnected, false);
+    assert.equal(chip.update({ children: 'Open' }), true, 'the nested mount is still live');
+
+    assert.equal(handle.update({ title, children: true }), true);
+    await settle();
+    assert.ok(handle.slot('children') === slot, 'the same slot element again');
+    assert.ok(slot.parentElement.parentElement === column, 'one wrapper below the column');
+    assert.equal(slot.querySelector('.manager-chip').textContent, 'Open');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  it('lays its column out and inks its title from its own stylesheet', async () => {
+    const theme = ':root[data-fabricate-theme] { --fab-text-secondary: rgb(1, 2, 3); }';
+    await underSheet(theme, async () => {
+      const { target, handle } = mountLeaf('EmptyState', { title: 'No factions yet' });
+      await settle();
+      const column = getComputedStyle(columnOf(target));
+      assert.equal(column.display, 'flex');
+      assert.equal(column.flexDirection, 'column');
+      assert.equal(getComputedStyle(target.querySelector('h3')).color, 'rgb(1, 2, 3)');
+      handle.destroy();
+    });
+  });
+});
+
+describe('Notice under a bare ancestor', () => {
+  it('is a polite status region, on the same root across an update of its title', async () => {
+    const { target, handle } = mountLeaf('Notice', { title: 'Over the limit' });
+    const notice = target.querySelector('.fab-notice');
+    const announces = () => [notice.getAttribute('role'), notice.getAttribute('aria-live')];
+    assert.deepEqual(announces(), ['status', 'polite']);
+    assert.equal(handle.update({ title: 'Back under the limit' }), true);
+    await settle();
+    assert.ok(target.querySelector('.fab-notice') === notice, 'the same root');
+    assert.deepEqual(announces(), ['status', 'polite']);
+    assert.equal(notice.querySelector('.fab-notice-title').textContent, 'Back under the limit');
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  it('writes its root class and one tone class, and draws no control whatever its published keys', () => {
+    const { target, handle } = mountLeaf('Notice', {
+      tone: 'warning',
+      title: 'Over the limit',
+      detail: 'Remove a project to continue.',
+      icon: 'fas fa-bell',
+    });
+    const notice = target.querySelector('.fab-notice');
+    assert.deepEqual(authoredClasses(notice), ['fab-notice', 'is-warning']);
+    assert.ok(Boolean(notice.querySelector('i.fa-bell[aria-hidden="true"]')), 'the passed glyph');
+    assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
+    handle.destroy();
+  });
+
+  it('resolves its warning ink from :root[data-fabricate-theme]', async () => {
+    const theme = ':root[data-fabricate-theme] { --fab-warning-text: rgb(4, 5, 6); }';
+    await underSheet(theme, async () => {
+      const { target, handle } = mountLeaf('Notice', { tone: 'warning', title: 'Over the limit' });
+      await settle();
+      const title = getComputedStyle(target.querySelector('.fab-notice-title'));
+      assert.equal(title.color, 'rgb(4, 5, 6)');
       handle.destroy();
     });
   });

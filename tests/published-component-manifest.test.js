@@ -4,16 +4,16 @@
  * stylesheet and template that need no ancestor above the entry's root, no read of a Foundry
  * global, no class the module sheet names under an `any` root, and focusable elements marked as
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
- * module sheet, and the published `InspectorCard`'s in the sheet and every component `<style>`
- * (issue 2451). The test-only probe runs beside the shipped entries; the adapter's bindings are
- * the mounted suite's.
+ * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
+ * and every component `<style>` (issue 2451). The test-only probe runs beside the shipped entries;
+ * the adapter's bindings are the mounted suite's.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
  * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
- * `data` value writes (`icon` on `Medallion`, `StatBox` and `InfoStrip`), or an unprefixed state
- * class.
+ * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
+ * or an unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
- * Limit: the card census's `manager-*` clause shares sheet reach's limits.
+ * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child or read through an alias; a forwarded `text` or `slot`
@@ -469,6 +469,13 @@ const CARD_DATA_HOOK_RULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte: .fabricate-card[data-crafting-modifier-catalogue]',
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte: .fabricate-card[data-crafting-modifier-policy-card]',
 ]);
+/**
+ * The one rule that names the notice root, inside `:has()`, as written: it pads the element a
+ * recipe notice sits in and not the notice, which the census cannot prove.
+ */
+const NOTICE_HAS_RULES = Object.freeze([
+  'styles/fabricate-manager-library.css: .fabricate-manager .manager-recipe-notice:has(.fab-notice)',
+]);
 
 /**
  * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
@@ -585,6 +592,10 @@ const SHEET_REACH_PINS = Object.freeze([
   'src/ui/svelte/components/Chip.svelte: fab-hit-area',
   // The chip's root class, which the 18-selector census below holds.
   'src/ui/svelte/components/Chip.svelte: manager-chip',
+  // The panel's root class, which its 3-selector census below holds.
+  'src/ui/svelte/components/EmptyState.svelte: manager-empty',
+  // The notice's root class, which its 1-selector census below holds.
+  'src/ui/svelte/components/Notice.svelte: fab-notice',
 ]);
 
 /** Every `manager-` class token a published closure spells, the probe's included. */
@@ -687,14 +698,23 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges one focusable element across the shipped closures, the Chip remove button', () => {
-    const judged = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap(
-      (entry) => closureFocusables(entry.path).judged
+  it('judges three focusable elements across the shipped closures, each file read once: the Chip remove button and the Notice action and dismiss buttons', () => {
+    const files = new Set(
+      [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
+        ...importClosure(entry.path, SHIPPED),
+      ])
     );
-    assert.deepEqual([...new Set(judged)], ['src/ui/svelte/components/Chip.svelte: button']);
+    const judged = [...files]
+      .filter(isComponent)
+      .flatMap((file) => focusableElements(file, componentAstOf(file)).judged);
+    assert.deepEqual(judged.sort(byName), [
+      'src/ui/svelte/components/Chip.svelte: button',
+      'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/Notice.svelte: button',
+    ]);
   });
 
-  it('spells no sheet-named class in an any closure but the pinned Chip pair', () => {
+  it('spells no sheet-named class in an any closure but the four pinned: the Chip pair, and the EmptyState and Notice roots', () => {
     const sheet = sheetClassNames();
     assert.ok(sheet.has('fabricate-card') && sheet.size > 500, 'the module sheet was read');
     const reach = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) =>
@@ -1161,6 +1181,36 @@ const syntheticCensus = (shape, css, options = {}) =>
   );
 const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector }) => selector);
 
+let stylesheets;
+/** Every module sheet partial and every component `<style>` under `src/ui/svelte`, as `[file, css]`. */
+function everyStylesheet() {
+  if (stylesheets) return stylesheets;
+  const sheets = stylesheetSources().parts.map(({ file, text }) => [
+    file,
+    templateOf(file, `<style>${text}</style>`).ast.css,
+  ]);
+  const blocks = componentPathsUnder('src/ui/svelte').map((file) => [
+    file,
+    componentAstOf(file).css,
+  ]);
+  assert.equal(sheets.length, 14, 'the fourteen partials');
+  assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
+  stylesheets = [...sheets, ...blocks];
+  return stylesheets;
+}
+
+const entryNamed = (name) => PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
+const ownFilesOf = (name) => importClosure(entryNamed(name).path, SHIPPED);
+
+/** The census of `shape` over every stylesheet, for the published entry `name` that draws its root. */
+function shippedCensus(shape, name) {
+  const options = { spelled: publishedManagerClasses(), own: ownFilesOf(name) };
+  return everyStylesheet().flatMap(([file, css]) => censusSelectors(file, css, shape, options));
+}
+
+/** An entry's published keys and root, which a census of its root class pins. */
+const publishedShapeOf = (name) => [Object.keys(entryNamed(name).props), entryNamed(name).root];
+
 describe('the module sheet against the published Chip', () => {
   it('names the chip root in 18 selectors, none of which a published chip can match', () => {
     const selectors = stylesheetSources().parts.flatMap(({ file, text }) =>
@@ -1210,34 +1260,17 @@ describe('the module sheet against the published Chip', () => {
 
 describe('the module sheet and every component style against the published InspectorCard', () => {
   it('names the card root in 24 selectors: its two family rules, two data-hook rules, and twenty no published card can match', () => {
-    const spelled = publishedManagerClasses();
-    assert.ok(spelled.has('manager-chip'), 'the published closures were read');
-    const sheets = stylesheetSources().parts.map(({ file, text }) => [
-      file,
-      templateOf(file, `<style>${text}</style>`).ast.css,
-    ]);
-    const blocks = componentPathsUnder('src/ui/svelte').map((file) => [
-      file,
-      componentAstOf(file).css,
-    ]);
-    assert.equal(sheets.length, 14, 'the fourteen partials');
-    assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
-    const selectors = [...sheets, ...blocks].flatMap(([file, css]) =>
-      censusSelectors(file, css, CARD, { spelled })
-    );
-    assert.deepEqual(
-      selectors.filter(({ safe }) => !safe).map(({ selector }) => selector),
-      [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]
-    );
+    assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
+    const selectors = shippedCensus(CARD, 'InspectorCard');
+    assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
     assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
-    const card = PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'InspectorCard');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
       ['InspectorCard'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(
-      [Object.keys(card.props), card.root],
+      publishedShapeOf('InspectorCard'),
       [['children'], 'fabricate'],
       'a published key that writes a class, or a wider root, reopens cannotMatchPublished'
     );
@@ -1279,7 +1312,18 @@ describe('the module sheet and every component style against the published Inspe
   }
 });
 
-describe("a census of EmptyState's root class", () => {
+describe('the module sheet and every component style against the published EmptyState', () => {
+  it('names the panel root in 3 selectors outside its own file, each under a pinned ancestor', () => {
+    const selectors = shippedCensus(EMPTY, 'EmptyState');
+    assert.deepEqual(unsafeOf(selectors), []);
+    assert.equal(selectors.length, 3, 'the census EmptyState was published on');
+    assert.deepEqual(
+      publishedShapeOf('EmptyState'),
+      [['icon', 'title', 'hint', 'filtered', 'children'], 'any'],
+      'a published key that writes a class reopens cannotMatchPublished'
+    );
+  });
+
   const unsafe = (css) => unsafeOf(syntheticCensus(EMPTY, css));
 
   for (const [claim, selector] of [
@@ -1324,7 +1368,29 @@ describe("a census of EmptyState's root class", () => {
   });
 });
 
-describe("a census of Notice's root class", () => {
+describe('the module sheet and every component style against the published Notice', () => {
+  it('names the notice root in 1 selector outside its own file, the pinned :has() rule, and its tone attribute in none', () => {
+    const selectors = shippedCensus(NOTICE, 'Notice');
+    assert.deepEqual(
+      selectors.filter(({ safe }) => !safe).map(({ written }) => written),
+      [...NOTICE_HAS_RULES]
+    );
+    assert.equal(selectors.length, 1, 'the census Notice was published on');
+    const own = ownFilesOf('Notice');
+    assert.deepEqual(
+      everyStylesheet()
+        .filter(([file]) => !own.has(file))
+        .flatMap(([file, css]) => selectorsOnAttribute(file, css, 'data-notice-tone')),
+      [],
+      'no rule outside the notice styles it by the tone attribute it writes'
+    );
+    assert.deepEqual(
+      publishedShapeOf('Notice'),
+      [['tone', 'title', 'detail', 'icon'], 'any'],
+      'a published key that writes a class reopens cannotMatchPublished'
+    );
+  });
+
   const unsafe = (css) => unsafeOf(syntheticCensus(NOTICE, css));
 
   it('admits a selector that needs a state class no published key writes', () => {

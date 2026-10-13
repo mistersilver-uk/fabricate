@@ -1,19 +1,21 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves,
-  then `Kicker`, `Chip`, `Rail` and `InspectorCard` (issue 2451), through the page-session seam
-  `game.fabricate.api.ui` binds, as a companion does: one mount per section, each into an element it
-  owns. A mount's third member lists the mounts made inside its `children` content slot, each into
-  a `div` the fixture appends there. The effect's teardown destroys the outer handles only, so the
-  seam ends the nested ones. Every word is a companion's final text, so none is localized, and the
-  art is the lab world's own, so `tests/view-lab-fixture-assets.test.js` resolves it.
-  `tests/view-lab/mount.js` mounts it for `?specimen=published-leaves` only.
+  then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` (issue 2451), through
+  the page-session seam `game.fabricate.api.ui` binds, as a companion does: one mount per section,
+  each into an element it owns. A mount's third member lists the mounts made inside its `children`
+  content slot, each into a `div` the fixture appends there. The effect's teardown destroys the
+  outer handles only, so the seam ends the nested ones. Every word is a companion's final text, so
+  none is localized, and the art is the lab world's own, so
+  `tests/view-lab-fixture-assets.test.js` resolves it. `tests/view-lab/mount.js` mounts it for
+  `?specimen=published-leaves` only.
 
   The ground is three 280px cells of three 88px tracks: a tile, a stat box or a chip takes one track
   and every other mount a whole cell. An inline mark's target is `display: flex`, as the spec asks
-  of a companion. It sets the danger ink, so an ink a leaf fails to state shows in the frame, and
-  the card's cell takes the downtime target's `--fab-bg-1` ground, so a card that drew no fill
-  shows too. The case's `expectContained` addresses each section by its position in `MOUNTS`, and
-  each nested mount by its host and its `data-nested` name.
+  of a companion, stated inline on a nested target, which this file's scoped rule does not reach.
+  It sets the danger ink, so an ink a leaf fails to state shows in the frame, and the card's, the
+  panels' and the notice's cells take the downtime target's `--fab-bg-1` ground, so a card that
+  drew no fill shows too. The case's `expectContained` addresses each section by its position in
+  `MOUNTS`, and each nested mount by its host and its `data-nested` name.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -91,6 +93,29 @@
         ['StatBox', { value: '7', label: 'Seals' }],
       ],
     ],
+    [
+      'EmptyState',
+      {
+        icon: 'fas fa-box-open',
+        title: 'No projects yet',
+        hint: 'Projects the party starts in downtime are listed here.',
+        children: true,
+      },
+      [['Chip', { tone: 'positive', density: 'list', children: 'Three slots free' }]],
+    ],
+    [
+      'Notice',
+      {
+        tone: 'warning',
+        title: 'Over the project limit',
+        detail: 'Finish or abandon a project before the caravan takes on another.',
+      },
+    ],
+    [
+      'EmptyState',
+      { filtered: true, hint: 'No projects match these filters.', children: true },
+      [['Chip', { tone: 'info', density: 'list', children: 'Two filters on' }]],
+    ],
   ]);
 
   const targets = $state([]);
@@ -103,6 +128,7 @@
       for (const [nestedName, nestedProps] of nested) {
         const target = targets[index].ownerDocument.createElement('div');
         target.dataset.nested = nestedName;
+        if (isInline(nestedName, nestedProps)) target.style.display = 'flex';
         handle.slot('children').append(target);
         mount(nestedName, { target, props: nestedProps });
       }
@@ -152,7 +178,9 @@
     display: flex;
   }
 
-  section[data-published='InspectorCard'] {
+  section[data-published='InspectorCard'],
+  section[data-published='EmptyState'],
+  section[data-published='Notice'] {
     padding: var(--fab-space-2);
     background: var(--fab-bg-1);
   }

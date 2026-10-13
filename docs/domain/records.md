@@ -517,6 +517,7 @@ A prop is plain data, a string of text or a content slot; snippets, bindables an
 A content slot is a place inside a published component where the companion draws its own content, into an element Fabricate owns and returns from `handle.slot`.
 An entry's **required ancestor root** says which Fabricate ancestor its target needs.
 The published `Rail` is a section primitive, not the Manager rail.
+The published `Notice` is the design system's notice, drawn in the companion's element, and is unrelated to a Foundry notification.
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
