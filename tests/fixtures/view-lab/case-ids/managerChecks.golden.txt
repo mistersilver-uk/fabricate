@@ -10,6 +10,7 @@ manager-checks-outcomes-range-notices
 manager-checks-triggers-notice
 manager-checks-off
 manager-checks-stacked-floor
+manager-checks-formula-card
 manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
 manager-checks-alchemy-behaviour

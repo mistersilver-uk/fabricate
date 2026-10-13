@@ -652,6 +652,29 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'checks', 'responsive'],
   }),
+  managerCase({
+    id: 'manager-checks-formula-card',
+    label: 'Manager — Checks Formula card, field, tokens and average',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @prof' },
+      // A closing click on the card's title: it takes focus off the field, so the frame is at rest.
+      { selector: '[data-roll-formula-card] .manager-checks-card-title' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager .manager-checks-formula:has([data-check-formula-average="10.5"])',
+    expectCenterHit: '.fab-expr-input-token',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
   // The first open-panel frame in the checks studio (issue 1510), and the only way to photograph a
   // converted control's own subject: the list exists only while the panel is open, and an open panel
   // cannot double as this route's closed-state frame. Its list is ticked and it opens from inside a

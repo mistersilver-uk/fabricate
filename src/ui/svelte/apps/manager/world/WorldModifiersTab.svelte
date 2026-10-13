@@ -31,9 +31,9 @@
   let {
     library = [],
     presetsSupported = false,
-    // The active Foundry game system id (`game.system.id`). Drives the SYSTEM-SPECIFIC half
-    // of the expression suggestion chips: a roll-data path is only meaningful in the world
-    // that defines it, so an unknown id yields the agnostic chips alone rather than a
+    // The active Foundry game system id (`game.system.id`). Drives the system-specific half
+    // of the expression field's tokens: a roll-data path is only meaningful in the world
+    // that defines it, so an unknown id yields the agnostic tokens alone rather than a
     // `dnd5e` row offered to a world that has no `@abilities`.
     foundrySystemId = '',
     onAdd = async () => null,
