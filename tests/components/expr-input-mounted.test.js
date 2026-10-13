@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { Window } from 'happy-dom';
+
 import { declarationViolations, readDeclaration } from '../helpers/apiConvention.js';
+import { parseDesignLibrary, readDesignLibrary } from '../helpers/designLibrary.js';
 import { walkNodes } from '../helpers/moduleAst.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
@@ -28,6 +31,30 @@ const component = templates.find(({ file }) => file === RDE);
 
 /** Props the component took before issue 2465, which no call site may pass again. */
 const RETIRED_PROPS = Object.freeze(['sigil', 'dataField', 'inputAttrs']);
+
+/** The planned-migrations row that names what the entry specifies and the file does not ship. */
+const MIGRATION_SUBJECT = 'Expression field tokens and reading';
+
+/** The entry's status, the prop names its API list sets in bold, and the migration subjects. */
+function readEntry() {
+  const html = readDesignLibrary();
+  const block = parseDesignLibrary(html).blocks.find(({ names }) => names.includes('ExprInput'));
+  const window = new Window();
+  window.document.write(html);
+  const heading = [...window.document.querySelectorAll('.notes h5')].find(
+    (h5) => h5.textContent === 'ExprInput API'
+  );
+  const bold = [...(heading?.parentElement.querySelectorAll(':scope li:not(.k-hint) b') ?? [])];
+  const entry = {
+    status: block?.perNameStatus.ExprInput,
+    names: bold.map((run) => run.textContent).filter((text) => /^[a-z][A-Za-z0-9]*$/u.test(text)),
+    subjects: [...window.document.querySelectorAll('section#log tbody tr > td:first-child')].map(
+      (cell) => cell.textContent.trim()
+    ),
+  };
+  window.close();
+  return entry;
+}
 
 function type(input, text) {
   input.value = text;
@@ -134,6 +161,27 @@ describe('ExprInput (issue 2465)', () => {
 
   it('breaks no rule of the shared-primitive API convention', () => {
     assert.deepEqual(declarationViolations(readDeclaration(component)), []);
+  });
+
+  it('agrees with its library entry on every prop the entry does not hold at target', () => {
+    const { status, names, subjects } = readEntry();
+    const declared = declaredPropNames(component.source).filter((name) => name !== '...rest');
+    assert.ok(names.length > 0, 'the entry states an API');
+    assert.deepEqual(
+      declared.filter((name) => !names.includes(name)),
+      [],
+      'the entry names every declared prop'
+    );
+    const unbuilt = new Set(names.filter((name) => !declared.includes(name)));
+    if (status !== 'target') {
+      assert.deepEqual(unbuilt, new Set(), `at ${status} the entry and the file state one API`);
+      return;
+    }
+    assert.deepEqual(unbuilt, new Set(['resolve', 'tokens']), 'what the entry holds at target');
+    assert.ok(
+      subjects.includes(MIGRATION_SUBJECT),
+      `a planned-migrations row names the difference: ${MIGRATION_SUBJECT}`
+    );
   });
 
   it('is passed no retired prop at any call site', () => {
