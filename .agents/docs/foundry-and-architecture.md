@@ -544,6 +544,9 @@ A promise a companion awaits in `_onRender` must therefore have its rejection ha
 Svelte 5.56's `unmount` returns a Promise and never throws synchronously: `component_root` wraps `destroy_effect` in `new Promise(...)` (`svelte/src/internal/client/reactivity/effects.js`), so a throwing effect cleanup during unmount is a rejection, not a synchronous throw.
 Fabricate's adapter in `src/ui/publishedComponents.svelte.js` returns that Promise itself, never through an `async` function or with `{ outro: true }`, and the seam reports its rejection with a handler attached directly to it (issue 2451).
 After Svelte's `mount`, `target.lastChild` is Svelte's own anchor text node: `mount` does `target.appendChild(create_text())` (`svelte/src/internal/client/render.js` L173) and removes it only in the root teardown (L281-282), so it survives a component replacing its root element (for example `<svelte:element>` changing tag), and the published seam's `record.root` relies on this to recognise a live claim.
+A `<svelte:boundary>` destroys its faulted content before it queues `onerror` (`svelte/src/internal/client/dom/blocks/boundary.js`, `#handle_error`), and `destroy_effect` runs each teardown with no catch, so a cleanup that throws during that destruction leaves the boundary before `onerror` is queued.
+`invoke_error_boundary` hands such a throw to the next boundary up, replacing the first error (`svelte/src/internal/client/error-handling.js`), which is why `PublishedComponentHost.svelte` nests two boundaries: the outer one faults the mount with the cleanup's error (issue 2451).
+A cleanup that throws when an `update` re-runs its own effect is run outside any reaction's `try` (`svelte/src/internal/client/runtime.js`, `update_effect`) and reaches no boundary, so a published component's cleanup must not throw.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
