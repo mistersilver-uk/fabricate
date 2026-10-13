@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
+import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   PUBLISHED_ADAPTER as ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -89,15 +90,6 @@ function mountProbe(props) {
     button: () => target.querySelector('[data-probe-press]'),
     read: (name) => paragraph.getAttribute(`data-probe-${name}`),
   };
-}
-
-/** A function that records each call's arguments in `calls`. */
-function recorder() {
-  const calls = [];
-  const record = (...args) => {
-    calls.push(args);
-  };
-  return { calls, record };
 }
 
 describe('a callback key on the real runtime', () => {
@@ -206,6 +198,24 @@ describe('a callback called from an effect', () => {
 });
 
 describe('a callback that acts on its own mount from inside a press', () => {
+  /**
+   * A second probe left live through a clause, as a Fabricate window's own mount is in Foundry:
+   * Svelte keeps its `document` click listener while any mount lives.
+   */
+  async function liveBeside() {
+    const ping = recorder();
+    const beside = mountProbe({ onPing: ping.record });
+    await settle();
+    return { ...beside, ping };
+  }
+
+  /** The mount beside a destroyed one is still live, and still takes a press. */
+  function assertStillPressed({ handle, button, ping }) {
+    assert.equal(handle.update({ onPing: ping.record }), true, 'the mount beside it is live');
+    button().click();
+    assert.equal(ping.calls.length, 1, 'and still takes a press');
+  }
+
   it('has its update drawn on the next flush', async () => {
     const held = {};
     const { handle, target, button } = mountProbe({
@@ -224,6 +234,7 @@ describe('a callback that acts on its own mount from inside a press', () => {
   });
 
   it('empties its target on destroy, and the rest of the click calls nothing', async () => {
+    const beside = await liveBeside();
     const pick = recorder();
     const held = {};
     const { seam, handle, target, button } = mountProbe({
@@ -239,10 +250,12 @@ describe('a callback that acts on its own mount from inside a press', () => {
     assert.deepEqual(pick.calls, [], 'neither the button nor the element around it reached onPick');
     assert.equal(handle.update({}), false);
     assert.equal(seam.liveMountCount(), 0);
+    assertStillPressed(beside);
     await settle();
   });
 
   it('is unharmed by a listener above the target that destroys the mount during the click', async () => {
+    const beside = await liveBeside();
     const ping = recorder();
     const { seam, handle, target, button } = mountProbe({ onPing: ping.record });
     await settle();
@@ -253,6 +266,7 @@ describe('a callback that acts on its own mount from inside a press', () => {
     assert.equal(ping.calls.length, 1, 'the press reached the companion before the listener');
     assert.equal(target.childNodes.length, 0);
     assert.equal(seam.liveMountCount(), 0);
+    assertStillPressed(beside);
     await settle();
   });
 });

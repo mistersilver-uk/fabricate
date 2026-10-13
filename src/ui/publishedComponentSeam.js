@@ -80,9 +80,16 @@ function queueFaultNotice(record, fault, report, first = null) {
 }
 
 function newRecord(entry, target, onFault) {
-  const [slots, callbacks] = [new Map(), new Map()];
-  const name = entry.name;
-  return { name, target, live: true, instance: null, root: null, onFault, slots, callbacks };
+  return {
+    name: entry.name,
+    target,
+    live: true,
+    instance: null,
+    root: null,
+    onFault,
+    slots: new Map(),
+    callbacks: new Map(),
+  };
 }
 
 /** Gives each `slot` key holding `true` its element, once; the element is kept while live. */

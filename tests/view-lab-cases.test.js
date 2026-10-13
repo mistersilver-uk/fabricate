@@ -1029,13 +1029,18 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
   ],
   // The published controls (issue 2452): the action button at each tone at its own box, type and
-  // ink, then the redrawn notice's success title and the default tone's danger title in their own
-  // inks, under the fixture's azure.
+  // ink, the focused action's drawn ring, then the redrawn notice's success title and the default
+  // tone's danger title in their own inks, under the fixture's azure.
   'manager-published-controls-specimen': [
     ...['info', 'danger', 'warning', 'success'].map((tone) => ({
       selector: `.fab-notice.is-${tone} [data-notice-action]`,
       styles: 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)',
     })),
+    {
+      selector:
+        '[data-lab-controls] > [data-lab-control="wide"] [data-notice-action]:focus-visible',
+      styles: 'outline-style: solid; outline-offset: 2px',
+    },
     {
       selector:
         '[data-lab-controls] > [data-lab-control="resume"] .fab-notice.is-success .fab-notice-title',
@@ -5700,6 +5705,11 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
   assert.ok(
     expectSelector.endsWith(`${focused}:focus-visible`) && expectCenterHit.endsWith(focused),
     'the frame is taken with keyboard focus on the action whose centre is hit-tested'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-control="resume"] .fab-notice.is-success') &&
+      expectSelector.includes('[data-lab-control="count"] .fab-notice[data-lab-presses="1"]'),
+    'the frame is taken only after the click and the Enter press each changed what is drawn'
   );
   assert.equal(
     expectContained.length,

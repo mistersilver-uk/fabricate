@@ -254,6 +254,18 @@ describe('1505 Notice — the API the library states', () => {
     });
   });
 
+  it('keeps its own width, margin and shadow over a host that styles every button', async () => {
+    const host = 'button { width: 100%; margin: 0 1px; box-shadow: 0 0 5px red }';
+    await underSheet(host, async () => {
+      const style = getComputedStyle(await bareAction());
+      assert.equal(style.width, 'auto');
+      assert.equal(style.marginRight, '0px');
+      assert.equal(style.marginLeft, 'auto', 'the trailing-edge rule still out-ranks the reset');
+      assert.equal(style.boxShadow, 'none');
+      harness.remount();
+    });
+  });
+
   it('describes an action by its optional description, and only when one is given (issue 2006)', async () => {
     const described = await harness.mount({
       title: 'This formula counts successes',

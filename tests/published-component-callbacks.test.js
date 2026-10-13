@@ -19,6 +19,7 @@ import {
   drained,
   exactly,
   fakeRuntime,
+  recorder,
   refusal,
   seamWith,
 } from './helpers/publishedComponentFakes.js';
@@ -52,15 +53,6 @@ function acted(options = {}) {
 
 // ratchet-exempt(lint): a thenable that is no Promise is the case under test.
 const thenable = (then) => ({ then });
-
-/** A function that records each call's arguments in `calls`. */
-function recorder() {
-  const calls = [];
-  const record = (...args) => {
-    calls.push(args);
-  };
-  return { calls, record };
-}
 
 const unhandled = [];
 const recordUnhandled = (error) => {

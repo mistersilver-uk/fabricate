@@ -209,5 +209,14 @@ export const zetaProps = (overrides = {}) => ({
   ...overrides,
 });
 
+/** A function that records each call's arguments in `calls`. */
+export function recorder() {
+  const calls = [];
+  const record = (...args) => {
+    calls.push(args);
+  };
+  return { calls, record };
+}
+
 /** Past every queued microtask, however many each one queues in turn. */
 export const drained = () => new Promise((done) => setTimeout(done, 0));

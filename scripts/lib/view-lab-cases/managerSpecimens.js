@@ -241,6 +241,11 @@ export const CASES = Object.freeze([
           selector: `.fab-notice.is-${tone} [data-notice-action]`,
           styles: ACTION_BUTTON,
         })),
+        // The third action under keyboard focus: `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${CONTROL_ACTION('wide')}:focus-visible`,
+          styles: 'outline-style: solid; outline-offset: 2px',
+        },
         {
           selector: `${CONTROL('resume')} .fab-notice.is-success .fab-notice-title`,
           styles: 'color: var(--fab-success-text)',
@@ -251,9 +256,9 @@ export const CASES = Object.freeze([
         },
       ],
     },
-    // The leaves specimen's window; `expectContained` holds the fixture's 592px ground inside
-    // `.window-content`.
-    position: { width: 1024, height: 720 },
+    // Sized to the fixture's 592px ground, so the PR body shows the ring at 100%; `expectContained`
+    // holds the ground inside `.window-content`.
+    position: { width: 680, height: 340 },
     kinds: ['manager', 'specimen'],
     // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,

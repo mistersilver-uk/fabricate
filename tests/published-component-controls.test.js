@@ -23,7 +23,7 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { templateOf } from './helpers/apiConvention.js';
-import { walkNodes } from './helpers/moduleAst.js';
+import { walkNodes, walkWithAncestors } from './helpers/moduleAst.js';
 import {
   SHIPPED,
   attributeOf,
@@ -37,7 +37,6 @@ import {
   selectorsOnAttribute,
   staticText,
   syntheticReader,
-  walkWithAncestors,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
 import { styleRules } from './helpers/svelteStructureContract.js';
@@ -79,15 +78,15 @@ function isEventReference(ancestors) {
   return tag?.type === 'ExpressionTag' && (value === undefined || isFunction(value));
 }
 
-/** Whether a reference is read, and not called, in the test of an `{#if}`. */
+const CALLS = new Set(['CallExpression', 'NewExpression', 'TaggedTemplateExpression']);
+
+/** Whether a reference is read in the test of an `{#if}`, neither called there nor handed to a call. */
 function isGuardRead(node, ancestors) {
   const at = ancestors.findLastIndex((ancestor) => ancestor.type === 'IfBlock');
   if (at === -1) return false;
   const path = [...ancestors.slice(at + 1), node];
   if (path[0] !== ancestors[at].test) return false;
-  return path.every(
-    (step, index) => step.type !== 'CallExpression' || step.callee !== path[index + 1]
-  );
+  return path.every((step) => !CALLS.has(step.type));
 }
 
 /** Where each reference to `local` sits: `'event'`, `'guard'` or `'other'`; its own declaration is none. */
@@ -150,8 +149,11 @@ function reachFaults({ id, guards, published, entry }, pins) {
   const pin = pins[id];
   if (pin === 'always') return guards.size > 0 ? [`${id} is pinned always under a guard`] : [];
   if (pin !== null) {
-    const known = Object.hasOwn(entry.props, pin);
-    return known ? [] : [`${id} is pinned to ${pin}, which ${entry.name} does not publish`];
+    if (!Object.hasOwn(entry.props, pin)) {
+      return [`${id} is pinned to ${pin}, which ${entry.name} does not publish`];
+    }
+    const named = [...guards].some((name) => published.get(name) === pin);
+    return named ? [] : [`${id} is pinned to ${pin}, which no guard above it names`];
   }
   if (guards.size === 0) return [`${id} is pinned null under no guard`];
   return [...guards]
@@ -203,7 +205,10 @@ function moduleRing() {
   return ring;
 }
 
-/** The pseudo-class a rule states on one subject made only of classes in `classes`, or `null`. */
+/**
+ * The pseudo-class a rule states on one subject made only of classes in `classes`, with how many
+ * classes that subject names, or `null`.
+ */
 function focusRuleOn(rule, classes) {
   const [complex, ...others] = rule.prelude.children;
   if (others.length > 0 || complex.children.length !== 1) return null;
@@ -211,7 +216,20 @@ function focusRuleOn(rule, classes) {
   const named = parts.filter((part) => part.type === 'ClassSelector');
   const pseudo = parts.filter((part) => part.type === 'PseudoClassSelector');
   if (pseudo.length !== 1 || named.length === 0 || named.length + 1 !== parts.length) return null;
-  return named.every((part) => classes.includes(part.name)) ? pseudo[0].name : null;
+  if (named.some((part) => !classes.includes(part.name))) return null;
+  return { pseudo: pseudo[0].name, weight: named.length };
+}
+
+/**
+ * Every rule of a component's `<style>` that states `pseudo` on the element's own classes, each
+ * with its place among the rules, its subject's class count and whether an at-rule holds it.
+ */
+function ownRules(ast, classes, pseudo) {
+  return styleRules(ast).flatMap((rule, at) => {
+    const on = focusRuleOn(rule, classes);
+    if (on?.pseudo !== pseudo) return [];
+    return [{ rule, at, weight: on.weight, nested: !ast.css.children.includes(rule) }];
+  });
 }
 
 const FOCUS_STRIP = JSON.stringify([
@@ -238,11 +256,25 @@ function markFaults(id, rule, moduleRule) {
   ];
 }
 
+/** What the two halves of a control's focus pair break against each other; either may be absent. */
+function pairFaults(id, strip, mark) {
+  const faults = [];
+  if (!strip) faults.push(`${id} has no :focus rule on its own classes`);
+  else if (!isStrip(strip.rule)) {
+    faults.push(`${id} :focus does not declare exactly outline: none and box-shadow: none`);
+  }
+  if (!mark) return [...faults, `${id} has no :focus-visible rule on its own classes`];
+  if (strip && mark.at < strip.at) faults.push(`${id} :focus-visible comes before :focus`);
+  if (strip && strip.weight > mark.weight) faults.push(`${id} :focus out-ranks :focus-visible`);
+  return faults;
+}
+
 /**
- * What a reached control's focus mark breaks. At `any`, its file holds a `:focus` rule declaring
- * exactly `outline: none` and `box-shadow: none`, then a `:focus-visible` rule drawing the module
- * ring, each on a subject made only of the element's static classes. At another root its tag is
- * one the module ring names.
+ * What a reached control's focus mark breaks. At `any`, its file holds one `:focus` rule declaring
+ * exactly `outline: none` and `box-shadow: none`, then one `:focus-visible` rule drawing the module
+ * ring, each outside any at-rule, on a subject made only of the element's static classes, the
+ * first naming no more of them than the second. At another root its tag is one the module ring
+ * names.
  */
 function focusMarkFaults({ id, node, ast, entry }, moduleRule = moduleRing()) {
   if (entry.root !== 'any') {
@@ -252,17 +284,20 @@ function focusMarkFaults({ id, node, ast, entry }, moduleRule = moduleRing()) {
     return named ? [] : [`${id} is a <${node.name}>, which the module ring does not name`];
   }
   const classes = (staticText(attributeOf(node, 'class')) ?? '').split(/\s+/).filter(Boolean);
-  const rules = styleRules(ast).map((rule) => [focusRuleOn(rule, classes), rule]);
-  const strip = rules.findIndex(([pseudo]) => pseudo === 'focus');
-  const mark = rules.findIndex(([pseudo]) => pseudo === 'focus-visible');
+  const strips = ownRules(ast, classes, 'focus');
+  const marks = ownRules(ast, classes, 'focus-visible');
   const faults = [];
-  if (strip === -1) faults.push(`${id} has no :focus rule on its own classes`);
-  else if (!isStrip(rules[strip][1])) {
-    faults.push(`${id} :focus does not declare exactly outline: none and box-shadow: none`);
+  for (const [pseudo, found] of [
+    ['focus', strips],
+    ['focus-visible', marks],
+  ]) {
+    if (found.length > 1) faults.push(`${id} has more than one :${pseudo} rule on its own classes`);
   }
-  if (mark === -1) return [...faults, `${id} has no :focus-visible rule on its own classes`];
-  if (strip !== -1 && mark < strip) faults.push(`${id} :focus-visible comes before :focus`);
-  return [...faults, ...markFaults(id, rules[mark][1], moduleRule)];
+  if ([...strips, ...marks].some(({ nested }) => nested)) {
+    faults.push(`${id} focus pair sits inside an at-rule`);
+  }
+  faults.push(...pairFaults(id, strips[0], marks[0]));
+  return marks[0] ? [...faults, ...markFaults(id, marks[0].rule, moduleRule)] : faults;
 }
 
 /** The local an expression is rooted at: itself, or the object its member chain starts from. */
@@ -434,6 +469,24 @@ describe('the reach clause', () => {
     });
   }
 
+  const UNNAMED = 'is pinned to label, which no guard above it names';
+  for (const [claim, open, close] of [
+    ['under a guard that names another prop', '{#if hidden}', '{/if}'],
+    ['under no guard', '', ''],
+  ]) {
+    it(`names a key pin on a button ${claim} as a fault`, () => {
+      const markup = [script('label, hidden'), open, button(), close, styled(PAIR)].join('');
+      assert.deepEqual(syntheticFaults(markup, { pin: 'label' }), [UNNAMED]);
+    });
+  }
+
+  it('names a key pin under a guard that names another published key as a fault', () => {
+    const markup = [script('rows, label'), '{#if label}', button(), '{/if}', styled(PAIR)].join('');
+    assert.deepEqual(syntheticFaults(markup, { props, pin: 'rows' }), [
+      'is pinned to rows, which no guard above it names',
+    ]);
+  });
+
   it('names a null pin on a button no guard hides as a fault', () => {
     const plain = script('label') + button() + styled(PAIR);
     assert.deepEqual(syntheticFaults(plain, { pin: null }), ['is pinned null under no guard']);
@@ -485,6 +538,21 @@ describe('the focus mark clause', () => {
       'a subject under an ancestor',
       `${STRIP} .wrap .press:focus-visible { ${MODULE_RING} }`,
       NO_MARK,
+    ],
+    [
+      'a second :focus-visible rule that strips the ring',
+      `${PAIR} .press:focus-visible { outline: none; }`,
+      'has more than one :focus-visible rule on its own classes',
+    ],
+    [
+      'a :focus half whose subject names more classes than the mark',
+      `.press.press:focus { outline: none; box-shadow: none; } ${RING}`,
+      ':focus out-ranks :focus-visible',
+    ],
+    [
+      'the pair inside an at-rule',
+      `@media (min-width: 9999px) { ${PAIR} }`,
+      'focus pair sits inside an at-rule',
     ],
     [
       'an outline that differs from the module ring',
@@ -579,7 +647,8 @@ describe('the name clause', () => {
 });
 
 describe('the called-from-an-event clause', () => {
-  const KEYS = 'inEffect, inText, inTest, inDerived, unused, onlyRead, clean, read: renamed';
+  const KEYS =
+    'inEffect, inText, inTest, inCall, inDerived, unused, onlyRead, clean, read: renamed';
   const SYNTHETIC = templateOf(
     'Synthetic.svelte',
     [
@@ -592,10 +661,11 @@ describe('the called-from-an-event clause', () => {
       '</script>',
       '<p>{inText?.()}{held}</p>',
       '{#if inTest()}<b></b>{/if}',
+      '{#if run(inCall)}<b></b>{/if}',
       '{#if onlyRead}<b></b>{/if}',
       '{#if renamed && clean}',
       '  <button type="button" onclick={clean}>x</button>',
-      '  <button type="button" onclick={() => { renamed?.(); inEffect?.(); inText?.(); inTest?.(); inDerived?.(); }}>y</button>',
+      '  <button type="button" onclick={() => { renamed?.(); inEffect?.(); inText?.(); inTest?.(); inCall?.(); inDerived?.(); }}>y</button>',
       '{/if}',
     ].join('\n')
   ).ast;
@@ -611,6 +681,7 @@ describe('the called-from-an-event clause', () => {
     ['a call in $effect', 'inEffect', OUTSIDE_AN_EVENT],
     ['a call in a text expression', 'inText', OUTSIDE_AN_EVENT],
     ['a call in an {#if} test', 'inTest', OUTSIDE_AN_EVENT],
+    ['a key handed to a call in an {#if} test', 'inCall', OUTSIDE_AN_EVENT],
     ['a read in $derived', 'inDerived', OUTSIDE_AN_EVENT],
     ['a key never referenced', 'unused', NOTHING_CALLS],
     ['a key only read in an {#if} test', 'onlyRead', NOTHING_CALLS],

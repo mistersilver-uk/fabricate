@@ -11,7 +11,13 @@ import { posix, resolve } from 'node:path';
 import { stylesheetSources } from '../../scripts/lib/stylesheetSource.js';
 
 import { templateOf } from './apiConvention.js';
-import { importedModules, lazilyImportedModules, parseModule, walkNodes } from './moduleAst.js';
+import {
+  importedModules,
+  lazilyImportedModules,
+  parseModule,
+  walkNodes,
+  walkWithAncestors,
+} from './moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from './parsedSource.js';
 import { readScannedDirectory, repoRoot } from './sourceScan.js';
 import { parseComponentScope } from './svelteStructureContract.js';
@@ -66,22 +72,6 @@ export function propLocals(ast) {
       });
   }
   return [];
-}
-
-/** Keys that carry no child node, or would make the walk cyclic. */
-const UNWALKED_KEYS = new Set(['parent', 'loc', 'range', 'tokens', 'comments']);
-
-/** Calls `visit(node, ancestors)` for every node under `root`, depth-first, nearest ancestor last. */
-export function walkWithAncestors(root, visit, ancestors = [], seen = new Set()) {
-  if (!root || typeof root !== 'object' || seen.has(root)) return;
-  seen.add(root);
-  const isNode = typeof root.type === 'string';
-  if (isNode) visit(root, ancestors);
-  const below = isNode ? [...ancestors, root] : ancestors;
-  for (const [key, value] of Object.entries(root)) {
-    if (UNWALKED_KEYS.has(key)) continue;
-    for (const child of [value].flat()) walkWithAncestors(child, visit, below, seen);
-  }
 }
 
 /** Every name an expression reads: no member name after a dot, and no object key. */

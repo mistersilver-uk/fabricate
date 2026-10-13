@@ -430,9 +430,17 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'one group per component but TierTrack, which the design-system capability states'
     );
     for (const [name, group] of groups) {
-      const keys = Object.keys(ui.describe(name).props);
+      const { props } = ui.describe(name);
+      const keys = Object.keys(props);
       const valuesIn = (text) =>
         Object.fromEntries(keys.map((key) => [key, statedValues(text, key)]));
+      for (const key of keys) {
+        if (props[key].kind !== 'callback') continue;
+        assert.ok(
+          linesOpenedBy(group, key).length > 0,
+          `the ${name} group opens a line with \`${key}\`, where its arguments are stated`
+        );
+      }
       const specified = valuesIn(group);
       assert.ok(
         Object.values(specified).some((values) => values.size > 0),

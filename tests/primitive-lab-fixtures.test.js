@@ -549,6 +549,18 @@ test('every fixture is named by a catalogue row', () => {
   assert.deepEqual(orphansOf(FIXTURES), [], 'a fixture no row names is code the lab never runs');
 });
 
+test('every notice row that passes an action names the fixture that gives it a handler', () => {
+  const rows = CATALOGUE.map((entry) => entry.row).filter(
+    (row) => row.path.endsWith('/Notice.svelte') && row.props?.action
+  );
+  assert.equal(rows.length, 3, 'the three notice rows that draw an action');
+  assert.deepEqual(
+    rows.map((row) => row.fixture),
+    ['NoticeAction', 'NoticeAction', 'NoticeAction'],
+    'a row that passes a label alone draws no button, so its frame loses the control unseen'
+  );
+});
+
 test('every fixture is a call site that authors no word', () => {
   for (const { file, source, rows } of FIXTURES) {
     assert.deepEqual(fixtureProblems(source, { file, rows, propsOf: declaredFor }), [], file);
