@@ -8,8 +8,10 @@ import { mount, unmount, untrack } from 'svelte';
 import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
+import Chip from './svelte/components/Chip.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
+import Kicker from './svelte/components/Kicker.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
@@ -26,6 +28,8 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/BandedBar.svelte': BandedBar,
   'src/ui/svelte/components/StatBox.svelte': StatBox,
   'src/ui/svelte/components/InfoStrip.svelte': InfoStrip,
+  'src/ui/svelte/components/Kicker.svelte': Kicker,
+  'src/ui/svelte/components/Chip.svelte': Chip,
 });
 
 export const publishedComponentRuntime = Object.freeze({

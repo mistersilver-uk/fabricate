@@ -1,14 +1,15 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves
-  through the page-session seam `game.fabricate.api.ui` binds, as a companion does: one mount per
-  section, each into an element it owns, all destroyed in the same effect's teardown. Every word is
-  a companion's final text, so none is localized, and the art is the lab world's own, so
-  `tests/view-lab-fixture-assets.test.js` resolves it. `tests/view-lab/mount.js` mounts it for
-  `?specimen=published-leaves` only.
+  A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves,
+  then `Kicker` and `Chip` (issue 2451), through the page-session seam `game.fabricate.api.ui`
+  binds, as a companion does: one mount per section, each into an element it owns, all destroyed in
+  the same effect's teardown. Every word is a companion's final text, so none is localized, and the
+  art is the lab world's own, so `tests/view-lab-fixture-assets.test.js` resolves it.
+  `tests/view-lab/mount.js` mounts it for `?specimen=published-leaves` only.
 
-  The ground is three 280px cells of three 88px tracks: a tile or a stat box takes one track and
-  every other mount a whole cell. It sets the danger ink, so an ink a leaf fails to state shows in
-  the frame. The case's `expectContained` addresses each section by its position in `MOUNTS`.
+  The ground is three 280px cells of three 88px tracks: a tile, a stat box or a chip takes one track
+  and every other mount a whole cell. An inline mark's target is `display: flex`, as the spec asks
+  of a companion. It sets the danger ink, so an ink a leaf fails to state shows in the frame. The
+  case's `expectContained` addresses each section by its position in `MOUNTS`.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -17,8 +18,10 @@
   const smithing = buildLabContent().systems.find(({ id }) => id === LAB_SYSTEM_IDS.SMITHING);
   const artOf = (componentId) => smithing.components.find(({ id }) => id === componentId).img;
 
-  const TILES = new Set(['Avatar', 'Medallion']);
-  const ONE_TRACK = new Set([...TILES, 'StatBox']);
+  const INLINE = new Set(['Avatar', 'Medallion', 'Chip']);
+  const ONE_TRACK = new Set([...INLINE, 'StatBox']);
+  // A `Kicker` is an inline mark only when it is drawn as `span`.
+  const isInline = (name, props) => INLINE.has(name) || props.as === 'span';
 
   const MOUNTS = Object.freeze([
     ['Avatar', { art: smithing.img, name: 'Karrun Forge', alt: '' }],
@@ -62,6 +65,12 @@
         ],
       },
     ],
+    ['Kicker', { children: 'Standing with the Ironvale Caravan and every guild it supplies' }],
+    ['Kicker', { as: 'h3', tone: 'accent', children: 'Guild standing' }],
+    ['Kicker', { as: 'span', children: 'Renown' }],
+    ['Chip', { tone: 'warning', density: 'list', children: 'Preview' }],
+    ['Chip', { tone: 'neutral', density: 'list', children: 'Locked' }],
+    ['Chip', { children: 'Awaiting the guild master' }],
   ]);
 
   const targets = $state([]);
@@ -78,11 +87,11 @@
 </script>
 
 <div class="published-leaves-ground">
-  {#each MOUNTS as [name], index (index)}
+  {#each MOUNTS as [name, props], index (index)}
     <section
       data-published={name}
       class:is-one-track={ONE_TRACK.has(name)}
-      class:is-tile={TILES.has(name)}
+      class:is-inline={isInline(name, props)}
     >
       <div bind:this={targets[index]}></div>
     </section>
@@ -111,7 +120,7 @@
     grid-column: span 1;
   }
 
-  section.is-tile > div {
+  section.is-inline > div {
     display: flex;
   }
 </style>

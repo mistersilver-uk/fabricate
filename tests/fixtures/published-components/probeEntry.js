@@ -8,6 +8,7 @@ export const PROBE_ENTRY = Object.freeze({
     leading: Object.freeze({ kind: 'data' }),
     throwAt: Object.freeze({ kind: 'data' }),
     explode: Object.freeze({ kind: 'data' }),
+    note: Object.freeze({ kind: 'text' }),
   }),
   rest: true,
 });

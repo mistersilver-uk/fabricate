@@ -158,11 +158,16 @@ function recordingFacade() {
   return { facade, calls };
 }
 
-/** The docs row a described published component must carry: name, version, props and rest. */
+/**
+ * The docs row a described published component must carry: name, version, props and rest. A prop
+ * cell notes its kind unless it is `data`, then `required`.
+ */
 function documentedComponentRow(name, { version, props, rest }) {
-  const cells = Object.entries(props).map(([key, spec]) =>
-    spec.required ? `\`${key}\` (required)` : `\`${key}\``
-  );
+  const cells = Object.entries(props).map(([key, spec]) => {
+    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : ''];
+    const noted = notes.filter(Boolean).join(', ');
+    return noted ? `\`${key}\` (${noted})` : `\`${key}\``;
+  });
   return `| \`${name}\` | ${version} | ${cells.join(', ') || '—'} | ${rest ? 'yes' : 'no'} |`;
 }
 
@@ -181,18 +186,23 @@ function documentedComponentSections() {
   return DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
 }
 
-/** Each top-level bullet under the spec's issue 2448 heading that one component names, by name. */
+/**
+ * Each top-level bullet one component names under the spec's issue 2448 and issue 2451 headings,
+ * by name and in the order the spec states them.
+ */
 function specifiedComponentGroups() {
-  const start = SPECIFIED.indexOf('\n### The issue 2448 components\n');
-  const end = SPECIFIED.indexOf('\n### ', start + 1);
-  assert.ok(start !== -1 && end !== -1, 'the issue 2448 components, then another heading');
-  const bullets = SPECIFIED.slice(start, end).split(/^- \*\*/mu);
-  return new Map(
-    bullets.flatMap((group) => {
-      const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
-      return name ? [[name, group]] : [];
-    })
-  );
+  const groups = ['2448', '2451'].flatMap((issue) => {
+    const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
+    const end = SPECIFIED.indexOf('\n### ', start + 1);
+    assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
+    return SPECIFIED.slice(start, end)
+      .split(/^- \*\*/mu)
+      .flatMap((group) => {
+        const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
+        return name ? [[name, group]] : [];
+      });
+  });
+  return new Map(groups);
 }
 
 /** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
@@ -238,9 +248,12 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'BandedBar',
       'StatBox',
       'InfoStrip',
+      'Kicker',
+      'Chip',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
+    const requiredText = { kind: 'text', required: true };
     assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
       TierTrack: {
         version: 1,
@@ -315,7 +328,22 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: { label: required, facts: required, badge: optional },
         rest: true,
       },
+      Kicker: {
+        version: 1,
+        props: { as: optional, tone: optional, children: requiredText },
+        rest: true,
+      },
+      Chip: {
+        version: 1,
+        props: { tone: optional, density: optional, children: requiredText },
+        rest: true,
+      },
     });
+    assert.deepEqual(
+      Object.keys(ui),
+      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
+      'the descriptor a bind publishes, `load` last'
+    );
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);

@@ -961,7 +961,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   ],
   // The published leaves (issue 2448): both portrait states and the 26px art rung on their ladder
   // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
-  // its own ink on a danger ground.
+  // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
+  // size and ink (issue 2451).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -974,6 +975,15 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '.fab-stat-box:has(.has-icon) .fab-kicker',
       styles: 'font-size: 8.5px; color: var(--fab-text-muted)',
+    },
+    { selector: '.fab-kicker.is-accent', styles: 'font-size: 8.5px; color: var(--fab-accent)' },
+    {
+      selector: '.manager-chip.is-warning.is-list',
+      styles: 'font-size: 9px; color: var(--fab-warning-text)',
+    },
+    {
+      selector: '.manager-chip.is-neutral.is-list',
+      styles: 'font-size: 9px; color: var(--fab-text-muted)',
     },
   ],
 });
@@ -5472,7 +5482,7 @@ test('the published component seam selects both specimens it mounts', () => {
   }
 });
 
-test('the leaves specimen mounts every issue 2448 leaf and checks the containment of each mount', () => {
+test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -5486,10 +5496,20 @@ test('the leaves specimen mounts every issue 2448 leaf and checks the containmen
     'every published component but TierTrack, which has its own specimen, and no other'
   );
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
+  const [{ container: ground }] = expectContained;
+  const wrappedChip = `${ground} > section > div > .manager-chip:not(.is-list)`;
   assert.deepEqual(
-    expectContained.map(({ target }) => /:nth-child\((\d+)\)/.exec(target)[1]),
+    expectContained.flatMap(({ target }) => /:nth-child\((\d+)\)/.exec(target)?.[1] ?? []),
     Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
     'one containment check per section, in fixture order'
+  );
+  assert.deepEqual(
+    expectContained.filter(({ target }) => !target.includes(':nth-child(')),
+    [
+      { container: wrappedChip, target: `${wrappedChip} > span` },
+      { container: '.window-content', target: ground },
+    ],
+    'then the wrapped label inside its chip, and the ground inside the window'
   );
 });
 
