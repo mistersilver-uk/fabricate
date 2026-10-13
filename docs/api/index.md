@@ -2222,18 +2222,19 @@ For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry locali
 `EmptyState` draws the design system's empty state: a dashed panel that says what is absent and holds the way out.
 `title` is optional final display text, the short statement of what is absent, drawn as a level-3 heading.
 Pass it only where a level-3 heading fits your outline: under a heading for the region the panel sits in, and not inside a card or rail you have yourself headed at level 3.
+Where no level-3 heading fits, draw your own heading above the panel and pass `hint` alone.
 `hint` is optional final display text, the sentence beneath the title.
 Pass a title, a hint or both; with neither the panel is an empty box.
 `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
 `filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
 The hint is plain text, so a search term in it takes no emphasis.
 `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
-It is the way out of the dead end, a control or a link, and what is drawn there is your own.
+It is the way out of the dead end, a control or a link; what is drawn there is your own, and a control you draw there is named by you.
 Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so state the ink of any text you draw there.
 It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is yours.
 It draws no fill, so it sits on `target`'s ground.
 The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
-The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so pass a `title` that says what is absent and keep the hint to what supports it.
+The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so pass a `title` that says what is absent where a level-3 heading fits, and where one does not, keep the hint to a sentence the surrounding text already says.
 At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
 The title states its own serif face, and the hint inherits `target`'s.
 The panel's own figures are private.
@@ -2253,9 +2254,9 @@ It is not a Foundry notification: it is drawn in your element, and `ui.notificat
 `title` is required and is the sentence that names what happened, final display text.
 `detail` is optional final display text, a second line that says what to do next.
 `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
-It repaints the edge, the fill, the glyph and the title, and is colour alone, so the title says the state.
+It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
 `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
-It is a live region, `role="status"` with `aria-live="polite"`: assistive technology announces it when it is mounted and when an `update` changes its text.
+It is a live region, `role="status"` with `aria-live="polite"`: a change to its text is announced, and most screen readers also announce one mounted with its text, though some do not, so a notice the reader must not miss also says it in `title`.
 An `update` that changes none of its text announces nothing.
 Mount it when the thing happens and destroy it when it no longer holds, never as standing text.
 Every mount is a new announcement, so when your content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), keep the notice through `update` where its `target` survives and do not mount an unchanged one again.

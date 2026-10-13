@@ -15,7 +15,8 @@
   It sets the danger ink, so an ink a leaf fails to state shows in the frame, and the card's, the
   panels' and the notice's cells take the downtime target's `--fab-bg-1` ground, so a card that
   drew no fill shows too. The case's `expectContained` addresses each section by its position in
-  `MOUNTS`, and each nested mount by its host and its `data-nested` name.
+  `MOUNTS`, and each nested mount by its host and its `data-nested` name. The chips stand in for the
+  way-out control, because a published button is issue 2452.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -101,7 +102,7 @@
         hint: 'Projects the party starts in downtime are listed here.',
         children: true,
       },
-      [['Chip', { tone: 'positive', density: 'list', children: 'Three slots free' }]],
+      [['Chip', { tone: 'positive', density: 'list', children: 'Up to three at a time' }]],
     ],
     [
       'Notice',

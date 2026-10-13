@@ -618,6 +618,22 @@ describe('Notice under a bare ancestor', () => {
     assert.deepEqual(reports, []);
   });
 
+  it('keeps its root and its title node across an update that changes no text', async () => {
+    const { target, handle } = mountLeaf('Notice', { tone: 'warning', title: 'Over the limit' });
+    const notice = target.querySelector('.fab-notice');
+    const title = notice.querySelector('.fab-notice-title');
+    const next = { tone: 'success', title: 'Over the limit', icon: 'fas fa-bell' };
+    assert.equal(handle.update(next), true);
+    await settle();
+    assert.ok(target.querySelector('.fab-notice') === notice, 'the same root, so no new region');
+    assert.ok(notice.querySelector('.fab-notice-title') === title, 'the same title node');
+    assert.deepEqual(authoredClasses(notice), ['fab-notice', 'is-success']);
+    assert.ok(Boolean(notice.querySelector('i.fa-bell')), 'the glyph is repainted in place');
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
   it('writes its root class and one tone class, and draws no control whatever its published keys', () => {
     const { target, handle } = mountLeaf('Notice', {
       tone: 'warning',

@@ -18,7 +18,9 @@
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child or read through an alias; a forwarded `text` or `slot`
  * key fails closed and a forwarded `data` key is not seen. It matches by name, so it does not see
- * a `{@const}` that shadows the local, nor a local tested in an `{#if}` other than its own guard.
+ * a `{@const}` or an `{#await … then}` binding that shadows the local, nor a local tested in an
+ * `{#if}` other than its own guard. Nor does it see a foreign `{#if}` around a render tag, `?.()`
+ * or guarded, so a slot another prop hides is not refused.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
@@ -423,13 +425,14 @@ const holdsGlobal = (node) =>
     (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
   );
 
-/** Whether `:global` reaches `complex`: in a part of its own, or in a rule that nests it. */
+/** Whether `:global` reaches `complex`: in a part of its own, in a rule that nests it, or in a rule it nests. */
 function reachedByGlobal(css, complex) {
-  const nests = ({ type, block }) =>
-    type === 'Rule' && block.start <= complex.start && complex.end <= block.end;
-  return (
-    holdsGlobal(complex) ||
-    [...walkNodes(css)].some((rule) => nests(rule) && holdsGlobal(rule.prelude))
+  const within = (outer) => outer.start <= complex.start && complex.end <= outer.end;
+  return [...walkNodes(css)].some(
+    (rule) =>
+      rule.type === 'Rule' &&
+      ((within(rule.block) && holdsGlobal(rule.prelude)) ||
+        (within(rule.prelude) && holdsGlobal(rule)))
   );
 }
 
@@ -886,7 +889,7 @@ describe('each entry matches its component declaration', () => {
     [
       '<script>',
       '  let { plain, boxed, note, a: first, b: second, other, alt, chained, negated, joined,',
-      '    foreign, twice, given, listed } = $props();',
+      '    foreign, twice, given, listed, nested } = $props();',
       '</script>',
       '{#if plain}{@render plain()}{/if}',
       '{#if boxed}<span>{@render boxed()}</span>{/if}',
@@ -901,6 +904,7 @@ describe('each entry matches its component declaration', () => {
       '{#if twice}{@render twice()}{@render twice()}{/if}',
       '{#if given}{@render given(1)}{/if}',
       '{#if listed}{#each [1] as item (item)}{@render listed()}{/each}{/if}',
+      '{#if nested}{#if other}{@render nested()}{/if}{/if}',
     ].join('\n')
   ).ast;
   const guardFaultsOf = (props) => declarationFaults({ props }, GUARDED);
@@ -912,6 +916,11 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(guardFaultsOf({ boxed: slot }), [], 'inside an element in the consequent');
     assert.deepEqual(guardFaultsOf({ note: { kind: 'text' } }), [], 'an optional text key');
     assert.deepEqual(guardFaultsOf({ a: slot }), [], 'a renamed local, guarded by its local name');
+    assert.deepEqual(
+      guardFaultsOf({ nested: slot }),
+      [],
+      'a foreign {#if} around the tag is not seen, so the slot another prop hides is admitted'
+    );
   });
 
   for (const [claim, key, fault] of [
@@ -1203,9 +1212,9 @@ const entryNamed = (name) => PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.
 const ownFilesOf = (name) => importClosure(entryNamed(name).path, SHIPPED);
 
 /** The census of `shape` over every stylesheet, for the published entry `name` that draws its root. */
-function shippedCensus(shape, name) {
+function shippedCensus(shape, name, sheets = everyStylesheet()) {
   const options = { spelled: publishedManagerClasses(), own: ownFilesOf(name) };
-  return everyStylesheet().flatMap(([file, css]) => censusSelectors(file, css, shape, options));
+  return sheets.flatMap(([file, css]) => censusSelectors(file, css, shape, options));
 }
 
 /** An entry's published keys and root, which a census of its root class pins. */
@@ -1348,6 +1357,7 @@ describe('the module sheet and every component style against the published Empty
     '.manager-empty',
     '.manager-empty.is-filtered',
     '.manager-empty > div > p',
+    '.manager-empty .companion-way-out',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published panel or its content`, () => {
       assert.deepEqual(unsafe(`${selector} { flex: 1 }`), [`sheet.css: ${selector}`]);
@@ -1365,6 +1375,27 @@ describe('the module sheet and every component style against the published Empty
     ]) {
       assert.deepEqual(unsafeOf(syntheticCensus(EMPTY, css, own)), ['sheet.css: .manager-empty p']);
     }
+    for (const css of [
+      '.manager-empty { :global(p) { margin: 0 } }',
+      '.manager-empty { & :global(p) { margin: 0 } }',
+      '.manager-empty { :global { p { margin: 0 } } }',
+    ]) {
+      assert.deepEqual(
+        unsafeOf(syntheticCensus(EMPTY, css, own)),
+        ['sheet.css: .manager-empty'],
+        css
+      );
+    }
+  });
+
+  it('refuses a published chip under the panel, through the census every sheet is read by', () => {
+    const { css } = templateOf(
+      'sheet.css',
+      '<style>.manager-empty .manager-chip { gap: 0 }</style>'
+    ).ast;
+    assert.deepEqual(unsafeOf(shippedCensus(EMPTY, 'EmptyState', [['sheet.css', css]])), [
+      'sheet.css: .manager-empty .manager-chip',
+    ]);
   });
 });
 
@@ -1403,6 +1434,10 @@ describe('the module sheet and every component style against the published Notic
     '.fab-notice.is-warning',
     '.fabricate .fab-notice .fab-notice-title',
     '.fab-notice > i',
+    '.fab-notice.is-danger',
+    '.fab-notice.is-info',
+    '.fab-notice.is-success',
+    '.fab-notice.is-accent',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published notice or its parts`, () => {
       assert.deepEqual(unsafe(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);

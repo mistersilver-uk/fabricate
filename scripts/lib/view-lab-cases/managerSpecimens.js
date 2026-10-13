@@ -175,8 +175,8 @@ export const CASES = Object.freeze([
         { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
       ],
     },
-    // Sized to the fixture's 880px ground, and to the height its seven rows need: 720, or the next
-    // multiple of 40 at which the ground is contained in `.window-content`.
+    // Sized to the fixture's 880px ground and the height of its seven rows; `expectContained` holds
+    // the ground inside `.window-content`.
     position: { width: 1024, height: 720 },
     kinds: ['manager', 'specimen'],
     // Every component mounted here is a broad signal, routed here by its override: the seven

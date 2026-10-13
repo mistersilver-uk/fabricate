@@ -556,18 +556,19 @@ Each group states the accepted values of every key that entry publishes.
   - It is the design system's empty state (`<Empty>` in the library): a dashed panel that says what is absent and holds the way out.
   - `title` is optional final display text, the short statement of what is absent, drawn as a level-3 heading.
     The companion passes it only where a level-3 heading fits its outline: under a heading for the region the panel sits in, and not inside a card or rail the companion has itself headed at level 3.
+    Where no level-3 heading fits, the companion draws its own heading above the panel and passes `hint` alone.
   - `hint` is optional final display text, the sentence beneath the title.
     The companion passes a title, a hint or both; with neither the panel is an empty box.
   - `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
   - `filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, and the companion passes `hint` alone with it.
     The hint is plain text, so a search term in it takes no emphasis.
   - `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
-    It is the way out of the dead end, a control or a link, and what is drawn there is the companion's own.
+    It is the way out of the dead end, a control or a link; what is drawn there is the companion's own, and a control drawn there is named by the companion.
     Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so the companion states the ink of any text it draws there.
   - It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is the companion's.
   - It draws no fill, so it sits on `target`'s ground.
     The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
-    The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so the companion passes a `title` that says what is absent and keeps the hint to what supports it.
+    The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so the companion passes a `title` that says what is absent where a level-3 heading fits, and where one does not, keeps the hint to a sentence the surrounding text already says.
     At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
   - The title states its own serif face, and the hint inherits `target`'s.
   - The panel never moves its content slot while it is requested.
@@ -577,9 +578,9 @@ Each group states the accepted values of every key that entry publishes.
   - `title` is required and is the sentence that names what happened, final display text.
   - `detail` is optional final display text, a second line that says what to do next.
   - `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
-    It repaints the edge, the fill, the glyph and the title, and is colour alone, so the title says the state.
+    It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
   - `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
-  - It is a live region, `role="status"` with `aria-live="polite"`: assistive technology announces it when it is mounted and when an `update` changes its text.
+  - It is a live region, `role="status"` with `aria-live="polite"`: a change to its text is announced, and most screen readers also announce one mounted with its text, though some do not, so a notice the reader must not miss also says it in `title`.
     An `update` that changes none of its text announces nothing.
     The companion mounts it when the thing happens and destroys it when it no longer holds, never as standing text.
     Every mount is a new announcement, so when the companion's content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), it keeps the notice through `update` where its `target` survives and does not mount an unchanged one again.
