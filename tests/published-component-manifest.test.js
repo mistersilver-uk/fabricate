@@ -35,6 +35,7 @@ import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
@@ -51,6 +52,7 @@ import {
   isComponent,
   propLocals,
   publishedLocals,
+  restElements,
   selectorsNaming,
   selectorsOnAttribute,
   syntheticReader,
@@ -559,6 +561,38 @@ function closureFocusables(path, reader = SHIPPED, dynamic = undefined) {
   };
 }
 
+const NO_REST_ELEMENT = 'rest lands on no element the gate can see';
+const MIXED_REST = 'rest lands on a control and on an element that is none';
+const UNSTATED_REST = "rest lands on a control and restOn is not 'control'";
+const OVERSTATED_REST = 'restOn is stated and rest lands on no control';
+
+/**
+ * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
+ * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
+ * is, and a rest the gate sees on no element fails closed. Where rest lands on a control, every
+ * `data-*` attribute written ahead of the spread is a name M13 refuses there.
+ */
+function restOnFaults(entry, ast, dynamic = undefined) {
+  if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
+  const landed = restElements(ast);
+  if (landed.length === 0) return [NO_REST_ELEMENT];
+  const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
+  const controls = landed.filter(({ node }) => judged.includes(node));
+  if (controls.length > 0 && controls.length < landed.length) return [MIXED_REST];
+  const lands = controls.length > 0;
+  const stated = entry.restOn === 'control';
+  const overridable = controls
+    .flatMap(({ before }) => before)
+    .filter((name) => !RESERVED_ON_A_CONTROL.test(name));
+  return [
+    ...(lands && !stated ? [UNSTATED_REST] : []),
+    ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
+    ...overridable.map(
+      (name) => `${name} is written before a control-landing rest and is not reserved`
+    ),
+  ];
+}
+
 /**
  * Every component file of `entries`' closures, once, as `{ file, ast, published }`: `published`
  * is the keys of the entry whose own file it is, by local name, and empty for any other file.
@@ -587,19 +621,21 @@ describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      assert.deepEqual(Object.keys(entry).sort(byName), [
-        'name',
-        'path',
-        'props',
-        'rest',
-        'root',
-        'version',
-      ]);
+      const keys = Object.keys(entry).filter((key) => key !== 'restOn');
+      assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
+      assert.ok(
+        !Object.hasOwn(entry, 'restOn') || entry.restOn === 'control',
+        "restOn is 'control' or absent"
+      );
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);
       assert.equal(entry.rest, declaration.rest !== null, 'rest matches the rest declaration');
       assert.deepEqual(declarationFaults(entry, declaration.ast), []);
+    });
+
+    it(`${entry.name} states restOn exactly when its rest keys land on a control it draws`, () => {
+      assert.deepEqual(restOnFaults(entry, componentAstOf(entry.path)), []);
     });
 
     it(`${entry.name} needs no ancestor above its root and reads no Foundry global, closure included`, () => {
@@ -1216,6 +1252,80 @@ describe('each entry matches its component declaration', () => {
       assert.deepEqual(keysOf(body, tag), { keys: [], faults: [CANNOT_FOLLOW(name)] });
     });
   }
+
+  const REST = '<script>let { label, ...rest } = $props();</script>';
+  /** One marked button that states `attributes` after its mark. */
+  const pressed = (attributes) =>
+    ['<button type="button" data-keyboard-focus="true"', attributes, '>x</button>'].join('');
+  /** What `restOn` breaks for an entry over `template`, stating `restOn` when one is given. */
+  const restFaultsOf = (template, restOn = null, script = REST) => {
+    const entry = { path: 'src/E.svelte', rest: true };
+    if (restOn) entry.restOn = restOn;
+    return restOnFaults(entry, templateOf(entry.path, script + template).ast);
+  };
+
+  it('passes rest on a control with restOn stated, and rest on elements that are none with it absent', () => {
+    assert.deepEqual(restFaultsOf(pressed(' {...rest}'), 'control'), []);
+    assert.deepEqual(restFaultsOf('<input {...rest} />', 'control'), [], 'a form control');
+    assert.deepEqual(restFaultsOf('<div {...rest}></div>'), []);
+    assert.deepEqual(
+      restFaultsOf('{#if label}<div {...rest}></div>{:else}<p {...rest}></p>{/if}'),
+      [],
+      'two roots, neither a control'
+    );
+  });
+
+  for (const [claim, template, restOn, faults] of [
+    ['rest on a button with restOn absent', pressed(' {...rest}'), null, [UNSTATED_REST]],
+    ['rest on a div with restOn stated', '<div {...rest}></div>', 'control', [OVERSTATED_REST]],
+    ['rest forwarded to a component', '<Child {...rest} />', null, [NO_REST_ELEMENT]],
+    ['rest spread on no element at all', '<div></div>', 'control', [NO_REST_ELEMENT]],
+    [
+      'rest on two elements, one a button',
+      ['<div {...rest}>', pressed(' {...rest}'), '</div>'].join(''),
+      'control',
+      [MIXED_REST],
+    ],
+    [
+      'a static data attribute written before a control-landing spread',
+      pressed(' data-open {...rest}'),
+      'control',
+      ['data-open is written before a control-landing rest and is not reserved'],
+    ],
+    [
+      'a dynamic data attribute written before a control-landing spread',
+      pressed(' data-open={label} {...rest}'),
+      'control',
+      ['data-open is written before a control-landing rest and is not reserved'],
+    ],
+  ]) {
+    it(`names ${claim} as a restOn fault`, () => {
+      assert.deepEqual(restFaultsOf(template, restOn), faults);
+    });
+  }
+
+  it('fails closed on rest that reaches a control through a $derived copy, and admits a data attribute written after the spread', () => {
+    const copied =
+      '<script>let { label, ...rest } = $props(); const attrs = $derived({ ...rest });</script>';
+    assert.deepEqual(restFaultsOf(pressed(' {...attrs}'), 'control', copied), [NO_REST_ELEMENT]);
+    assert.deepEqual(restFaultsOf(pressed(' {...rest} data-open'), 'control'), []);
+  });
+
+  it('judges a svelte:element the rest is spread on by its pinned tags', () => {
+    const entry = { path: 'src/E.svelte', rest: true };
+    const markup = `${REST}<svelte:element this="button" data-keyboard-focus="true" {...rest} />`;
+    const { ast } = templateOf(entry.path, markup);
+    const pinned = (tags) => ({ 'src/E.svelte: svelte:element': { tags, keys: [] } });
+    assert.deepEqual(restOnFaults(entry, ast, pinned(['button'])), [UNSTATED_REST]);
+    assert.deepEqual(restOnFaults({ ...entry, restOn: 'control' }, ast, pinned(['button'])), []);
+    assert.deepEqual(restOnFaults(entry, ast, pinned(['span'])), []);
+  });
+
+  it('refuses restOn on an entry that takes no rest', () => {
+    const entry = { path: 'src/E.svelte', rest: false, restOn: 'control' };
+    const { ast } = templateOf(entry.path, '<script>let { label } = $props();</script><p>x</p>');
+    assert.deepEqual(restOnFaults(entry, ast), [OVERSTATED_REST]);
+  });
 
   const faceRule = (value) =>
     ancestorDependencies(

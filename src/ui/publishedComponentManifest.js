@@ -6,7 +6,8 @@
  * takes a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element`
  * says `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or `'manager'`
  * (issue 2451). A `callback` key takes a function, called with its first `args` arguments, none
- * when unstated (issue 2452).
+ * when unstated (issue 2452). An entry whose rest keys land on a control it draws also states
+ * `restOn: 'control'`, which reserves the rest names M13 refuses there and is not described.
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({

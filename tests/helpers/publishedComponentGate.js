@@ -321,6 +321,39 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
   return { judged, faults, elements };
 }
 
+/** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */
+function restLocal(ast) {
+  const declarators = [...walkNodes(ast.instance)].filter(
+    (node) => node.type === 'VariableDeclarator' && isCallTo(node.init, '$props')
+  );
+  const patterns = declarators.flatMap((node) => node.id.properties ?? []);
+  return patterns.find((property) => property.type === 'RestElement')?.argument.name;
+}
+
+/**
+ * Every element one component spreads its `$props()` rest local on, a `svelte:element` included,
+ * as `{ node, before }`, `before` naming each `data-*` attribute written ahead of the spread,
+ * static or not. A rest that reaches an element any other way (an alias, a `$derived` copy, a
+ * child component) answers none.
+ */
+export function restElements(ast) {
+  const rest = restLocal(ast);
+  if (!rest) return [];
+  return [...walkNodes(ast.fragment)]
+    .filter((node) => node.type === 'RegularElement' || node.type === 'SvelteElement')
+    .flatMap((node) => {
+      const at = node.attributes.findIndex(
+        (attribute) => attribute.type === 'SpreadAttribute' && attribute.expression?.name === rest
+      );
+      if (at === -1) return [];
+      const before = node.attributes
+        .slice(0, at)
+        .filter(({ type, name }) => type === 'Attribute' && name.startsWith('data-'))
+        .map(({ name }) => name);
+      return [{ node, before }];
+    });
+}
+
 /** Every `.svelte` file under `dir`, recursively, by path. */
 export function componentPathsUnder(dir, isRoot = true) {
   return readScannedDirectory(resolve(repoRoot, dir), { isRoot })
