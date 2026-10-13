@@ -696,7 +696,9 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager [data-check-attribute-fields]:has([data-expr-input-reading="unresolved"]):has([data-check-target-resolution="unresolved"])',
+      '.fabricate-manager [data-check-attribute-fields]' +
+      ':has([data-expr-input-reading="unresolved"]:text-is("Unresolved"))' +
+      ':has([data-check-target-resolution="unresolved"]:has-text("@skills.craft.value"))',
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
@@ -1377,7 +1379,7 @@ export const CASES = Object.freeze([
       ...parityPreview(3),
     ],
     expectSelector:
-      '.fabricate-manager [data-check-attribute-fields] [data-expr-input-reading="resolved"]',
+      '.fabricate-manager [data-check-attribute-fields] [data-expr-input-reading="resolved"]:text-is("= 12")',
   }),
   parityCase({
     id: 'manager-checks-parity-under-multiply',
@@ -2136,6 +2138,7 @@ export const CASES = Object.freeze([
     expectSelector:
       COUNTING +
       ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ':has([data-check-count-row-base] [data-expr-input-reading="resolved"])' +
       ' [data-check-count-actor-line="resolved"]',
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

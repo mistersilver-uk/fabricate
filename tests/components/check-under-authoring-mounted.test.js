@@ -340,7 +340,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     );
   });
 
-  describe('the reading is spoken through the Studio’s own echo (issue 2465)', () => {
+  describe('the reading is spoken under a caller that echoes each write (issue 2465)', () => {
     const settle = () => new Promise((done) => setImmediate(done));
     const status = (root) => statusOf(root).textContent;
 

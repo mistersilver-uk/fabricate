@@ -32,6 +32,10 @@ const ENTRY_TERMS = Object.freeze(['@prof', '@abilities.dex.mod', '@skills.cra.r
 const REDUCED = Object.freeze({ resolve: () => 13, unresolvedLabel: 'Unresolved' });
 const UNREDUCED = Object.freeze({ resolve: () => null, unresolvedLabel: 'Unresolved' });
 
+/** A statement far wider than the 120px host it is mounted in. */
+const LONG_STATEMENT =
+  'Dieser Ausdruck lässt sich für die gewählte Figur nicht auf eine Zahl zurückführen';
+
 /** The longest row a shipped world offers: five terms, one of them 43 characters. */
 const PF2E_TERMS = getModifierExpressionSuggestions('pf2e').map(({ expression }) => expression);
 
@@ -65,6 +69,10 @@ const CASES = Object.freeze({
   unresolved: {
     props: { ...UNREDUCED },
     host: (field) => `<div data-case="unresolved">${field}</div>`,
+  },
+  long: {
+    props: { resolve: () => null, unresolvedLabel: LONG_STATEMENT },
+    host: (field) => `<div data-case="long" style="width:120px">${field}</div>`,
   },
   blank: {
     props: { value: '', ...REDUCED },
@@ -353,6 +361,29 @@ describe('ExprInput, drawn (issue 2465)', () => {
     assert.ok(
       Math.abs(wrapped[0].left) <= EPSILON,
       `the wrapped token starts ${wrapped[0].left}px into its row, not at its left edge`
+    );
+  });
+
+  it('wraps a statement longer than its host inside its chip, written whole', async () => {
+    const drawn = await tab.evaluate((reading) => {
+      const root = document.querySelector('[data-case="long"]');
+      const chip = root.querySelector(reading);
+      const box = chip.getBoundingClientRect();
+      const row = root.querySelector('.fab-expr-input-row').getBoundingClientRect();
+      return {
+        statement: chip.textContent,
+        clipsColumns: chip.scrollWidth - chip.clientWidth,
+        height: box.height,
+        pastRow: box.right - row.right,
+        rowPastHost: row.right - root.getBoundingClientRect().right,
+      };
+    }, READING);
+    assert.equal(drawn.statement, LONG_STATEMENT, 'the statement is never truncated');
+    assert.ok(drawn.clipsColumns <= 0, `the chip clips ${drawn.clipsColumns}px of its statement`);
+    assert.ok(drawn.height > 20, `a wrapped chip is taller than one line: ${drawn.height}px`);
+    assert.ok(
+      drawn.pastRow <= EPSILON && drawn.rowPastHost <= EPSILON,
+      `the chip runs ${drawn.pastRow}px past its row, the row ${drawn.rowPastHost}px past its host`
     );
   });
 

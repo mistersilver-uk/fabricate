@@ -1,5 +1,5 @@
 /** The Checks Studio's simulator, odds histogram and previewed record, MOUNTED (issue 1097). */
-import { describe, it, before, after, afterEach } from 'node:test';
+import { describe, it, before, after, afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -1696,6 +1696,82 @@ describe('the Preview’s additional-dice stepper (issue 2008)', () => {
     assert.ok(!field(root), 'no stepper');
     await rollFaces(root, [9, 3, 8]);
     assert.deepEqual(tileMarks(root), ['qualified', '']);
+  });
+});
+
+describe('the character value’s reading under the Preview-as picker (issue 2465)', () => {
+  /** A second player character with a proficiency, so a pick between two changes the number. */
+  const NINE = { id: 'nine', name: 'Nine', type: 'character', getRollData: () => ({ prof: 9 }) };
+  const attribute = {
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'attribute', expression: '@prof', adjustmentKind: 'multiply' },
+  };
+  const fields = (root) => root.querySelector('[data-check-attribute-fields]');
+  const chip = (root) => fields(root).querySelector('[data-expr-input-reading]')?.textContent ?? '';
+  const region = (root) => fields(root).querySelector('[data-expr-input-status]');
+
+  let worldActors;
+  before(() => {
+    worldActors = globalThis.game.actors;
+    const actors = [...WORLD_ACTORS, NINE];
+    globalThis.game.actors = { contents: actors, get: (id) => actors.find((a) => a.id === id) };
+  });
+  after(() => {
+    globalThis.game.actors = worldActors;
+  });
+  // `setImmediate` stays real: every `harness.mount` awaits one.
+  beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+  afterEach(() => mock.timers.reset());
+
+  // Through the route every write hands the field a new resolver, so its identity cannot tell an
+  // edit from a pick: this is the clause that holds the typed edit spoken.
+  it('speaks a typed edit once it settles, and never a pick in the picker', async () => {
+    const echoed = [];
+    /** Run `ms` of timers, then cross a real macrotask so the route's echo has landed. */
+    const advance = async (ms) => {
+      mock.timers.tick(ms);
+      await new Promise((done) => setImmediate(done));
+      const landing = [...echoed];
+      echoed.length = 0;
+      await Promise.all(landing);
+      await settle();
+    };
+    let check = { ...ROUTED_CHECK, evaluation: attribute };
+    const root = await mountChecks({
+      craftingCheck: check,
+      onUpdateCraftingCheck: (next) => {
+        check = typeof next === 'function' ? next(check) : { ...check, ...next };
+        echoed.push(harness.setProps({ craftingCheck: check }));
+      },
+    });
+    await choosePreviewActor(root, 'sera');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 3', ''], 'a pick is not an edit');
+
+    const input = root.querySelector('[data-check-target-expression]');
+    input.value = '@prof + 4';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await advance(499);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', ''], 'silent at 499ms');
+    await advance(1);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', '= 7']);
+
+    await choosePreviewActor(root, 'nine');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 13', ''], 'emptied, not rewritten');
+    await advance(1000);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 13', ''], 'at any later tick too');
+
+    await choosePreviewActor(root, 'bare');
+    assert.deepEqual([chip(root), region(root).textContent], ['Unresolved', '']);
+
+    await choosePreviewActor(root, 'no-actor');
+    assert.equal(chip(root), '', 'no actor is in scope, so no reading is drawn');
+    assert.ok(!region(root), 'and the status region is unmounted');
+
+    await choosePreviewActor(root, 'sera');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', ''], 'mounted empty again');
+    await advance(1000);
+    assert.equal(region(root).textContent, '');
   });
 });
 
