@@ -90,7 +90,7 @@ So a character-data path needs its own `@`, and a number or a die must not have 
 | All three added together | `@abilities.med.mod + 2 + 1d4` |
 
 {: .note }
-> **No field adds the `@` for you.**
+> **No expression field adds the `@` for you.**
 > A Tool's check bonus is not typed at all: it is picked from the Modifiers library and takes that entry's expression as written.
 
 ### Dice
@@ -382,7 +382,7 @@ Skill-driven and tool-gated, with no randomness in the setup itself.
 | Crafting check roll | `1d20 + @prof` | Proficiency only; everything else arrives as a named modifier |
 | Modifier "Strength" | `@abilities.str.mod` | Applied by the smithing check |
 | Modifier "Smith's Tools" | `2` | A flat bonus the GM grants for good equipment |
-| Tool bonus on a masterwork hammer | `1` | A plain number is a plain number, `@` or no `@` |
+| Tool bonus on a masterwork hammer | `1`, in a library modifier | A library modifier whose expression is a plain number, picked on the Tool's Requirements tab |
 | Gate on who may wield the forge | A **character prerequisite**, picked on the Tool's Requirements tab | Tools gate on prerequisites, not on a typed expression |
 | Prerequisite to learn a recipe | `tools.smith.value` at least `1` | Proficient with Smith's Tools |
 

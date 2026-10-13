@@ -51,8 +51,7 @@ const harness = createMountedComponentHarness({
     // The LINKED-ITEM CARD's two leaves (issue 1373).
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    // The REQUIREMENTS TAB's two: the prerequisite one-line preview the checklist rows render,
-    // and the roll-data display/store conversion its bonus field is written through.
+    // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
     // THE BREAKAGE TAB'S REPAIR EDITOR (issue 1373, maintainer round 2). The world entry mounts

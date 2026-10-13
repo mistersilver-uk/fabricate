@@ -177,7 +177,11 @@ describe('ExprInput (issue 2465)', () => {
       assert.deepEqual(unbuilt, new Set(), `at ${status} the entry and the file state one API`);
       return;
     }
-    assert.deepEqual(unbuilt, new Set(['resolve', 'tokens']), 'what the entry holds at target');
+    assert.deepEqual(
+      unbuilt,
+      new Set(['resolve', 'tokens']),
+      'what the entry still holds at target; a PR that builds one strikes it from this set, the entry hint and the planned-migrations row together'
+    );
     assert.ok(
       subjects.includes(MIGRATION_SUBJECT),
       `a planned-migrations row names the difference: ${MIGRATION_SUBJECT}`
@@ -195,7 +199,11 @@ describe('ExprInput (issue 2465)', () => {
             .map((attribute) => attribute.name),
         }))
     );
-    assert.equal(new Set(tags.map(({ file }) => file)).size, 4, 'four files render it');
+    assert.equal(
+      new Set(tags.map(({ file }) => file)).size,
+      4,
+      "four files render it; a fifth importer updates this count and the manifest row's `why`, which names them"
+    );
     assert.ok(tags.length >= 4, `only ${tags.length} tags were read`);
     assert.deepEqual(
       tags

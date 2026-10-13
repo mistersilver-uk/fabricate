@@ -583,7 +583,16 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     await choose(chooserRadio(target, 'rolled'));
     assert.deepEqual(groups.at(-1).results[0], { ...PLAYER_GROUP, chooser: 'rolled' });
     assert.equal(target.querySelectorAll('[data-recipe-range-cell]').length, 2);
-    assert.ok(target.querySelector('[data-recipe-group-selection]'), 'the selection line opens');
+    const selection = target.querySelector('[data-recipe-group-selection]');
+    assert.ok(selection, 'the selection line opens');
+    const caption = target.ownerDocument.querySelector(
+      `#${selection.getAttribute('aria-labelledby')}`
+    );
+    assert.equal(caption?.textContent.trim(), 'Selection', 'the field is named by its caption');
+    assert.ok(
+      selection.getAttribute('title').startsWith('Rolled against the crafting character'),
+      'the field carries its hint as a title'
+    );
     const labels = [...members(target)[0].querySelectorAll('[data-recipe-range]')].map((input) =>
       input.closest('label').textContent.trim()
     );
