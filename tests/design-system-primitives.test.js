@@ -464,6 +464,61 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
     ],
     [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-component-edit-validation',
+      'the frame that draws the strip as a row of the component entry column',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'player-gathering-events',
+      'a frame that draws the strip outside the manager',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-tool-parity-06-breakage-900x700',
+      'the one frame in the tool strip`s 832 to 900px rung, where it wraps',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-tool-parity-05-validation-1280x720',
+      'the frame that draws the Tool editor`s strip on its Validation tab at 1280px',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-essence-edit-validation',
+      'the frame that draws the Essence editor`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-recipe-edit-validation',
+      'the frame that draws the Recipe editor`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-gathering-task-editor-normal',
+      'the frame that draws the Gathering task editor`s strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-component-entry-validation',
+      'the frame that draws the World Component entry`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-essence-entry',
+      'the frame that draws the World Essence entry`s strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-tool-entry-validation',
+      'the frame that draws the World Tool entry`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'player-salvage',
+      'a second frame that draws the strip outside the manager, in the player app`s inventory',
+    ],
+    [
       'src/ui/svelte/components/Callout.svelte',
       'manager-essence-edit-unscoped-on-craft',
       'the one frame that draws the `items` form, the essence On craft primer',

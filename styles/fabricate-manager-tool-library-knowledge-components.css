@@ -1107,17 +1107,9 @@
   min-height: 0;
 }
 
-/* THE TAB STRIP'S OWN BAND (`proto:823`): a 22px gap snapped to `--fab-space-5`, on a bottom hairline (issue 1371). */
+/* The strip is a row of the flex column, so it holds its own height. */
 .fabricate-manager .manager-component-entry-column > .manager-editor-tabs {
   flex: 0 0 auto;
-  gap: var(--fab-space-5);
-  border-bottom: 1px solid var(--fab-border);
-}
-
-/* The tab's own scale on this strip (`proto:824`): 12px at 600, against the shared strip's 12.48px at 700. */
-.fabricate-manager .manager-component-entry-column > .manager-editor-tabs .manager-editor-tab-button {
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* The page notice position, a row of the column above the scroller, inset as the scroller insets its cards (issue 1522). */
