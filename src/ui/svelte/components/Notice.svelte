@@ -8,12 +8,12 @@
   | --- | --- | --- | --- |
   | `tone` | `'danger'` \| `'warning'` \| `'info'` \| `'success'` \| `'accent'` | `'danger'` | Changes the edge, the fill, the glyph's ink and the title's ink, NEVER the geometry or type scale. An unknown tone falls back to `danger`, the unmodified specimen. |
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
-  | `action` | `{ label, onClick?, description? }` | `null` | Rendered as one button when it has a non-empty `label` and a handler, its own `onClick` or `onAction`; an already-localized `description` becomes the button's accessible description. |
+  | `action` | `{ label, onClick?, description? }` | `null` | Rendered as one button when its `label` is a string with non-blank text and there is a function to call, its own `onClick` or else `onAction`; an already-localized `description` becomes the button's accessible description. |
   | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
 
   Callbacks:
-  - `onAction(event)` — called on each press of the action button when `action` has no `onClick`,
-    which wins when both are passed. The published seam passes it, because a function inside
+  - `onAction(event)` — called on each press of the action button when `action.onClick` is not a
+    function, which wins when both are. The published seam passes it, because a function inside
     `action` is refused there.
 
   Rest spread:
@@ -83,6 +83,12 @@
 
   const uid = $props.id();
   const descriptionId = `${uid}-action-description`;
+
+  const isLabel = (value) => typeof value === 'string' && value.trim() !== '';
+
+  /** What a press calls: `onClick` when it is a function, else `fallback` when it is one. */
+  const pressOf = (onClick, fallback) =>
+    [onClick, fallback].find((candidate) => typeof candidate === 'function');
 </script>
 
 {#if !dismissed}
@@ -98,14 +104,14 @@
       <div class="fab-notice-title">{title}</div>
       {#if detail}<div class="fab-notice-detail">{detail}</div>{/if}
     </div>
-    {#if action?.label && (action.onClick ?? onAction)}
+    {#if isLabel(action?.label) && (typeof action.onClick === 'function' || typeof onAction === 'function')}
       <button
         type="button"
         class="fab-notice-button"
         data-keyboard-focus="true"
         data-notice-action
         aria-describedby={action.description ? descriptionId : undefined}
-        onclick={(event) => (action.onClick ?? onAction)?.(event)}>{action.label}</button
+        onclick={(event) => pressOf(action.onClick, onAction)?.(event)}>{action.label}</button
       >
       {#if action.description}<span class="fab-notice-hidden" id={descriptionId}
           >{action.description}</span

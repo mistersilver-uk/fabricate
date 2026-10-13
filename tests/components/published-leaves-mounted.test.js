@@ -822,6 +822,9 @@ describe('Notice with an action under a bare ancestor', () => {
     ['onAction without action', { onAction: () => {} }],
     ['an action with no label', { action: {}, onAction: () => {} }],
     ['an action whose label is empty', { action: { label: '' }, onAction: () => {} }],
+    ['an action whose label is blank', { action: { label: ' ' }, onAction: () => {} }],
+    ['an action whose label is an object', { action: { label: {} }, onAction: () => {} }],
+    ['an action whose label is true', { action: { label: true }, onAction: () => {} }],
     ['an action that is a string', { action: 'x', onAction: () => {} }],
   ]) {
     it(`draws no button for ${what}`, async () => {
@@ -833,6 +836,21 @@ describe('Notice with an action under a bare ancestor', () => {
       assert.deepEqual(reports, []);
     });
   }
+
+  it('calls onAction once for an action that carries a string onClick, and throws and reports nothing', async () => {
+    const calls = [];
+    const onAction = (...args) => {
+      calls.push(args);
+    };
+    const { target, handle } = mountNotice({ action: { label: LABEL, onClick: 'x' }, onAction });
+    await settle();
+    assert.equal(actionOf(target).textContent, LABEL, 'the button is drawn');
+    actionOf(target).click();
+    await settle();
+    assert.deepEqual(calls, [[]]);
+    assert.deepEqual(reports, []);
+    handle.destroy();
+  });
 
   it('removes the button on an update that omits onAction, and draws it again when both are passed', async () => {
     const action = { label: LABEL };

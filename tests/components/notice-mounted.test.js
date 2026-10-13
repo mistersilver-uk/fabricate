@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { assertClipped, underSheet } from '../helpers/publishedComponentModules.js';
+import { assertClipped, recordEscapes, underSheet } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -179,10 +179,42 @@ describe('1505 Notice — the API the library states', () => {
     harness.remount();
   });
 
+  it('calls onAction for an action whose onClick is no function, and throws nothing', async () => {
+    const escaped = [];
+    const stopRecording = recordEscapes((error) => {
+      escaped.push(error);
+    });
+    for (const onClick of ['x', false, {}]) {
+      const calls = [];
+      const onAction = () => {
+        calls.push('onAction');
+      };
+      const target = await harness.mount({
+        title: 'Held',
+        action: { label: 'Retry', onClick },
+        onAction,
+      });
+      target.querySelector('[data-notice-action]').click();
+      await flushRender();
+      assert.deepEqual(calls, ['onAction'], `an onClick of ${JSON.stringify(onClick)}`);
+      harness.remount();
+    }
+    stopRecording();
+    assert.deepEqual(escaped, []);
+  });
+
   for (const [what, props] of [
     ['an action with no label', { action: {}, onAction: () => {} }],
     ['an action whose label is empty', { action: { label: '' }, onAction: () => {} }],
+    ['an action whose label is blank', { action: { label: ' ' }, onAction: () => {} }],
+    ['an action whose label is an object', { action: { label: {} }, onAction: () => {} }],
+    ['an action whose label is true', { action: { label: true }, onAction: () => {} }],
     ['a labelled action with neither handler', { action: { label: 'Review' } }],
+    ['a labelled action whose onClick is a string', { action: { label: 'Review', onClick: 'x' } }],
+    [
+      'a labelled action with no function in onClick or onAction',
+      { action: { label: 'Review', onClick: 'x' }, onAction: 'y' },
+    ],
   ]) {
     it(`draws no button for ${what}`, async () => {
       const target = await harness.mount({ title: 'Held', ...props });

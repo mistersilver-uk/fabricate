@@ -312,8 +312,23 @@ describe('a callback that fails', () => {
   const fail = () => {
     throw failure;
   };
+  const later = new Error('a second failure of the same call');
   for (const [what, result] of [
     ['rejects', thenable((_resolve, reject) => reject(failure))],
+    [
+      'rejects twice',
+      thenable((_resolve, reject) => {
+        reject(failure);
+        reject(later);
+      }),
+    ],
+    [
+      'rejects and then throws',
+      thenable((_resolve, reject) => {
+        reject(failure);
+        throw later;
+      }),
+    ],
     ['throws from then', thenable(fail)],
     // ratchet-exempt(lint): a thenable whose `then` throws on read is the case under test.
     ['throws from the read of then', Object.defineProperty({}, 'then', { get: fail })],

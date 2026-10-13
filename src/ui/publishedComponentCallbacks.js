@@ -27,23 +27,27 @@ export function takeCallbacks(entry, callbacks, props) {
  * What the host's `callbacks(key)` answers: a frozen `{ arity, deliver }`, where `arity` is how
  * many leading arguments the entry forwards and `deliver(args)` calls the key's newest function.
  * `deliver` calls nothing once `record` is no longer live, and a throw, or the rejection of a
- * thenable the function returns, goes to `report` and no further.
+ * thenable the function returns, goes to `report` and no further, once per call.
  */
 export function callbackFor(entry, record, report) {
-  return (key) => {
-    const reportFailure = (error) => report(CALLBACK_REPORT, entry.name, key, error);
-    return Object.freeze({
+  return (key) =>
+    Object.freeze({
       arity: entry.props[key].args ?? 0,
       deliver(args) {
         const call = record.live ? record.callbacks.get(key) : undefined;
         if (!call) return;
+        let reported = false;
+        const reportOnce = (error) => {
+          if (reported) return;
+          reported = true;
+          report(CALLBACK_REPORT, entry.name, key, error);
+        };
         try {
           const result = call(...args);
-          if (typeof result?.then === 'function') result.then(noop, reportFailure);
+          if (typeof result?.then === 'function') result.then(noop, reportOnce);
         } catch (error) {
-          reportFailure(error);
+          reportOnce(error);
         }
       },
     });
-  };
 }

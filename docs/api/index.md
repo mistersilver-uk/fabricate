@@ -2257,7 +2257,7 @@ It is not a Foundry notification: it is drawn in your element, and `ui.notificat
 It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
 `icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
 `action` is optional and is `{ label }`, drawing one button after the text; `label` is the button's whole accessible name, final display text.
-An `action` with no non-empty `label`, or passed without `onAction`, draws no button.
+An `action` with no non-blank string `label`, or with no function to call (`onAction`, or its own `onClick` in a Fabricate caller), draws no button.
 Pass no other member: one this line does not state is private, and a function in it throws `"action" must not hold a function`.
 `onAction` is an optional callback, called with no argument each time the action button is pressed.
 The label is one line, never wrapped or clipped: where the notice is too narrow to hold it beside the text the button drops beneath, and a label wider than `target` overflows the notice, so keep it short.
