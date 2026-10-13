@@ -10,7 +10,8 @@
  * `null` pin rests on that gate's pin of its published keys.
  * Limit: the focus mark reads declarations; the computed half is `notice-mounted.test.js`'s. A mark
  * that is not an outline is refused.
- * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file.
+ * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file; the
+ * `type` of a dynamic button is `components/published-button-mounted.test.js`'s.
  * Limit: a handler declared in `<script>` and named by an attribute fails closed, as does a
  * callback handed to a child component.
  * Limit: a name is read from the element's own `aria-label` or content, not from a child element
@@ -19,7 +20,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
@@ -30,11 +30,14 @@ import {
   SHIPPED,
   attributeOf,
   byName,
+  declarationsOf,
   everyStylesheet,
   focusableElements,
   importClosure,
   isComponent,
   isControlTag,
+  isStrip,
+  moduleRing,
   propLocals,
   publishedLocals,
   selectorsNaming,
@@ -53,6 +56,7 @@ const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
  * reaches.
  */
 const FOCUSABLE_REACH = Object.freeze({
+  'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
@@ -166,48 +170,6 @@ function reachFaults({ id, guards, published, entry }, pins) {
 
 const isReached = ({ id }, pins) => pins[id] !== null && pins[id] !== undefined;
 
-const isRingSelector = (complex) => {
-  const [root, subject, ...deeper] = complex.children;
-  if (!subject || deeper.length > 0) return false;
-  const [rootPart, ...rootRest] = root.selectors;
-  const [element, pseudo, ...rest] = subject.selectors;
-  return (
-    rootRest.length === 0 &&
-    rootPart.type === 'ClassSelector' &&
-    rootPart.name === 'fabricate' &&
-    rest.length === 0 &&
-    (element.type === 'TypeSelector' || element.type === 'AttributeSelector') &&
-    pseudo?.type === 'PseudoClassSelector' &&
-    pseudo.name === 'focus-visible'
-  );
-};
-
-const declarationsOf = (rule) =>
-  rule.block.children
-    .filter((node) => node.type === 'Declaration')
-    .map((node) => [node.property, node.value.replaceAll(/\s+/g, ' ').trim()]);
-
-let ring;
-/** The module's keyboard ring, read from `styles/fabricate-base.css`: the elements it names and what it draws. */
-function moduleRing() {
-  if (ring) return ring;
-  const base = stylesheetSources().parts.find(({ file }) => file === 'styles/fabricate-base.css');
-  const { css } = templateOf(base.file, `<style>${base.text}</style>`).ast;
-  const rules = [...walkNodes(css)].filter(
-    (node) => node.type === 'Rule' && node.prelude.children.every(isRingSelector)
-  );
-  assert.equal(rules.length, 1, 'one `.fabricate <element>:focus-visible` rule');
-  const named = rules[0].prelude.children.map((complex) => complex.children[1].selectors[0]);
-  const drawn = Object.fromEntries(declarationsOf(rules[0]));
-  ring = {
-    tags: named.filter((part) => part.type === 'TypeSelector').map((part) => part.name),
-    attributes: named.filter((part) => part.type === 'AttributeSelector').map((part) => part.name),
-    outline: drawn.outline,
-    offset: drawn['outline-offset'],
-  };
-  return ring;
-}
-
 /**
  * The pseudo-class a rule states on one subject made only of classes in `classes`, with how many
  * classes that subject names, or `null`.
@@ -235,12 +197,6 @@ function ownRules(ast, classes, pseudo) {
   });
 }
 
-const FOCUS_STRIP = JSON.stringify([
-  ['box-shadow', 'none'],
-  ['outline', 'none'],
-]);
-const byProperty = ([a], [b]) => byName(a, b);
-const isStrip = (rule) => JSON.stringify(declarationsOf(rule).sort(byProperty)) === FOCUS_STRIP;
 const drawsOutline = (value) =>
   Boolean(value) &&
   value.split(' ').every((token) => token !== 'none' && !/^0[a-z%]*$/.test(token));
@@ -362,7 +318,8 @@ const declaresUnderRing = (property) => `declares ${property} under a root that 
 function focusRuleFaults(entry, controls, pins, reader) {
   const reached = controls.filter((control) => isReached(control, pins));
   if (entry.root === 'any' || reached.length === 0) return [];
-  return [...importClosure(entry.path, reader)].filter(isComponent).flatMap((file) => {
+  const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
+  return components.flatMap((file) => {
     const nodes = [...walkNodes(reader.component(file).css)];
     const own = nodes.some(
       (node) => node.type === 'PseudoClassSelector' && FOCUS_PSEUDO_CLASSES.has(node.name)

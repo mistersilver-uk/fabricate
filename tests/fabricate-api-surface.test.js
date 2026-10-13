@@ -188,11 +188,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448 and issue 2451 headings,
- * by name and in the order the spec states them.
+ * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
+ * headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -255,6 +255,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'InspectorCard',
       'EmptyState',
       'Notice',
+      'Button',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -385,6 +386,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: true,
         root: 'any',
       },
+      Button: {
+        version: 1,
+        props: {
+          role: optional,
+          fullWidth: optional,
+          disabled: optional,
+          children: requiredText,
+          onclick: { kind: 'callback', required: true },
+        },
+        rest: true,
+        root: 'fabricate',
+      },
     });
     assert.deepEqual(
       Object.keys(ui),
@@ -477,6 +490,32 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       !documented.includes('non-interactive'),
       'the docs no longer say a published component is non-interactive'
     );
+  });
+
+  it('states the reserved rest names and their refusal in the spec’s M13 row and the docs’ mounting section', () => {
+    const row = SPECIFIED.split('\n').filter((line) => line.startsWith('| M13 |'));
+    assert.equal(row.length, 1, 'one M13 row');
+    const from = DOCUMENTED.indexOf('\n### Mounting, updating and destroying\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mounting section, then another heading');
+    const stated = [
+      'is reserved on <name>',
+      '`data-keyboard-focus`',
+      '`data-action`',
+      '`data-cursor`',
+      '`data-tooltip`',
+      '`data-tooltip-`',
+    ];
+    for (const [where, prose] of [
+      ['the spec’s M13 row', row[0]],
+      ['### Mounting, updating and destroying', DOCUMENTED.slice(from, to)],
+    ]) {
+      assert.deepEqual(
+        stated.filter((token) => !prose.includes(token)),
+        [],
+        `${where} states each reserved name and the tail that refuses it`
+      );
+    }
   });
 
   it('publishes the canonical realm classes and the deprecated alias as the same class', () => {

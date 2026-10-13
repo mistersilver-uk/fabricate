@@ -593,6 +593,11 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'fabricate-journal-lifecycle-ready-single',
         'fabricate-journal-lifecycle-cancel-confirmation',
       ],
+      [
+        'manager-published-leaves-specimen',
+        'manager-published-controls-specimen',
+        'manager-published-buttons-specimen',
+      ],
     ],
     ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
   ];
@@ -700,6 +705,7 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
     'InspectorCard',
     'EmptyState',
     'Notice',
+    'Button',
   ]) {
     const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
       (viewCase) => viewCase.id

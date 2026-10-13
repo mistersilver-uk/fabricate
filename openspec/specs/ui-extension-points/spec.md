@@ -378,20 +378,25 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required?, element?, args? } }, rest, root }`, and Fabricate's runtime adapter binds each `path` to its component.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required?, element?, args? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
+`restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
+It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
+The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
 - The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
 - The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
 - The published set continues with `Rail` and `InspectorCard` (issue 2451), in that order.
 - The published set continues with `EmptyState` and `Notice` (issue 2451), in that order.
+- The published set continues with `Button` (issue 2452).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
-- An element-ref bindable (`Chip`'s `element`) is never published.
+- An element-ref bindable (`Chip`'s and `Button`'s `element`) is never published.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
+- `Button`'s `size`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and a companion calls it for them before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button` too (issue 2452); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'` and `'callback'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
@@ -427,6 +432,7 @@ A `<button>` the companion draws there states `type="button"`: an untyped button
 The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
 - A `callback` key takes a function, and `undefined` or absence omits it, so the component's own default applies; anything else is M17.
+A `required` `callback` key refuses absence and `undefined` (M9) and any value that is not a function, `''` included (M17), and an `update` that omits it is M9.
 A function is accepted only as the whole value of a `callback` key: anywhere else, at any depth, it is M10.
 - The component receives one forwarder per `callback` key, the same one for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
 - Fabricate calls the function with the arguments the entry's group states, in that order, and with nothing else.
@@ -440,7 +446,7 @@ A companion that is called back inside an effect of its own untracks its own rea
 A throw, or the rejection of a Promise it returns, is reported as `console.error('Fabricate | Published component callback failed:', name, key, error)` and goes no further: the mount stays live, it is not a fault, and `onFault` is not called.
 - The function may call `update` or `destroy` on its own handle, or `mount`, before it returns.
 An `update` made there is drawn on Fabricate's next flush, and a refusal it throws is reported as a callback failure unless the function catches it.
-- After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again.
+- After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again; a `required` key cannot be omitted.
 - A companion detects a callback key with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates the key refuses it.
 
 ### The required ancestor root
@@ -462,6 +468,7 @@ A Foundry 14 detached window's target is judged the same way.
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 - A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
+Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
 Enter presses on key down and again on each repeat while held, and Space on release.
@@ -479,17 +486,22 @@ Where the destination is drawn by the same change, the companion draws it first,
 - A press bubbles from the control as a `click`.
 A companion element above `target` that listens for `click` receives every press too.
 The companion keeps `target` out of any element of its own that carries `data-action`, and passes no `data-action` through rest to a component that draws a control: the window dispatches the nearest `data-action` above the press, and `close` closes it, as a DialogV2 button's own action name submits it.
+Where the entry's rest keys land on the control itself, `data-action` is refused (M13): the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
 The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
 - A control is unavailable only through a key its group names.
-A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead.
+A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the bullet above orders.
+Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
 In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
+Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): Foundry copies its value into the pressed element's inline `cursor` at the next pointer release and deletes the attribute.
 - A control's only motion is the fade of its own state change.
 Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
-A Foundry tooltip attribute the companion passes through rest lands on the component's root, never on the control: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
+A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
+Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
+A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
 A control whose face is a glyph alone is published only with a required key for its name, and its group says whether the pointer is shown that name.
 
 ### The issue 2448 components
@@ -666,6 +678,59 @@ Each group states the accepted values of every key that entry publishes.
   - It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
 - **Private:** every other `Chip` tone, emphasis and density; the card's padding, gap, corner and border figures; and how Fabricate redraws a card inside its own Checks rail and inspectors; the panel's and the notice's own figures; and `Notice`'s `accent` tone and what it draws for a tone outside its set.
 
+### The issue 2452 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`Button`.**
+  - It is the design system's button: a labelled native `<button>` that is pressed to do one thing.
+  - `children` is required and is the label, final display text, and the button's whole accessible name.
+    The button hugs its label on one line while it has the room.
+    Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: the companion passes a short verb phrase and gives the button the room for one line.
+    A label of white space alone draws a button with no name, so the companion never passes one.
+    The button draws no glyph: a leading glyph and a glyph-only button are not published at version 1.
+  - `onclick` is a required callback, called with no argument each time the button is pressed, a held Enter key included.
+    The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
+  - `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
+    It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
+    Each names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster, at most one in a cluster; `ghost` the quiet verb that changes no record, never its cluster's leading verb; `dashed` the verb that adds to the list it closes; `danger` the destructive verb; and `warning` the caution verb, which proceeds against a flagged rule or breaks a reference that can be re-made exactly, and destroys nothing.
+    A verb that both destroys and cautions is `danger`.
+    A `dashed` label starts with its verb, as "Add tier", because no plus glyph is drawn.
+    A visual role is colour and edge alone and reaches no assistive technology, so the label says the verb.
+    A destructive press is confirmed by the companion, in a dialog of Foundry's, before anything is written; Fabricate's arm-then-confirm state is private.
+  - `fullWidth` is `true` or `false`.
+    The companion gives `target` `display: flex`, as for an inline mark: the button then hugs its label, and `true` spans `target`.
+    In a block `target` a `dashed` button spans it whatever `fullWidth` holds.
+  - `disabled` is `true` or `false`.
+    `true` draws the button as unavailable whatever the visual role, takes the button out of the tab order and stops every press, so `onclick` is not called.
+    It is for a verb that cannot apply and whose reason the surrounding text already gives: a keyboard or screen-reader user tabs past a disabled button, and it opens no tooltip, so nothing at the button can say why.
+    A verb the user is refused for a reason stays enabled, and its press answers with the reason, in a `Notice` or a notification of the companion's.
+    The unavailable label is not held to the contrast floor.
+    The companion never passes `true` while the button holds focus, an `update` made inside `onclick` included, so a press that starts work leaves the button enabled.
+  - The button has no busy state at version 1.
+    While a press is being handled the companion leaves the button enabled, ignores every further press, a held Enter key's repeats among them, and where the wait is perceptible passes `children` that say so.
+    A change to a focused button's label is not reliably announced, so the companion announces the outcome itself, with a `Notice` or a live region of its own.
+    When the work ends it passes the first label again, or moves focus and then removes the button.
+  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window.
+    It inherits `target`'s face; its size, weight and ink are its own.
+    The companion aligns its own content to the button by centring, never by restating its height.
+  - A companion's own window or dialog carries no Fabricate root, so the button is refused there (M16), and a dialog the companion opens draws Foundry's own buttons.
+  - It is never a form's submit button: a companion that submits a `<form>` of its own from a press calls that form's `requestSubmit()` in `onclick`.
+  - Two buttons side by side are two mounts in two targets, which the companion lays out as a wrapping row `--fab-space-2` apart.
+    A `target` is never Foundry's `.form-footer`, which resizes a button that is its child.
+  - The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
+    An `update` keeps the same button, so focus stays on it; `destroy` removes it, so where it holds focus the companion moves focus first.
+    In a host that replaces its content on render the button is a new element after every render, as `Notice`'s is.
+  - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side.
+    The companion leaves that much inside any edge of its own that clips, a scrolling container's among them, and insets a `fullWidth` button's `target` by as much.
+    It clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not against `--fab-bg-3`.
+  - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor` and every `data-tooltip` name are refused (M13).
+  - The label of an enabled button clears the 4.5:1 small-text floor at rest in every role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every role but `primary`, which falls short of it there in the `foundry-native` palette.
+    `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
+    On `--fab-bg-3` every role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
+  - `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: the companion passes a verb phrase.
+- **Private:** what the button draws for a role outside its set; its height, corner, padding, type size and weight; each role's colours and edge beyond what this group states, the success family `primary` is drawn in among them; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+
 ### Mounting and its refusals
 
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
@@ -683,11 +748,11 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent or `''` | `<name> requires a non-empty "<key>"` |
+| M9 | A `required` prop is absent, or `''` where the key is not a `callback` | `<name> requires a non-empty "<key>"` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
-| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean | `"<key>" is not a data attribute` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip` or a name that starts `data-tooltip-` | `"<key>" is not a data attribute`, or `"<key>" is reserved on <name>` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
@@ -803,6 +868,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Notice` with `action` and `onAction` and the user presses the action button
 - **THEN** Fabricate calls `onAction` once, with no argument
 - **AND** when `onAction` throws, Fabricate reports it, the notice stays drawn, and `update` still answers `true`
+
+#### Scenario: A published button
+
+- **WHEN** a companion mounts `Button` with `children` and `onclick` inside a Fabricate window and the user presses it
+- **THEN** Fabricate calls `onclick` once, with no argument
+- **AND** after an `update` that passes `disabled: true` a press calls nothing
+- **AND** a mount that passes `data-action` through rest throws M13, and nothing is rendered
 
 #### Scenario: A malformed request
 

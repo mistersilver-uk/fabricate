@@ -548,10 +548,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-simple',
     'manager-published-leaves-specimen',
   ]),
-  // The player window draws it in the journal's run action bar: the primary, then the danger and neutral pair.
+  // The player window draws it in the journal's run action bar: the primary, then the danger and
+  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452).
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
+    'manager-published-leaves-specimen',
+    'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
   ]),
   // The pager's two player forms: the inventory's persistent bar and the recipe browser's threshold one.
   'src/ui/svelte/components/Pagination.svelte': Object.freeze([

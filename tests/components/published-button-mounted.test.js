@@ -1,0 +1,457 @@
+/**
+ * The published `Button` on Fabricate's real Svelte runtime (issue 2452), through a fresh seam
+ * registered with the adapter's own table, under the Fabricate window root it needs: the one
+ * native button it draws at each visual role, a press and its `onclick`, an update that keeps the
+ * node and its focus, the native `disabled`, every refusal the entry adds, its required root, and a
+ * button in a published `EmptyState`'s content slot.
+ * The `type` and the mark for keyboard focus are read here because the component writes both on a
+ * `svelte:element`, where the static gates see the mark and not the type.
+ * Limit: happy-dom moves no focus when a focused button is disabled and activates no button from
+ * a key, so neither is asserted; the browser's answer to each is the View Lab's.
+ */
+import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+
+import { recorder } from '../helpers/publishedComponentFakes.js';
+import {
+  CALLBACK_REPORT,
+  PUBLISHED_ADAPTER,
+  PUBLISHED_COMPILED_MODULES,
+  PUBLISHED_RAW_MODULES,
+  PUBLISHED_RUNE_MODULES,
+  PUBLISHED_SEAM,
+  companionTarget,
+  fabricateTarget,
+  recordEscapes,
+  settle,
+  shippedSeam,
+} from '../helpers/publishedComponentModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+
+const REFUSAL = 'Fabricate | published components: ';
+const LABEL = 'Clear filters';
+const FAMILY = ['fabricate-button', 'fab-manager-button'];
+/** Each published visual role and the one class it writes beside the family's two. */
+const ROLES = Object.freeze([
+  ['neutral', []],
+  ['primary', ['is-primary']],
+  ['ghost', ['is-ghost']],
+  ['dashed', ['is-dashed']],
+  ['danger', ['is-danger']],
+  ['warning', ['is-warning-action']],
+]);
+/** Every rest name the entry reserves, as `tests/published-components.test.js` holds the seam to. */
+const RESERVED = Object.freeze([
+  ['data-keyboard-focus', 'false'],
+  ['data-keyboard-focus', false],
+  ['data-keyboard-focus', 'true'],
+  ['data-action', 'close'],
+  ['data-cursor', 'wait'],
+  ['data-tooltip', 'Why'],
+  ['data-tooltip-', 'x'],
+  ['data-tooltip-text', 'Why'],
+  ['data-tooltip-html', '<b>Why</b>'],
+  ['data-tooltip-direction', 'UP'],
+]);
+
+const harness = createMountedComponentHarness({
+  repoRoot: resolve(import.meta.dirname, '../..'),
+  tmpPrefix: 'fabricate-published-button-',
+  rawModules: PUBLISHED_RAW_MODULES,
+  runeModules: PUBLISHED_RUNE_MODULES,
+  compiledModules: PUBLISHED_COMPILED_MODULES,
+  componentPath: 'src/ui/svelte/published/PublishedComponentHost.svelte',
+});
+
+let seamParts;
+let reports;
+let escaped;
+let targets;
+let stopRecording;
+
+const ui = () =>
+  shippedSeam({
+    ...seamParts,
+    report: (...args) => {
+      reports.push(args);
+    },
+  });
+
+before(async () => {
+  await harness.setup();
+  const { publishedComponentRuntime: runtime, COMPONENTS: components } =
+    await harness.loadRuneModule(PUBLISHED_ADAPTER);
+  const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
+  seamParts = { createPublishedComponents, runtime, components };
+  stopRecording = recordEscapes((error) => {
+    escaped.push(error);
+  });
+});
+
+after(() => {
+  stopRecording();
+  return harness.teardown();
+});
+
+beforeEach(() => {
+  reports = [];
+  escaped = [];
+  targets = [];
+});
+
+afterEach(() => {
+  for (const shell of targets) shell.remove();
+  assert.deepEqual(escaped, [], 'nothing was thrown past the seam');
+});
+
+/**
+ * A button mounted with `props` over a label and a recording `onclick`, under a shell carrying
+ * `under`: its target, its handle, the recorded calls, and `button()`, the element drawn now.
+ */
+function mountButton(props = {}, under = 'fabricate') {
+  const press = recorder();
+  const target = fabricateTarget(targets, under);
+  const given = { children: LABEL, onclick: press.record, ...props };
+  const handle = ui().mount('Button', { target, props: given });
+  return { target, handle, calls: press.calls, button: () => target.querySelector('button') };
+}
+
+const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
+
+/** The refusal `mount` throws for `props` over a label and a callback, with nothing rendered. */
+function assertRefused(props, tail) {
+  const target = fabricateTarget(targets);
+  const given = { children: LABEL, onclick() {}, ...props };
+  assert.throws(() => ui().mount('Button', { target, props: given }), {
+    name: 'TypeError',
+    message: REFUSAL + tail,
+  });
+  assert.equal(target.childNodes.length, 0, 'nothing is rendered');
+}
+
+describe('the published Button', () => {
+  for (const [role, classes] of ROLES) {
+    it(`draws one native button at ${role}, typed, marked for keyboard focus and named by its label`, async () => {
+      const { target, handle, button } = mountButton({ role });
+      await settle();
+      assert.equal(target.children.length, 1, 'the only element drawn directly in target');
+      const drawn = button();
+      assert.ok(drawn === target.firstElementChild, 'and it is the button');
+      assert.equal(drawn.localName, 'button');
+      assert.equal(drawn.getAttribute('type'), 'button');
+      assert.equal(drawn.getAttribute('data-keyboard-focus'), 'true');
+      assert.equal(drawn.disabled, false);
+      assert.deepEqual(authoredClasses(drawn), [...FAMILY, ...classes]);
+      assert.equal(drawn.textContent, LABEL);
+      assert.equal(drawn.children.length, 1, 'one element holds the label');
+      assert.equal(drawn.children[0].localName, 'span');
+      assert.equal(target.querySelectorAll('button, a, input, [tabindex]').length, 1);
+      assert.ok(!drawn.hasAttribute('role') && !drawn.hasAttribute('aria-label'), 'no ARIA');
+      handle.destroy();
+      assert.equal(target.childNodes.length, 0);
+      assert.deepEqual(reports, []);
+    });
+  }
+
+  it('writes no role class for a role outside its set, and is-full-width for fullWidth alone', async () => {
+    const unknown = mountButton({ role: 'accent' });
+    const wide = mountButton({ role: 'primary', fullWidth: true });
+    await settle();
+    assert.deepEqual(authoredClasses(unknown.button()), FAMILY);
+    assert.deepEqual(authoredClasses(wide.button()), [...FAMILY, 'is-primary', 'is-full-width']);
+    assert.equal(wide.handle.update({ children: LABEL, onclick() {} }), true);
+    await settle();
+    assert.deepEqual(authoredClasses(wide.button()), FAMILY, 'replace, not merge');
+    unknown.handle.destroy();
+    wide.handle.destroy();
+  });
+
+  it('draws a label of markup as text, and a label of white space as a button with no name', async () => {
+    const marked = mountButton({ children: '<b>x</b>' });
+    const blank = mountButton({ children: ' ' });
+    await settle();
+    assert.equal(marked.button().textContent, '<b>x</b>');
+    assert.ok(!marked.target.querySelector('b'), 'never parsed as markup');
+    assert.equal(blank.button().textContent, ' ', 'accepted, and drawn as passed');
+    marked.handle.destroy();
+    blank.handle.destroy();
+  });
+
+  it('lands a rest data attribute on the button itself', async () => {
+    const { handle, button } = mountButton({ 'data-acme-id': 'clear', 'data-acme-open': true });
+    await settle();
+    assert.equal(button().getAttribute('data-acme-id'), 'clear');
+    assert.ok(button().hasAttribute('data-acme-open'));
+    assert.equal(button().getAttribute('data-keyboard-focus'), 'true', 'its own mark stays');
+    handle.destroy();
+  });
+});
+
+describe('a press on the published Button', () => {
+  it('calls onclick once, with no argument', async () => {
+    const { handle, calls, button } = mountButton();
+    await settle();
+    button().click();
+    assert.deepEqual(calls, [[]], 'once, inside the click, with an empty argument list');
+    button().click();
+    assert.equal(calls.length, 2, 'and again on the next press');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('keeps the same focused button across an update, and calls only the newest function', async () => {
+    const { handle, calls, button } = mountButton();
+    await settle();
+    const node = button();
+    node.focus();
+    assert.ok(document.activeElement === node, 'the button takes focus');
+    const next = recorder();
+    assert.equal(handle.update({ children: 'Filters cleared', onclick: next.record }), true);
+    await settle();
+    assert.ok(button() === node, 'the same button node');
+    assert.equal(node.textContent, 'Filters cleared');
+    assert.ok(document.activeElement === node, 'focus stays on it');
+    node.click();
+    assert.deepEqual([calls, next.calls], [[], [[]]], 'the earlier function is not called again');
+    handle.destroy();
+  });
+
+  it('refuses an update that omits onclick (M9), and the earlier function still answers', async () => {
+    const { handle, calls, button } = mountButton();
+    await settle();
+    assert.throws(() => handle.update({ children: 'Next' }), {
+      name: 'TypeError',
+      message: `${REFUSAL}Button requires a non-empty "onclick"`,
+    });
+    await settle();
+    assert.equal(button().textContent, LABEL, 'the earlier props stay rendered');
+    button().click();
+    assert.deepEqual(calls, [[]]);
+    handle.destroy();
+  });
+
+  it('keeps the same button when onclick updates its own label', async () => {
+    const held = mountButton({
+      onclick: () => held.handle.update({ children: 'Projects: 1', onclick() {} }),
+    });
+    await settle();
+    const node = held.button();
+    node.click();
+    await settle();
+    assert.ok(held.button() === node, 'the same node');
+    assert.equal(node.textContent, 'Projects: 1');
+    held.handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('is gone when a press whose onclick destroys it returns', async () => {
+    const held = mountButton({ onclick: () => held.handle.destroy() });
+    await settle();
+    held.button().click();
+    assert.equal(held.target.childNodes.length, 0, 'the target is empty');
+    assert.equal(held.handle.update({ children: LABEL, onclick() {} }), false);
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  const failure = new Error('the companion write failed');
+  for (const [what, onclick] of [
+    [
+      'throws',
+      () => {
+        throw failure;
+      },
+    ],
+    ['rejects', () => Promise.reject(failure)],
+  ]) {
+    it(`reports an onclick that ${what} once, and stays drawn and live`, async () => {
+      const { handle, button } = mountButton({ onclick });
+      await settle();
+      button().click();
+      await settle();
+      assert.deepEqual(reports, [[CALLBACK_REPORT, 'Button', 'onclick', failure]]);
+      assert.equal(button().textContent, LABEL, 'the button is still drawn');
+      assert.equal(handle.update({ children: LABEL, onclick() {} }), true);
+      handle.destroy();
+    });
+  }
+});
+
+describe('the published Button, disabled', () => {
+  for (const [role, classes] of ROLES) {
+    it(`writes the native attribute at ${role}, beside the same classes`, async () => {
+      const { handle, button } = mountButton({ role, disabled: true });
+      await settle();
+      assert.equal(button().disabled, true);
+      assert.deepEqual(authoredClasses(button()), [...FAMILY, ...classes]);
+      assert.ok(button().hasAttribute('disabled'), 'the native attribute');
+      assert.ok(!button().hasAttribute('aria-disabled'), 'and no ARIA form of it');
+      handle.destroy();
+    });
+  }
+
+  it('calls nothing for a press, and enables again on an update', async () => {
+    const { handle, calls, button } = mountButton({ disabled: true });
+    await settle();
+    // happy-dom's own suppression: it dispatches no click from a disabled button.
+    button().click();
+    assert.deepEqual(calls, [], 'a press on the disabled button');
+    // Svelte's guard, not a user path: Foundry makes a button's children pointer-transparent.
+    const { MouseEvent } = button().ownerDocument.defaultView;
+    button().firstElementChild.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    assert.deepEqual(calls, [], 'a click that bubbles from the label');
+    const next = recorder();
+    assert.equal(handle.update({ children: LABEL, onclick: next.record }), true);
+    await settle();
+    assert.equal(button().disabled, false);
+    button().firstElementChild.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    assert.deepEqual(next.calls, [[]], 'the same click reaches an enabled button');
+    handle.destroy();
+  });
+
+  it('stops the press of a button an update disabled', async () => {
+    const { handle, calls, button } = mountButton();
+    await settle();
+    const node = button();
+    const next = recorder();
+    assert.equal(handle.update({ children: LABEL, onclick: next.record, disabled: true }), true);
+    await settle();
+    assert.ok(button() === node, 'the same button node');
+    assert.equal(node.disabled, true);
+    node.click();
+    assert.deepEqual([calls, next.calls], [[], []]);
+    handle.destroy();
+  });
+});
+
+describe('what the published Button refuses', () => {
+  for (const key of [
+    'tag',
+    'href',
+    'target',
+    'rel',
+    'type',
+    'size',
+    'class',
+    'element',
+    'title',
+    'aria-label',
+  ]) {
+    it(`refuses ${key}, which it does not publish (M13)`, () => {
+      assertRefused({ [key]: 'x' }, `"${key}" is not a data attribute`);
+    });
+  }
+
+  for (const [key, value] of RESERVED) {
+    it(`refuses ${key} holding ${JSON.stringify(value)} as reserved (M13), on mount and on update`, async () => {
+      assertRefused({ [key]: value }, `"${key}" is reserved on Button`);
+      const { handle, calls, button } = mountButton();
+      await settle();
+      assert.throws(() => handle.update({ children: 'Next', onclick() {}, [key]: value }), {
+        name: 'TypeError',
+        message: `${REFUSAL}"${key}" is reserved on Button`,
+      });
+      await settle();
+      assert.equal(button().textContent, LABEL, 'the earlier props stay rendered');
+      assert.equal(button().getAttribute('data-keyboard-focus'), 'true');
+      button().click();
+      assert.deepEqual(calls, [[]], 'and the earlier function still answers');
+      handle.destroy();
+    });
+  }
+
+  it('leaves a Notice, whose rest lands on its root, accepting a tooltip attribute', async () => {
+    const target = companionTarget(targets);
+    const props = { title: 'Over the limit', 'data-tooltip-text': 'Why', 'data-action': 'x' };
+    const handle = ui().mount('Notice', { target, props });
+    await settle();
+    assert.equal(target.firstElementChild.getAttribute('data-tooltip-text'), 'Why');
+    handle.destroy();
+  });
+
+  for (const [claim, props, tail] of [
+    [
+      'a function as its label (M10)',
+      { children: () => 'x' },
+      '"children" must not hold a function',
+    ],
+    ['a number as its label (M14)', { children: 7 }, '"children" must be a string'],
+    ['an empty label (M9)', { children: '' }, 'Button requires a non-empty "children"'],
+    ['a string for onclick (M17)', { onclick: 'press' }, '"onclick" must be a function'],
+    ['an empty string for onclick (M17)', { onclick: '' }, '"onclick" must be a function'],
+    ['an absent onclick (M9)', { onclick: undefined }, 'Button requires a non-empty "onclick"'],
+  ]) {
+    it(`refuses ${claim}, and renders nothing`, () => {
+      assertRefused(props, tail);
+    });
+  }
+});
+
+describe('the published Button and its required root', () => {
+  it('refuses a companion’s own shell (M16), and renders nothing', () => {
+    const target = companionTarget(targets);
+    assert.throws(
+      () => ui().mount('Button', { target, props: { children: LABEL, onclick() {} } }),
+      {
+        name: 'TypeError',
+        message: `${REFUSAL}Button needs a Fabricate window ancestor`,
+      }
+    );
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  for (const under of ['fabricate fabricate-app', 'fabricate fabricate-manager']) {
+    it(`draws the same button under a frame classed ${under}`, async () => {
+      const { handle, calls, button } = mountButton({ role: 'primary' }, under);
+      await settle();
+      assert.deepEqual(authoredClasses(button()), [...FAMILY, 'is-primary']);
+      button().click();
+      assert.deepEqual(calls, [[]]);
+      handle.destroy();
+    });
+  }
+
+  /** An `EmptyState` mounted with its content slot in `panelTarget`, and a target of the companion's inside that slot. */
+  function panelWithSlot(seam, panelTarget) {
+    const panel = seam.mount('EmptyState', {
+      target: panelTarget,
+      props: { title: 'No projects yet', children: true },
+    });
+    const inner = panelTarget.ownerDocument.createElement('div');
+    panel.slot('children').append(inner);
+    return { panel, inner };
+  }
+
+  it('draws in the content slot of a published EmptyState inside a Fabricate window, and the outer destroy ends it', async () => {
+    const seam = ui();
+    const target = fabricateTarget(targets);
+    const { panel, inner } = panelWithSlot(seam, target);
+    const press = recorder();
+    const props = { role: 'primary', children: 'New project', onclick: press.record };
+    const button = seam.mount('Button', { target: inner, props });
+    await settle();
+    const drawn = inner.querySelector('button');
+    assert.ok(target.querySelector('.manager-empty').contains(drawn), 'inside the panel');
+    assert.equal(drawn.textContent, 'New project');
+    drawn.click();
+    assert.deepEqual(press.calls, [[]]);
+    panel.destroy();
+    assert.equal(button.update(props), false, 'the nested button ended with the panel');
+    assert.equal(target.childNodes.length, 0);
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  it('is refused in the content slot of an EmptyState that sits in no Fabricate window (M16)', async () => {
+    const seam = ui();
+    const { panel, inner } = panelWithSlot(seam, companionTarget(targets));
+    await settle();
+    assert.throws(
+      () => seam.mount('Button', { target: inner, props: { children: LABEL, onclick() {} } }),
+      { name: 'TypeError', message: `${REFUSAL}Button needs a Fabricate window ancestor` }
+    );
+    assert.equal(inner.childNodes.length, 0);
+    panel.destroy();
+  });
+});

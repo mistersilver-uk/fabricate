@@ -199,4 +199,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'any',
   }),
+  Object.freeze({
+    name: 'Button',
+    path: 'src/ui/svelte/components/Button.svelte',
+    version: 1,
+    props: Object.freeze({
+      role: Object.freeze({ kind: 'data' }),
+      fullWidth: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
+      onclick: Object.freeze({ kind: 'callback', required: true }),
+    }),
+    rest: true,
+    root: 'fabricate',
+    restOn: 'control',
+  }),
 ]);

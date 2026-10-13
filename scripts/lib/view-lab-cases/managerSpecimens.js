@@ -50,8 +50,8 @@ const LEAF_MOUNTS = 28;
 const NESTED_LEAF_MOUNTS = Object.freeze([
   ['Rail', '.fab-rail', ['Meter', 'InfoStrip']],
   ['InspectorCard', '.fabricate-card', ['Kicker', 'StatBox']],
-  ['EmptyState', HERO_PANEL, ['Chip']],
-  ['EmptyState', FILTERED_PANEL, ['Chip']],
+  ['EmptyState', HERO_PANEL, ['Button']],
+  ['EmptyState', FILTERED_PANEL, ['Button']],
 ]);
 
 /** One containment per nested mount: its root inside the root of the mount whose slot holds it. */
@@ -88,6 +88,75 @@ const CONTROL_KEYS = Object.freeze(['resume', 'count', 'wide', 'hold', 'undo']);
 /** The action button's own box, type and ink, the same at every tone. */
 const ACTION_BUTTON = 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)';
 
+/** The same fixture's band of published buttons, and one of them by its section's key. */
+const BUTTONS_GROUND = '[data-lab-buttons]';
+const BUTTON_SECTION = (key) => `[data-lab-button="${key}"]`;
+const LAB_BUTTON = (key) => `${BUTTONS_GROUND} ${BUTTON_SECTION(key)} button`;
+
+/** Each button that fixture mounts, by its section's key. */
+const BUTTON_KEYS = Object.freeze([
+  'clear',
+  'create',
+  'back',
+  'delete',
+  'review',
+  'add',
+  'add-wide',
+  'wide',
+  'off',
+  'off-primary',
+  'long',
+  'card-back',
+  'card-add',
+]);
+
+/**
+ * Each visual role at rest in the sheet's own declared values, then `fullWidth` at its cell's
+ * width and at the two-cell span's, the disabled look at two roles, and the box a long label
+ * does not grow.
+ */
+const RESTING_BUTTONS = Object.freeze(
+  [
+    [
+      'clear',
+      'min-height: 34px; border-radius: 9px; color: var(--fab-text); background-color: var(--fab-surface-soft)',
+    ],
+    ['create', 'color: var(--fab-on-success); background-color: var(--fab-success)'],
+    [
+      'back',
+      'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0); border-color: var(--fab-border)',
+    ],
+    ['delete', 'color: var(--fab-danger-text); border-color: var(--fab-danger-border)'],
+    ['review', 'color: var(--fab-warning-text); background-color: var(--fab-warning-soft)'],
+    ['add', 'border-top-style: dashed; color: var(--fab-text-muted)'],
+    ['add-wide', 'width: 568px'],
+    ['wide', 'width: 280px'],
+    ['off', 'opacity: 0.62; cursor: default; color: var(--fab-text-muted)'],
+    ['off-primary', 'opacity: 0.62; color: var(--fab-text-muted)'],
+    ['long', 'height: 34px'],
+  ].map(([key, styles]) => ({ selector: LAB_BUTTON(key), styles }))
+);
+
+/** The band once both of the buttons case's steps have acted: each pressed button's count at one. */
+const PRESSED_BUTTONS = [
+  BUTTONS_GROUND,
+  `:has(> ${BUTTON_SECTION('clear')} button[data-lab-presses="1"])`,
+  `:has(> ${BUTTON_SECTION('create')} button[data-lab-presses="1"])`,
+].join('');
+
+/** Each notice and each button inside the ground, and the ground inside the window. */
+const CONTROLS_CONTAINMENT = Object.freeze([
+  ...CONTROL_KEYS.map((key) => ({
+    container: CONTROLS_GROUND,
+    target: `${CONTROL(key)} > div > .fab-notice`,
+  })),
+  ...BUTTON_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_BUTTON(key) })),
+  { container: '.window-content', target: CONTROLS_GROUND },
+]);
+
+/** Sized to the fixture's 592px ground and the height of its notices and buttons. */
+const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 640 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -120,7 +189,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-leaves-specimen',
     label:
-      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box; then, each on that lighter ground, a dashed empty panel holding a glyph tile, a serif title, a hint and a chip, a warning notice whose detail wraps to two lines, and the quieter filtered panel holding a hint over a chip. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box; then, each on that lighter ground, a dashed empty panel holding a glyph tile, a serif title and a hint over a centred primary button, a warning notice whose detail wraps to two lines, and the quieter filtered panel holding a hint over a centred neutral button. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
     // Beyond the smoke: a companion mounts each through `api.ui`, in states no one screen draws together.
     reaches: 'beyond',
     smokeLabels: [],
@@ -204,13 +273,13 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // Every component mounted here is a broad signal, routed here by its override: the seven
     // leaves (issue 2448), then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and
-    // `Notice` (issue 2451).
+    // `Notice` (issue 2451), then `Button` (issue 2452).
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
     id: 'manager-published-controls-specimen',
     label:
-      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral whose long label wraps to two lines inside its 34px box in a 120px target; and, on a darker strip, a ghost and a dashed adder. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -224,15 +293,8 @@ export const CASES = Object.freeze([
     // no action, the second's count, and keyboard focus on the third's action.
     expectSelector: `${ACTED_GROUND} > ${CONTROL_SECTION('wide')} [data-notice-action]:focus-visible`,
     expectCenterHit: CONTROL_ACTION('wide'),
-    // Each notice inside the ground, and the ground inside the window, so a row the window clips
-    // fails the capture.
-    expectContained: [
-      ...CONTROL_KEYS.map((key) => ({
-        container: CONTROLS_GROUND,
-        target: `${CONTROL(key)} > div > .fab-notice`,
-      })),
-      { container: '.window-content', target: CONTROLS_GROUND },
-    ],
+    // A row the window clips fails the capture.
+    expectContained: CONTROLS_CONTAINMENT,
     expectLayout: {
       controls: [
         // One button per tone once the first notice has lost its own: a control selector names
@@ -254,13 +316,48 @@ export const CASES = Object.freeze([
           selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
           styles: 'color: var(--fab-danger-text)',
         },
+        ...RESTING_BUTTONS,
       ],
     },
-    // Sized to the fixture's 592px ground, so the PR body shows the ring at 100%; `expectContained`
-    // holds the ground inside `.window-content`.
-    position: { width: 680, height: 340 },
+    // The PR body shows the ring at 100%; `expectContained` holds the ground inside
+    // `.window-content`.
+    position: CONTROLS_WINDOW,
     kinds: ['manager', 'specimen'],
-    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    // `Notice.svelte` and `Button.svelte` are broad signals, each routed here by its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-buttons-specimen',
+    label:
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn and the five notices above are unpressed. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: LAB_BUTTON('clear') }, { selector: LAB_BUTTON('create'), press: 'Space' }],
+    // Both pressed states, neither of which exists before its step, and keyboard focus on the
+    // primary, where ring against fill is lowest.
+    expectSelector: `${PRESSED_BUTTONS} > ${BUTTON_SECTION('create')} button:focus-visible`,
+    expectCenterHit: LAB_BUTTON('create'),
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${LAB_BUTTON('create')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+        // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
+        {
+          selector: LAB_BUTTON('clear'),
+          styles: 'background-color: var(--fab-surface-raised)',
+        },
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Button.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

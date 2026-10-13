@@ -154,6 +154,8 @@ function guardNames(ancestors) {
  * may be.
  */
 export const DYNAMIC_ELEMENTS = Object.freeze({
+  // `tag` and `href`, which could draw an `<a>`, are not published.
+  'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
     tags: ['h3', 'p', 'span'],
@@ -365,17 +367,28 @@ export function componentPathsUnder(dir, isRoot = true) {
     .sort(byName);
 }
 
-/** Every selector of one parsed stylesheet with a part `test` passes, wherever in the selector. */
-export function selectorsHolding(css, test) {
+/**
+ * Every selector of one parsed stylesheet with a part `test` passes, wherever in the selector, as
+ * `{ complex, rule, within }`: its rule, and the names of the at-rules and `'rule'` for each style
+ * rule that hold it.
+ */
+export function selectorsWithRules(css, test) {
   const found = [];
-  for (const node of walkNodes(css)) {
-    if (node.type !== 'Rule') continue;
-    for (const complex of node.prelude.children) {
-      if ([...walkNodes(complex)].some((part) => test(part))) found.push(complex);
+  walkWithAncestors(css, (rule, ancestors) => {
+    if (rule.type !== 'Rule') return;
+    const within = ancestors
+      .filter((ancestor) => ancestor.type === 'Rule' || ancestor.type === 'Atrule')
+      .map((ancestor) => (ancestor.type === 'Rule' ? 'rule' : `@${ancestor.name}`));
+    for (const complex of rule.prelude.children) {
+      if ([...walkNodes(complex)].some((part) => test(part))) found.push({ complex, rule, within });
     }
-  }
+  });
   return found;
 }
+
+/** Every selector of one parsed stylesheet with a part `test` passes, wherever in the selector. */
+export const selectorsHolding = (css, test) =>
+  selectorsWithRules(css, test).map(({ complex }) => complex);
 
 export const selectorsNaming = (css, root) =>
   selectorsHolding(css, (part) => part.type === 'ClassSelector' && part.name === root);
@@ -389,6 +402,59 @@ export const selectorsOnAttribute = (file, css, name) =>
   selectorsHolding(css, (part) => part.type === 'AttributeSelector' && part.name === name).map(
     (complex) => `${file}: ${writtenSelector(css, complex)}`
   );
+
+const isRingSelector = (complex) => {
+  const [root, subject, ...deeper] = complex.children;
+  if (!subject || deeper.length > 0) return false;
+  const [rootPart, ...rootRest] = root.selectors;
+  const [element, pseudo, ...rest] = subject.selectors;
+  return (
+    rootRest.length === 0 &&
+    rootPart.type === 'ClassSelector' &&
+    rootPart.name === 'fabricate' &&
+    rest.length === 0 &&
+    (element.type === 'TypeSelector' || element.type === 'AttributeSelector') &&
+    pseudo?.type === 'PseudoClassSelector' &&
+    pseudo.name === 'focus-visible'
+  );
+};
+
+/** A rule's declarations as `[property, value]`, each value on one line. */
+export const declarationsOf = (rule) =>
+  rule.block.children
+    .filter((node) => node.type === 'Declaration')
+    .map((node) => [node.property, node.value.replaceAll(/\s+/g, ' ').trim()]);
+
+let ring;
+/** The module's keyboard ring, read from `styles/fabricate-base.css`: the elements it names and what it draws. */
+export function moduleRing() {
+  if (ring) return ring;
+  const base = stylesheetSources().parts.find(({ file }) => file === 'styles/fabricate-base.css');
+  const { css } = templateOf(base.file, `<style>${base.text}</style>`).ast;
+  const rules = [...walkNodes(css)].filter(
+    (node) =>
+      node.type === 'Rule' && node.prelude.children.every((complex) => isRingSelector(complex))
+  );
+  assert.equal(rules.length, 1, 'one `.fabricate <element>:focus-visible` rule');
+  const named = rules[0].prelude.children.map((complex) => complex.children[1].selectors[0]);
+  const drawn = Object.fromEntries(declarationsOf(rules[0]));
+  ring = {
+    tags: named.filter((part) => part.type === 'TypeSelector').map((part) => part.name),
+    attributes: named.filter((part) => part.type === 'AttributeSelector').map((part) => part.name),
+    outline: drawn.outline,
+    offset: drawn['outline-offset'],
+  };
+  return ring;
+}
+
+const FOCUS_STRIP = JSON.stringify([
+  ['box-shadow', 'none'],
+  ['outline', 'none'],
+]);
+const byProperty = ([a], [b]) => byName(a, b);
+/** Whether a rule declares exactly `outline: none` and `box-shadow: none`. */
+export const isStrip = (rule) =>
+  JSON.stringify(declarationsOf(rule).sort(byProperty)) === FOCUS_STRIP;
 
 let stylesheets;
 /** Every module sheet partial and every component `<style>` under `src/ui/svelte`, as `[file, css]`. */
