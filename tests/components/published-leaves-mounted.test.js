@@ -293,13 +293,13 @@ describe('a required prop', () => {
 });
 
 describe('the order a rest entry refuses in', () => {
-  const FUNCTION = 'functions are phase 2 (issue 2427)';
+  const FUNCTION = (key) => `"${key}" must not hold a function`;
   for (const [claim, name, props, refusal] of [
     [
       'a function inside an unpublished key before the key (M10), and a missing title last',
       'Notice',
       { action: { label: 'Review', onClick: () => {} } },
-      FUNCTION,
+      FUNCTION('action'),
     ],
     [
       'an unpublished key holding data (M13) before a missing title (M9)',
@@ -307,8 +307,18 @@ describe('the order a rest entry refuses in', () => {
       { action: { label: 'Review' } },
       '"action" is not a data attribute',
     ],
-    ['a function for its unpublished evidence (M10)', 'Notice', { evidence: () => {} }, FUNCTION],
-    ['a function for its content slot (M10)', 'EmptyState', { children: () => {} }, FUNCTION],
+    [
+      'a function for its unpublished evidence (M10)',
+      'Notice',
+      { evidence: () => {} },
+      FUNCTION('evidence'),
+    ],
+    [
+      'a function for its content slot (M10)',
+      'EmptyState',
+      { children: () => {} },
+      FUNCTION('children'),
+    ],
   ]) {
     it(`${name} refuses ${claim}, and renders nothing`, () => {
       const target = targetFor(name);
@@ -380,7 +390,7 @@ describe('a text key through the shipped seam', () => {
     const props = { children: 'Locked', onRemove: () => {} };
     assert.throws(() => ui().mount('Chip', { target, props }), {
       name: 'TypeError',
-      message: `${REFUSAL}functions are phase 2 (issue 2427)`,
+      message: `${REFUSAL}"onRemove" must not hold a function`,
     });
     assert.equal(target.childNodes.length, 0);
   });

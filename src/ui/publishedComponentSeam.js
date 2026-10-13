@@ -1,11 +1,13 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
  * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot }`, draws its
- * own content in a content slot, and is told of a contained fault through `onFault` (issue 2451).
+ * own content in a content slot, is told of a contained fault through `onFault` (issue 2451), and
+ * is told of a press through a callback prop (issue 2452).
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
  * `mount` and `unmount`.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
+import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
 
@@ -78,8 +80,9 @@ function queueFaultNotice(record, fault, report, first = null) {
 }
 
 function newRecord(entry, target, onFault) {
-  const slots = new Map();
-  return { name: entry.name, target, live: true, instance: null, root: null, onFault, slots };
+  const [slots, callbacks] = [new Map(), new Map()];
+  const name = entry.name;
+  return { name, target, live: true, instance: null, root: null, onFault, slots, callbacks };
 }
 
 /** Gives each `slot` key holding `true` its element, once; the element is kept while live. */
@@ -130,13 +133,17 @@ function underRoot(target, selector, hasAncestor, owner) {
   return true;
 }
 
-/** What the host receives beside its component; `slots` answers a requested key's element. */
-function hostPropsFor(entry, record, initial, onfault) {
+/**
+ * What the host receives beside its component; `slots` answers a requested key's element, and
+ * `callbacks` a callback key's `{ arity, deliver }`.
+ */
+function hostPropsFor(entry, record, initial, onfault, report) {
   return {
     initial,
     onfault,
     kinds: contentKinds(entry),
     slots: (key) => record.slots.get(key) ?? null,
+    callbacks: callbackFor(entry, record, report),
   };
 }
 
@@ -145,6 +152,7 @@ function handleFor(entry, record, end) {
     update(props) {
       if (!record.live) return false;
       const next = copyProps(entry, props);
+      takeCallbacks(entry, record.callbacks, next);
       requestSlots(entry, record, next);
       record.instance.setProps(next);
       return true;
@@ -192,6 +200,7 @@ function createMountLifecycle({ runtime, report }) {
     for (const nested of nestedIn(record, live)) end(nested);
     unmount(record);
     detachSlots(record);
+    record.callbacks.clear();
   }
 
   function end(record) {
@@ -217,10 +226,11 @@ function createMountLifecycle({ runtime, report }) {
     claims.set(target, record);
     live.add(record);
     requestSlots(entry, record, initial);
+    takeCallbacks(entry, record.callbacks, initial);
     const { components, host, mount } = runtime();
     const onfault = (error) => fault(record, error);
     const component = components[entry.path];
-    const props = { component, ...hostPropsFor(entry, record, initial, onfault) };
+    const props = { component, ...hostPropsFor(entry, record, initial, onfault, report) };
     try {
       record.instance = mount(host, { target, props });
     } catch (error) {

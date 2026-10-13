@@ -2,8 +2,8 @@
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
  * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
  * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
- * slots and the required root are `published-component-slots.test.js`'s, and the real Svelte
- * runtime the mounted suites'.
+ * slots and the required root are `published-component-slots.test.js`'s, callbacks
+ * `published-component-callbacks.test.js`'s, and the real Svelte runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -228,16 +228,16 @@ describe('mount refuses before it can draw', () => {
     }
   });
 
-  it('M10: refuses a function at any depth', () => {
+  it('M10: refuses a function at any depth, naming the top-level key that holds it', () => {
     const { ui } = seamWith();
-    for (const props of [
-      zetaProps({ label: () => 'x' }),
-      zetaProps({ items: [{ id: 'a', render() {} }] }),
-      zetaProps({ 'data-x': () => 1 }),
+    for (const [key, value] of [
+      ['label', () => 'x'],
+      ['items', [{ id: 'a', render() {} }]],
+      ['data-x', () => 1],
     ]) {
       assert.throws(
-        () => ui.mount('Zeta', { target: new FakeTarget(), props }),
-        refusal('functions are phase 2 (issue 2427)')
+        () => ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps({ [key]: value }) }),
+        refusal(`"${key}" must not hold a function`)
       );
     }
   });
@@ -304,7 +304,14 @@ describe('a live mount', () => {
     const [{ host, props: hostProps }] = mounts;
     assert.equal(host, HOST);
     assert.equal(hostProps.component, ZETA_COMPONENT);
-    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds', 'slots']);
+    assert.deepEqual(Object.keys(hostProps), [
+      'component',
+      'initial',
+      'onfault',
+      'kinds',
+      'slots',
+      'callbacks',
+    ]);
     assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
     assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
@@ -335,7 +342,7 @@ describe('a live mount', () => {
       [null, 'props must be a plain object'],
       [zetaProps({ 'aria-x': 'y' }), '"aria-x" is not a data attribute'],
       [{ items: [] }, 'Zeta requires a non-empty "label"'],
-      [zetaProps({ items: [() => 1] }), 'functions are phase 2 (issue 2427)'],
+      [zetaProps({ items: [() => 1] }), '"items" must not hold a function'],
       [zetaProps({ items: new Date() }), '"items" must be data'],
       [zetaProps({ items: loop }), '"items" holds a cycle'],
     ];
@@ -442,7 +449,7 @@ describe('a text key', () => {
     const { ui } = seamWith();
     assert.throws(
       () => ui.mount('Titled', { target: new FakeTarget(), props: titled({ note: () => 'x' }) }),
-      refusal('functions are phase 2 (issue 2427)')
+      refusal('"note" must not hold a function')
     );
   });
 
@@ -709,7 +716,7 @@ describe('a mount made with onFault', () => {
 });
 
 describe('registration', () => {
-  for (const kind of ['snippet', 'callback']) {
+  for (const kind of ['snippet', 'value']) {
     it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
       const unknown = { ...ALPHA, props: { body: { kind } } };
       const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
