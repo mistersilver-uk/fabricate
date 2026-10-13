@@ -107,6 +107,7 @@ export class FakeTarget {
     detach(this);
   }
   replaceChildren() {
+    for (const child of this.childNodes) if (child instanceof FakeTarget) child.parentNode = null;
     this.childNodes.length = 0;
   }
 }

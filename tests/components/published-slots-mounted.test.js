@@ -90,7 +90,7 @@ afterEach(() => {
 });
 
 describe('a slot key on the real runtime', () => {
-  it('draws the slot element as the only child of one wrapper, in place when mount returns', () => {
+  it('draws the slot element as the only child of one wrapper, in place when mount returns', async () => {
     const target = companionTarget(targets);
     const handle = seam().publicApi.mount('PublishedProbe', { target, props: { body: true } });
     const host = target.querySelector('.probe-body');
@@ -112,6 +112,7 @@ describe('a slot key on the real runtime', () => {
     assert.ok(!target.querySelector('.probe-aside').firstElementChild, 'aside was not requested');
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
+    await settle();
     assert.deepEqual(reports, []);
   });
 
@@ -169,6 +170,7 @@ describe('a slot key on the real runtime', () => {
     assert.equal(host.children.length, 1);
     handle.destroy();
     assert.ok(!slot.isConnected && slot.firstChild === content, 'destroy leaves its children');
+    await settle();
     assert.deepEqual(reports, []);
   });
 
@@ -188,6 +190,7 @@ describe('a slot key on the real runtime', () => {
     assert.ok(host.contains(slot) && slot.firstChild === content, 'under the new host');
     assert.equal(host.children.length, 1, 'in one wrapper');
     handle.destroy();
+    await settle();
     assert.deepEqual(reports, []);
   });
 });
@@ -227,6 +230,7 @@ describe('a published mount nested in a slot element on the real runtime', () =>
     assert.ok(slot.firstChild === innerTarget, "the companion's own element is left in place");
     assert.equal(target.childNodes.length, 0);
     assert.ok(outer.slot('body') === null);
+    await settle();
     assert.deepEqual(reports, []);
   });
 
@@ -262,6 +266,7 @@ describe('a published mount nested in a slot element on the real runtime', () =>
     assert.equal(instance.liveMountCount(), 0);
     assert.equal(inner.update({}), false);
     assert.equal(slot.childNodes.length, 0);
+    await settle();
     assert.deepEqual(reports, []);
   });
 
@@ -278,6 +283,7 @@ describe('a published mount nested in a slot element on the real runtime', () =>
     assert.equal(instance.liveMountCount(), 0);
     assert.equal(inner.update({}), false);
     assert.equal(innerTarget.childNodes.length, 0);
+    await settle();
     assert.deepEqual(reports, []);
   });
 });

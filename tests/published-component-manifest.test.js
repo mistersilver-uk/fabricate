@@ -12,12 +12,12 @@
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox` and `InfoStrip`), or an unprefixed state
  * class.
+ * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
+ * Limit: the card census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
  * forwarded `text` or `slot` key fails closed and a forwarded `data` key is not seen.
- * Limit: the slot clause does not see a render tag inside a `{#snippet}` or a child component's
- * content, which may draw it more than once.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
@@ -99,11 +99,22 @@ function propLocals(ast) {
   return [];
 }
 
-/** Every render tag beneath an `{#each}` or a `{#key}`, where one tag can hold several branches. */
+/**
+ * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
+ * where one tag can hold several branches.
+ */
+const REPEATING_BLOCKS = new Set([
+  'EachBlock',
+  'KeyBlock',
+  'SnippetBlock',
+  'Component',
+  'SvelteComponent',
+  'SvelteSelf',
+]);
 function repeatedRenderTags(ast) {
   const repeated = new Set();
   for (const block of walkNodes(ast.fragment)) {
-    if (block.type !== 'EachBlock' && block.type !== 'KeyBlock') continue;
+    if (!REPEATING_BLOCKS.has(block.type)) continue;
     for (const node of walkNodes(block)) if (node.type === 'RenderTag') repeated.add(node);
   }
   return repeated;
@@ -150,8 +161,8 @@ function textRenderFaults(key, spec, calls) {
 
 /**
  * What a `slot` key's spec and render calls break: `{ kind, element? }` with a `<div>` or
- * `<span>` element, drawn by exactly one bare `?.()` render tag that no `{#each}` or `{#key}`
- * holds, so the one slot element is drawn once and never taken in turn.
+ * `<span>` element, drawn by exactly one bare `?.()` render tag that no `{#each}`, `{#key}`,
+ * `{#snippet}` or component holds, so the one slot element is drawn once and never taken in turn.
  */
 function slotFaults(key, spec, calls) {
   const faults = [];
@@ -166,7 +177,7 @@ function slotFaults(key, spec, calls) {
   }
   if (calls.some((call) => !call.optional)) faults.push(`${key} is a slot key rendered without ?.`);
   if (calls.some((call) => call.repeated)) {
-    faults.push(`${key} is a slot key rendered inside {#each} or {#key}`);
+    faults.push(`${key} is a slot key rendered inside {#each}, {#key}, {#snippet} or a component`);
   }
   return faults;
 }
@@ -696,12 +707,14 @@ describe('each entry matches its component declaration', () => {
     'Slotted.svelte',
     [
       '<script>',
-      '  let { clean, twice, bare, given, listed, keyed, unused } = $props();',
+      '  let { clean, twice, bare, given, listed, keyed, snipped, wrapped, unused } = $props();',
       '</script>',
       '<div>{@render clean?.()}{@render twice?.()}{@render twice?.()}{@render bare()}</div>',
       '{@render given?.(1)}',
       '{#each [1] as item (item)}<p>{@render listed?.()}</p>{/each}',
       '{#key clean}<p>{@render keyed?.()}</p>{/key}',
+      '{#snippet row()}<p>{@render snipped?.()}</p>{/snippet}',
+      '<Wrapper>{@render wrapped?.()}</Wrapper>',
     ].join('\n')
   ).ast;
   const slot = { kind: 'slot' };
@@ -730,12 +743,22 @@ describe('each entry matches its component declaration', () => {
     [
       'rendered inside {#each}',
       { listed: slot },
-      ['listed is a slot key rendered inside {#each} or {#key}'],
+      ['listed is a slot key rendered inside {#each}, {#key}, {#snippet} or a component'],
     ],
     [
       'rendered inside {#key}',
       { keyed: slot },
-      ['keyed is a slot key rendered inside {#each} or {#key}'],
+      ['keyed is a slot key rendered inside {#each}, {#key}, {#snippet} or a component'],
+    ],
+    [
+      'rendered inside {#snippet}',
+      { snipped: slot },
+      ['snipped is a slot key rendered inside {#each}, {#key}, {#snippet} or a component'],
+    ],
+    [
+      'rendered inside a component',
+      { wrapped: slot },
+      ['wrapped is a slot key rendered inside {#each}, {#key}, {#snippet} or a component'],
     ],
     [
       'that states required',
@@ -1007,7 +1030,7 @@ describe('the module sheet against the published Chip', () => {
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
       ['tone', 'density', 'children'],
-      'a published key that draws a classed child reopens cannotMatchPublishedChip and fab-hit-area'
+      'a published key that draws a classed child reopens cannotMatchPublished and fab-hit-area'
     );
   });
 
@@ -1064,6 +1087,11 @@ describe('the module sheet and every component style against the published Inspe
     );
     assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
     const card = PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'InspectorCard');
+    assert.deepEqual(
+      PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
+      ['InspectorCard'],
+      'an entry with a required root needs a census of its own'
+    );
     assert.deepEqual(
       [Object.keys(card.props), card.root],
       [['children'], 'fabricate'],

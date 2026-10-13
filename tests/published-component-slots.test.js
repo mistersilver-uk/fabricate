@@ -349,6 +349,20 @@ describe('a mount nested in a slot element', () => {
     assert.equal(inner.update(zetaProps()), false);
     assert.equal(fake.seam.liveMountCount(), 0);
   });
+
+  it('still ends the outer mount when the nested mount own unmount throws', async () => {
+    const unmountError = new Error('unmount threw');
+    const fake = logged({ unmountError });
+    const outer = fake.ui.mount('Panel', { target: fake.targetIn(), props: { body: true } });
+    const slot = outer.slot('body');
+    fake.ui.mount('Zeta', { target: fake.targetIn(slot), props: zetaProps() });
+    assert.doesNotThrow(() => outer.destroy());
+    await drained();
+    assert.equal(fake.unmounts.length, 2, 'both mounts were unmounted');
+    assert.equal(slot.parentNode, null, 'the slot element was removed');
+    assert.equal(fake.reports.length, 2, 'one report each');
+    assert.equal(fake.seam.liveMountCount(), 0);
+  });
 });
 
 describe('a runtime whose unmount returns a rejected Promise', () => {

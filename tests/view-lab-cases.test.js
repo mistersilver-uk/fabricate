@@ -5502,9 +5502,42 @@ test('the leaves specimen mounts every published component but TierTrack and che
     .find((declarator) => declarator.id.name === 'MOUNTS');
   const nameOf = (mount) => mount.elements[0].value;
   const outer = mounts.init.arguments[0].elements;
+  const hasType = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => hasType(child, test)));
+  const { fragment } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
+  assert.ok(
+    hasType(
+      fragment,
+      (node) => node.type === 'Attribute' && node.name === 'data-published' && node.value !== true
+    ),
+    'the fixture writes data-published on a section'
+  );
+  assert.ok(
+    hasType(
+      instance,
+      (node) =>
+        node.type === 'MemberExpression' &&
+        node.property?.name === 'nested' &&
+        node.object?.property?.name === 'dataset'
+    ),
+    'the fixture writes dataset.nested on each nested target'
+  );
   const mounted = outer.map(nameOf);
   const nested = outer.flatMap((mount) =>
     (mount.elements[2]?.elements ?? []).map((inner) => [nameOf(mount), nameOf(inner)])
+  );
+  const meterMounts = [
+    ...outer,
+    ...outer.flatMap((mount) => mount.elements[2]?.elements ?? []),
+  ].filter((mount) => nameOf(mount) === 'Meter');
+  assert.equal(
+    meterMounts.filter((mount) =>
+      mount.elements[1].properties.some((property) => property.key.name === 'valueText')
+    ).length,
+    1,
+    'exactly one Meter mount carries valueText, so .fab-meter[aria-valuetext] names one element'
   );
   assert.deepEqual(
     nested,

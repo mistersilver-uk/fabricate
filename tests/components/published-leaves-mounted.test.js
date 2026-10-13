@@ -347,7 +347,7 @@ const SLOT_LEAVES = ['Rail', 'InspectorCard'];
 
 describe('a slot key through the shipped seam', () => {
   for (const name of SLOT_LEAVES) {
-    it(`${name} hands back a <div> slot element, drawn inside its root when mount returns`, () => {
+    it(`${name} hands back a <div> slot element, drawn inside its root when mount returns`, async () => {
       const { target, handle } = mountLeaf(name, { children: true });
       const slot = handle.slot('children');
       assert.equal(slot.localName, 'div');
@@ -356,6 +356,7 @@ describe('a slot key through the shipped seam', () => {
       assert.ok(slot.parentElement.parentElement === root, 'one private wrapper below the root');
       handle.destroy();
       assert.equal(target.childNodes.length, 0);
+      await settle();
       assert.deepEqual(reports, []);
     });
 
@@ -387,6 +388,7 @@ describe('a slot key through the shipped seam', () => {
       assert.equal(kicker.update({ children: 'Again' }), false, 'the nested mount ended');
       assert.equal(inner.childNodes.length, 0);
       assert.equal(target.childNodes.length, 0);
+      await settle();
       assert.deepEqual(reports, []);
     });
   }
