@@ -165,25 +165,6 @@
   text-transform: none;
 }
 
-/* The SECTION STRIP's own scale (maintainer parity round 3). */
-.fabricate-manager .manager-environment-tabs.manager-checks-sections {
-  gap: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-checks-sections .manager-environment-tab-button {
-  min-height: 38px;
-  gap: var(--fab-space-chip);
-  padding: var(--fab-space-3) var(--fab-space-4);
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-/* The active tab takes the ACCENT, not full text ink: the prototype separates the two, and the 2px accent underline below it is the same colour. */
-.fabricate-manager .manager-checks-sections .manager-environment-tab-button.is-active {
-  color: var(--fab-accent);
-  font-weight: 600;
-}
-
 /* The PANE heading — the studio's section title, above the cards. It was missing entirely, so the Outcomes screen opened on a card with no statement of what the screen is for. */
 .fabricate-manager .manager-checks-pane-head {
   margin: 0 0 var(--fab-space-4);

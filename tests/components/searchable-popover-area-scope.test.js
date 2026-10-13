@@ -426,7 +426,7 @@ const PRIMITIVES = Object.freeze([
       'manager-editor-tab-dot',
     ]),
     classMaps: Object.freeze(['DEFAULT_CLASSES']),
-    // Measured at this commit: 6 written, 14 family selectors, 9 owned.
+    // Measured at this commit: 6 written, 11 family selectors, 8 owned.
     writtenFloor: 4,
     familyFloor: 10,
     ownedFloor: 6,
@@ -1490,7 +1490,7 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
       'credits it and the control below proves nothing'
   );
 
-  // POSITIVE CONTROL 2: dropping the field really costs the family six of its nine owned rules,
+  // POSITIVE CONTROL 2: dropping the field really costs the family five of its eight owned rules,
   // stated as a measured DIFFERENCE over a copy of the entry with `classMaps` removed — the exact
   // state this component was in before the defaults were frozen into a map. The figure is the one
   // the GATE emits (`owned.length`), not the eight rules the change re-roots, because a control
@@ -1515,14 +1515,14 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
     pickerSelectors(written, entry).filter((selector) => isPrimitiveOwned(selector, written, entry));
   assert.equal(
     ownedIn(tabs, withMap).length,
-    9,
-    'the strip owns nine of the fourteen selectors that name a class it writes'
+    8,
+    'the strip owns eight of the eleven selectors that name a class it writes'
   );
   assert.equal(
     ownedIn(withoutMap, without).length,
     3,
-    'dropping the class map must take the gate-owned count from 9 to 3 — only the count, dot and ' +
-      'padlock rules survive, and the strip`s own container, button, hover, active, active-count, ' +
+    'dropping the class map must take the gate-owned count from 8 to 3 — only the count, dot and ' +
+      'padlock rules survive, and the strip`s own container, button, hover, active, ' +
       'active-padlock ' +
       'and badge rules all read CALLER-owned, gate-inert, and would have been left rooted at ' +
       '`.fabricate-manager` with this file reporting the family clean'

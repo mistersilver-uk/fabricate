@@ -308,7 +308,7 @@
   }
 
   .fab-stepper.is-disabled {
-    opacity: 0.55;
+    opacity: 0.45;
   }
 
   .fab-stepper.is-vertical {
@@ -324,7 +324,7 @@
     width: 100%;
     height: 26px;
     border-radius: 7px;
-    font-size: 0.7rem;
+    font-size: 11px;
   }
 
   .fab-stepper.is-vertical .fab-stepper-input {
@@ -372,7 +372,7 @@
     border-radius: 6px;
     color: var(--fab-text-subtle);
     background: transparent;
-    font-size: 0.62rem;
+    font-size: 9px;
     line-height: 1;
     cursor: pointer;
   }
@@ -417,8 +417,9 @@
     color: var(--fab-text);
     background: transparent;
     font-family: var(--fab-font-mono);
-    font-size: 0.74rem;
+    font-size: 11.5px;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
     text-align: center;
     appearance: textfield;
   }

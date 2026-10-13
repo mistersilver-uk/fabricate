@@ -1,7 +1,10 @@
 /**
- * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is
- * `{ name, path, version, props: { <key>: { kind: 'data', required? } }, rest }`, frozen. An entry
- * is appended, never interleaved; a breaking change to one bumps its own `version` (issue 2426).
+ * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
+ * frozen `{ name, path, version, props, rest, root }`, appended and never interleaved, and a
+ * breaking change to one bumps its own `version` (issue 2426). A prop is
+ * `{ kind: 'data' | 'text' | 'slot', required?, element? }`: a `text` key takes a string, and a
+ * `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says `'span'`. `root`
+ * is the ancestor the target needs: `'any'`, `'fabricate'` or `'manager'` (issue 2451).
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({
@@ -20,6 +23,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       hint: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
+    root: 'any',
   }),
   Object.freeze({
     name: 'Avatar',
@@ -34,6 +38,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       tint: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
+    root: 'any',
   }),
   Object.freeze({
     name: 'Medallion',
@@ -51,6 +56,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ink: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
+    root: 'any',
   }),
   Object.freeze({
     name: 'FillBar',
@@ -63,6 +69,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
+    root: 'any',
   }),
   Object.freeze({
     name: 'Meter',
@@ -76,6 +83,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       label: Object.freeze({ kind: 'data', required: true }),
     }),
     rest: true,
+    root: 'any',
   }),
   Object.freeze({
     name: 'BandedBar',
@@ -87,6 +95,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
+    root: 'any',
   }),
   Object.freeze({
     name: 'StatBox',
@@ -99,6 +108,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       tone: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
+    root: 'any',
   }),
   Object.freeze({
     name: 'InfoStrip',
@@ -110,5 +120,51 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       badge: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'Kicker',
+    path: 'src/ui/svelte/components/Kicker.svelte',
+    version: 1,
+    props: Object.freeze({
+      as: Object.freeze({ kind: 'data' }),
+      tone: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'Chip',
+    path: 'src/ui/svelte/components/Chip.svelte',
+    version: 1,
+    props: Object.freeze({
+      tone: Object.freeze({ kind: 'data' }),
+      density: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'Rail',
+    path: 'src/ui/svelte/components/Rail.svelte',
+    version: 1,
+    props: Object.freeze({
+      label: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'InspectorCard',
+    path: 'src/ui/svelte/components/InspectorCard.svelte',
+    version: 1,
+    props: Object.freeze({
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'fabricate',
   }),
 ]);

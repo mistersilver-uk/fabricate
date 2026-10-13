@@ -287,6 +287,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
+    'manager-published-leaves-specimen',
   ]),
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
@@ -307,6 +308,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
     'manager-world-downtime-tracking-described',
     'manager-world-downtime-narrow-settings',
+    // One frame per remaining render site, and the tool strip's 832 to 900px rung (issue 2464).
+    'manager-tool-parity-05-validation-1280x720',
+    'manager-tool-parity-06-breakage-900x700',
+    'manager-essence-edit-validation',
+    'manager-recipe-edit-validation',
+    'manager-gathering-task-editor-normal',
+    'manager-component-edit-validation',
+    'world-component-entry-validation',
+    'world-essence-entry',
+    'world-tool-entry-validation',
+    'player-salvage',
+    'player-gathering-events',
   ]),
   // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
@@ -516,6 +529,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-normal',
     'manager-tool-parity-01-library-1280x720',
     'manager-recipe-item-overview',
+    'manager-published-leaves-specimen',
   ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
   // and the roll prompt's additional-dice control.

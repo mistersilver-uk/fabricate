@@ -1,9 +1,10 @@
 /**
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
- * microtask timing, the target claim, three fault paths, destroy on a removed target, ancestor
- * independence, and a companion's own reactive contexts; then the adapter's table and `TierTrack`.
- * The issue 2448 leaves are `published-leaves-mounted.test.js`'s.
+ * microtask timing, a `text` key's one element, the target claim, three fault paths and their
+ * `onFault` notice, destroy on a removed target, ancestor independence, and a companion's own
+ * reactive contexts; then the adapter's table and `TierTrack`.
+ * The other shipped entries are `published-leaves-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -67,6 +68,8 @@ function seam(options = {}) {
 }
 
 const textOf = (target) => target.querySelector('.probe-text')?.textContent;
+const noteOf = (target) => target.querySelector('.probe-note');
+const NOTE_FALLBACK = 'NO NOTE';
 
 before(async () => {
   await harness.setup();
@@ -168,6 +171,61 @@ describe('a published component on the real runtime', () => {
   });
 });
 
+describe('a text key on the real runtime', () => {
+  it('draws the string in one attribute-free element, in place when mount returns', () => {
+    const ui = seam().publicApi;
+    const target = companionTarget(targets);
+    const handle = ui.mount('PublishedProbe', { target, props: { note: '<b>Now</b>' } });
+    const note = noteOf(target);
+    assert.equal(note.children.length, 1, 'one element');
+    const [span] = note.children;
+    assert.equal(span.localName, 'span');
+    assert.equal(span.attributes.length, 0, 'no class, attribute or style');
+    assert.equal(span.textContent, '<b>Now</b>', 'the string is text, never markup');
+    assert.equal(span.children.length, 0, 'no element was parsed out of it');
+    assert.ok(!note.querySelector('b'), 'no <b>');
+    handle.destroy();
+  });
+
+  it('draws a key first passed by update, keeps its element, and omits it when empty', async () => {
+    const ui = seam().publicApi;
+    const target = companionTarget(targets);
+    const handle = ui.mount('PublishedProbe', { target, props: {} });
+    const note = noteOf(target);
+    const root = target.querySelector('.probe');
+    assert.equal(note.textContent, NOTE_FALLBACK);
+    assert.equal(note.children.length, 0, 'no element without a note');
+    assert.equal(handle.update({ note: 'A' }), true);
+    await settle();
+    assert.equal(note.textContent, 'A', 'a key the mount never passed is drawn');
+    assert.equal(note.children.length, 1);
+    const [span] = note.children;
+    assert.equal(span.attributes.length, 0);
+    handle.update({ note: 'B' });
+    await settle();
+    assert.ok(note.children[0] === span, 'a new string is written into the same element');
+    assert.equal(span.textContent, 'B');
+    const textNode = span.firstChild;
+    handle.update({ note: 'B', text: 'Moved' });
+    await settle();
+    assert.equal(textOf(target), 'Moved');
+    assert.ok(span.firstChild === textNode, 'an unchanged string rewrites nothing');
+    for (const props of [{ note: '' }, {}]) {
+      handle.update(props);
+      await settle();
+      assert.equal(note.textContent, NOTE_FALLBACK, 'the fallback is back');
+      assert.equal(note.children.length, 0, 'and the element is gone');
+      handle.update({ note: 'C' });
+      await settle();
+      assert.equal(note.children.length, 1);
+      assert.equal(note.children[0].textContent, 'C', 'drawn again with the current string');
+    }
+    assert.ok(target.querySelector('.probe') === root, 'the same root node, so nothing remounted');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+});
+
 describe('the adapter', () => {
   it("binds exactly the manifest paths, each to that path's own component", async () => {
     assert.ok(Object.isFrozen(adapterComponents));
@@ -176,6 +234,7 @@ describe('the adapter', () => {
       const { default: component } = await harness.loadRuneModule(path);
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
     }
+    assert.equal(runtime.unmount.constructor.name, 'Function', 'never async');
   });
 });
 
@@ -458,18 +517,60 @@ describe('a published component that faults', () => {
     });
   }
 
+  for (const [fault, props, update] of FAULTS) {
+    it(`tells onFault of a fault at ${fault} once, with the target empty and free`, async () => {
+      const instance = seam();
+      const target = companionTarget(targets);
+      const seen = [];
+      const mounted = {};
+      const onFault = (error) => {
+        seen.push({ error, children: target.childNodes.length, update: mounted.handle.update({}) });
+        mounted.again = instance.publicApi.mount('PublishedProbe', {
+          target,
+          props: { text: 'Fallback' },
+        });
+      };
+      mounted.handle = instance.publicApi.mount('PublishedProbe', { target, props, onFault });
+      assert.equal(seen.length, 0, 'never inside mount');
+      await settle();
+      if (update) {
+        assert.equal(mounted.handle.update(update), true);
+        assert.equal(seen.length, 0, 'never inside update');
+        await settle();
+      }
+      assert.equal(seen.length, 1, 'told once');
+      assert.ok(seen[0].error === probe.PROBE_FAULTS[fault], "the probe's own Error");
+      assert.equal(seen[0].children, 0, 'the target was already empty');
+      assert.equal(seen[0].update, false, 'the handle was already inert');
+      assert.equal(textOf(target), 'Fallback', 'a mount from inside it took the target');
+      assert.equal(mounted.again.update({ text: 'Still' }), true);
+      mounted.again.destroy();
+      await settle();
+      assert.equal(seen.length, 1);
+      assert.equal(reports.length, 1);
+      assert.deepEqual(escaped, []);
+    });
+  }
+
   it('contains a fault Svelte delivers inside flushSync', async () => {
     const instance = seam();
     const target = companionTarget(targets);
-    const handle = instance.publicApi.mount('PublishedProbe', { target, props: {} });
+    const told = [];
+    const onFault = (error) => {
+      told.push(error);
+    };
+    const handle = instance.publicApi.mount('PublishedProbe', { target, props: {}, onFault });
     await settle();
     handle.update({ explode: true });
     flushSync();
+    assert.deepEqual(told, [], 'onFault is not called inside the flush that delivered the fault');
     assert.deepEqual(escaped, []);
     assert.deepEqual(reports, [[FAULT_REPORT, 'PublishedProbe', probe.PROBE_FAULTS.explode]]);
     assert.equal(handle.update({}), false, "the boundary's onerror retired it inside flushSync");
     assert.equal(target.childNodes.length, 0, 'unmounted inside the flush that delivered it');
     await settle();
+    assert.equal(told.length, 1, 'and is called once the flush has returned');
+    assert.ok(told[0] === probe.PROBE_FAULTS.explode);
     assert.deepEqual(escaped, []);
     assert.equal(target.childNodes.length, 0);
     assert.equal(instance.liveMountCount(), 0);

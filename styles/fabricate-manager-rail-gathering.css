@@ -466,17 +466,9 @@
   flex: 0 0 auto;
   color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
-  font-size: 0.625rem;
+  font-size: 10.5px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-}
-
-.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count {
-  color: var(--fab-accent);
-}
-
-.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-count {
-  color: var(--fab-accent);
 }
 
 /* The formula token quick-add row (issue 1096): a wrap of small mono chips under the formula field. */

@@ -2480,8 +2480,8 @@ const NEGATIVE_CONTROLS =
   // `.fabricate-tabs button` member is a (0,1,1) TIE with the area's own bare-element baseline,
   // declared later and so winning on source order with the identical declaration — which means
   // that inside the manager it must be a no-op, and this is the element that says so with a
-  // measurement rather than with an argument. The button's own (0,2,0) rule states the 0.78rem
-  // and the 700 weight, and the floor must not disturb either.
+  // measurement rather than with an argument. The button's own (0,2,0) rule states the 12.5px
+  // and its (0,3,0) current-tab rule the 600 weight, and the floor must not disturb either.
   '<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="neg-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="neg-tab"><span>Overview</span></button></div>';
 
 /**
