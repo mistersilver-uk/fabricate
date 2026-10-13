@@ -1,66 +1,50 @@
 <!--
-  A roll-expression field, with or without the `@` affix. `sigil={false}` is a PLAIN input showing
-  and writing the stored value byte for byte: a maintainer ruling (issue 1096), because an
-  expression may now be `1d4` and a cap that prepends `@` would make that `@1d4`, so the surrounding
-  copy teaches the leading `@` instead. It DROPS THE AFFIX WRAPPER, not just the glyph, which insets
-  its content and strips the inner `<input>`'s border — kept, it rendered a visible seam, and
-  hanging a class on it instead is how this comes back. `sigil` defaults to TRUE, so the Tool
-  Studio's bonus-expression field keeps the behaviour its own hint documents.
+  The design system's `<ExprInput>`: a roll-expression field that shows and writes the stored text
+  unchanged. It states the mono face and draws no box; the box is its host's.
+
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `value` | string | `''` | The stored expression, shown byte for byte. |
+  | `placeholder` | string | `''` | The caller's example, which is where a leading `@` is taught. |
+  | `disabled` | boolean | `false` | Disables the input. |
+  | `class` | class string | `''` | An extra class, appended to `fab-expr-input`. |
+
+  Callbacks:
+  - `onChange(expression)` — every keystroke, with the text as typed.
+
+  Rest spread:
+  - `{...rest}` lands on the `<input>`, which is the root, written after `class={…}`: the caller's
+    hook, name, description and invalid state.
+
+  Invariants:
+  - The template is the one `<input>`, and nothing adds or strips an `@`.
+  - A caller's `oninput` is not honoured: the component's own follows the spread. Both pinned by
+    `tests/components/expr-input-mounted.test.js`.
 -->
 <script>
-  import {
-    displayRollDataExpression,
-    toStoredRollDataExpression,
-  } from '../../../../systems/characterModifierPrerequisiteCopy.js';
-
   let {
     value = '',
-    placeholder = 'abilities.str.mod',
+    placeholder = '',
     disabled = false,
-    dataField = '',
-    inputAttrs = {},
-    sigil = true,
+    class: extraClass = '',
     onChange = () => {},
+    ...rest
   } = $props();
-
-  const displayValue = $derived(sigil ? displayRollDataExpression(value) : String(value ?? ''));
-  const showSigil = $derived(
-    sigil &&
-      (String(value || '').trim() === '' || /^@?[A-Za-z_][\w.]*$/.test(String(value || '').trim()))
-  );
-
-  function write(raw) {
-    onChange(sigil ? toStoredRollDataExpression(raw) : raw);
-  }
 </script>
 
-<!-- ONE definition of the field, rendered into either tree, so the two cannot drift. -->
-{#snippet field()}
-  <input
-    type="text"
-    class:is-plain={!sigil}
-    value={displayValue}
-    {placeholder}
-    {disabled}
-    data-roll-data-expression={dataField || undefined}
-    {...inputAttrs}
-    oninput={(event) => write(event.currentTarget.value)}
-  />
-{/snippet}
-
-{#if sigil}
-  <div class="manager-prerequisite-path-input manager-roll-data-expression-input">
-    {#if showSigil}<span class="manager-prerequisite-at" aria-hidden="true">@</span>{/if}
-    {@render field()}
-  </div>
-{:else}
-  {@render field()}
-{/if}
+<input
+  type="text"
+  class={['fab-expr-input', extraClass]}
+  value={String(value ?? '')}
+  {placeholder}
+  {disabled}
+  {...rest}
+  oninput={(event) => onChange(event.currentTarget.value)}
+/>
 
 <style>
-  /* The plain field is the library's mono `<ExprInput>`; the affixed branch keeps its wrapper's
-     type. */
-  .is-plain {
+  .fab-expr-input {
     font-family: var(--fab-font-mono);
     font-size: 11.5px;
     font-weight: 500;

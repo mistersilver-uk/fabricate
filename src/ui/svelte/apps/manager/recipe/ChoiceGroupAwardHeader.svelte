@@ -255,22 +255,17 @@
       >
       <span class="manager-recipe-option-controls">
         <RollDataExpressionInput
-          sigil={false}
           value={group?.selectionFormula ?? ''}
           placeholder="1d20"
-          inputAttrs={{
-            'data-recipe-option-formula': '',
-            'data-recipe-group-selection': '',
-            'aria-labelledby': selectionId,
-            title: localizeOr(
-              'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.SelectionHint',
-              'Rolled against the crafting character once per award; its total picks the alternative whose range holds it.'
-            ),
-            ...(selectionInvalid && {
-              'aria-invalid': 'true',
-              'aria-describedby': `${selectionId}-problem`,
-            }),
-          }}
+          data-recipe-option-formula=""
+          data-recipe-group-selection=""
+          aria-labelledby={selectionId}
+          title={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.SelectionHint',
+            'Rolled against the crafting character once per award; its total picks the alternative whose range holds it.'
+          )}
+          aria-invalid={selectionInvalid ? 'true' : undefined}
+          aria-describedby={selectionInvalid ? `${selectionId}-problem` : undefined}
           onChange={(formula) => onChange(withSelection(group, formula))}
         />
         {#if selectionInvalid}

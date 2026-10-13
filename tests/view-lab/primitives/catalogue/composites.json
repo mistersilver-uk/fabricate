@@ -4,8 +4,12 @@
     "cap": "expression — resolved only where an actor is in scope",
     "draws": ".k-field.mono",
     "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
+    "undrawn": {
+      "Expression": "the field’s accessible name; the drawing draws the field alone"
+    },
     "props": {
-      "value": "1d20 + @prof + @abilities.dex.mod"
+      "value": "1d20 + @prof + @abilities.dex.mod",
+      "aria-label": "Expression"
     }
   },
   {

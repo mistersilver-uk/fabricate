@@ -1081,7 +1081,7 @@ describe('the world Tool entry (issue 1373)', () => {
       });
 
       assert.ok(
-        !target.querySelector('[data-roll-data-expression="tool-bonus"]'),
+        !target.querySelector('.fab-expr-input'),
         'the world entry has no free-text bonus field either'
       );
       const rows = [...target.querySelectorAll('[data-tool-bonus-modifier]')];

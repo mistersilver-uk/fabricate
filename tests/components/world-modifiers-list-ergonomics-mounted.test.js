@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
-    // `RollDataExpressionInput` reads the shared `@`-sigil helpers from the copy module.
+    // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
   ],
@@ -138,13 +138,9 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     assert.ok(row.querySelector('.manager-modifier-body'), 'the editor body opens');
     const trigger = row.querySelector('.essence-icon-picker-trigger');
     assert.ok(trigger, 'the modifier editor renders an IconPicker trigger, not a bare text input');
-    // The expression field is `RollDataExpressionInput` with `sigil={false}` (maintainer
-    // ruling, issue 1096): a PLAIN input over the stored value. The `@` cap was written when an
-    // expression was always a roll-data path, and dice retired that premise — a cap that
-    // prepends `@` to whatever is typed turns `1d4` into `@1d4`, and the adaptive cap that
-    // shipped restructures the field as the GM types. Both halves are asserted, because
-    // "shows the value" and "draws no cap" are different claims and dropping either would
-    // leave half the ruling unguarded.
+    // The expression field is `RollDataExpressionInput`, a plain input over the stored value
+    // (maintainer ruling, issue 1096). Both halves are asserted, because "shows the value" and
+    // "draws no cap" are different claims.
     const expressionInput = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(expressionInput, 'the editor exposes the expression field');
     assert.equal(
