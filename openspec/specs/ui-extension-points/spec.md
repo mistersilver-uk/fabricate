@@ -462,12 +462,13 @@ A Foundry 14 detached window's target is judged the same way.
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 - A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
-- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and stops no other key.
-The press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
+A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
+Enter presses on key down and again on each repeat while held, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
-In any other ApplicationV2 window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off.
+In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
 - A control's accessible name is text the companion passes through a key its group names, and Fabricate supplies none.
 - Fabricate moves no focus.
@@ -481,12 +482,14 @@ The companion keeps `target` out of any element of its own that carries `data-ac
 The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
 - A control is unavailable only through a key its group names.
 A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead.
+In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
 - A control's only motion is the fade of its own state change.
 Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
-- A control opens no tooltip at version 1, Fabricate's or Foundry's, and the companion passes no `title` or `data-tooltip`.
+- A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
+A Foundry tooltip attribute the companion passes through rest lands on the component's root, never on the control: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 A control whose face is a glyph alone is published only with a required key for its name, and its group says whether the pointer is shown that name.
 
 ### The issue 2448 components
@@ -649,8 +652,8 @@ Each group states the accepted values of every key that entry publishes.
   - Fabricate removes no notice on a timer, and a companion that does gives a notice that carries an action no time limit.
   - The button's label is part of the live region: an `update` that changes it is announced, by some screen readers together with the whole notice, so the companion changes it only to report a change of state.
   - An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
-    An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so the companion moves focus first, as `### Interactive components` states.
-    The button is the only focusable element inside `target`.
+    An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so where it does the companion moves focus first, as `### Interactive components` states.
+    The button is the only focusable element inside `target`, so `target.querySelector('button')` reaches it.
     In a host that replaces its content on render (DialogV2, a Handlebars part) the button is a new element after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses the button.
     The keyboard ring is the accent, 2px outside the button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
   - It draws no dismissal at version 1, so the companion removes it with `destroy`.
