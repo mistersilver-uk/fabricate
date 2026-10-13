@@ -1,9 +1,10 @@
 /**
- * Issue 2448's seven published leaves, and issue 2451's `Kicker` and `Chip`, on Fabricate's real
- * Svelte runtime, each through a fresh seam registered with the adapter's own table, into a bare
- * companion target: mount, update on one root and destroy; the seam's refusal of an unpublished or
- * missing prop; a `text` key drawn as text; and what each leaf draws from its own stylesheet under
- * no Fabricate ancestor.
+ * Issue 2448's seven published leaves, and issue 2451's `Kicker`, `Chip`, `Rail` and
+ * `InspectorCard`, on Fabricate's real Svelte runtime, each through a fresh seam registered with
+ * the adapter's own table, into a bare companion target or the shell its root needs: mount, update
+ * on one root and destroy; the seam's refusal of an unpublished or missing prop; a `text` key drawn
+ * as text and a `slot` key filled; and what each `any` leaf draws from its own stylesheet under no
+ * Fabricate ancestor.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -19,6 +20,7 @@ import {
   PUBLISHED_SEAM,
   assertClipped,
   companionTarget,
+  fabricateTarget,
   recordEscapes,
   settle,
   shippedSeam,
@@ -53,8 +55,14 @@ const ui = () =>
     },
   });
 
+/** An empty target for `name`: bare, or inside the shell its entry in `LEAVES` names. */
+function targetFor(name) {
+  const under = LEAVES.find((leaf) => leaf.name === name)?.under;
+  return under ? fabricateTarget(targets, under) : companionTarget(targets);
+}
+
 function mountLeaf(name, props) {
-  const target = companionTarget(targets);
+  const target = targetFor(name);
   return { target, handle: ui().mount(name, { target, props }) };
 }
 
@@ -78,7 +86,7 @@ afterEach(() => {
   for (const shell of targets) shell.remove();
 });
 
-/** Each leaf's root, and a mount and an update that changes `read`. */
+/** Each leaf's root, a mount and an update that changes `read`, and the shell its root needs. */
 const LEAVES = Object.freeze([
   {
     name: 'Avatar',
@@ -152,6 +160,23 @@ const LEAVES = Object.freeze([
     read: (root) => root.textContent,
     drawn: ['Locked', 'Open'],
   },
+  {
+    name: 'Rail',
+    root: '.fab-rail',
+    props: { label: 'Standing' },
+    next: { label: 'Renown' },
+    read: (root) => root.querySelector('.fab-rail-label').textContent,
+    drawn: ['Standing', 'Renown'],
+  },
+  {
+    name: 'InspectorCard',
+    under: 'fabricate',
+    root: '.fabricate-card',
+    props: {},
+    next: { children: true },
+    read: (root) => root.children.length,
+    drawn: [0, 1],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -200,10 +225,12 @@ describe('a key a leaf does not publish', () => {
     ['Chip', 'tag', 'is not a data attribute'],
     ['Chip', 'removable', 'is not a data attribute'],
     ['Chip', 'element', 'is not a data attribute'],
+    ['Rail', 'class', 'is not a data attribute'],
+    ['InspectorCard', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
-      const target = companionTarget(targets);
+      const target = targetFor(name);
       assert.throws(() => ui().mount(name, { target, props: { ...propsOf(name), [key]: 'x' } }), {
         name: 'TypeError',
         message: `${REFUSAL}"${key}" ${refusal}`,
@@ -221,7 +248,7 @@ describe('a required prop', () => {
           const given = { ...props };
           if (value === undefined) delete given[key];
           else given[key] = value;
-          const target = companionTarget(targets);
+          const target = targetFor(name);
           assert.throws(() => ui().mount(name, { target, props: given }), {
             name: 'TypeError',
             message: `${REFUSAL}${name} requires a non-empty "${key}"`,
@@ -312,6 +339,116 @@ describe('a text key through the shipped seam', () => {
     );
     assert.ok(!chip.hasAttribute('role') && !chip.hasAttribute('tabindex'), 'no role, no focus');
     assert.ok(!target.querySelector('button, a, input, [tabindex]'), 'nothing focusable');
+    handle.destroy();
+  });
+});
+
+const SLOT_LEAVES = ['Rail', 'InspectorCard'];
+
+describe('a slot key through the shipped seam', () => {
+  for (const name of SLOT_LEAVES) {
+    it(`${name} hands back a <div> slot element, drawn inside its root when mount returns`, () => {
+      const { target, handle } = mountLeaf(name, { children: true });
+      const slot = handle.slot('children');
+      assert.equal(slot.localName, 'div');
+      const root = target.firstElementChild;
+      assert.ok(root.contains(slot), 'inside the root');
+      assert.ok(slot.parentElement.parentElement === root, 'one private wrapper below the root');
+      handle.destroy();
+      assert.equal(target.childNodes.length, 0);
+      assert.deepEqual(reports, []);
+    });
+
+    for (const [value, what] of [
+      ['x', 'a string'],
+      [1, 'a number'],
+      [null, 'null'],
+    ]) {
+      it(`${name} refuses ${what} for its content slot (M15), and renders nothing`, () => {
+        const target = targetFor(name);
+        assert.throws(() => ui().mount(name, { target, props: { children: value } }), {
+          name: 'TypeError',
+          message: `${REFUSAL}"children" is a slot and takes true or false`,
+        });
+        assert.equal(target.childNodes.length, 0);
+      });
+    }
+
+    it(`${name} draws a Kicker mounted in its content slot, and its destroy ends both`, async () => {
+      const seam = ui();
+      const target = targetFor(name);
+      const outer = seam.mount(name, { target, props: { children: true } });
+      const inner = target.ownerDocument.createElement('div');
+      outer.slot('children').append(inner);
+      const kicker = seam.mount('Kicker', { target: inner, props: { children: 'Renown' } });
+      await settle();
+      assert.equal(target.firstElementChild.querySelector('.fab-kicker').textContent, 'Renown');
+      outer.destroy();
+      assert.equal(kicker.update({ children: 'Again' }), false, 'the nested mount ended');
+      assert.equal(inner.childNodes.length, 0);
+      assert.equal(target.childNodes.length, 0);
+      assert.deepEqual(reports, []);
+    });
+  }
+});
+
+describe('Rail under a bare ancestor', () => {
+  it('names itself a group by its label, drawn as a paragraph', () => {
+    const { target, handle } = mountLeaf('Rail', { label: 'Standing' });
+    const rail = target.querySelector('.fab-rail');
+    assert.equal(rail.localName, 'section');
+    assert.equal(rail.getAttribute('role'), 'group');
+    const label = rail.querySelector('p.fab-rail-label');
+    assert.equal(label.textContent, 'Standing');
+    assert.ok(label.id.length > 0, 'the label carries an id');
+    assert.equal(rail.getAttribute('aria-labelledby'), label.id);
+    handle.destroy();
+  });
+
+  it('is an unnamed section with no label', () => {
+    const { target, handle } = mountLeaf('Rail', {});
+    const rail = target.querySelector('.fab-rail');
+    assert.equal(rail.localName, 'section');
+    assert.ok(!rail.hasAttribute('role') && !rail.hasAttribute('aria-labelledby'), 'no naming');
+    assert.ok(!rail.querySelector('p'), 'no paragraph');
+    assert.equal(rail.children.length, 0);
+    handle.destroy();
+  });
+
+  it('lays its children out in a column, and its label in its own ink and case', async () => {
+    const theme = ':root[data-fabricate-theme] { --fab-text-muted: rgb(1, 2, 3); }';
+    await underSheet(theme, async () => {
+      const { target, handle } = mountLeaf('Rail', { label: 'Standing', children: true });
+      await settle();
+      const rail = getComputedStyle(target.querySelector('.fab-rail'));
+      assert.equal(rail.display, 'flex');
+      assert.equal(rail.flexDirection, 'column');
+      const label = getComputedStyle(target.querySelector('.fab-rail-label'));
+      assert.equal(label.color, 'rgb(1, 2, 3)');
+      assert.equal(label.fontSize, '8.5px');
+      assert.equal(label.textTransform, 'uppercase');
+      handle.destroy();
+    });
+  });
+});
+
+describe('InspectorCard and its required root', () => {
+  it('refuses a bare target (M16), and renders nothing', () => {
+    const target = companionTarget(targets);
+    assert.throws(() => ui().mount('InspectorCard', { target, props: {} }), {
+      name: 'TypeError',
+      message: `${REFUSAL}InspectorCard needs a Fabricate window ancestor`,
+    });
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('draws an unnamed section whose one class is the card root, under a .fabricate shell', () => {
+    const { target, handle } = mountLeaf('InspectorCard', { 'data-companion-card': 'renown' });
+    const card = target.firstElementChild;
+    assert.equal(card.localName, 'section');
+    assert.deepEqual([...card.classList], ['fabricate-card']);
+    assert.ok(!card.hasAttribute('role') && !card.hasAttribute('aria-labelledby'), 'no naming');
+    assert.equal(card.getAttribute('data-companion-card'), 'renown');
     handle.destroy();
   });
 });

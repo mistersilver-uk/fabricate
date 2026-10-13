@@ -962,7 +962,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // The published leaves (issue 2448): both portrait states and the 26px art rung on their ladder
   // boxes, the portrait art cropped to cover, the meter's clipped label, and a stat box's kicker in
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
-  // size and ink (issue 2451).
+  // size and ink, the rail's and the card's column, the card's box, and each slot element and its
+  // wrapper taking no box (issue 2451).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -971,7 +972,10 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',
       styles: 'width: 26px; height: 26px; border-radius: 7px',
     },
-    { selector: '.fab-meter-hidden', styles: 'position: absolute; width: 1px; height: 1px' },
+    {
+      selector: '.fab-meter[aria-valuetext] > .fab-meter-hidden',
+      styles: 'position: absolute; width: 1px; height: 1px',
+    },
     {
       selector: '.fab-stat-box:has(.has-icon) .fab-kicker',
       styles: 'font-size: 8.5px; color: var(--fab-text-muted)',
@@ -985,6 +989,16 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: '.manager-chip.is-neutral.is-list',
       styles: 'font-size: 9px; color: var(--fab-text-muted)',
     },
+    { selector: '.fab-rail', styles: 'display: flex; row-gap: 8px' },
+    {
+      selector: '.fabricate-card',
+      styles:
+        'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+    },
+    { selector: '.fab-rail > div', styles: 'display: contents' },
+    { selector: '.fab-rail > div > div', styles: 'display: contents' },
+    { selector: '.fabricate-card > div', styles: 'display: contents' },
+    { selector: '.fabricate-card > div > div', styles: 'display: contents' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5481,12 +5495,27 @@ test('every published component seam module, and the host, selects both specimen
   }
 });
 
-test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount', () => {
+test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
     .find((declarator) => declarator.id.name === 'MOUNTS');
-  const mounted = mounts.init.arguments[0].elements.map((mount) => mount.elements[0].value);
+  const nameOf = (mount) => mount.elements[0].value;
+  const outer = mounts.init.arguments[0].elements;
+  const mounted = outer.map(nameOf);
+  const nested = outer.flatMap((mount) =>
+    (mount.elements[2]?.elements ?? []).map((inner) => [nameOf(mount), nameOf(inner)])
+  );
+  assert.deepEqual(
+    nested,
+    [
+      ['Rail', 'Meter'],
+      ['Rail', 'InfoStrip'],
+      ['InspectorCard', 'Kicker'],
+      ['InspectorCard', 'StatBox'],
+    ],
+    'the mounts the fixture makes inside a content slot, in fixture order'
+  );
   assert.deepEqual(
     [...new Set(mounted)].sort(byCodePoint),
     PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
@@ -5502,13 +5531,27 @@ test('the leaves specimen mounts every published component but TierTrack and che
     Array.from({ length: mounted.length }, (_, index) => String(index + 1)),
     'one containment check per section, in fixture order'
   );
+  const HOST_ROOTS = { Rail: '.fab-rail', InspectorCard: '.fabricate-card' };
+  const hostRoot = (host) =>
+    `${ground} > section[data-published="${host}"] > div > ${HOST_ROOTS[host]}`;
   assert.deepEqual(
     expectContained.filter(({ target }) => !target.includes(':nth-child(')),
     [
+      ...nested.map(([host, name]) => ({
+        container: hostRoot(host),
+        target: `${hostRoot(host)} [data-nested="${name}"] > *`,
+      })),
       { container: wrappedChip, target: `${wrappedChip} > span` },
       { container: '.window-content', target: ground },
     ],
-    'then the wrapped label inside its chip, and the ground inside the window'
+    'then each nested root inside its host root, the wrapped label inside its chip, and the ground inside the window'
+  );
+  assert.deepEqual(
+    expectContained
+      .slice(mounted.length, mounted.length + nested.length)
+      .map(({ target }) => target),
+    nested.map(([host, name]) => `${hostRoot(host)} [data-nested="${name}"] > *`),
+    'the nested entries directly follow the per-section ones'
   );
 });
 

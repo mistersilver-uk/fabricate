@@ -146,4 +146,25 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'any',
   }),
+  Object.freeze({
+    name: 'Rail',
+    path: 'src/ui/svelte/components/Rail.svelte',
+    version: 1,
+    props: Object.freeze({
+      label: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'InspectorCard',
+    path: 'src/ui/svelte/components/InspectorCard.svelte',
+    version: 1,
+    props: Object.freeze({
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);

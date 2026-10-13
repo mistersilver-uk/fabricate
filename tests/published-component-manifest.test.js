@@ -3,9 +3,10 @@
  * props, rest, root and each key's kind, then its import closure of `.svelte` and `.js` files: a
  * stylesheet and template that need no ancestor above the entry's root, no read of a Foundry
  * global, no class the module sheet names under an `any` root, and focusable elements marked as
- * admission rule 9 asks; then the module sheet's selectors that name the published `Chip`'s root
- * class (issue 2451). The test-only probe runs beside the shipped entries; the adapter's bindings
- * are the mounted suite's.
+ * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
+ * module sheet, and the published `InspectorCard`'s in the sheet and every component `<style>`
+ * (issue 2451). The test-only probe runs beside the shipped entries; the adapter's bindings are
+ * the mounted suite's.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
  * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
@@ -15,11 +16,13 @@
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
  * forwarded `text` or `slot` key fails closed and a forwarded `data` key is not seen.
- * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and takes on
- * trust that no extension target sits under a `CHIP_LAYOUT_ANCESTORS` class.
+ * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
+ * census takes on trust that no extension target sits under one of its pinned ancestor classes.
+ * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
+ * takes Fabricate's private rule.
  */
 import assert from 'node:assert/strict';
-import { posix } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
@@ -34,6 +37,7 @@ import {
   walkNodes,
 } from './helpers/moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from './helpers/parsedSource.js';
+import { readScannedDirectory, repoRoot } from './helpers/sourceScan.js';
 import { parseComponentScope, readsGlobal } from './helpers/svelteStructureContract.js';
 
 const byName = (a, b) => a.localeCompare(b);
@@ -194,7 +198,6 @@ function declarationFaults(entry, ast) {
   });
 }
 
-const CHIP_ROOT = 'manager-chip';
 /** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
@@ -226,54 +229,152 @@ const CHIP_LAYOUT_ANCESTORS = new Set([
   'manager-component-tag-run',
 ]);
 
+/**
+ * What a census needs of a published root class: the classes its published keys can write beside
+ * it, the ancestor classes no extension target sits under, and whether it draws the companion's
+ * own children. The ancestor sets are per root and never merged.
+ */
+const CHIP = Object.freeze({
+  root: 'manager-chip',
+  writable: PUBLISHED_CHIP_CLASSES,
+  ancestors: CHIP_LAYOUT_ANCESTORS,
+  drawsChildren: false,
+});
+const CARD = Object.freeze({
+  root: 'fabricate-card',
+  writable: new Set(),
+  ancestors: new Set(['manager-checks-rail', 'manager-inspector']),
+  drawsChildren: true,
+});
+
 const classesOf = (compound) =>
   compound.selectors.filter((part) => part.type === 'ClassSelector').map((part) => part.name);
 
+/** A complex selector's compounds in order, each `:global(…)` replaced by the compounds it wraps. */
+function compoundsOf(complex) {
+  const compounds = [];
+  for (const relative of complex.children) {
+    let current = { combinator: relative.combinator?.name ?? null, selectors: [] };
+    compounds.push(current);
+    for (const part of relative.selectors) {
+      const isGlobal = part.type === 'PseudoClassSelector' && part.name === 'global';
+      if (!isGlobal || part.args?.children.length !== 1) {
+        current.selectors.push(part);
+        continue;
+      }
+      const [first, ...rest] = compoundsOf(part.args.children[0]);
+      current.selectors.push(...first.selectors);
+      compounds.push(...rest);
+      current = rest.at(-1) ?? current;
+    }
+  }
+  return compounds;
+}
+
 /**
- * Whether no element a published `Chip` draws can match `complex`: its chip compound takes a class
- * the published keys cannot write or `:disabled`, a later compound needs a classed descendant (the
- * chip draws none), or an earlier one is a pinned layout ancestor. Anything else fails closed.
+ * Whether no element a published component draws at `shape.root` can match `complex`: its root
+ * compound takes a class the published keys cannot write or `:disabled`, or an earlier compound is
+ * a pinned ancestor, or a later one needs a descendant the mount cannot hold. A root that draws no
+ * children holds no classed descendant; one that draws the companion's holds none classed
+ * `manager-*` unless a published closure spells that class. An attribute selector never makes a
+ * selector safe, and anything else fails closed.
  */
-function cannotMatchPublishedChip(complex) {
-  const compounds = complex.children;
-  const at = compounds.findLastIndex((compound) => classesOf(compound).includes(CHIP_ROOT));
+function cannotMatchPublished(complex, shape, spelled = new Set()) {
+  const { root, writable, ancestors, drawsChildren } = shape;
+  const compounds = compoundsOf(complex);
+  const at = compounds.findLastIndex((compound) => classesOf(compound).includes(root));
   if (at === -1) return false;
-  const chip = compounds[at];
-  const unwritable = classesOf(chip).some(
-    (name) => name !== CHIP_ROOT && !PUBLISHED_CHIP_CLASSES.has(name)
-  );
-  const disabled = chip.selectors.some(
+  const own = compounds[at];
+  const unwritable = classesOf(own).some((name) => name !== root && !writable.has(name));
+  const disabled = own.selectors.some(
     (part) => part.type === 'PseudoClassSelector' && part.name === 'disabled'
   );
-  const classedChild = compounds.slice(at + 1).some((compound) => classesOf(compound).length > 0);
-  const layoutAncestor = compounds
+  const unheld = drawsChildren
+    ? (name) => name.startsWith('manager-') && !spelled.has(name)
+    : () => true;
+  const classedChild = compounds.slice(at + 1).some((compound) => classesOf(compound).some(unheld));
+  const pinnedAncestor = compounds
     .slice(0, at)
-    .some((compound) => classesOf(compound).some((name) => CHIP_LAYOUT_ANCESTORS.has(name)));
-  return unwritable || disabled || classedChild || layoutAncestor;
+    .some((compound) => classesOf(compound).some((name) => ancestors.has(name)));
+  return unwritable || disabled || classedChild || pinnedAncestor;
+}
+
+/** Every selector of one parsed stylesheet that names `root`, wherever in the selector. */
+function selectorsNaming(css, root) {
+  const found = [];
+  for (const node of walkNodes(css)) {
+    if (node.type !== 'Rule') continue;
+    for (const complex of node.prelude.children) {
+      const names = [...walkNodes(complex)].some(
+        (part) => part.type === 'ClassSelector' && part.name === root
+      );
+      if (names) found.push(complex);
+    }
+  }
+  return found;
 }
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
   const { source, ast } = templateOf(file, `<style>${css}</style>`);
-  const found = [];
-  for (const node of walkNodes(ast.css)) {
-    if (node.type !== 'Rule') continue;
-    for (const complex of node.prelude.children) {
-      const names = [...walkNodes(complex)].some(
-        (part) => part.type === 'ClassSelector' && part.name === CHIP_ROOT
-      );
-      if (!names) continue;
-      const selector = source.slice(complex.start, complex.end);
-      found.push({ selector: `${file}: ${selector}`, safe: cannotMatchPublishedChip(complex) });
-    }
-  }
-  return found;
+  return selectorsNaming(ast.css, CHIP.root).map((complex) => ({
+    selector: `${file}: ${source.slice(complex.start, complex.end)}`,
+    safe: cannotMatchPublished(complex, CHIP),
+  }));
 }
 
 const unsafeChipSelectors = (file, css) =>
   chipSelectors(file, css)
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
+
+const PART_TEXT = Object.freeze({
+  ClassSelector: (part) => `.${part.name}`,
+  AttributeSelector: (part) => `[${part.name}${part.matcher ?? ''}${part.value ?? ''}]`,
+  TypeSelector: (part) => part.name,
+  PseudoClassSelector: (part) => `:${part.name}`,
+  PseudoElementSelector: (part) => `::${part.name}`,
+});
+
+/** A selector spelled from its compounds, so a `:global()` rule and a sheet rule read alike. */
+function flatSelector(complex) {
+  return compoundsOf(complex)
+    .map(({ combinator, selectors }) => {
+      const lead = combinator && combinator !== ' ' ? `${combinator} ` : '';
+      return lead + selectors.map((part) => PART_TEXT[part.type]?.(part) ?? part.type).join('');
+    })
+    .join(' ');
+}
+
+/** Every selector of one parsed stylesheet that names the card root, as `{ selector, safe }`. */
+function cardSelectors(file, css, spelled) {
+  return selectorsNaming(css, CARD.root).map((complex) => ({
+    selector: `${file}: ${flatSelector(complex)}`,
+    safe: cannotMatchPublished(complex, CARD, spelled),
+  }));
+}
+
+/** Every `.svelte` file under `dir`, recursively, by path. */
+function componentPathsUnder(dir, isRoot = true) {
+  return readScannedDirectory(resolve(repoRoot, dir), { isRoot })
+    .flatMap((entry) => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return componentPathsUnder(path, false);
+      return path.endsWith('.svelte') ? [path] : [];
+    })
+    .sort(byName);
+}
+
+/** The card's own two family rules, which draw all of it under a Fabricate window. */
+const CARD_FAMILY_RULES = Object.freeze([
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-card.fabricate-card',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-card.fabricate-card',
+]);
+/** The component rules a card matches only through a `data-*` hook Fabricate writes. */
+const CARD_DATA_HOOK_RULES = Object.freeze([
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte: .fabricate-card[data-crafting-modifier-catalogue]',
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte: .fabricate-card[data-crafting-modifier-policy-card]',
+]);
 
 /**
  * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
@@ -392,6 +493,15 @@ const SHEET_REACH_PINS = Object.freeze([
   'src/ui/svelte/components/Chip.svelte: manager-chip',
 ]);
 
+/** Every `manager-` class token a published closure spells, the probe's included. */
+function publishedManagerClasses() {
+  const tokens = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]
+    .flatMap((entry) => [...importClosure(entry.path, SHIPPED)])
+    .flatMap((file) => spelledStrings(file, SHIPPED))
+    .flatMap((text) => text.split(/\s+/));
+  return new Set(tokens.filter((token) => token.startsWith('manager-')));
+}
+
 const FOCUSABLE_TAGS = new Set(['button', 'a']);
 const FORM_CONTROLS = new Set(['button', 'input', 'select', 'textarea']);
 
@@ -497,6 +607,12 @@ describe('each entry matches its component declaration', () => {
       sheetReach(entry, sheet)
     );
     assert.deepEqual([...new Set(reach)].sort(byName), [...SHEET_REACH_PINS]);
+    const card = PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'InspectorCard');
+    assert.deepEqual(
+      sheetReach({ ...card, root: 'any' }, sheet),
+      ['src/ui/svelte/components/InspectorCard.svelte: fabricate-card'],
+      'the class the sheet draws the card by is what refuses it the any root'
+    );
   });
 
   it('reads a snippet, a bindable and a rest prop from a declaration, so the gate can see them', () => {
@@ -919,6 +1035,75 @@ describe('the module sheet against the published Chip', () => {
     it(`refuses ${selector}, which nothing keeps off a published chip`, () => {
       const css = `@media (width > 1px) { .manager-pill, ${selector} { height: 30px } }`;
       assert.deepEqual(unsafeChipSelectors('sheet.css', css), [`sheet.css: ${selector}`]);
+    });
+  }
+});
+
+describe('the module sheet and every component style against the published InspectorCard', () => {
+  it('names the card root in 24 selectors: its two family rules, two data-hook rules, and twenty no published card can match', () => {
+    const spelled = publishedManagerClasses();
+    assert.ok(spelled.has('manager-chip'), 'the published closures were read');
+    const sheets = stylesheetSources().parts.map(({ file, text }) => [
+      file,
+      templateOf(file, `<style>${text}</style>`).ast.css,
+    ]);
+    const blocks = componentPathsUnder('src/ui/svelte').map((file) => [
+      file,
+      componentAstOf(file).css,
+    ]);
+    assert.equal(sheets.length, 14, 'the fourteen partials');
+    assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
+    const selectors = [...sheets, ...blocks].flatMap(([file, css]) =>
+      cardSelectors(file, css, spelled)
+    );
+    assert.deepEqual(
+      selectors.filter(({ safe }) => !safe).map(({ selector }) => selector),
+      [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]
+    );
+    assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
+    const card = PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'InspectorCard');
+    assert.deepEqual(
+      [Object.keys(card.props), card.root],
+      [['children'], 'fabricate'],
+      'a published key that writes a class, or a wider root, reopens cannotMatchPublished'
+    );
+  });
+
+  const SPELLED = new Set(['manager-chip']);
+  const unsafeCardSelectors = (css) =>
+    cardSelectors('sheet.css', templateOf('sheet.css', `<style>${css}</style>`).ast.css, SPELLED)
+      .filter(({ safe }) => !safe)
+      .map(({ selector }) => selector);
+
+  for (const [claim, selector] of [
+    ['a class no published key writes', '.fabricate-card.manager-checks-card'],
+    ['a pinned ancestor', '.fabricate-manager .manager-checks-rail .fabricate-card'],
+    ['the other pinned ancestor', '.manager-inspector > .fabricate-card'],
+    [
+      'a manager class no published closure spells, below',
+      '.fabricate-card[data-x] .manager-unspelled',
+    ],
+    ['an unwritable class inside :global()', ':global(.fabricate-card.is-x > .fab-rail)'],
+    ['another class that only starts with the root', '.fabricate .fabricate-card-row'],
+  ]) {
+    it(`admits a selector that needs ${claim}`, () => {
+      assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), []);
+    });
+  }
+
+  for (const [selector, flat = selector] of [
+    ['.fabricate-card'],
+    ['.fabricate .fabricate-card'],
+    ['.fabricate-card .manager-chip'],
+    ['.fabricate-card > .fab-rail'],
+    ['.fabricate-card[data-x]'],
+    ['.fabricate-card .is-open'],
+    [':global(.fabricate-card[data-x])', '.fabricate-card[data-x]'],
+    ['.a :global(.fabricate-card) > p', '.a .fabricate-card > p'],
+    ['.manager-tools-authority-heading .fabricate-card'],
+  ]) {
+    it(`refuses ${selector}, which nothing keeps off a published card or its content`, () => {
+      assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), [`sheet.css: ${flat}`]);
     });
   }
 });

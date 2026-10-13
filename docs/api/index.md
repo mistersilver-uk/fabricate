@@ -1979,7 +1979,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam, in two parts; slot content, callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; callbacks, bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2039,6 +2039,8 @@ The published components, in publication order:
 | `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
 | `Kicker` | 1 | `any` | `as`, `tone`, `children` (text, required) | yes |
 | `Chip` | 1 | `any` | `tone`, `density`, `children` (text, required) | yes |
+| `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
+| `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2181,29 +2183,66 @@ Rest `data-*` is for your own hooks.
 Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element with no role and no focus.
 For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the label does not.
 
+### Rail
+
+`Rail` draws one section of an inspector column: an optional kicker over your own content.
+`label` is optional final display text, drawn as the section's kicker in upper case.
+With it the section is a `group` named by it; without it, an unnamed `<section>`, never a landmark.
+Pass sentence case.
+`children` is a content slot whose element is a `<div>`; the rail draws the content slot's children in a column it spaces, the first a little further below the label.
+A child that draws nothing still takes its gap, so remove or hide an empty one.
+The rail draws no box, fill or padding.
+The label takes `Kicker`'s ink, size, weight and tracking, so the same four grounds apply; it inherits `target`'s face and line height, which a `Kicker` states for itself.
+It is not a heading.
+The rail never moves its content slot while it is requested.
+Rest `data-*` is for your own hooks.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the label does not.
+
+### InspectorCard
+
+`InspectorCard` draws the bordered card shell, the design system's card, around your own content.
+`children` is a content slot whose element is a `<div>`; the card draws the content slot's children in a column it spaces, inside its own padding, so add neither.
+Its fill is `--fab-bg-2` and it states no ink or type, so your content is on that ground and inherits from `target`: a `Kicker` and a `Rail` label clear 4.5:1 there, and a `neutral` `Chip` does not.
+It needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager, the player window and a Fabricate dialog.
+It is an unnamed `<section>` with no role and takes no heading of its own; head its content yourself, for example with a `Kicker`, as `h3` where it heads the whole card.
+Never nest a card in a card: the design system has two container levels, and the second, the well, is not yet published.
+The card's padding, gap, corner and border figures are private, and so is how Fabricate redraws a card inside its own Checks rail and inspectors.
+The card never moves its content slot while it is requested.
+Rest `data-*` is for your own hooks.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the content does not.
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
-`describe(name)` returns a frozen `{ version, props, rest }`, where each prop is `{ kind, required }` and `rest` says whether the component takes `data-*` attributes; it returns `null` for a name that is not published.
-A prop's `kind` is `data` or `text`.
+`describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
+A prop's `kind` is `data`, `text` or `slot`.
 A `data` prop takes plain data, and the component receives a copy.
 A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
 A `text` prop that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a required one refuses `''`.
+A `slot` prop is a content slot, a place where the component draws your own content.
+It takes `true` to request the content slot and `false`, `undefined` or absence to omit it, and it is never required.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
-Treat an unknown name, member or prop kind as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind is additive.
+Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
+Narrowing a component's root is a breaking change.
 A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
 
 ### Mounting, updating and destroying
 
 `mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
-It returns a frozen `{ update(props), destroy() }`.
+It returns a frozen `{ update(props), destroy(), slot(key) }`.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
+  A component whose root is not `any` also needs that Fabricate ancestor above `target`: otherwise `mount` throws `<name> needs a Fabricate window ancestor` or `<name> needs a Fabricate manager ancestor`, before it claims the target.
 - `props` must be a plain object of the component's published props, holding only data: primitives, plain objects and arrays, with no function at any depth and no cycle.
   A `text` prop holds a string, and anything else there throws `"<key>" must be a string`.
+  A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean.
 - `onFault` is optional, and is described with faults below.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
@@ -2213,15 +2252,56 @@ It returns a frozen `{ update(props), destroy() }`.
 - `destroy()` is idempotent, never throws, and releases the target.
   Call it from your own cleanup, from an ApplicationV2 `_preClose` or `_onClose` (or before `super.close`), and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting again), because DialogV2 and Handlebars `_replaceHTML` replace their content on render; `destroy` works whether or not `target` is still in the document.
   It is safe after a fault, and still expected there.
-  A mount that is never destroyed leaks for the life of the page.
+  A mount that is never destroyed leaks for the life of the page, and keeps its slot elements, their content and every nested mount with it.
+- `slot(key)` returns the content slot's element, the same one for the life of the mount once it has been requested.
+  It returns `null` for an unknown key, for a content slot never requested, and after `destroy` or a fault.
+  The element is a `<div>`, or a `<span>` where the component draws the content slot inside phrasing content; each component's section says which.
+  It is created by `target.ownerDocument` and carries `display: contents` and no other attribute, so its children lay out as the component's own would.
+  The element Fabricate holds it in is private.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
 A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent or `''` throws `<name> requires a non-empty "<key>"`.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
+Fill a content slot by mounting a component of your own into its element, or by appending an element you own.
+In a `<span>` content slot what you append is phrasing content, a `<span>` for a mount target.
+Style and attribute your own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
+A child of a content slot that draws nothing still takes the host's gap.
+Focusable content you draw in a content slot is yours to mark `data-keyboard-focus="true"`.
+Fabricate attaches the slot element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and your components, effects, listeners and bound values inside it keep running.
+Each detach and attach is a DOM removal and insertion, so the browser resets what it resets on those: an `<iframe>` reloads, playing media pauses, focus and scroll positions inside the slot element are lost, CSS animations restart, and a custom element receives `disconnectedCallback` and `connectedCallback`.
+That happens when the content slot is omitted and requested again, when an `update` makes the component replace the element holding it, and when a Foundry 14 window is detached or re-attached, which also moves the content to another document.
+
+A published component may itself be mounted in a slot element, and one `destroy` then ends both:
+
+```javascript
+// After `load(['InspectorCard', 'Kicker'])` has resolved and `fabricate.ready` has fired.
+const card = fabUi.mount('InspectorCard', { target, props: { children: true } });
+const nested = [
+  ['Kicker', { children: 'Renown' }],
+  ['Meter', { label: 'Renown', value: 3, max: 5, valueText: '3 of 5 renown' }],
+].map(([name, props]) => {
+  const element = target.ownerDocument.createElement('div');
+  card.slot('children').append(element); // Append first: a root other than `any` is judged from here.
+  return fabUi.mount(name, { target: element, props });
+});
+
+card.destroy(); // Ends the kicker and the meter, then the card.
+```
+
+`destroy` first destroys every live published mount inside its slot elements, then detaches each slot element with its remaining children untouched.
+The nested handles are dead from then on: `update` answers `false` and `destroy` does nothing, so drop them with the card's handle, in `onFault` as well.
+Fabricate never empties a slot element and never calls into your runtime, so content you drew there with your own runtime is yours to tear down, before `destroy`.
+On every path that ends such a mount, unmount what you drew in its content slot with your own runtime, then call `destroy` on the outermost handle, which ends every published mount nested in its slot elements.
+A navigation provider does both in the cleanup its `mount` returned, which Fabricate calls while the target is still connected and before `requestRemount` clears it.
+A host that replaces its content on every render (DialogV2, a Handlebars part) does both on each re-render and mounts again in `_onRender`.
+
 If the component faults while rendering, updating or in an effect, Fabricate logs `Fabricate | Published component render failed:` with the name and the error, empties `target`, and the handle goes inert.
 The report, and `update` answering `false`, arrive after a microtask, never inside the `mount` or `update` call that caused the fault.
 Any fallback copy is yours to draw.
+A teardown that throws while Fabricate unmounts is reported the same way, a microtask later.
+A fault ends nested published mounts and detaches slot elements as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
+Keep your own reference to content you drew in a content slot and tear it down from `onFault`, because `handle.slot` answers `null` from then on.
 
 Pass `onFault(error)` to `mount` to be told of that fault.
 It is called once, in a microtask after Fabricate has torn its own content down, and never inside `mount`, `update` or `destroy`.
@@ -2246,7 +2326,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker` and `Chip` were published with `load`, so call it for them before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail` and `InspectorCard` were published with `load`, so call it for them before mounting.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
@@ -2272,19 +2352,27 @@ A navigation provider's `mount` callback may not, because it returns synchronous
 
 ### Ownership and theme
 
-You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted, and style only the target's own box.
+You own the placement of `target`: size it as a block-level container, write nothing inside it while it is mounted except inside a slot element, and style only the target's own box.
 A published component inherits from `target` every inherited text property its own rules do not state, so set none on `target`.
 `.fab-*` and `manager-*` classes and `svelte-*` hashes are private and may change in any release: select none of them, and write no `manager-*` class on an element you own, `target` included.
+Never write `fabricate`, `fabricate-app` or `fabricate-manager` on an element you own.
+A `data-*` name Fabricate writes is private as its classes are: pass only rest names that carry your own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
 Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
-A published component resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor; mount it after `target` is attached to its final document.
+Every component states a root, the Fabricate ancestor its `target` needs.
+A component whose root is `any` resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor.
+A `fabricate` component needs a `.fabricate` ancestor, which Fabricate's window frames carry (the player window, the Manager and the interactable windows), so both extension targets have it.
+A `manager` component needs a `.fabricate-manager` ancestor, the Manager's root inside its frame.
+`mount` decides it by class, with `target.closest`, at `mount` only, and judges a target inside a slot element that is not attached from the mount that owns that element.
+Your own window, a chat message and another module's sheet carry no Fabricate root, so they host `any` components only.
+Mount a component after `target` is attached to its final document.
 In an ApplicationV2, mount in `_onRender`, never in `_renderHTML`.
 A mount into an attached target in its final document is styled, including in a Foundry 14 detached window.
 A later move between windows is not carried to a mount, and a theme change made after a window detached does not reach that window (issue 2432).
 A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`; content inside a Fabricate window has no such signal.
 Mount at the composite level, on stable keyed elements, and reuse a mount through `update` rather than mounting per row.
 
-- A component whose props are all `data` or `text` is non-interactive: it takes no focus and has no accessible name beyond what you pass.
+- A published component is non-interactive: it takes no focus and has no accessible name beyond what you pass.
 - A required label is yours to localise.
 - Interactive target sizing and keyboard handling arrive with [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 

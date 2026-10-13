@@ -251,10 +251,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'InfoStrip',
       'Kicker',
       'Chip',
+      'Rail',
+      'InspectorCard',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
     const requiredText = { kind: 'text', required: true };
+    const slot = { kind: 'slot', required: false };
     assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
       TierTrack: {
         version: 1,
@@ -348,6 +351,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: { tone: optional, density: optional, children: requiredText },
         rest: true,
         root: 'any',
+      },
+      Rail: {
+        version: 1,
+        props: { label: optional, children: slot },
+        rest: true,
+        root: 'any',
+      },
+      InspectorCard: {
+        version: 1,
+        props: { children: slot },
+        rest: true,
+        root: 'fabricate',
       },
     });
     assert.deepEqual(

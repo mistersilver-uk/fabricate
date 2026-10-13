@@ -287,6 +287,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
+    'manager-published-leaves-specimen',
   ]),
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
@@ -516,6 +517,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-normal',
     'manager-tool-parity-01-library-1280x720',
     'manager-recipe-item-overview',
+    'manager-published-leaves-specimen',
   ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
   // and the roll prompt's additional-dice control.

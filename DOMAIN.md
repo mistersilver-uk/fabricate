@@ -311,6 +311,7 @@ A PLAYER window presentation seam, and the structural counterpart of the row abo
 
 A Fabricate primitive a companion renders into an element it owns, through `game.fabricate.api.ui`: the other direction from the two navigation seams, which put a companion's content into Fabricate's windows.
 The **target** is that element, and the **seam** names only the mount function, never the target or the component.
+A **content slot** is a place inside a published component where the companion draws its own content; it is unrelated to the crafting **Slot**.
 
 [Notes](docs/domain/records.md#published-ui-component)
 
@@ -502,6 +503,7 @@ What `IngredientSet.resolveIngredientSelection` reports about the search that pr
 #### Slot
 
 The player-facing name for one requirement position in the crafting app's requirement rail, drawn as one tile of the shared requirement chooser.
+Unrelated to a published component's **content slot**.
 
 [Notes](docs/domain/terms.md#slot)
 

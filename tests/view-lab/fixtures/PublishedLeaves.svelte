@@ -1,15 +1,19 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves,
-  then `Kicker` and `Chip` (issue 2451), through the page-session seam `game.fabricate.api.ui`
-  binds, as a companion does: one mount per section, each into an element it owns, all destroyed in
-  the same effect's teardown. Every word is a companion's final text, so none is localized, and the
+  then `Kicker`, `Chip`, `Rail` and `InspectorCard` (issue 2451), through the page-session seam
+  `game.fabricate.api.ui` binds, as a companion does: one mount per section, each into an element it
+  owns. A mount's third member lists the mounts made inside its `children` content slot, each into
+  a `div` the fixture appends there. The effect's teardown destroys the outer handles only, so the
+  seam ends the nested ones. Every word is a companion's final text, so none is localized, and the
   art is the lab world's own, so `tests/view-lab-fixture-assets.test.js` resolves it.
   `tests/view-lab/mount.js` mounts it for `?specimen=published-leaves` only.
 
   The ground is three 280px cells of three 88px tracks: a tile, a stat box or a chip takes one track
   and every other mount a whole cell. An inline mark's target is `display: flex`, as the spec asks
-  of a companion. It sets the danger ink, so an ink a leaf fails to state shows in the frame. The
-  case's `expectContained` addresses each section by its position in `MOUNTS`.
+  of a companion. It sets the danger ink, so an ink a leaf fails to state shows in the frame, and
+  the card's cell takes the downtime target's `--fab-bg-1` ground, so a card that drew no fill
+  shows too. The case's `expectContained` addresses each section by its position in `MOUNTS`, and
+  each nested mount by its host and its `data-nested` name.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -71,15 +75,39 @@
     ['Chip', { tone: 'warning', density: 'list', children: 'Preview' }],
     ['Chip', { tone: 'neutral', density: 'list', children: 'Locked' }],
     ['Chip', { children: 'Awaiting the guild master' }],
+    [
+      'Rail',
+      { label: 'Standing', children: true },
+      [
+        ['Meter', { value: 2, max: 5, label: 'Favour' }],
+        ['InfoStrip', { label: 'Terms', facts: [{ value: 'Fair' }] }],
+      ],
+    ],
+    [
+      'InspectorCard',
+      { children: true },
+      [
+        ['Kicker', { children: 'Renown' }],
+        ['StatBox', { value: '7', label: 'Seals' }],
+      ],
+    ],
   ]);
 
   const targets = $state([]);
 
   $effect(() => {
     if (MOUNTS.some((_, index) => !targets[index])) return undefined;
-    const handles = MOUNTS.map(([name, props], index) =>
-      publishedComponentSeam.publicApi.mount(name, { target: targets[index], props })
-    );
+    const { mount } = publishedComponentSeam.publicApi;
+    const handles = MOUNTS.map(([name, props, nested = []], index) => {
+      const handle = mount(name, { target: targets[index], props });
+      for (const [nestedName, nestedProps] of nested) {
+        const target = targets[index].ownerDocument.createElement('div');
+        target.dataset.nested = nestedName;
+        handle.slot('children').append(target);
+        mount(nestedName, { target, props: nestedProps });
+      }
+      return handle;
+    });
     return () => {
       for (const handle of handles) handle.destroy();
     };
@@ -122,5 +150,10 @@
 
   section.is-inline > div {
     display: flex;
+  }
+
+  section[data-published='InspectorCard'] {
+    padding: var(--fab-space-2);
+    background: var(--fab-bg-1);
   }
 </style>
