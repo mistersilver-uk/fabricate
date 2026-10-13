@@ -30,6 +30,9 @@
   - It takes no `class` and no `style`; a caller that needs layout keeps its own wrapper, and a
     hook is not layout. `align-items: flex-start` is declared explicitly, because the specimen declares no
     `align-items` and renders top-aligned only through its glyph's fixed box and top margin.
+  - `.fab-notice-hidden` restates the module's visually hidden set, because a companion's ancestor
+    is not `.fabricate` — its clip, and the absence of `.visually-hidden`, are pinned by
+    `tests/components/notice-mounted.test.js`.
 
   Six recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
   an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
@@ -93,7 +96,7 @@
         aria-describedby={action.description ? descriptionId : undefined}
         onclick={(event) => action.onClick?.(event)}>{action.label}</button
       >
-      {#if action.description}<span class="visually-hidden" id={descriptionId}
+      {#if action.description}<span class="fab-notice-hidden" id={descriptionId}
           >{action.description}</span
         >{/if}
     {/if}
@@ -214,6 +217,18 @@
   .fab-notice-button.is-dismiss {
     width: 28px;
     padding: 0;
+  }
+
+  .fab-notice-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .fab-notice.is-warning {

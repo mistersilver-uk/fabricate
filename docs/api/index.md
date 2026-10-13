@@ -2041,6 +2041,8 @@ The published components, in publication order:
 | `Chip` | 1 | `any` | `tone`, `density`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
+| `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
+| `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2215,6 +2217,65 @@ Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is
 Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
 For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the content does not.
 
+### EmptyState
+
+`EmptyState` draws the design system's empty state: a dashed panel that says what is absent and holds the way out.
+`title` is optional final display text, the short statement of what is absent, drawn as a level-3 heading.
+Pass it only where a level-3 heading fits your outline: under a heading for the region the panel sits in, and not inside a card or rail you have yourself headed at level 3.
+Where no level-3 heading fits, draw your own heading above the panel and pass `hint` alone.
+`hint` is optional final display text, the sentence beneath the title.
+Pass a title, a hint or both; with neither the panel is an empty box.
+`icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
+`filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
+The hint is plain text, so a search term in it takes no emphasis.
+`children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
+It is the way out of the dead end, a control or a link; what is drawn there is your own, and a control you draw there is named by you.
+Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so state the ink of any text you draw there.
+It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is yours.
+It draws no fill, so it sits on `target`'s ground.
+The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so pass a `title` that says what is absent where a level-3 heading fits, and where one does not, keep the hint to a sentence the surrounding text already says.
+At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
+The title states its own serif face, and the hint inherits `target`'s.
+The panel's own figures are private.
+The panel never moves its content slot while it is requested.
+Rest `data-*` is for your own hooks.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+On a component that holds a content slot it also catches every click on what you draw there, since the window takes the nearest `data-action` above the click.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip` or `data-tooltip-html`, which Foundry reads as HTML; it opens on pointer hover only, so it never says what the panel's text and content do not.
+`data-tooltip-class` and `data-tooltip-direction` on it apply to every tooltip inside its content slot.
+
+### Notice
+
+`Notice` draws the design system's notice: what just happened or is wrong right now, which goes away.
+It is not a standing statement: a rule that is always true is not a notice.
+It is not a Foundry notification: it is drawn in your element, and `ui.notifications` knows nothing of it.
+`title` is required and is the sentence that names what happened, final display text.
+`detail` is optional final display text, a second line that says what to do next.
+`tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
+It repaints the edge, the fill, the glyph and the title; the glyph is hidden from assistive technology and `danger` and `warning` share one, so the title says the state.
+`icon` is optional Font Awesome classes for the leading glyph, which is hidden from assistive technology; absent, the tone's own glyph is drawn.
+It is a live region, `role="status"` with `aria-live="polite"`: a change to its text is announced, and most screen readers also announce one mounted with its text, though some do not, so a notice the reader must not miss also says it in `title`.
+An `update` that changes none of its text announces nothing.
+Mount it when the thing happens and destroy it when it no longer holds, never as standing text.
+Every mount is a new announcement, so when your content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), keep the notice through `update` where its `target` survives and do not mount an unchanged one again.
+It takes no focus and moves none; where the act that caused it also moves focus, move focus first and mount the notice after, because a focus change cancels polite speech.
+Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
+Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
+It draws no control at version 1, neither an action nor a dismissal, so remove it with `destroy`.
+The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
+At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
+So say in `title` whatever the reader must not miss.
+It inherits `target`'s face.
+The notice's own figures are private, and so are its `accent` tone and what it draws for a tone outside its set.
+Rest `data-*` is for your own hooks.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+`data-notice-*` names are the notice's own: a value you pass under one overwrites what the notice writes.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip` or `data-tooltip-html`, which Foundry reads as HTML; it opens on pointer hover only, so it never says what the title and the detail do not.
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2268,6 +2329,8 @@ In a `<span>` content slot what you append is phrasing content, a `<span>` for a
 Style and attribute your own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
 A child of a content slot that draws nothing still takes the host's gap.
 Focusable content you draw in a content slot is yours to mark `data-keyboard-focus="true"`.
+A `<button>` you draw there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
+Put `data-action` on nothing you draw there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 Fabricate attaches the slot element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and your components, effects, listeners and bound values inside it keep running.
 Each detach and attach is a DOM removal and insertion, so the browser resets what it resets on those: an `<iframe>` reloads, playing media pauses, focus and scroll positions inside the slot element are lost, CSS animations restart, and a custom element receives `disconnectedCallback` and `connectedCallback`.
 That happens when the content slot is omitted and requested again, when an `update` makes the component replace the element holding it, and when a Foundry 14 window is detached or re-attached, which also moves the content to another document.
@@ -2328,7 +2391,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail` and `InspectorCard` were published with `load`, so call it for them before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load`, so call it for them before mounting.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
@@ -2361,6 +2424,7 @@ Never write `fabricate`, `fabricate-app` or `fabricate-manager` on an element yo
 A `data-*` name Fabricate writes is private as its classes are: pass only rest names that carry your own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 Pass final display text: a string you supply is rendered verbatim and never treated as a localization key.
 Localise it first with your own `game.i18n`; Fabricate adds no default copy or accessible name.
+A published component is not a live region unless its section says it is.
 Every component states a root, the Fabricate ancestor its `target` needs.
 A component whose root is `any` resolves its tokens from `:root[data-fabricate-theme]` and its own stylesheet, so it needs no Fabricate ancestor.
 A `fabricate` component needs a `.fabricate` ancestor, which Fabricate's window frames carry (the player window, the Manager and the interactable windows), so both extension targets have it.

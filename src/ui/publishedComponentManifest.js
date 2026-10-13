@@ -167,4 +167,31 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'EmptyState',
+    path: 'src/ui/svelte/components/EmptyState.svelte',
+    version: 1,
+    props: Object.freeze({
+      icon: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({ kind: 'data' }),
+      hint: Object.freeze({ kind: 'data' }),
+      filtered: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
+  Object.freeze({
+    name: 'Notice',
+    path: 'src/ui/svelte/components/Notice.svelte',
+    version: 1,
+    props: Object.freeze({
+      tone: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({ kind: 'data', required: true }),
+      detail: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
 ]);

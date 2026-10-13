@@ -369,6 +369,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-availability-feedback-narrow',
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
+    'manager-published-leaves-specimen',
   ]),
   // Both parties pickers: between them they are the primitive's two modes, and neither renders the other's chrome.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
@@ -492,7 +493,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers.
-  'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
+  'src/ui/svelte/components/Notice.svelte': Object.freeze([
+    'player-inventory-bulk-report',
+    'manager-published-leaves-specimen',
+  ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.
   'src/ui/svelte/components/InfoStrip.svelte': Object.freeze([

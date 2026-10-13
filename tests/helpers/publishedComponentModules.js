@@ -35,6 +35,8 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/components/Rail.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/Notice.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

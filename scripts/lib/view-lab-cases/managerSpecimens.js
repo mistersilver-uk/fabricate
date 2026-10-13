@@ -15,6 +15,10 @@ const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
 ]);
 
+/** The leaves fixture mounts two empty panels, so a selector says which: the hero, or the filtered. */
+const HERO_PANEL = '.manager-empty:not(.is-filtered)';
+const FILTERED_PANEL = '.manager-empty.is-filtered';
+
 /** The leaves fixture's ground: the one `div` whose sections hold every mounted root. */
 const LEAVES_GROUND = [
   '.fab-avatar[data-avatar="image"]',
@@ -30,15 +34,20 @@ const LEAVES_GROUND = [
   '.manager-chip.is-warning.is-list > span',
   '.fab-rail',
   '.fabricate-card',
+  HERO_PANEL,
+  '.fab-notice',
+  FILTERED_PANEL,
 ].reduce((ground, root) => `${ground}:has(> section > div > ${root})`, 'div');
 
 /** How many mounts `tests/view-lab/fixtures/PublishedLeaves.svelte` makes, one section each. */
-const LEAF_MOUNTS = 25;
+const LEAF_MOUNTS = 28;
 
 /** Each mount that fixture makes inside another's content slot, as host, host root and nested names. */
 const NESTED_LEAF_MOUNTS = Object.freeze([
   ['Rail', '.fab-rail', ['Meter', 'InfoStrip']],
   ['InspectorCard', '.fabricate-card', ['Kicker', 'StatBox']],
+  ['EmptyState', HERO_PANEL, ['Chip']],
+  ['EmptyState', FILTERED_PANEL, ['Chip']],
 ]);
 
 /** One containment per nested mount: its root inside the root of the mount whose slot holds it. */
@@ -88,7 +97,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-leaves-specimen',
     label:
-      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box; then, each on that lighter ground, a dashed empty panel holding a glyph tile, a serif title, a hint and a chip, a warning notice whose detail wraps to two lines, and the quieter filtered panel holding a hint over a chip. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
     // Beyond the smoke: a companion mounts each through `api.ui`, in states no one screen draws together.
     reaches: 'beyond',
     smokeLabels: [],
@@ -144,13 +153,35 @@ export const CASES = Object.freeze([
         { selector: '.fab-rail > div > div', styles: SLOT_BOX },
         { selector: '.fabricate-card > div', styles: SLOT_BOX },
         { selector: '.fabricate-card > div > div', styles: SLOT_BOX },
+        {
+          selector: HERO_PANEL,
+          styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+        },
+        { selector: `${HERO_PANEL} > div`, styles: 'display: flex; row-gap: 8px' },
+        { selector: `${HERO_PANEL} > div > i`, styles: 'width: 46px; height: 46px' },
+        { selector: `${HERO_PANEL} > div > div`, styles: SLOT_BOX },
+        { selector: `${HERO_PANEL} > div > div > div`, styles: SLOT_BOX },
+        {
+          selector: '.manager-empty h3',
+          styles: 'color: var(--fab-text-secondary); font-size: 13px',
+        },
+        { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 12px' },
+        { selector: `${FILTERED_PANEL} p`, styles: 'color: var(--fab-text-muted)' },
+        {
+          selector: '.fab-notice',
+          styles: 'display: flex; background-color: var(--fab-warning-soft)',
+        },
+        { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
+        { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
       ],
     },
-    // Sized to the fixture's 880px ground.
-    position: { width: 1024, height: 640 },
+    // Sized to the fixture's 880px ground and the height of its seven rows; `expectContained` holds
+    // the ground inside `.window-content`.
+    position: { width: 1024, height: 720 },
     kinds: ['manager', 'specimen'],
     // Every component mounted here is a broad signal, routed here by its override: the seven
-    // leaves (issue 2448), then `Kicker`, `Chip`, `Rail` and `InspectorCard` (issue 2451).
+    // leaves (issue 2448), then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and
+    // `Notice` (issue 2451).
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

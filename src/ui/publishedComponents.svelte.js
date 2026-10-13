@@ -9,12 +9,14 @@ import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
 import Chip from './svelte/components/Chip.svelte';
+import EmptyState from './svelte/components/EmptyState.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
 import InspectorCard from './svelte/components/InspectorCard.svelte';
 import Kicker from './svelte/components/Kicker.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
+import Notice from './svelte/components/Notice.svelte';
 import Rail from './svelte/components/Rail.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
@@ -34,6 +36,8 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Chip.svelte': Chip,
   'src/ui/svelte/components/Rail.svelte': Rail,
   'src/ui/svelte/components/InspectorCard.svelte': InspectorCard,
+  'src/ui/svelte/components/EmptyState.svelte': EmptyState,
+  'src/ui/svelte/components/Notice.svelte': Notice,
 });
 
 export const publishedComponentRuntime = Object.freeze({

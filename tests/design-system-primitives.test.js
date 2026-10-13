@@ -698,6 +698,8 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
     'Chip',
     'Rail',
     'InspectorCard',
+    'EmptyState',
+    'Notice',
   ]) {
     const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
       (viewCase) => viewCase.id
