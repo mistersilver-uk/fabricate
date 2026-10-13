@@ -7,7 +7,7 @@
     "fixture": "ExprInputReading",
     "undrawn": {
       "Expression": "the field’s accessible name; the drawing draws the field alone",
-      "Add a term": "the token row’s accessible name; the drawing draws the tokens alone",
+      "Add a term": "the token group’s accessible name; the drawing draws the tokens alone",
       "Unresolved": "the caller’s statement for an expression that does not reduce; the drawing draws one that does"
     },
     "props": {

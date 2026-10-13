@@ -590,7 +590,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Promoted at issue 2006 on its second independent caller: the Difficulty card's roll-under target (`checks/CheckDifficultyCard.svelte`) and the success-counting pool's base and threshold (`checks/CheckCountInputField.svelte`) author a character-value expression through this one field, with its live reading for the Preview-as character. `library: null` stands: `<ExprInput>` (`RollDataExpressionInput.svelte`) is the library entry it wraps: this passes that field a resolver for the Preview-as character in both of its modes, over roll data for an expression and over the stored document for a stored path, and adds the sentences the reading cannot say. Scoped `manager-only`: it authors a check in the Checks Studio."
+      "why": "Promoted at issue 2006 on its second independent caller: the Difficulty card's roll-under target (`checks/CheckDifficultyCard.svelte`) and the success-counting pool's base and threshold (`checks/CheckCountInputField.svelte`) author a character-value expression through this one field, with its live reading for the Preview-as character. `library: null` stands: `<ExprInput>` (`RollDataExpressionInput.svelte`) is the library entry it wraps, and this passes that field a resolver for the Preview-as character in both of its modes, over roll data for an expression and over the stored document for a stored path, and adds the sentences the reading cannot say. Scoped `manager-only`: it authors a check in the Checks Studio."
     },
     {
       "path": "src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte",
