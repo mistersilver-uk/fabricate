@@ -142,7 +142,7 @@
     "data": {
       "kind": "multiply"
     },
-    "note": "The endpoint input fits its label at the shipped type, 67px against the drawn 64."
+    "note": "The endpoint input fits its label at the shipped type, 66px against the drawn 64."
   },
   {
     "spec": "<Button> <IconButton>",
