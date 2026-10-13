@@ -12,6 +12,7 @@ import { after, before, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import { readDesignLibrary } from '../helpers/designLibrary.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -26,6 +27,7 @@ const MOUNTS = Object.freeze({
   comfortable: { props: { ...COUNT, density: 'comfortable' } },
   fill: { props: { ...COUNT, fill: true } },
   disabled: { props: { ...COUNT, disabled: true } },
+  'disabled-comfortable': { props: { ...COUNT, disabled: true, density: 'comfortable' } },
   endpoint: {
     props: { value: null, nullLabel: 'Otherwise', formatValue: String, parseValue: Number },
   },
@@ -58,6 +60,7 @@ function readMounted() {
     const bare = host.querySelector('[data-bare]');
     return {
       value: `${input.fontSize} ${input.fontVariantNumeric}`,
+      inputMinWidth: input.minWidth,
       glyphs: [...root.querySelectorAll(':scope > .fab-stepper-adjunct > i')].map(
         (glyph) => getComputedStyle(glyph).fontSize
       ),
@@ -94,7 +97,10 @@ function readDrawn() {
     units: Object.fromEntries(units),
     horizontal: [...document.querySelectorAll('.k-step:not(.vert)')]
       .filter((step) => !step.closest('.k-stepset'))
-      .map(size),
+      .map((step) => ({
+        entry: step.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '',
+        box: size(step),
+      })),
   };
 }
 
@@ -149,14 +155,16 @@ it('draws the vertical value at 1.05rem tabular and its glyphs at 11px', () => {
   assert.deepEqual(live.cases.vertical.glyphs, ['11px', '11px']);
 });
 
-it('dims a disabled group to .45 and no other', () => {
+it('dims a disabled group to .45 at either density, and no other', () => {
   for (const [key, { opacity }] of Object.entries(live.cases)) {
-    assert.equal(opacity, key === 'disabled' ? 0.45 : 1, `${key} opacity`);
+    assert.equal(opacity, key.startsWith('disabled') ? 0.45 : 1, `${key} opacity`);
   }
 });
 
 it('keeps its type inside a host whose input rule is live', () => {
   assert.equal(live.cases.hosted.bareMinHeight, '34px', 'the host rule reaches a bare input');
+  assert.notEqual(live.cases.default.inputMinWidth, '0px', 'no other rule zeroes the input');
+  assert.equal(live.cases.hosted.inputMinWidth, '0px', 'the host font rule reaches the stepper');
   assert.equal(live.cases.hosted.value, '11.5px tabular-nums');
 });
 
@@ -181,10 +189,35 @@ it('draws each library unit at the box and opacity its mount ships', () => {
 it('draws every horizontal library stepper at a shipped box', () => {
   const endpoint = drawn.units['formatted · null endpoint'].box;
   assert.equal(endpoint, '118x28', 'the endpoint draws its 64px floor');
-  assert.equal(drawn.horizontal.filter((box) => box === endpoint).length, 1);
+  const boxes = drawn.horizontal.map(({ box }) => box);
+  assert.equal(boxes.filter((box) => box === endpoint).length, 1);
   assert.deepEqual(
-    new Set(drawn.horizontal),
+    new Set(boxes),
     new Set(['102x28', '106x30', '84x28', endpoint]),
     'the default, the comfortable, the 30px-input and the endpoint groups, and no other'
   );
+});
+
+it('draws the narrow and the comfortable group only in the entries that ship them', () => {
+  const entriesAt = (size) =>
+    [...new Set(drawn.horizontal.filter(({ box }) => box === size).map(({ entry }) => entry))].sort(
+      byCodePoint
+    );
+  const narrow = entriesAt('84x28');
+  assert.deepEqual(narrow, [
+    '<BulkStagingInset>',
+    'Routed by check',
+    'Routed by ingredients',
+    'The two sets',
+  ]);
+  assert.deepEqual(
+    drawn.horizontal.filter(({ entry, box }) => narrow.includes(entry) && box !== '84x28'),
+    [],
+    'an entry whose component caps the input at 30px draws no wider stepper'
+  );
+  assert.deepEqual(entriesAt('106x30'), [
+    '<EssencePool>',
+    '<ExprInput> <RequirementChooser>',
+    '<Stepper>',
+  ]);
 });

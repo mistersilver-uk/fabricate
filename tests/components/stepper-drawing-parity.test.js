@@ -142,6 +142,8 @@ test('the entry draws one unit per catalogue row, beside the composite', () => {
     .filter(({ row }) => row.spec === ENTRY)
     .map(({ row }) => row.cap);
   assert.ok(caps.length > 0, 'the catalogue holds no Stepper row');
+  const captions = entry.querySelectorAll(':scope .unit > .cap');
+  assert.equal(captions.length, units.size, 'a caption is drawn once');
   assert.deepEqual([...units.keys()].sort(byCodePoint), [...caps, COMPOSITE].sort(byCodePoint));
 });
 
