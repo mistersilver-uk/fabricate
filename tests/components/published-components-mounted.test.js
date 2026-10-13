@@ -234,6 +234,7 @@ describe('the adapter', () => {
       const { default: component } = await harness.loadRuneModule(path);
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
     }
+    assert.equal(runtime.unmount.constructor.name, 'Function', 'never async');
   });
 });
 

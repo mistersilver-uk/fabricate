@@ -6,9 +6,10 @@
 
 import { managerCase } from './caseFactories.js';
 
-/** The seam, its manifest, its adapter and its host: a change to any redraws what it mounts. */
+/** The seam, its prop kinds, its manifest, its adapter and its host: each redraws what it mounts. */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
+  /^src\/ui\/publishedComponentProps\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
@@ -27,13 +28,30 @@ const LEAVES_GROUND = [
   '.fab-stat-box',
   '.fab-kicker.is-accent > span',
   '.manager-chip.is-warning.is-list > span',
+  '.fab-rail',
+  '.fabricate-card',
 ].reduce((ground, root) => `${ground}:has(> section > div > ${root})`, 'div');
 
 /** How many mounts `tests/view-lab/fixtures/PublishedLeaves.svelte` makes, one section each. */
-const LEAF_MOUNTS = 23;
+const LEAF_MOUNTS = 25;
+
+/** Each mount that fixture makes inside another's content slot, as host, host root and nested names. */
+const NESTED_LEAF_MOUNTS = Object.freeze([
+  ['Rail', '.fab-rail', ['Meter', 'InfoStrip']],
+  ['InspectorCard', '.fabricate-card', ['Kicker', 'StatBox']],
+]);
+
+/** One containment per nested mount: its root inside the root of the mount whose slot holds it. */
+const NESTED_LEAF_CONTAINMENT = NESTED_LEAF_MOUNTS.flatMap(([host, root, nested]) => {
+  const container = `${LEAVES_GROUND} > section[data-published="${host}"] > div > ${root}`;
+  return nested.map((name) => ({ container, target: `${container} [data-nested="${name}"] > *` }));
+});
 
 /** The one mounted chip at the default density, whose long label wraps inside its 88px track. */
 const WRAPPED_CHIP = `${LEAVES_GROUND} > section > div > .manager-chip:not(.is-list)`;
+
+/** A slot element and the wrapper that holds it: neither takes a box in its host's column. */
+const SLOT_BOX = 'display: contents';
 
 /** The portrait ladder's single mark, whose edge includes its border under Foundry's reset. */
 const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
@@ -70,7 +88,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-leaves-specimen',
     label:
-      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+      'Specimen, mounted through the published seam — the seven data-only leaves, then three kickers and three chips, then a rail and a card that each hold two more mounts in a content slot, reading left to right, top to bottom: three portraits, four art tiles; fill bars at 0, 64 and 100; the meter, the single banded bar, the histogram; three stat boxes, the info strip, a kicker wrapped to two lines; a heading kicker in the accent ink, an inline kicker, a warning and a neutral list chip, a chip whose label wraps; a rail labelled Standing whose meter starts 10px under the label, with an info strip 8px under the meter, and a card on the lighter ground holding a kicker over a stat box. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
     // Beyond the smoke: a companion mounts each through `api.ui`, in states no one screen draws together.
     reaches: 'beyond',
     smokeLabels: [],
@@ -79,13 +97,14 @@ export const CASES = Object.freeze([
     // Spelt from hooks `src/` emits, each root the direct child of its target, so a `FillBar`
     // nested in `Meter` cannot stand in for the mounted one.
     expectSelector: `${LEAVES_GROUND} > section > div > .fabricate-info-strip`,
-    // Each mount inside the ground, the wrapped label inside its chip, and the ground inside the
-    // window, so a row the window clips fails the capture.
+    // Each mount inside the ground, each nested mount inside its host, the wrapped label inside its
+    // chip, and the ground inside the window, so a row the window clips fails the capture.
     expectContained: [
       ...Array.from({ length: LEAF_MOUNTS }, (_, index) => ({
         container: LEAVES_GROUND,
         target: `${LEAVES_GROUND} > section:nth-child(${index + 1}) > div > *`,
       })),
+      ...NESTED_LEAF_CONTAINMENT,
       { container: WRAPPED_CHIP, target: `${WRAPPED_CHIP} > span` },
       { container: '.window-content', target: LEAVES_GROUND },
     ],
@@ -98,7 +117,10 @@ export const CASES = Object.freeze([
           selector: '.fab-medallion.is-corner-7:not(.is-tone-danger)',
           styles: 'width: 26px; height: 26px; border-radius: 7px',
         },
-        { selector: '.fab-meter-hidden', styles: 'position: absolute; width: 1px; height: 1px' },
+        {
+          selector: '.fab-meter[aria-valuetext] > .fab-meter-hidden',
+          styles: 'position: absolute; width: 1px; height: 1px',
+        },
         {
           selector: '.fab-stat-box:has(.has-icon) .fab-kicker',
           styles: 'font-size: 8.5px; color: var(--fab-text-muted)',
@@ -112,13 +134,23 @@ export const CASES = Object.freeze([
           selector: '.manager-chip.is-neutral.is-list',
           styles: 'font-size: 9px; color: var(--fab-text-muted)',
         },
+        { selector: '.fab-rail', styles: 'display: flex; row-gap: 8px' },
+        {
+          selector: '.fabricate-card',
+          styles:
+            'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+        },
+        { selector: '.fab-rail > div', styles: SLOT_BOX },
+        { selector: '.fab-rail > div > div', styles: SLOT_BOX },
+        { selector: '.fabricate-card > div', styles: SLOT_BOX },
+        { selector: '.fabricate-card > div > div', styles: SLOT_BOX },
       ],
     },
     // Sized to the fixture's 880px ground.
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'specimen'],
-    // The seven leaves, `Kicker` and `Chip` are broad signals, each routed here by its override.
-    // `Kicker` and `Chip` are mounted here in their own right too (issue 2451).
+    // Every component mounted here is a broad signal, routed here by its override: the seven
+    // leaves (issue 2448), then `Kicker`, `Chip`, `Rail` and `InspectorCard` (issue 2451).
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

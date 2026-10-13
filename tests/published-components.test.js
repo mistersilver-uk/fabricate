@@ -1,136 +1,31 @@
 /**
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
  * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
- * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. The real
- * Svelte runtime is the mounted suite's.
+ * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
+ * slots and the required root are `published-component-slots.test.js`'s, and the real Svelte
+ * runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
-const PREFIX = 'Fabricate | published components: ';
-const FAULT_REPORT = 'Fabricate | Published component render failed:';
-const HOST = Object.freeze({ role: 'host' });
-const ZETA_COMPONENT = Object.freeze({ role: 'Zeta' });
-const ALPHA_COMPONENT = Object.freeze({ role: 'Alpha' });
-const TITLED_COMPONENT = Object.freeze({ role: 'Titled' });
-
-// Entries out of alphabetical order, so `components` must keep table order.
-const ZETA = Object.freeze({
-  name: 'Zeta',
-  path: 'src/ui/svelte/components/Zeta.svelte',
-  version: 3,
-  props: { label: { kind: 'data', required: true }, items: { kind: 'data' } },
-  rest: true,
-  component: ZETA_COMPONENT,
-});
-const ALPHA = Object.freeze({
-  name: 'Alpha',
-  path: 'src/ui/svelte/components/Alpha.svelte',
-  version: 1,
-  props: { value: { kind: 'data' } },
-  rest: false,
-  component: ALPHA_COMPONENT,
-});
-// A required and an optional `text` key beside a `data` one.
-const TITLED = Object.freeze({
-  name: 'Titled',
-  path: 'src/ui/svelte/components/Titled.svelte',
-  version: 1,
-  props: {
-    title: { kind: 'text', required: true },
-    note: { kind: 'text' },
-    rank: { kind: 'data' },
-  },
-  rest: true,
-  component: TITLED_COMPONENT,
-});
-const TABLE = Object.freeze([ZETA, ALPHA, TITLED]);
-
-const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-const exactly = (message) => new RegExp(`^${escape(message)}$`);
-
-function refusal(tail) {
-  return (error) => {
-    assert.ok(error instanceof TypeError, `a TypeError, not ${error?.constructor?.name}`);
-    assert.match(error.message, exactly(PREFIX + tail));
-    return true;
-  };
-}
-
-/** A DOM-shaped target: `nodeType` 1, children, and `contains`. */
-class FakeTarget {
-  nodeType = 1;
-  childNodes = [];
-  get firstChild() {
-    return this.childNodes[0] ?? null;
-  }
-  get lastChild() {
-    return this.childNodes.at(-1) ?? null;
-  }
-  contains(node) {
-    return this.childNodes.includes(node);
-  }
-  replaceChildren() {
-    this.childNodes.length = 0;
-  }
-}
-
-/**
- * A recording runtime: `mount` appends a root and captures the host's fault callback, and `events`
- * logs each `unmount` beside whatever the test pushes. With both errors it faults, then throws.
- */
-function fakeRuntime({ mountError = null, faultDuringMount = null, unmountError = null } = {}) {
-  const mounts = [];
-  const unmounts = [];
-  const reports = [];
-  const events = [];
-  const runtime = {
-    host: HOST,
-    mount(host, { target, props }) {
-      if (mountError) {
-        target.childNodes.push({ role: 'partial' });
-        if (faultDuringMount) props.onfault(faultDuringMount);
-        throw mountError;
-      }
-      const instance = {
-        target,
-        root: { role: 'root' },
-        updates: [],
-        setProps(next) {
-          instance.updates.push(next);
-        },
-      };
-      target.childNodes.push(instance.root);
-      mounts.push({ host, target, props, instance });
-      if (faultDuringMount) props.onfault(faultDuringMount);
-      return instance;
-    },
-    unmount(instance) {
-      unmounts.push(instance);
-      events.push('unmount');
-      if (unmountError) throw unmountError;
-      const at = instance.target.childNodes.indexOf(instance.root);
-      if (at !== -1) instance.target.childNodes.splice(at, 1);
-    },
-    report: (...args) => {
-      reports.push(args);
-    },
-  };
-  return { runtime, mounts, unmounts, reports, events };
-}
-
-function seamWith({ table = TABLE, isReady = () => true, ...runtimeOptions } = {}) {
-  const fake = fakeRuntime(runtimeOptions);
-  const seam = createPublishedComponents({ table, isReady, ...fake.runtime });
-  return { ...fake, seam, ui: seam.publicApi };
-}
-
-const zetaProps = (overrides = {}) => ({ label: 'Rank', items: [{ id: 'a' }], ...overrides });
-
-/** Past every queued microtask, however many each one queues in turn. */
-const drained = () => new Promise((done) => setTimeout(done, 0));
+import {
+  ALPHA,
+  FAULT_REPORT,
+  FakeTarget,
+  HOST,
+  PREFIX,
+  TABLE,
+  ZETA,
+  ZETA_COMPONENT,
+  drained,
+  exactly,
+  fakeRuntime,
+  refusal,
+  seamWith,
+  zetaProps,
+} from './helpers/publishedComponentFakes.js';
 
 describe('the published-components descriptor', () => {
   it('is frozen, with exactly its five members and schema version 1', () => {
@@ -146,14 +41,15 @@ describe('the published-components descriptor', () => {
     assert.ok(Object.isFrozen(ui.components));
   });
 
-  it('describes an entry as a frozen version, its props by kind and rest, with nothing else', () => {
+  it('describes an entry as a frozen version, its props by kind, rest and root, with nothing else', () => {
     const { ui } = seamWith();
     const described = ui.describe('Zeta');
-    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest']);
+    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root']);
     assert.deepEqual(described, {
       version: 3,
       props: { label: { kind: 'data', required: true }, items: { kind: 'data', required: false } },
       rest: true,
+      root: 'any',
     });
     assert.ok(Object.isFrozen(described));
     assert.ok(Object.isFrozen(described.props));
@@ -162,6 +58,7 @@ describe('the published-components descriptor', () => {
       version: 1,
       props: { value: { kind: 'data', required: false } },
       rest: false,
+      root: 'any',
     });
     assert.deepEqual(ui.describe('Titled').props, {
       title: { kind: 'text', required: true },
@@ -407,7 +304,7 @@ describe('a live mount', () => {
     const [{ host, props: hostProps }] = mounts;
     assert.equal(host, HOST);
     assert.equal(hostProps.component, ZETA_COMPONENT);
-    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds']);
+    assert.deepEqual(Object.keys(hostProps), ['component', 'initial', 'onfault', 'kinds', 'slots']);
     assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
     assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
@@ -415,7 +312,7 @@ describe('a live mount', () => {
     assert.notEqual(hostProps.initial.items, props.items, 'copied at every depth');
     props.items[0].id = 'mutated';
     assert.equal(hostProps.initial.items[0].id, 'a', 'copied at call time');
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
   });
 
@@ -650,7 +547,7 @@ describe('a faulted mount', () => {
     const target = new FakeTarget();
     const handle = ui.mount('Zeta', { target, props: zetaProps() });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
     assert.ok(Object.isFrozen(handle));
     assert.equal(handle.update(zetaProps()), false);
     handle.destroy();
@@ -812,7 +709,7 @@ describe('a mount made with onFault', () => {
 });
 
 describe('registration', () => {
-  for (const kind of ['snippet', 'slot']) {
+  for (const kind of ['snippet', 'callback']) {
     it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
       const unknown = { ...ALPHA, props: { body: { kind } } };
       const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
@@ -833,6 +730,33 @@ describe('registration', () => {
       );
     });
   }
+
+  for (const [root, written] of [
+    ['window', 'window'],
+    [undefined, 'undefined'],
+    ['Any', 'Any'],
+    ['toString', 'toString'],
+  ]) {
+    it(`refuses a manifest entry whose root is ${written}, naming the entry and the root`, () => {
+      const unknown = { ...ALPHA, root };
+      const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(error.message, exactly(`${PREFIX}Alpha has an unknown root "${written}"`));
+          return true;
+        }
+      );
+    });
+  }
+
+  it('registers each shipped root, and describes it', () => {
+    for (const root of ['any', 'fabricate', 'manager']) {
+      const { ui } = seamWith({ table: [{ ...ALPHA, root }] });
+      assert.equal(ui.describe('Alpha').root, root);
+    }
+  });
 
   it('refuses a second registration, keeping the first runtime', () => {
     const { seam, ui, mounts } = seamWith();

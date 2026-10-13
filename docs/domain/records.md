@@ -509,15 +509,18 @@ Spec reference: openspec/specs/ui-extension-points/spec.md
 ## Published UI Component
 
 A presentation primitive, not a record: Fabricate persists nothing for it.
-A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy }` handle.
+A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot }` handle.
 "Seam" names that mount function only; the target is the companion's element, and the component is Fabricate's primitive.
-The published set is a frozen data manifest of `{ name, path, version, props, rest }` entries, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
-Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, `load` and `onFault`.
-A prop is plain data or a string of text; snippets, bindables and overlays wait for issue #2427.
+The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
+Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`.
+A prop is plain data, a string of text or a content slot; snippets, bindables and overlays wait for issue #2427.
+A content slot is a place inside a published component where the companion draws its own content, into an element Fabricate owns and returns from `handle.slot`.
+An entry's **required ancestor root** says which Fabricate ancestor its target needs.
+The published `Rail` is a section primitive, not the Manager rail.
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
-Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
+Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 
