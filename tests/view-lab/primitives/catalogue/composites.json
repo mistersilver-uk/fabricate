@@ -2,9 +2,10 @@
   {
     "spec": "<ExprInput> <RequirementChooser>",
     "cap": "expression — resolved only where an actor is in scope",
-    "draws": ".k-field.mono",
+    "draws": ".k-lbl",
     "path": "src/ui/svelte/components/RollDataExpressionInput.svelte",
     "fixture": "ExprInputReading",
+    "note": "The fixture stands the field in `<Field as=\"div\">`, because the field draws no box and states no gap: both are its host's.",
     "undrawn": {
       "Expression": "the field’s accessible name; the drawing draws the field alone",
       "Add a term": "the token group’s accessible name; the drawing draws the tokens alone",

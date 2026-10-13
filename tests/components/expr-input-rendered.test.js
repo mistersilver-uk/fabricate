@@ -66,6 +66,11 @@ const CASES = Object.freeze({
     props: { tokens: ENTRY_TERMS, ...REDUCED },
     host: (field) => `<div data-case="both" style="width:300px">${field}</div>`,
   },
+  column: {
+    props: { tokens: ENTRY_TERMS, ...REDUCED },
+    host: (field) =>
+      `<div class="fabricate-field" data-case="column" style="width:300px">${field}</div>`,
+  },
   unresolved: {
     props: { ...UNREDUCED },
     host: (field) => `<div data-case="unresolved">${field}</div>`,
@@ -404,6 +409,33 @@ describe('ExprInput, drawn (issue 2465)', () => {
     assert.ok(drawn.plain > 0, 'the plain field has a height to compare against');
     assert.equal(drawn.blank, drawn.plain);
     assert.deepEqual(drawn.region, ['absolute', '1px', '1px', 'hidden', 'inset(50%)']);
+  });
+
+  it("stands the row the shell's gap beneath the field, and takes no gap for the status region", async () => {
+    const drawn = await tab.evaluate((status) => {
+      const root = document.querySelector('[data-case="column"]');
+      const shell = getComputedStyle(root);
+      const region = getComputedStyle(root.querySelector(status));
+      const row = root.querySelector('.fab-expr-input-row').getBoundingClientRect();
+      const edge =
+        Number.parseFloat(shell.paddingBottom) + Number.parseFloat(shell.borderBottomWidth);
+      return {
+        gap: shell.getPropertyValue('--fab-space-chip').trim(),
+        beneath: row.top - root.querySelector('input').getBoundingClientRect().bottom,
+        pastRow: root.getBoundingClientRect().bottom - edge - row.bottom,
+        region: [region.position, region.width, region.height, region.overflow, region.clipPath],
+      };
+    }, STATUS);
+    assert.deepEqual(drawn.region, ['absolute', '1px', '1px', 'hidden', 'inset(50%)']);
+    assert.equal(drawn.gap, '6px', "`--fab-space-chip`, the gap a field shell's column states");
+    assert.ok(
+      Math.abs(drawn.beneath - 6) <= EPSILON,
+      `the row starts ${drawn.beneath}px beneath the field, against the shell's 6px gap`
+    );
+    assert.ok(
+      Math.abs(drawn.pastRow) <= EPSILON,
+      `the shell runs ${drawn.pastRow}px past its row, so the status region took a gap`
+    );
   });
 });
 

@@ -433,6 +433,20 @@ test('every catalogue row addresses a drawing the library actually has', () => {
   assert.ok(matched > 50, `${matched} drawings matched, which is not the whole catalogue`);
 });
 
+test('the <ExprInput> row replaces the whole drawn field and leaves the unit its hints', () => {
+  const { row } = CATALOGUE.find((entry) => entry.row.fixture === 'ExprInputReading');
+  const unit = unitsFor(SPEC_BLOCKS.get(row.spec)).get(normalize(row.cap));
+  const [host] = unit.querySelectorAll(row.draws);
+  const outside = (selector) =>
+    [...unit.querySelectorAll(selector)].filter((drawn) => !host.contains(drawn)).length;
+  assert.equal(
+    outside('.k-field, .k-badge, .k-btn'),
+    0,
+    'a drawn control stands beside the live one'
+  );
+  assert.equal(outside('.k-hint'), 2, 'the replaced drawing takes a hint with it');
+});
+
 /**
  * The rows whose component is not named by the entry that owns their drawing: a row repathed to
  * another component still resolves, mounts and passes every other rule, and draws the wrong thing.

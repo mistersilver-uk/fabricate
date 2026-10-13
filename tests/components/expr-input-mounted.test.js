@@ -10,6 +10,7 @@ import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:t
 
 import { Window } from 'happy-dom';
 
+import { DESIGN_SYSTEM_PRIMITIVES } from '../../scripts/lib/designSystemPrimitives.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { declarationViolations, readDeclaration } from '../helpers/apiConvention.js';
@@ -60,10 +61,7 @@ const RETIRED_CLASSES = Object.freeze([
   'manager-checks-formula-tokens',
 ]);
 
-/** The planned-migrations row that names what still holds the entry at target: the file's place. */
-const MIGRATION_SUBJECT = 'Expression field placement';
-
-/** The entry's status, the prop names its API list sets in bold, and the migration subjects. */
+/** The entry's status, and the prop names its API list sets in bold. */
 function readEntry() {
   const html = readDesignLibrary();
   const block = parseDesignLibrary(html).blocks.find(({ names }) => names.includes('ExprInput'));
@@ -76,9 +74,6 @@ function readEntry() {
   const entry = {
     status: block?.perNameStatus.ExprInput,
     names: bold.map((run) => run.textContent).filter((text) => /^[a-z][A-Za-z0-9]*$/u.test(text)),
-    subjects: [...window.document.querySelectorAll('section#log tbody tr > td:first-child')].map(
-      (cell) => cell.textContent.trim()
-    ),
   };
   window.close();
   return entry;
@@ -356,28 +351,28 @@ describe('ExprInput (issue 2465)', () => {
     assert.deepEqual(declarationViolations(readDeclaration(component)), []);
   });
 
-  it('agrees with its library entry on every prop the entry does not hold at target', () => {
-    const { status, names, subjects } = readEntry();
+  it('stands at shipped in its library entry, which names exactly the props it declares', () => {
+    const { status, names } = readEntry();
     const declared = declaredPropNames(component.source).filter((name) => name !== '...rest');
+    assert.equal(status, 'shipped');
     assert.ok(names.length > 0, 'the entry states an API');
     assert.deepEqual(
       declared.filter((name) => !names.includes(name)),
       [],
       'the entry names every declared prop'
     );
-    const unbuilt = new Set(names.filter((name) => !declared.includes(name)));
-    if (status !== 'target') {
-      assert.deepEqual(unbuilt, new Set(), `at ${status} the entry and the file state one API`);
-      return;
-    }
     assert.deepEqual(
-      unbuilt,
+      new Set(names.filter((name) => !declared.includes(name))),
       new Set(),
-      'the entry holds no prop at target that the file does not build: only its place is still to come'
+      'the entry names no prop the file does not build'
     );
-    assert.ok(
-      subjects.includes(MIGRATION_SUBJECT),
-      `a planned-migrations row names the difference: ${MIGRATION_SUBJECT}`
+  });
+
+  it('holds one manifest row: shipped from the shared directory, scoped to the manager', () => {
+    const rows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.library === '<ExprInput>');
+    assert.deepEqual(
+      rows.map(({ path, status, scope, evidence }) => ({ path, status, scope, evidence })),
+      [{ path: RDE, status: 'shipped', scope: 'manager-only', evidence: 'broad' }]
     );
   });
 

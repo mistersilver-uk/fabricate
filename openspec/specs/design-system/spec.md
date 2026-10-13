@@ -346,6 +346,10 @@ The same issue adds `Typeahead`, which emits `fabricate-typeahead` on its field'
 Issue 2321 adds `XrefList`, which emits `fab-xref-list` on its own root, `fab-xref-list-label` on its label and `fab-xref-list-items` on its list, all painted from its own scoped block; its rows are `ListRow`'s, whose family it does not restate, and it portals nothing, so it needs one root.
 Issue 2412 adds `ViewToggle`, which writes no family of its own: its root is the `SegmentedControl` it composes, whose classes it does not restate, and it portals nothing.
 Issue 2420 records `AppTitleBar`, a non-member, which writes no root of its own: it keeps the `manager-titlebar` family and its `data-manager-titlebar` hooks, every rule of which is rooted at `.fabricate-manager`, so it is not adoptable outside the manager until that family is re-rooted, which no host asks for because the player window carries no premium signal; it portals nothing.
+Issue 2465 moves the expression field (`RollDataExpressionInput`, the library's `<ExprInput>`) into the shared directory, scoped `manager-only` while every importer is a manager editor: it emits `fab-expr-input` on its input, `fab-expr-input-row` on the row beneath it, `fab-expr-input-tokens` on its token group and `fab-expr-input-token` on each token, all painted from its own scoped block.
+It also emits `fab-expr-input-reading` on its reading, a class no rule paints, since the reading is drawn by `Chip`.
+Its reading is `Chip`'s and each token is `Button`'s, whose families it does not restate: its one rule on a token reaches `Button`'s own classes through a chained `:global` selector and sets the token's shrink, width floor, height, corner, line height and face alone.
+It writes no rule in the module sheet, wraps its input in nothing and portals nothing, so its input, its row and its status region are siblings in its caller's own column.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -918,6 +922,14 @@ Readonly is DISTINCT from disabled: a readonly control takes focus and refuses e
 A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
 Foundry core also rings the STATE class `.active` exactly as it rings `:focus`, so a module that uses `.active` as its own selected marker MUST normalise that class alongside the focus reset and at the same rank — otherwise core's ring rides along with selection and merely hides while the element is focused, appearing the moment focus moves elsewhere.
 A programmatic `.focus()` that follows a pointer activation matches `:focus` and NOT `:focus-visible`, so the pair has a hole: a control focused that way is stripped by the suppressing half and supplied by neither, and the surface that moves focus programmatically MUST stamp its own marker attribute for a third rule to paint.
+
+The expression field (`RollDataExpressionInput`) draws no box, so the faces of its input that a box carries are its host's.
+Its rest face is `Field`'s box, the recipe row's amount box, or the manager's free-text baseline.
+Its focus-visible ring is the module's inset text-field ring.
+Its disabled face is the manager baseline's `:disabled` rule, so a host outside a manager root owes one.
+Its invalid face is the caller's own rule on `[aria-invalid='true']`, since neither `Field`'s box nor the manager's baseline draws one.
+No text input draws a hover face at this head.
+It declares `disabled`, which disables its input and every token together and leaves its reading drawn, and it takes the invalid state as `aria-invalid` on its rest spread.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
