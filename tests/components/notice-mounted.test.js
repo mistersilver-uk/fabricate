@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { assertClipped } from '../helpers/publishedComponentModules.js';
+import { assertClipped, underSheet } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -156,6 +156,70 @@ describe('1505 Notice — the API the library states', () => {
     assert.equal(received[0].length, 1, 'and was forwarded one argument');
     assert.equal(received[0][0]?.type, 'click', 'which is the click event');
     harness.remount();
+  });
+
+  it('calls onAction when the action has no onClick, and onClick alone when both are passed', async () => {
+    const calls = [];
+    const press = (name) => () => {
+      calls.push(name);
+    };
+    const onAction = press('onAction');
+    const label = 'Allow another attempt';
+    const alone = await harness.mount({ title: 'Held', action: { label }, onAction });
+    alone.querySelector('[data-notice-action]').click();
+    await flushRender();
+    assert.deepEqual(calls, ['onAction']);
+    harness.remount();
+
+    const onClick = press('onClick');
+    const both = await harness.mount({ title: 'Held', action: { label, onClick }, onAction });
+    both.querySelector('[data-notice-action]').click();
+    await flushRender();
+    assert.deepEqual(calls, ['onAction', 'onClick'], 'the nested handler wins');
+    harness.remount();
+  });
+
+  for (const [what, props] of [
+    ['an action with no label', { action: {}, onAction: () => {} }],
+    ['an action whose label is empty', { action: { label: '' }, onAction: () => {} }],
+    ['a labelled action with neither handler', { action: { label: 'Review' } }],
+  ]) {
+    it(`draws no button for ${what}`, async () => {
+      const target = await harness.mount({ title: 'Held', ...props });
+      assert.ok(Boolean(noticeOf(target)), 'the notice itself is drawn');
+      assert.ok(!target.querySelector('button'), 'no nameless or inert control');
+      harness.remount();
+    });
+  }
+
+  /** A notice with an action, mounted under no Fabricate ancestor; answers its action button. */
+  async function bareAction() {
+    const target = await harness.mount({
+      title: 'Held',
+      action: { label: 'Allow another attempt' },
+      onAction: () => {},
+    });
+    target.className = 'companion-sheet';
+    const button = target.querySelector('[data-notice-action]');
+    assert.ok(!button.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
+    return button;
+  }
+
+  it('rings its focused action from its own stylesheet, over a host that rings button:focus', async () => {
+    const core = 'button:focus { outline: 1px solid red; box-shadow: 0 0 5px red }';
+    const theme = ':root[data-fabricate-theme] { --fab-accent: rgb(1, 2, 3); }';
+    await underSheet(`${core} ${theme}`, async () => {
+      const button = await bareAction();
+      button.focus();
+      assert.ok(document.activeElement === button, 'the action holds focus');
+      const style = getComputedStyle(button);
+      assert.equal(style.outlineStyle, 'solid');
+      assert.equal(style.outlineWidth, '2px');
+      assert.equal(style.outlineColor, 'rgb(1, 2, 3)', 'the accent, not the host ring');
+      assert.equal(style.outlineOffset, '2px');
+      assert.equal(style.boxShadow, 'none');
+      harness.remount();
+    });
   });
 
   it('describes an action by its optional description, and only when one is given (issue 2006)', async () => {

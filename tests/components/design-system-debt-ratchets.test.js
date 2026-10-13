@@ -149,8 +149,9 @@ function focusResetRoot(selector) {
   return focusPairRoot(selector, RESET_COMPOUND);
 }
 
-/** The seven primitive families that root their own focus chrome. */
+/** Each primitive family that roots its own focus chrome, by the compound its strip is written on. */
 const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
+  '.fab-notice-button:focus',
   '.fabricate-button:focus',
   '.fabricate-field :is(input, textarea):focus',
   '.fabricate-icon-button:focus',
@@ -277,6 +278,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
   assert.deepEqual(
     [...new Set(strips.map((entry) => entry.strip))].sort(byCodePoint),
     [
+      '.fab-notice-button:focus',
       '.fabricate-button:focus',
       '.fabricate-field :is(input, textarea):focus',
       '.fabricate-icon-button:focus',
@@ -289,7 +291,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '.fabricate-toggle.fabricate-toggle:focus',
     ],
     'the set of primitive families declaring their own focus strip has changed. Each of the ' +
-      'nine is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
+      'ten is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
       'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
       'carrying neither application root — a deliberate edit here, never a silent one. `Field` ' +
       'and `SearchField` joined at issue 1508 phase 1 and `ChanceSlider` and ' +
@@ -304,12 +306,14 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '`StatusToggle` is ' +
       'the one family with TWO members: its checkbox host is a `<label>`, which never matches ' +
       '`:focus`, so that host`s strip is written on the `<input>` the label wraps while its ' +
-      'repaint stays a `:has()` ring on the label itself.'
+      'repaint stays a `:has()` ring on the label itself. `Notice` joined at issue 2452: its ' +
+      'strip is scoped to its own `<style>`, because a published notice has no `.fabricate` ' +
+      'ancestor to take the module pair from.'
   );
   assert.equal(
     strips.length,
-    10,
-    'one strip per family and per host that takes focus separately — NINE families and TEN ' +
+    11,
+    'one strip per family and per host that takes focus separately — ten families and eleven ' +
       'compounds. The two numbers differ by one, and always for the same reason: `StatusToggle` ' +
       'declares two, because its checkbox host is a `<label>` that never matches `:focus` and ' +
       'that host`s strip is therefore written on the `<input>` the label wraps. Every other ' +

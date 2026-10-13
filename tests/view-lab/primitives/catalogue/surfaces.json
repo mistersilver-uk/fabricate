@@ -21,7 +21,8 @@
       "action": {
         "label": "Show both"
       }
-    }
+    },
+    "fixture": "NoticeAction"
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
@@ -35,7 +36,8 @@
       "action": {
         "label": "Discard"
       }
-    }
+    },
+    "fixture": "NoticeAction"
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
@@ -48,7 +50,8 @@
       "action": {
         "label": "Undo"
       }
-    }
+    },
+    "fixture": "NoticeAction"
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
