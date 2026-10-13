@@ -11,10 +11,10 @@
     {
       "path": "src/ui/svelte/components/EssencePool.svelte",
       "library": "<EssencePool>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. Issue 1644 adopts it in crafting through the EssencePoolPanel adapter, which passes capAtHeld and per-item hooks. Measured against its specimen, it stays target pending a maintainer ruling on five geometry figures. The components path selects broad evidence."
+      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. Issue 1644 adopts it in crafting through the EssencePoolPanel adapter, which passes capAtHeld and per-item hooks. Measured against its specimen at issue 1644; issue 2403 redrew the specimen's kicker, bar gap, carrier name and stepper to the shipped pool, and issue 1523 put its chips on the Medallion's radius 7, so it is `shipped` at issue 2457 (maintainer, 2026-10-12). DEBT: its kicker, hint, overshoot and carrier reading ship in `--fab-text-subtle` under the 4.5:1 floor and are drawn in `--fab-text-muted`; owned by issue 2368. The components path selects broad evidence."
     },
     {
       "path": "src/ui/svelte/components/StageCard.svelte",
