@@ -3,6 +3,7 @@
  * (issue 1116).
  */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -1303,5 +1304,26 @@ test('(f) no file under components/ imports from the application tree', () => {
       'depends on, so an edge in this direction makes one primitive unusable without the manager ' +
       'and reverses the dependency the `design-system` capability specifies. Move the imported ' +
       'file into the primitive directory, or take the dependency out of the primitive.'
+  );
+});
+
+test('(g) no tracked file under scripts, src, openspec, tests or docs names the field by its old path', () => {
+  // The needle is built from parts so this clause's own file does not hold it.
+  const needle = ['apps/manager', 'RollDataExpressionInput'].join('/');
+  const tracked = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', 'scripts', 'src', 'openspec', 'tests', 'docs'],
+    { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+  )
+    .split('\0')
+    .filter(Boolean);
+  assert.ok(tracked.length > 1000, `only ${tracked.length} tracked files walked`);
+
+  const stale = tracked.filter((file) => readFileSync(path.join(REPO_ROOT, file)).includes(needle));
+  assert.deepEqual(
+    stale,
+    [],
+    `${needle} is where the field stood before issue 2465 moved it into ${PRIMITIVE_DIRECTORY}; ` +
+      'point these at the new path, including any prose that names it'
   );
 });
