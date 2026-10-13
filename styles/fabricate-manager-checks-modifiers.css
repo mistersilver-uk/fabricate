@@ -2077,25 +2077,6 @@
   gap: var(--fab-space-2);
 }
 
-/* ── Roll-data suggestion chips under the expression ── The CHIP is the shipped `.manager-tag-suggestion` — same 16px-glyph-plus-label grid, same success-tinted hover — so this row and the modifier typeahead speak with one voice (issue 1096). */
-.fabricate-manager .manager-modifier-expression-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  min-width: 0;
-}
-
-/* Three classes (0,3,0) to clear the base chip's `border: 0`, transparent fill and in-panel 6px corner at (0,2,0); a standalone 28px chip takes 7. */
-.fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
-  flex: 0 1 auto;
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  background: var(--fab-bg-2);
-  font-family: var(--fab-font-mono, monospace);
-  font-size: 0.72rem;
-}
-
 .fabricate-manager .manager-character-modifier-actions {
   display: flex;
   gap: var(--fab-space-chip);

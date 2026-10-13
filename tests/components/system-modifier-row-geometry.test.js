@@ -148,10 +148,10 @@ const FIELD_FIXTURE = `
           <span>Label</span>
           <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
-        <label class="fabricate-field" data-case="plain">
+        <div class="fabricate-field" data-case="plain">
           <span>Expression</span>
           <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
-        </label>
+        </div>
         <label class="fabricate-field manager-prerequisite-path" data-case="capped">
           <span class="visually-hidden">Property path</span>
           <div class="manager-prerequisite-path-input">

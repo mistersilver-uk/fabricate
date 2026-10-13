@@ -9,6 +9,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { Window } from 'happy-dom';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { declarationViolations, readDeclaration } from '../helpers/apiConvention.js';
 import { parseDesignLibrary, readDesignLibrary } from '../helpers/designLibrary.js';
 import { walkNodes } from '../helpers/moduleAst.js';
@@ -32,6 +33,19 @@ const component = templates.find(({ file }) => file === RDE);
 
 /** Props the component took before issue 2465, which no call site may pass again. */
 const RETIRED_PROPS = Object.freeze(['sigil', 'dataField', 'inputAttrs']);
+
+/** Hooks the hand-rolled rows this field replaced carried, which no template may write again. */
+const RETIRED_HOOKS = Object.freeze([
+  'data-world-modifier-suggestion',
+  'data-world-modifier-suggestions',
+]);
+
+/** Classes those rows were drawn by, which no rule in the module sheet may name again. */
+const RETIRED_CLASSES = Object.freeze([
+  'manager-tag-suggestion',
+  'manager-modifier-expression-suggestion',
+  'manager-modifier-expression-suggestions',
+]);
 
 /** The planned-migrations row that names what the entry specifies and the file does not ship. */
 const MIGRATION_SUBJECT = 'Expression field tokens and reading';
@@ -327,6 +341,26 @@ describe('ExprInput (issue 2465)', () => {
         .map(({ file }) => file),
       [],
       'a row of tokens is a group, and its name is the caller’s to give'
+    );
+    assert.ok(
+      tags.some(({ names }) => names.includes('tokens')),
+      'no call site passes `tokens`, so the two clauses above read nothing'
+    );
+  });
+
+  it('left no hand-rolled row of tokens behind: no hook in a template, no rule in the sheet', () => {
+    const written = templates.flatMap(({ file, ast }) =>
+      [...walkNodes(ast.fragment)]
+        .filter((node) => node.type === 'Attribute' && RETIRED_HOOKS.includes(node.name))
+        .map((node) => `${file}: ${node.name}`)
+    );
+    assert.deepEqual(written, []);
+
+    const sheet = readStylesheet().replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+    assert.ok(sheet.includes('.fabricate-typeahead-option'), 'the module sheet was not read');
+    assert.deepEqual(
+      RETIRED_CLASSES.filter((name) => new RegExp(String.raw`\.${name}(?![\w-])`, 'u').test(sheet)),
+      []
     );
   });
 });

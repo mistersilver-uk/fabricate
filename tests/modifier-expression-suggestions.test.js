@@ -1,14 +1,12 @@
 /**
- * The modifier expression suggestion chips (issue 1096). Two things are pinned here, and the FIRST
- * is the one that matters.
+ * The modifier expression suggestions (issue 1096): the terms offered are derived from the active
+ * world. How a pressed term joins an expression is the expression field's, pinned by
+ * `tests/components/expr-input-mounted.test.js`.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  appendModifierExpressionTerm,
-  getModifierExpressionSuggestions,
-} from '../src/config/modifierExpressionSuggestions.js';
+import { getModifierExpressionSuggestions } from '../src/config/modifierExpressionSuggestions.js';
 
 /** The expressions offered, in row order. */
 function expressionsFor(foundrySystemId) {
@@ -86,69 +84,4 @@ test('the row leads with the system-specific terms and every chip carries a dist
     suggestions.every((s) => s.label && s.expression),
     'every chip has both a human label and a term to append'
   );
-});
-
-// Appending ──────────────────────────────────────────────────────────────────────────── The chips
-// BUILD an expression, so the join is the behaviour.
-const APPEND_CASES = [
-  {
-    name: 'joins two terms with a single +',
-    current: '@abilities.wis.mod',
-    term: '1d4',
-    expected: '@abilities.wis.mod + 1d4',
-  },
-  {
-    name: 'an empty expression takes the term alone, with NO leading +',
-    current: '',
-    term: '@abilities.wis.mod',
-    expected: '@abilities.wis.mod',
-  },
-  {
-    name: 'an absent expression is treated as empty',
-    current: undefined,
-    term: '1d4',
-    expected: '1d4',
-  },
-  {
-    name: 'a trailing + is COMPLETED rather than doubled',
-    current: '@abilities.wis.mod +',
-    term: '1d4',
-    expected: '@abilities.wis.mod + 1d4',
-  },
-  {
-    name: 'so is a trailing + with the whitespace a GM actually leaves behind',
-    current: '@abilities.wis.mod +   ',
-    term: '1d4',
-    expected: '@abilities.wis.mod + 1d4',
-  },
-  {
-    name: 'a trailing - is respected, so the chip never turns a subtraction into an addition',
-    current: '@abilities.wis.mod -',
-    term: '2',
-    expected: '@abilities.wis.mod - 2',
-  },
-  {
-    name: 'an open bracket takes the term with no operator at all',
-    current: 'floor((',
-    term: '@abilities.wis.mod',
-    expected: 'floor(( @abilities.wis.mod',
-  },
-  {
-    name: 'an empty term leaves the expression untouched',
-    current: '@abilities.wis.mod',
-    term: '',
-    expected: '@abilities.wis.mod',
-  },
-];
-
-for (const { name, current, term, expected } of APPEND_CASES) {
-  test(`appendModifierExpressionTerm ${name}`, () => {
-    assert.equal(appendModifierExpressionTerm(current, term), expected);
-  });
-}
-
-test('appending is cumulative — two chips build one compound expression', () => {
-  const once = appendModifierExpressionTerm('', '@abilities.wis.mod');
-  const twice = appendModifierExpressionTerm(once, '1d4');
-  assert.equal(twice, '@abilities.wis.mod + 1d4', 'the second chip appends, it does not replace');
 });

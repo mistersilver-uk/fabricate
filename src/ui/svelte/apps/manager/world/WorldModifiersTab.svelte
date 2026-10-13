@@ -25,10 +25,7 @@
     isRollExpression,
     resolveModifierBounds,
   } from '../../../../../systems/checkModifierResolver.js';
-  import {
-    appendModifierExpressionTerm,
-    getModifierExpressionSuggestions,
-  } from '../../../../../config/modifierExpressionSuggestions.js';
+  import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
   import IconButton from '../../../components/IconButton.svelte';
 
   let {
@@ -177,29 +174,11 @@
     onUpdate(entryId, { [key]: next });
   }
 
-  // The expression field's roll-data suggestion chips (issue 1096). Derived from the ACTIVE
-  // world rather than written out here — see `modifierExpressionSuggestions.js` for why a
-  // hard-coded row would be wrong in every system but one.
-  const expressionSuggestions = $derived(getModifierExpressionSuggestions(foundrySystemId));
-
-  // Appending, not replacing: the chips build up a compound expression. The caret is left at
-  // the end of the field the GM is editing so the next keystroke continues the expression
-  // instead of landing wherever focus happened to be — a chip that silently steals focus to
-  // nowhere is worse than no chip. The DOM lookup is scoped to the clicked chip's OWN editor
-  // body, so an open second row is never touched.
-  async function handleSuggestion(event, entry, term) {
-    const input = event.currentTarget
-      ?.closest('[data-world-modifier-editor]')
-      ?.querySelector('[data-world-modifier-field="expression"]');
-    await onUpdate(entry.id, {
-      expression: appendModifierExpressionTerm(entry.expression, term),
-    });
-    await tick();
-    if (!input) return;
-    input.focus();
-    const caret = input.value.length;
-    input.setSelectionRange?.(caret, caret);
-  }
+  // The expression field's tokens, derived from the active world's preset bundle, so the row never
+  // offers a roll-data path this world does not define.
+  const expressionTokens = $derived(
+    getModifierExpressionSuggestions(foundrySystemId).map((suggestion) => suggestion.expression)
+  );
 
   // The bounds field labels, derived once: `stepperLabels` composes the two adjunct names
   // from the input's own name, so the three must come from one string rather than three
@@ -455,56 +434,39 @@
                       'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
                     )}
                   </p>
-                  <Field as="label">
-                    <span>{text('FABRICATE.Admin.Manager.Modifiers.Expression', 'Expression')}</span
+                  <!-- A `div`, because the field draws its row of tokens inside this shell and a
+                       `<label>` would name the field by every token. The caption names it and
+                       the hint describes it. -->
+                  <Field as="div">
+                    <span id={`world-modifier-expression-label-${entry.id}`}
+                      >{text('FABRICATE.Admin.Manager.Modifiers.Expression', 'Expression')}</span
                     >
-                    <!-- A PLAIN input: no `@` cap, no stripping, no re-prepending (maintainer
-                         ruling). The affix was written when an expression was always a
-                         roll-data path; dice made it wrong, because a cap that prepends `@` to
-                         whatever is typed turns `1d4` into `@1d4`. So the leading `@` is the
-                         GM's to write, and the PLACEHOLDER has to teach that. -->
+                    <!-- Nothing adds or strips an `@`: the leading `@` is the GM's to write, and
+                         the placeholder and the hint teach it. -->
                     <RollDataExpressionInput
                       data-world-modifier-field="expression"
+                      aria-labelledby={`world-modifier-expression-label-${entry.id}`}
+                      aria-describedby={`world-modifier-expression-hint-${entry.id}`}
                       value={entry.expression}
                       placeholder="@abilities.med.mod"
+                      tokens={expressionTokens}
+                      tokensLabel={text(
+                        'FABRICATE.Admin.Manager.Modifiers.SuggestionsLabel',
+                        'Add a term to this expression'
+                      )}
                       onChange={(expression) => onUpdate(entry.id, { expression })}
                     />
-                    <small class="manager-muted" data-world-modifier-expression-hint>
+                    <small
+                      id={`world-modifier-expression-hint-${entry.id}`}
+                      class="manager-muted"
+                      data-world-modifier-expression-hint
+                    >
                       {text(
                         'FABRICATE.Admin.Manager.Modifiers.ExpressionHint',
                         'A character-data path needs its leading @ — for example @abilities.med.mod. A number or a dice expression does not: write 2 or 1d4 as-is.'
                       )}
                     </small>
                   </Field>
-                  {#if expressionSuggestions.length > 0}
-                    <!-- Roll-data suggestion chips (issue 1096). Each APPENDS its term to the
-                         expression above rather than replacing it, so a GM builds
-                         `@abilities.wis.mod + 1d4` by clicking twice. The system-specific chips
-                         come from the active world's preset bundle — the same derivation `Seed
-                         presets` uses — so a chip can never offer a path this world does not
-                         define. -->
-                    <div
-                      class="manager-modifier-expression-suggestions"
-                      data-world-modifier-suggestions={entry.id}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Modifiers.SuggestionsLabel',
-                        'Add a term to this expression'
-                      )}
-                    >
-                      {#each expressionSuggestions as suggestion (suggestion.id)}
-                        <button
-                          type="button"
-                          class="manager-tag-suggestion manager-modifier-expression-suggestion"
-                          data-world-modifier-suggestion={suggestion.id}
-                          title={suggestion.label}
-                          onclick={(event) => handleSuggestion(event, entry, suggestion.expression)}
-                        >
-                          <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          <span class="fab-truncate">{suggestion.expression}</span>
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
                   {#if modifierIsRoll(entry)}
                     <!-- A roll-shaped expression is legal EVERYWHERE (issue 1118): a drop row
                          applies its result and a check appends the dice to its formula. The
