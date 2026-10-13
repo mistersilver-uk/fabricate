@@ -1,4 +1,4 @@
-/** Issue 2257 D3: the selected tint cell wears the inset ring, apart from the focus outline, in a browser. */
+/** Issues 2257 D3 and 2416: the tint cell's selected ring, keyboard cursor and hover outline, in a browser. */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -59,7 +59,50 @@ const paint = () =>
     ])
   );
 
-describe('2257 TintPicker — the selected ring, rendered', () => {
+const cell = (token) => `[data-manager-color-picker-popover] [data-manager-color-token="${token}"]`;
+
+/** One control's pseudo-class state and computed paint, read in the page. */
+const stateOf = (selector) => {
+  const control = globalThis.document.querySelector(selector);
+  const style = globalThis.getComputedStyle(control);
+  const swatch = control.querySelector('.manager-color-swatch');
+  const fill = swatch ? globalThis.getComputedStyle(swatch) : null;
+  const outer = control.getBoundingClientRect();
+  const inner = swatch?.getBoundingClientRect() ?? outer;
+  return {
+    focusVisible: control.matches(':focus-visible'),
+    hover: control.matches(':hover'),
+    outline: `${style.outlineStyle} ${style.outlineWidth}`,
+    offset: style.outlineOffset,
+    ink: style.outlineColor,
+    cellFill: style.backgroundColor,
+    swatchFill: fill?.backgroundColor,
+    ring: fill?.boxShadow,
+    inset: [
+      inner.top - outer.top,
+      inner.left - outer.left,
+      outer.right - inner.right,
+      outer.bottom - inner.bottom,
+    ],
+  };
+};
+
+/** Moves keyboard focus one stop on from `from`, so `:focus-visible` is the browser's own. */
+async function tabFrom(page, from) {
+  await page.focus(from);
+  await page.keyboard.press('Tab');
+}
+
+/** The control is under keyboard focus and draws the 2px outline at `offset`. */
+function assertFocusOutline(state, offset, message) {
+  assert.ok(state.focusVisible, 'the control is not under keyboard focus');
+  assert.equal(state.outline, 'solid 2px');
+  assert.equal(state.offset, offset, message);
+}
+
+const INSET = "the keyboard cursor is the picker's inset outline";
+
+describe('TintPicker — the selected ring and the keyboard cursor, rendered', () => {
   before(async () => {
     await harness.setup();
     browser = await chromium.launch();
@@ -90,24 +133,48 @@ describe('2257 TintPicker — the selected ring, rendered', () => {
     }
   });
 
-  it('focus outlines the button outside the swatch and leaves the inset ring in place', async () => {
+  it('draws the keyboard cursor inset on a cell that is not selected, and no ring', async () => {
     const page = await open({ colorToken: 'rose' });
     try {
-      await page.focus('[data-manager-color-token="rose"]');
-      await page.keyboard.press('Shift+Tab');
-      await page.keyboard.press('Tab');
-      const focused = await page.evaluate(() => {
-        const cell = globalThis.document.activeElement;
-        const style = globalThis.getComputedStyle(cell);
-        return {
-          token: cell.dataset.managerColorToken,
-          outline: `${style.outlineStyle} ${style.outlineWidth}`,
-          ring: globalThis.getComputedStyle(cell.querySelector('.manager-color-swatch')).boxShadow,
-        };
-      });
-      assert.equal(focused.token, 'rose');
-      assert.equal(focused.outline, 'solid 2px', 'keyboard focus draws the outset outline');
-      assert.match(focused.ring, /inset$/u, 'and the selected ring stays drawn inside the swatch');
+      await tabFrom(page, cell('sage'));
+      const mist = await page.evaluate(stateOf, cell('mist'));
+      assertFocusOutline(mist, '-2px', INSET);
+      assert.equal(mist.ring, 'none', 'a cell that is not selected draws no ring');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('draws the cursor and the selected ring whole on one cell, in two inks', async () => {
+    const page = await open({ colorToken: 'rose' });
+    try {
+      await tabFrom(page, cell('lavender'));
+      const rose = await page.evaluate(stateOf, cell('rose'));
+      assertFocusOutline(rose, '-2px', INSET);
+      const ring = rose.ring.match(/^(rgb\([^)]+\)) 0px 0px 0px 2px inset$/u);
+      assert.ok(ring, `the selected ring is not a 2px inset ring: ${rose.ring}`);
+      assert.notEqual(rose.ink, ring[1], 'the cursor and the selected ring share one ink');
+      assert.ok(
+        Math.min(...rose.inset) >= 3,
+        `the swatch sits ${rose.inset.join(', ')}px inside its cell, so the 2px cursor reaches its ring`
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('draws the same inset cursor on the inline strip', async () => {
+    const page = await open({ colorToken: 'rose', layout: 'inline' });
+    try {
+      assert.ok(await page.locator('[data-manager-color-layout="inline"].is-inline').count());
+      await tabFrom(page, cell('sage'));
+      const mist = await page.evaluate(stateOf, cell('mist'));
+      assertFocusOutline(mist, '-2px', INSET);
+      assert.equal(mist.ring, 'none');
+      assert.ok(
+        Math.min(...mist.inset) >= 3,
+        `the inline swatch sits ${mist.inset.join(', ')}px inside its cell, so the 2px cursor reaches it`
+      );
     } finally {
       await page.close();
     }
@@ -150,6 +217,8 @@ const CORE_BUTTON =
 /** The host clips its overflow, so it stands at a window's height rather than the trigger's. */
 const HOST_HEIGHT = '.fabricate-manager { height: 360px; }';
 
+const TRIGGER = '.fabricate-color-picker .manager-color-picker-trigger';
+
 describe('the tint trigger and swatches, over a core button transition', () => {
   let chrome;
   let page;
@@ -189,22 +258,50 @@ describe('the tint trigger and swatches, over a core button transition', () => {
     assert.deepEqual(new Set(durations), new Set(['0s']));
   });
 
-  it('hovers a swatch with its outline alone, never a fill (ruling 2026-10-11)', async () => {
-    const cell = '[data-manager-color-picker-popover] [data-manager-color-token="sage"]';
-    const read = (selector) => {
-      const button = globalThis.document.querySelector(selector);
-      const swatch = button.querySelector('.manager-color-swatch');
-      return {
-        cell: globalThis.getComputedStyle(button).backgroundColor,
-        swatch: globalThis.getComputedStyle(swatch).backgroundColor,
-        outline: globalThis.getComputedStyle(button).outlineStyle,
-      };
-    };
-    const rest = await page.evaluate(read, cell);
-    const box = await page.locator(cell).boundingBox();
+  /** Parks the pointer off the grid and drops focus, so a case starts from rest on this page. */
+  async function settle() {
+    await page.mouse.move(399, 399);
+    await page.evaluate(() => globalThis.document.activeElement?.blur());
+  }
+
+  async function pointAt(selector) {
+    const box = await page.locator(selector).boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    const hovered = await page.evaluate(read, cell);
-    assert.equal(rest.outline, 'none');
-    assert.deepEqual(hovered, { ...rest, outline: 'solid' });
+  }
+
+  it('hovers a swatch with its outset outline alone, never a fill (ruling 2026-10-11)', async () => {
+    await settle();
+    const rest = await page.evaluate(stateOf, cell('sage'));
+    assert.deepEqual([rest.hover, rest.focusVisible], [false, false], 'sage starts at rest');
+    assert.match(rest.outline, /^none /u);
+    await pointAt(cell('sage'));
+    const hovered = await page.evaluate(stateOf, cell('sage'));
+    assert.deepEqual([hovered.hover, hovered.focusVisible], [true, false], 'sage is hovered alone');
+    assert.equal(hovered.outline, 'solid 2px');
+    assert.equal(hovered.offset, '1px', 'pointer hover keeps the outset ring');
+    assert.deepEqual(
+      [hovered.cellFill, hovered.swatchFill],
+      [rest.cellFill, rest.swatchFill],
+      'hover changed a fill'
+    );
+  });
+
+  it('keeps the inset cursor on a keyboard-focused swatch under the pointer', async () => {
+    await settle();
+    await tabFrom(page, cell('sage'));
+    await pointAt(cell('mist'));
+    const mist = await page.evaluate(stateOf, cell('mist'));
+    assert.ok(mist.hover, 'the pointer is not over the focused cell');
+    assertFocusOutline(mist, '-2px', 'the cursor outranks hover');
+  });
+
+  it('leaves the trigger its outset ring under keyboard focus', async () => {
+    await settle();
+    await page.focus(TRIGGER);
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    const trigger = await page.evaluate(stateOf, TRIGGER);
+    assert.ok(!trigger.hover, 'the pointer is over the trigger, so hover could draw its ring');
+    assertFocusOutline(trigger, '1px', 'the trigger opens a panel and is not a cell in the grid');
   });
 });
