@@ -575,6 +575,7 @@ Each group states the accepted values of every key that entry publishes.
 - **`Notice`.**
   - It is the design system's notice: what just happened or is wrong right now, which goes away.
     It is not a standing statement: a rule that is always true is not a notice.
+    It is not a Foundry notification: the companion draws it in its own element, and `ui.notifications` knows nothing of it.
   - `title` is required and is the sentence that names what happened, final display text.
   - `detail` is optional final display text, a second line that says what to do next.
   - `tone` is `danger`, `warning`, `info` or `success`, and defaults to `danger`.
