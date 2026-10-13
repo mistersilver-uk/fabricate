@@ -2377,7 +2377,7 @@ The label of an enabled button clears the 4.5:1 small-text floor at rest in ever
 `ghost` and `dashed` draw no fill, so their label is the muted ink on your target's own ground and clears that floor by the least.
 On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do.
 Mount a button on one of those four grounds, never on `--fab-bg-3` and never inside a tinted panel of your own.
-`neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground, so the label alone marks the button as a control: pass a verb phrase.
+`neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: pass a verb phrase.
 What the button draws for a `role` value outside its set is private.
 So are its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
 Rest `data-*` is for your own hooks.
@@ -2434,6 +2434,7 @@ Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, be
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
 Narrowing a component's root is a breaking change.
+The rest names a component reserves are fixed for its `version`, and reserving another is a narrowing; `describe` does not state them, so read them from the component's section.
 A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
 
 ### Mounting, updating and destroying
