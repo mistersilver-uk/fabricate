@@ -16,6 +16,8 @@
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
  * forwarded `text` or `slot` key fails closed and a forwarded `data` key is not seen.
+ * Limit: the slot clause does not see a render tag inside a `{#snippet}` or a child component's
+ * content, which may draw it more than once.
  * Limit: the chip census reads the module sheet, not a component's `:global()` rule, and each
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`

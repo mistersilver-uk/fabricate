@@ -592,6 +592,7 @@ Otherwise `mount` destroys the stale entry first, then checks that the target is
 Fabricate never empties a slot element and never calls into a companion's runtime; content a companion drew there with its own runtime is the companion's to tear down, before `destroy`.
 - `destroy` never throws: if the runtime's unmount throws, Fabricate reports it as `console.error('Fabricate | Published component render failed:', name, error)` and still releases the target.
 A teardown that throws during the unmount is reported the same way, a microtask later.
+After such a teardown the target may still hold a node of Fabricate's, so the companion empties it before mounting there again.
 - The companion MUST call `destroy` on every path that ends the mount: its own cleanup; an ApplicationV2 close (in `_preClose`, `_onClose`, or before `super.close`); and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting into the new target), because DialogV2 and Handlebars `_replaceHTML` replace their content on render and `destroy` works on a detached target.
 A mount whose content slot holds the companion's own content ends in this order on each of those paths: the companion unmounts what it drew there with its own runtime, then calls `destroy` on the outermost handle, which ends every published mount nested in its slot elements.
 A navigation provider does both in the cleanup its `mount` returned, which Core calls while the target is still connected and before `requestRemount` clears it.
@@ -602,6 +603,8 @@ A mount that is never destroyed keeps its slot elements, their content and every
 ### Faults
 
 - **A fault in render, update or an effect is caught by the host's boundary, and by the next microtask Fabricate reports it, unmounts, releases the target and makes the handle inert.**
+A cleanup that throws while Fabricate tears a faulted component down is that mount's fault, reported once with the cleanup's error.
+- A published component's cleanup MUST NOT throw: one that throws when an `update` re-runs its effect reaches no boundary and is not contained.
 - The report is `console.error('Fabricate | Published component render failed:', name, error)`.
 - A fault that arrives before the runtime's `mount` has returned defers its unmount with `queueMicrotask`.
 This is defensive: Svelte 5.56 delivers no fault before its `mount` returns.

@@ -5,6 +5,8 @@
   nothing remounts. A `text` key reaches the component as a snippet built once per mount, whose one
   element's `textContent` tracks the string; the string is never markup. A `slot` key's snippet
   holds the seam's element in a wrapper of its own, and detaches it on teardown (issue 2451).
+  The outer boundary takes what the inner one throws while it tears a faulted component down,
+  which Svelte hands to the next boundary up.
 -->
 <script>
   import { createRawSnippet, untrack } from 'svelte';
@@ -72,5 +74,7 @@
 </script>
 
 <svelte:boundary onerror={(error) => onfault(error)}>
-  <Published {...drawn} />
+  <svelte:boundary onerror={(error) => onfault(error)}>
+    <Published {...drawn} />
+  </svelte:boundary>
 </svelte:boundary>

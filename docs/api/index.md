@@ -2198,7 +2198,7 @@ The rail never moves its content slot while it is requested.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
-For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the label does not.
+For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry localises and otherwise reads as HTML; it opens on pointer hover only, so it never says what the rail's label and content do not.
 
 ### InspectorCard
 
@@ -2300,6 +2300,8 @@ If the component faults while rendering, updating or in an effect, Fabricate log
 The report, and `update` answering `false`, arrive after a microtask, never inside the `mount` or `update` call that caused the fault.
 Any fallback copy is yours to draw.
 A teardown that throws while Fabricate unmounts is reported the same way, a microtask later.
+After such a teardown the target may still hold a node of Fabricate's, so empty it before mounting there again.
+A cleanup that throws while Fabricate tears a faulted component down is reported as that mount's fault, once, with the cleanup's error.
 A fault ends nested published mounts and detaches slot elements as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
 Keep your own reference to content you drew in a content slot and tear it down from `onFault`, because `handle.slot` answers `null` from then on.
 

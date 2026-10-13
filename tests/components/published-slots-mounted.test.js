@@ -300,6 +300,29 @@ describe('a published teardown that throws on the real runtime', () => {
     assert.ok(reports[0][2] === probe.PROBE_FAULTS.teardown, "the probe's own Error");
     assert.equal(handle.update({}), false);
   });
+
+  it('faults the mount once when its cleanup throws while a fault is torn down', async () => {
+    const instance = seam();
+    const target = companionTarget(targets);
+    const faults = [];
+    const handle = instance.publicApi.mount('PublishedProbe', {
+      target,
+      props: { throwAt: 'teardown' },
+      onFault: (error) => {
+        faults.push([error, target.childNodes.length]);
+      },
+    });
+    await settle();
+    assert.equal(handle.update({ throwAt: 'teardown', explode: true }), true);
+    await settle();
+    assert.equal(faults.length, 1, 'onFault once');
+    assert.ok(faults[0][0] === probe.PROBE_FAULTS.teardown, 'the error that left the boundary');
+    assert.equal(faults[0][1], 0, 'the target is empty inside onFault');
+    assert.deepEqual(reports, [[FAULT_REPORT, 'PublishedProbe', probe.PROBE_FAULTS.teardown]]);
+    assert.equal(instance.liveMountCount(), 0);
+    assert.equal(handle.update({}), false);
+    assert.equal(target.childNodes.length, 0);
+  });
 });
 
 describe('the required ancestor root on the real runtime', () => {
