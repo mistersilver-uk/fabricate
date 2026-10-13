@@ -497,6 +497,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.

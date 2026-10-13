@@ -7,7 +7,8 @@
  * The `type` and the mark for keyboard focus are read here because the component writes both on a
  * `svelte:element`, where the static gates see the mark and not the type.
  * Limit: happy-dom moves no focus when a focused button is disabled and activates no button from
- * a key, so neither is asserted; the browser's answer to each is the View Lab's.
+ * a key, so neither is asserted: the View Lab's buttons case holds the Space press, and no suite
+ * holds the blur, which the spec states from a measurement in two browsers.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -301,13 +302,20 @@ describe('the published Button, disabled', () => {
     const { handle, calls, button } = mountButton();
     await settle();
     const node = button();
+    const { MouseEvent } = node.ownerDocument.defaultView;
+    const clickLabel = () =>
+      node.firstElementChild.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    clickLabel();
+    assert.deepEqual(calls, [[]], 'a click that bubbles from the label reaches the enabled button');
     const next = recorder();
     assert.equal(handle.update({ children: LABEL, onclick: next.record, disabled: true }), true);
     await settle();
     assert.ok(button() === node, 'the same button node');
     assert.equal(node.disabled, true);
+    // happy-dom's own suppression, then Svelte's guard for the click that bubbles from the label.
     node.click();
-    assert.deepEqual([calls, next.calls], [[], []]);
+    clickLabel();
+    assert.deepEqual([calls, next.calls], [[[]], []]);
     handle.destroy();
   });
 });

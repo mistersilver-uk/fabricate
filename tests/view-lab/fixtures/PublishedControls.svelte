@@ -12,10 +12,11 @@
   copy in one 280px cell, where the action drops beneath the text, and the fifth a title alone.
 
   The buttons draw each visual role once, then `fullWidth` on a dashed and on a neutral one, the
-  disabled look at two roles, and a label longer than its 120px target. `clear` and `create` each
-  update their own label on a press and count it in a rest `data-*`. The last two stand on a
-  `--fab-bg-2` strip, the lowest ground the two unfilled roles are stated for. Every button's
-  target is `display: flex`, as the spec asks of a companion.
+  disabled look at two roles, and a label that takes four lines in its 120px target, so its first
+  and last lines spill past the top and bottom edges of the 34px button, into the 8px gaps between
+  rows. `clear` and `create` each update their own label on a press and count it in a rest
+  `data-*`. The last two stand on a `--fab-bg-2` strip, the lowest ground the two unfilled roles
+  are stated for. Every button's target is `display: flex`, as the spec asks of a companion.
 
   The ground is two 280px cells on `--fab-bg-1`, a ground both labels are stated for. It sets the
   azure tag ink, so an ink a notice or a button fails to state shows in the frame. A case
@@ -47,7 +48,11 @@
     ['wide', { fullWidth: true, children: 'Review every project' }],
     ['off', { disabled: true, children: 'Clear filters' }],
     ['off-primary', { role: 'primary', disabled: true, children: 'New project' }],
-    ['long', { children: 'Clear every filter on this board' }, 'is-narrow'],
+    [
+      'long',
+      { children: 'Clear every one of the filters that are set on this board today' },
+      'is-narrow',
+    ],
     ['card-back', { role: 'ghost', children: 'Back to projects' }],
     ['card-add', { role: 'dashed', children: 'Add tier' }],
   ]);

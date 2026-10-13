@@ -974,7 +974,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
   // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
-  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451).
+  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451); then each
+  // panel's nested button in its visual role's ink and fill (issue 2452).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -1027,6 +1028,14 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
     { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
     { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    {
+      selector: '.manager-empty:not(.is-filtered) .fabricate-button',
+      styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
+    },
+    {
+      selector: '.manager-empty.is-filtered .fabricate-button',
+      styles: 'color: var(--fab-text); background-color: var(--fab-surface-soft)',
+    },
     { selector: '.fab-notice', styles: 'display: flex; background-color: var(--fab-warning-soft)' },
     { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
     { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
@@ -1055,7 +1064,7 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
     // The published buttons at rest (issue 2452): each visual role in the sheet's own values, a
     // full-width button at its cell's width and at the two-cell span's, the disabled look at two
-    // roles, and the 34px box a long label does not grow.
+    // roles, and the 34px box a four-line label spills past without growing it.
     ...[
       [
         'clear',
@@ -1076,12 +1085,13 @@ const NON_VERB_CONTROLS = Object.freeze({
       ['long', 'height: 34px'],
     ].map(([key, styles]) => ({ selector: labButton(key), styles })),
   ],
-  // The same fixture after its two presses (issue 2452): the focused primary's drawn ring, and the
-  // pressed neutral on the raised tile under the pointer.
+  // The same fixture after its two presses (issue 2452): the focused primary's drawn ring in the
+  // accent, and the pressed neutral on the raised tile under the pointer.
   'manager-published-buttons-specimen': [
     {
       selector: `${labButton('create')}:focus-visible`,
-      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
     },
     { selector: labButton('clear'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
@@ -5748,13 +5758,15 @@ test('the leaves specimen mounts every published component but TierTrack and che
   );
 });
 
+/** Whether `node`, or anything under it, passes `test`. */
+const holds = (node, test) =>
+  node !== null &&
+  typeof node === 'object' &&
+  (test(node) || Object.values(node).some((child) => holds(child, test)));
+
 test('the controls specimen mounts through the seam and presses what it mounts: a click, Enter and Tab', () => {
   const FIXTURE = 'tests/view-lab/fixtures/PublishedControls.svelte';
   const { instance, fragment } = componentAstOf(FIXTURE);
-  const holds = (node, test) =>
-    node !== null &&
-    typeof node === 'object' &&
-    (test(node) || Object.values(node).some((child) => holds(child, test)));
   assert.ok(
     holds(
       instance,
@@ -5810,10 +5822,6 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
 
 test('the buttons specimen presses two published buttons of the controls fixture: a click, then Space', () => {
   const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedControls.svelte');
-  const holds = (node, test) =>
-    node !== null &&
-    typeof node === 'object' &&
-    (test(node) || Object.values(node).some((child) => holds(child, test)));
   assert.ok(
     holds(
       instance,

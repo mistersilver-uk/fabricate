@@ -112,8 +112,8 @@ const BUTTON_KEYS = Object.freeze([
 
 /**
  * Each visual role at rest in the sheet's own declared values, then `fullWidth` at its cell's
- * width and at the two-cell span's, the disabled look at two roles, and the box a long label
- * does not grow.
+ * width and at the two-cell span's, the disabled look at two roles, and the 34px box a four-line
+ * label spills past without growing it.
  */
 const RESTING_BUTTONS = Object.freeze(
   [
@@ -260,6 +260,14 @@ export const CASES = Object.freeze([
         { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 12px' },
         { selector: `${FILTERED_PANEL} p`, styles: 'color: var(--fab-text-muted)' },
         {
+          selector: `${HERO_PANEL} .fabricate-button`,
+          styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
+        },
+        {
+          selector: `${FILTERED_PANEL} .fabricate-button`,
+          styles: 'color: var(--fab-text); background-color: var(--fab-surface-soft)',
+        },
+        {
           selector: '.fab-notice',
           styles: 'display: flex; background-color: var(--fab-warning-soft)',
         },
@@ -279,7 +287,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-controls-specimen',
     label:
-      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral whose long label wraps to two lines inside its 34px box in a 120px target; and, on a darker strip, a ghost and a dashed adder. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -346,7 +354,8 @@ export const CASES = Object.freeze([
         // `:focus-visible` alone says focus, not a ring.
         {
           selector: `${LAB_BUTTON('create')}:focus-visible`,
-          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
         },
         // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
         {
@@ -357,7 +366,8 @@ export const CASES = Object.freeze([
     },
     position: CONTROLS_WINDOW,
     kinds: ['manager', 'specimen'],
-    // `Button.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    // `Notice.svelte` and `Button.svelte` are broad signals, each routed here by its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);
