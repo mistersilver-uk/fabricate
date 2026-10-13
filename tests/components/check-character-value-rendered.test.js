@@ -188,4 +188,31 @@ describe("a check's character value, drawn (issue 2465)", () => {
       `the line starts at ${unresolved.line.top}px, above the row's bottom edge at ${unresolved.row.bottom}px`
     );
   });
+
+  it('stands a stored path’s reading between the field and the line, under the border its line gives', async () => {
+    const resolved = await stackOf('resolved');
+    assert.equal(resolved.tone, 'resolved');
+    assertReadingUnderField(resolved, 'resolved');
+    assert.equal(resolved.line, null, 'a stored number draws no line');
+
+    const warning = await stackOf('warning');
+    assert.equal(warning.tone, 'unresolved');
+    assertReadingUnderField(warning, 'warning');
+    assert.ok(
+      warning.line.top >= warning.row.bottom,
+      `the line starts at ${warning.line.top}px, above the row's bottom edge at ${warning.row.bottom}px`
+    );
+    assert.equal(
+      (await pathInputOf('warning')).border,
+      await colourOf(page, '--fab-warning-border'),
+      'the field keeps its warning border under the unresolved reading'
+    );
+
+    const empty = await stackOf('danger');
+    assert.deepEqual(
+      [empty.reading, empty.row, Boolean(empty.line)],
+      [null, null, true],
+      'an empty path draws the line alone'
+    );
+  });
 });

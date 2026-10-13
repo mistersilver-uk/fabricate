@@ -256,6 +256,8 @@ const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: 
 const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
 const PATH_LINE = (tone, text) =>
   `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
+const PATH_READING = (kind, text) =>
+  `:has([data-check-additional-dice-path-field] [data-expr-input-reading="${kind}"]:text-is("${text}"))`;
 const PREVIEW_NOTE = (kind, text) =>
   `:has([data-checks-preview-additional-dice-note="${kind}"]:text-is("${text}"))`;
 const MOMENTUM_PATH = 'system.resources.momentum.value';
@@ -2386,9 +2388,13 @@ export const CASES = Object.freeze([
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}` +
       ':has([data-check-additional-dice-source-option="path"].is-active)' +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2') +
+      PATH_READING('resolved', '= 2') +
       ':has([data-check-additional-dice-label-field])' +
       ':has([data-check-additional-dice-max])',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-path-narrow',
@@ -2399,7 +2405,7 @@ export const CASES = Object.freeze([
     expectSelector:
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-source-option="path"].is-active)` +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2'),
+      PATH_READING('resolved', '= 2'),
   }),
   // `rdySrc` in the Studio: the path cleared, so nothing can be offered.
   additionalDiceCase({
@@ -2424,6 +2430,7 @@ export const CASES = Object.freeze([
         `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
       ) +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
@@ -2441,6 +2448,7 @@ export const CASES = Object.freeze([
       ) +
       ':has(input[data-checks-preview-additional-dice]:disabled)' +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so spending it would not lower it. Use a stored value.`

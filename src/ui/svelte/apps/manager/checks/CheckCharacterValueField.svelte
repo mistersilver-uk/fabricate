@@ -13,7 +13,7 @@
   | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the Studio's line, spelled out so each stays greppable. |
   | `validationTarget` | string | `''` | The Validation route's id for the input, written as its `data-validation-target` in either mode. |
   | `placeholder` | string | `'@skills.craft.value'` | The input's placeholder. |
-  | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a plain stored-path input read through `character.readStored`. |
+  | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a stored-path field, whose reading is the number `character.readStored` gives. |
 
   Callbacks:
   - `onChange(expression)` — every keystroke, with the raw text.
@@ -24,8 +24,9 @@
     line — `tests/components/check-under-authoring-mounted.test.js`.
   - The line never reads a missing path as zero: it names the path, and with no actor it says
     to choose one — `targetValueStatus`, pinned by `tests/components/check-count-authoring-mounted.test.js`.
-  - A stored path is read from the document, never roll data, so an active effect's value reads as
-    overridden — `tests/components/check-additional-dice-fields-mounted.test.js`.
+  - A stored path is read from the document, never roll data: its reading is the stored number,
+    and a missing number or one an active effect overrides reads `Unresolved` over the warning
+    line — `tests/components/check-additional-dice-fields-mounted.test.js`.
 -->
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
@@ -44,6 +45,13 @@
     onChange = () => {},
   } = $props();
 
+  /** The character's stored number at `path`: whether one is stored, and its value unless overridden. */
+  function readStoredNumber(path) {
+    const read = character?.readStored?.(String(path ?? '').trim()) ?? {};
+    const stored = typeof read.value === 'number' && Number.isFinite(read.value);
+    return { stored, value: stored && !read.overridden ? read.value : null };
+  }
+
   function storedPathStatus(path, copy) {
     const key = String(path ?? '').trim();
     if (!key) return { tone: 'danger', text: copy.empty };
@@ -56,17 +64,10 @@
         ),
       };
     }
-    const read = character.readStored?.(key) ?? {};
-    const words = { actor: character.name, path: key };
-    if (typeof read.value !== 'number' || !Number.isFinite(read.value)) {
-      return { tone: 'warning', text: interpolate(copy.unresolved, words) };
-    }
-    if (read.overridden) return { tone: 'warning', text: interpolate(copy.overridden, words) };
-    const resolved = localizeOr(
-      'FABRICATE.Admin.Manager.Checks.Evaluation.ValueResolved',
-      '{actor} → {value}'
-    );
-    return { tone: 'resolved', text: interpolate(resolved, { ...words, value: read.value }) };
+    const { stored, value: number } = readStoredNumber(key);
+    if (number !== null) return null;
+    const sentence = stored ? copy.overridden : copy.unresolved;
+    return { tone: 'warning', text: interpolate(sentence, { actor: character.name, path: key }) };
   }
 
   const resolution = $derived(
@@ -81,6 +82,8 @@
   const resolveExpression = $derived(
     character ? (expression) => resolveCharacterValue(expression, character.rollData) : undefined
   );
+  const resolveStored = $derived(character ? (path) => readStoredNumber(path).value : undefined);
+  const pathFaulted = $derived(resolution?.tone === 'danger' || resolution?.tone === 'warning');
   const uid = $props.id();
   const hintId = `${uid}-value-hint`;
   const resolutionId = `${uid}-value-resolution`;
@@ -90,16 +93,18 @@
 <div class="manager-checks-value-field">
   {#if documentPath}
     <RollDataExpressionInput
-      class={`manager-checks-value-path is-${resolution.tone}`}
+      class={resolution
+        ? `manager-checks-value-path is-${resolution.tone}`
+        : 'manager-checks-value-path'}
       {...attr(hooks.expression)}
       data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
-      aria-describedby={resolutionId}
-      aria-invalid={resolution.tone === 'danger' || resolution.tone === 'warning'
-        ? 'true'
-        : 'false'}
+      aria-describedby={resolution ? resolutionId : undefined}
+      aria-invalid={pathFaulted ? 'true' : 'false'}
       {value}
       {placeholder}
+      resolve={resolveStored}
+      {unresolvedLabel}
       {onChange}
     />
   {:else}
@@ -149,10 +154,6 @@
 
   .manager-checks-value-field .manager-checks-value-resolution.is-muted {
     color: var(--fab-text-subtle);
-  }
-
-  .manager-checks-value-field .manager-checks-value-resolution.is-resolved {
-    color: var(--fab-text-secondary);
   }
 
   .manager-checks-value-field .manager-checks-value-resolution.is-unresolved,
