@@ -235,6 +235,8 @@ export const KIND_MENU_COMPILED_MODULES = Object.freeze([
 // both lists, which restate the kind menu's paths: the harness guard follows one spread level.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/actionMenuLayout.js',
+  // The expression field's reading and its announcement (issue 2465).
+  'src/ui/svelte/util/announceAfterFocus.js',
   // Issue 1521: the card and the requirement row localize through `localizeOr`.
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
@@ -260,6 +262,7 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
@@ -280,6 +283,7 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
 // award header and range cell, the edits they write and the amount floor they read. Restated as
 // literals, because the harness guard follows a nested spread one level only.
 export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
@@ -299,6 +303,7 @@ export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',

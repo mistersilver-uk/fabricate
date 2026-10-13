@@ -256,6 +256,8 @@ const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: 
 const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
 const PATH_LINE = (tone, text) =>
   `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
+const PATH_READING = (kind, text) =>
+  `:has([data-check-additional-dice-path-field] [data-expr-input-reading="${kind}"]:text-is("${text}"))`;
 const PREVIEW_NOTE = (kind, text) =>
   `:has([data-checks-preview-additional-dice-note="${kind}"]:text-is("${text}"))`;
 const MOMENTUM_PATH = 'system.resources.momentum.value';
@@ -669,6 +671,34 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager .manager-checks-formula:has([data-check-formula-average="10.5"])',
     expectCenterHit: '.fab-expr-input-token',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-character-value-unresolved',
+    label: 'Manager — Checks character value the character lacks, reading and line',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      ...PARITY_NAV,
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.craft.value'),
+      // A closing click on the card's title takes focus off the field, so the frame is at rest.
+      { selector: '[data-check-difficulty-card] .manager-checks-card-title' },
+      // The click can scroll the panel; the field is brought back into view.
+      { selector: '[data-check-attribute-fields]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields]' +
+      ':has([data-expr-input-reading="unresolved"]:text-is("Unresolved"))' +
+      ':has([data-check-target-resolution="unresolved"]:has-text("@skills.craft.value"))',
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
@@ -1348,7 +1378,8 @@ export const CASES = Object.freeze([
       ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['+2', '0', '-2', '-4']),
       ...parityPreview(3),
     ],
-    expectSelector: '.fabricate-manager [data-check-target-resolution="resolved"]',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields] [data-expr-input-reading="resolved"]:text-is("= 12")',
   }),
   parityCase({
     id: 'manager-checks-parity-under-multiply',
@@ -2107,7 +2138,12 @@ export const CASES = Object.freeze([
     expectSelector:
       COUNTING +
       ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ':has([data-check-count-row-base] [data-expr-input-reading="resolved"])' +
       ' [data-check-count-actor-line="resolved"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
   }),
   authoringCase({
     id: 'manager-checks-v3-count-under',
@@ -2355,9 +2391,13 @@ export const CASES = Object.freeze([
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}` +
       ':has([data-check-additional-dice-source-option="path"].is-active)' +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2') +
+      PATH_READING('resolved', '= 2') +
       ':has([data-check-additional-dice-label-field])' +
       ':has([data-check-additional-dice-max])',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-path-narrow',
@@ -2368,7 +2408,7 @@ export const CASES = Object.freeze([
     expectSelector:
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-source-option="path"].is-active)` +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2'),
+      PATH_READING('resolved', '= 2'),
   }),
   // `rdySrc` in the Studio: the path cleared, so nothing can be offered.
   additionalDiceCase({
@@ -2393,6 +2433,7 @@ export const CASES = Object.freeze([
         `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
       ) +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
@@ -2410,6 +2451,7 @@ export const CASES = Object.freeze([
       ) +
       ':has(input[data-checks-preview-additional-dice]:disabled)' +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so spending it would not lower it. Use a stored value.`

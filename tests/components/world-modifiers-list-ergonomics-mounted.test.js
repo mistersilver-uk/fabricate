@@ -15,6 +15,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -575,7 +576,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     assert.ok(terms.includes('@abilities.wis.mod'), 'a dnd5e world is offered dnd5e roll data');
     assert.ok(terms.includes('1d4'), 'and the system-agnostic terms beside it');
 
-    const suggestions = row.querySelector('.fab-expr-input-row');
+    const suggestions = row.querySelector('.fab-expr-input-tokens');
     const expression = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(
       Boolean(
@@ -587,7 +588,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     assert.equal(
       suggestions.getAttribute('aria-label'),
       'Add a term to this expression',
-      'and the row is a group the caller names'
+      'and the tokens are a group the caller names'
     );
   });
 

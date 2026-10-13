@@ -3,7 +3,7 @@
  * Difficulty, recipe-tier and outcome cards is driven through its real element, and each switch is
  * proved lossless by a round trip back to the starting record (Q13).
  */
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
@@ -42,6 +42,12 @@ const progressiveHarness = createMountedComponentHarness({
 });
 
 const IDRIN = Object.freeze({ name: 'Idrin', rollData: { skills: { craft: { value: 55 } } } });
+const SERA = Object.freeze({ name: 'Sera', rollData: { skills: { craft: { value: 40 } } } });
+
+/** The Difficulty card's character-value fields, and what the expression field draws in them. */
+const attributeFields = (root) => root.querySelector('[data-check-attribute-fields]');
+const readingOf = (root) => attributeFields(root).querySelector('[data-expr-input-reading]');
+const statusOf = (root) => attributeFields(root).querySelector('[data-expr-input-status]');
 
 const evaluation = (overrides = {}, target = {}) =>
   normalizeCheckEvaluation({
@@ -278,35 +284,93 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     assert.deepEqual(state.value, start);
   });
 
-  it('edits the character value and shows what it resolves to for the Preview-as actor', async () => {
+  it('edits the character value and reads what it resolves to for the Preview-as actor', async () => {
     const state = await mount();
-    assert.equal(
-      state.root.querySelector('[data-check-target-resolution]').textContent.trim(),
-      'Idrin → 55'
+    const field = () => state.root.querySelector('[data-check-target-expression]');
+    const described = () => field().getAttribute('aria-describedby').split(' ');
+    const hint = state.root.querySelector('[data-check-target-expression-hint]');
+    assert.ok(hint?.id, 'the syntax hint exists');
+    assert.equal(field().getAttribute('aria-label'), 'Character value', 'the field is named');
+
+    const resolved = readingOf(state.root);
+    assert.equal(resolved.dataset.exprInputReading, 'resolved');
+    assert.equal(resolved.textContent, '= 55');
+    assert.ok(
+      !state.root.querySelector('[data-check-target-resolution]'),
+      'a resolved value draws no line, so nothing names the actor beside it'
     );
+    assert.deepEqual(described(), [resolved.id, hint.id], 'the reading, then the syntax hint');
+
     await state.act((root) => {
       const input = root.querySelector('[data-check-target-expression]');
       input.value = '@skills.lore.value';
       input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     });
     assert.equal(state.value.evaluation.target.expression, '@skills.lore.value');
+    const unresolved = readingOf(state.root);
+    assert.equal(unresolved.dataset.exprInputReading, 'unresolved');
+    assert.equal(unresolved.textContent, 'Unresolved');
     const line = state.root.querySelector('[data-check-target-resolution]');
     assert.equal(line.dataset.checkTargetResolution, 'unresolved');
     assert.equal(
       line.textContent.trim(),
       'Idrin has no value at @skills.lore.value. The check cannot resolve for them.'
     );
-    assert.ok(!line.hasAttribute('aria-live'), 'the line is not announced per keystroke');
-    const described = state.root
-      .querySelector('[data-check-target-expression]')
-      .getAttribute('aria-describedby')
-      .split(' ');
-    assert.ok(described.includes(line.id), 'the field is described by its resolution line');
-    const field = state.root.querySelector('[data-check-target-expression]');
-    assert.equal(field.getAttribute('aria-label'), 'Character value', 'the field is named');
+    assert.ok(
+      !attributeFields(state.root).querySelector('[aria-live]'),
+      'neither is announced per keystroke'
+    );
+    assert.deepEqual(
+      described(),
+      [unresolved.id, line.id, hint.id],
+      'the reading, the sentence that explains it, then the syntax hint'
+    );
+  });
+
+  it('draws the line alone, and no reading, with no Preview-as actor', async () => {
+    const state = await mount(routedCheck(), { previewCharacter: null });
+    assert.ok(!readingOf(state.root), 'no actor is in scope, so the field is passed no resolver');
+    assert.ok(!statusOf(state.root), 'and mounts no status region');
+    const line = state.root.querySelector('[data-check-target-resolution]');
+    assert.equal(line.dataset.checkTargetResolution, 'muted');
     const hint = state.root.querySelector('[data-check-target-expression-hint]');
-    assert.ok(hint?.id, 'the syntax hint exists');
-    assert.ok(described.includes(hint.id), 'the field is described by its syntax hint');
+    assert.equal(
+      state.root.querySelector('[data-check-target-expression]').getAttribute('aria-describedby'),
+      `${line.id} ${hint.id}`
+    );
+  });
+
+  describe('the reading is spoken under a caller that echoes each write (issue 2465)', () => {
+    const settle = () => new Promise((done) => setImmediate(done));
+    const status = (root) => statusOf(root).textContent;
+
+    // `setImmediate` stays real: every `harness.mount` awaits one.
+    beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+    afterEach(() => mock.timers.reset());
+
+    it('speaks a typed edit once it settles, and never a change of the Preview-as actor', async () => {
+      const state = await mount();
+      assert.equal(status(state.root), '', 'empty at mount');
+      await state.act((root) => {
+        const input = root.querySelector('[data-check-target-expression]');
+        input.value = '@skills.craft.value - 5';
+        input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      });
+      assert.equal(readingOf(state.root).textContent, '= 50');
+      mock.timers.tick(499);
+      await settle();
+      assert.equal(status(state.root), '', 'silent before the edit has settled');
+      mock.timers.tick(1);
+      await settle();
+      assert.equal(status(state.root), '= 50');
+
+      await routedHarness.setProps({ previewCharacter: SERA });
+      assert.equal(readingOf(state.root).textContent, '= 35', 'the chip follows the actor');
+      assert.equal(status(state.root), '', 'and the region is emptied, not rewritten');
+      mock.timers.tick(1000);
+      await settle();
+      assert.equal(status(state.root), '', 'at any later tick too');
+    });
   });
 
   it('states each refusal the character value meets in its own words', async () => {
@@ -727,10 +791,8 @@ describe('the simple editor draws an under target read-only', () => {
     const underAdd = evaluation({}, { adjustmentKind: 'add' });
     const state = await mountControlled(simpleHarness, kept(underAdd), { previewCharacter: IDRIN });
     assert.equal(state.root.querySelector('[data-tier-row="t"] [data-tier-adjustment]').value, '−2');
-    assert.equal(
-      state.root.querySelector('[data-check-target-resolution]').textContent.trim(),
-      'Idrin → 55'
-    );
+    assert.equal(readingOf(state.root).textContent, '= 55');
+    assert.ok(!state.root.querySelector('[data-check-target-resolution]'), 'and no line beside it');
   });
 
   it('draws the previewed record: its DC under a fixed target, its adjustment under a character value', async () => {

@@ -1,44 +1,56 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  A character-value expression field with its live reading for the Preview-as actor: the
-  roll-under target, and a counting pool's base and threshold (issue 2006), share this one field.
+  A check's character value: the expression field with its reading for the Preview-as actor, and
+  the Studio's own line for what that reading cannot say. The roll-under target, and a counting
+  pool's base and threshold (issue 2006), share this one field.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The stored expression, shown byte for byte. |
-  | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the reading resolves against. |
+  | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the reading resolves against; `null` passes the field no resolver. |
   | `label` | localized string | `''` | The input's accessible name; the field draws no visible caption. |
-  | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the reading line, spelled out so each stays greppable. |
-  | `inputAttrs` | plain object | `{}` | Attributes for the input, such as its `data-validation-target`; never event handlers. |
+  | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the Studio's line, spelled out so each stays greppable. |
+  | `validationTarget` | string | `''` | The Validation route's id for the input, written as its `data-validation-target` in either mode. |
   | `placeholder` | string | `'@skills.craft.value'` | The input's placeholder. |
-  | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a plain stored-path input read through `character.readStored`. |
+  | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a stored-path field, whose reading is the number `character.readStored` gives. |
 
   Callbacks:
   - `onChange(expression)` — every keystroke, with the raw text.
 
   Invariants:
-  - The reading never reads a missing path as zero: it names the path, and with no actor it says
+  - An expression's reading is the field's: `= {n}` where it reduces for the actor, the
+    `Unresolved` statement where it does not, and none with no actor. A resolved value draws no
+    line — `tests/components/check-under-authoring-mounted.test.js`.
+  - The line never reads a missing path as zero: it names the path, and with no actor it says
     to choose one — `targetValueStatus`, pinned by `tests/components/check-count-authoring-mounted.test.js`.
-  - A stored path is read from the document, never roll data, so an active effect's value reads as
-    overridden — `tests/components/check-additional-dice-fields-mounted.test.js`.
+  - A stored path is read from the document, never roll data: its reading is the stored number,
+    and a missing number or one an active effect overrides reads `Unresolved` over the warning
+    line — `tests/components/check-additional-dice-fields-mounted.test.js`.
 -->
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import { interpolate } from './checksCopy.js';
-  import { targetValueStatus } from './checkTargetStatus.js';
+  import { resolveCharacterValue, targetValueStatus } from './checkTargetStatus.js';
 
   let {
     value = '',
     character = null,
     label = '',
     hooks = {},
-    inputAttrs = {},
+    validationTarget = '',
     placeholder = '@skills.craft.value',
     documentPath = null,
     onChange = () => {},
   } = $props();
+
+  /** The character's stored number at `path`: whether one is stored, and its value unless overridden. */
+  function readStoredNumber(path) {
+    const read = character?.readStored?.(String(path ?? '').trim()) ?? {};
+    const stored = typeof read.value === 'number' && Number.isFinite(read.value);
+    return { stored, value: stored && !read.overridden ? read.value : null };
+  }
 
   function storedPathStatus(path, copy) {
     const key = String(path ?? '').trim();
@@ -52,17 +64,10 @@
         ),
       };
     }
-    const read = character.readStored?.(key) ?? {};
-    const words = { actor: character.name, path: key };
-    if (typeof read.value !== 'number' || !Number.isFinite(read.value)) {
-      return { tone: 'warning', text: interpolate(copy.unresolved, words) };
-    }
-    if (read.overridden) return { tone: 'warning', text: interpolate(copy.overridden, words) };
-    const resolved = localizeOr(
-      'FABRICATE.Admin.Manager.Checks.Evaluation.ValueResolved',
-      '{actor} → {value}'
-    );
-    return { tone: 'resolved', text: interpolate(resolved, { ...words, value: read.value }) };
+    const { stored, value: number } = readStoredNumber(key);
+    if (number !== null) return null;
+    const sentence = stored ? copy.overridden : copy.unresolved;
+    return { tone: 'warning', text: interpolate(sentence, { actor: character.name, path: key }) };
   }
 
   const resolution = $derived(
@@ -70,6 +75,15 @@
       ? storedPathStatus(value, documentPath)
       : targetValueStatus(value, character, localizeOr)
   );
+  const unresolvedLabel = localizeOr(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved',
+    'Unresolved'
+  );
+  const resolveExpression = $derived(
+    character ? (expression) => resolveCharacterValue(expression, character.rollData) : undefined
+  );
+  const resolveStored = $derived(character ? (path) => readStoredNumber(path).value : undefined);
+  const pathFaulted = $derived(resolution?.tone === 'danger' || resolution?.tone === 'warning');
   const uid = $props.id();
   const hintId = `${uid}-value-hint`;
   const resolutionId = `${uid}-value-resolution`;
@@ -78,28 +92,31 @@
 
 <div class="manager-checks-value-field">
   {#if documentPath}
-    <input
-      type="text"
-      class={`manager-checks-value-path is-${resolution.tone}`}
+    <RollDataExpressionInput
+      class={resolution
+        ? `manager-checks-value-path is-${resolution.tone}`
+        : 'manager-checks-value-path'}
       {...attr(hooks.expression)}
-      {...inputAttrs}
+      data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
-      aria-describedby={resolutionId}
-      aria-invalid={resolution.tone === 'danger' || resolution.tone === 'warning'
-        ? 'true'
-        : 'false'}
+      aria-describedby={resolution ? resolutionId : undefined}
+      aria-invalid={pathFaulted ? 'true' : 'false'}
       {value}
       {placeholder}
-      oninput={(event) => onChange(event.currentTarget.value)}
+      resolve={resolveStored}
+      {unresolvedLabel}
+      {onChange}
     />
   {:else}
     <RollDataExpressionInput
       {...attr(hooks.expression)}
-      {...inputAttrs}
+      data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
-      aria-describedby={resolution ? `${hintId} ${resolutionId}` : hintId}
+      aria-describedby={resolution ? `${resolutionId} ${hintId}` : hintId}
       {value}
       {placeholder}
+      resolve={resolveExpression}
+      {unresolvedLabel}
       {onChange}
     />
     <!-- The path syntax stays the field's description for assistive tech; the prototype draws only
@@ -139,10 +156,6 @@
     color: var(--fab-text-subtle);
   }
 
-  .manager-checks-value-field .manager-checks-value-resolution.is-resolved {
-    color: var(--fab-text-secondary);
-  }
-
   .manager-checks-value-field .manager-checks-value-resolution.is-unresolved,
   .manager-checks-value-field .manager-checks-value-resolution.is-danger {
     color: var(--fab-danger-text);
@@ -152,17 +165,11 @@
     color: var(--fab-warning-text);
   }
 
-  .manager-checks-value-path {
-    font-family: var(--fab-font-mono);
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  .manager-checks-value-field .manager-checks-value-path.is-danger[aria-invalid='true'] {
+  .manager-checks-value-field :global(.manager-checks-value-path.is-danger[aria-invalid='true']) {
     border-color: var(--fab-danger-border);
   }
 
-  .manager-checks-value-field .manager-checks-value-path.is-warning[aria-invalid='true'] {
+  .manager-checks-value-field :global(.manager-checks-value-path.is-warning[aria-invalid='true']) {
     border-color: var(--fab-warning-border);
   }
 </style>

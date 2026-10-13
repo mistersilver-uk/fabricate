@@ -1,27 +1,40 @@
 /**
  * Issue 2465 — what `<ExprInput>` draws and does in Chromium. The static half computes the faces
- * the field and its tokens state, from the component's mounted markup; the live half runs the real
- * component in `tests/fixtures/expr-input/` and presses its tokens by pointer and by keyboard.
+ * the field, its reading and its tokens state, from the component's mounted markup; the live half
+ * runs the real component in `tests/fixtures/expr-input/`, presses its tokens by pointer and by
+ * keyboard, and reads what its status region says and what the engine's accessibility tree holds.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { getModifierExpressionSuggestions } from '../../src/config/modifierExpressionSuggestions.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createViteFixtureServer, pressPointerOn } from '../helpers/vite-fixture-server.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const CHIP = 'src/ui/svelte/components/Chip.svelte';
 
 /** Rounding tolerance for a fractional rect. */
 const EPSILON = 0.5;
 
 const TOKEN = '.fab-expr-input-token';
 const FIELD = 'input.fab-expr-input';
+const READING = '[data-expr-input-reading]';
+const STATUS = '[data-expr-input-status]';
+
+/** The entry's three tokens, which a 300px host cannot hold on one line beside a reading. */
+const ENTRY_TERMS = Object.freeze(['@prof', '@abilities.dex.mod', '@skills.cra.rank']);
+
+/** What a caller passes for a reading that reduces, and for one that does not. */
+const REDUCED = Object.freeze({ resolve: () => 13, unresolvedLabel: 'Unresolved' });
+const UNREDUCED = Object.freeze({ resolve: () => null, unresolvedLabel: 'Unresolved' });
+
+/** A statement far wider than the 120px host it is mounted in. */
+const LONG_STATEMENT =
+  'Dieser Ausdruck lässt sich für die gewählte Figur nicht auf eine Zahl zurückführen';
 
 /** The longest row a shipped world offers: five terms, one of them 43 characters. */
 const PF2E_TERMS = getModifierExpressionSuggestions('pf2e').map(({ expression }) => expression);
@@ -45,15 +58,31 @@ const CASES = Object.freeze({
     props: { tokens: PF2E_TERMS },
     host: (field) => `<div data-case="narrow" style="width:220px">${field}</div>`,
   },
+  reading: {
+    props: { ...REDUCED },
+    host: (field) => `<div data-case="reading">${field}</div>`,
+  },
+  both: {
+    props: { tokens: ENTRY_TERMS, ...REDUCED },
+    host: (field) => `<div data-case="both" style="width:300px">${field}</div>`,
+  },
+  unresolved: {
+    props: { ...UNREDUCED },
+    host: (field) => `<div data-case="unresolved">${field}</div>`,
+  },
+  long: {
+    props: { resolve: () => null, unresolvedLabel: LONG_STATEMENT },
+    host: (field) => `<div data-case="long" style="width:120px">${field}</div>`,
+  },
+  blank: {
+    props: { value: '', ...REDUCED },
+    host: (field) => `<div data-case="blank">${field}</div>`,
+  },
+  plain: {
+    props: { value: '' },
+    host: (field) => `<div data-case="plain">${field}</div>`,
+  },
 });
-
-const staticPage = (hosts) => `<!doctype html><html><head><meta charset="utf-8">
-<style>${readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
-<style>@layer modules {${readStylesheet()}}</style>
-<style>${scopedComponentCss(resolve(repoRoot, RDE)).css}</style>
-</head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
-${hosts.join('\n')}
-</div></body></html>`;
 
 const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@expr-input-styles/' });
 
@@ -65,18 +94,6 @@ after(async () => {
   await fixtureServer.stop();
 });
 
-/** What a `--fab-*` colour token computes to under the page's manager root. */
-function colourOf(page, token) {
-  return page.evaluate((name) => {
-    const probe = document.createElement('i');
-    probe.style.color = `var(${name})`;
-    document.querySelector('.fabricate-manager').append(probe);
-    const { color } = getComputedStyle(probe);
-    probe.remove();
-    return color;
-  }, token);
-}
-
 describe('ExprInput, drawn (issue 2465)', () => {
   let tab;
 
@@ -84,8 +101,8 @@ describe('ExprInput, drawn (issue 2465)', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-expr-input-rendered-',
-      rawModules: [],
-      compiledModules: ['src/ui/svelte/components/Button.svelte', RDE],
+      rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
+      compiledModules: ['src/ui/svelte/components/Button.svelte', CHIP, RDE],
       componentPath: RDE,
     });
     await harness.setup();
@@ -104,7 +121,7 @@ describe('ExprInput, drawn (issue 2465)', () => {
       harness.teardown();
     }
     tab = await fixtureServer.newPage({ viewport: { width: 1280, height: 900 } });
-    await tab.setContent(staticPage(hosts), { waitUntil: 'load' });
+    await tab.setContent(staticComponentPage([RDE, CHIP], hosts), { waitUntil: 'load' });
   });
 
   /** Every token of one case, as the figures the clauses below read. */
@@ -260,6 +277,133 @@ describe('ExprInput, drawn (issue 2465)', () => {
         `${token.text} runs ${token.pastHost}px past the host's right edge`
       );
     }
+  });
+
+  /** The reading of one case and the tokens beside it, as the figures the clauses below read. */
+  function readingOf(name) {
+    return tab.evaluate(
+      ({ host, reading, token }) => {
+        const root = document.querySelector(`[data-case="${host}"]`);
+        const row = root.querySelector('.fab-expr-input-row');
+        const chip = root.querySelector(reading);
+        const style = getComputedStyle(chip);
+        const edge = row.getBoundingClientRect().left;
+        const placed = (node) => {
+          const box = node.getBoundingClientRect();
+          return { left: box.left - edge, top: box.top, middle: box.top + box.height / 2 };
+        };
+        return {
+          text: chip.textContent,
+          height: chip.getBoundingClientRect().height,
+          ...placed(chip),
+          mono: /^"?JetBrains Mono/u.test(style.fontFamily),
+          hostFace: style.fontFamily === getComputedStyle(root).fontFamily,
+          size: style.fontSize,
+          weight: style.fontWeight,
+          numerals: style.fontVariantNumeric,
+          ink: style.color,
+          tokens: [...root.querySelectorAll(token)].map((button) => placed(button)),
+        };
+      },
+      { host: name, reading: READING, token: TOKEN }
+    );
+  }
+
+  it("draws the reading at the chip's inspector rung, 20px tall, so Chip's own rules reach it", async () => {
+    for (const host of ['reading', 'unresolved', 'both']) {
+      assert.equal((await readingOf(host)).height, 20, host);
+    }
+  });
+
+  it('computes the mono face at 10px / 500, tabular numerals and the info ink on a number', async () => {
+    const { text, mono, size, weight, numerals, ink } = await readingOf('reading');
+    assert.deepEqual(
+      { text, mono, size, weight, numerals, ink },
+      {
+        text: '= 13',
+        mono: true,
+        size: '10px',
+        weight: '500',
+        numerals: 'tabular-nums',
+        ink: await colourOf(tab, '--fab-info-text'),
+      }
+    );
+  });
+
+  it('computes the UI face and the secondary ink on a statement', async () => {
+    const { text, mono, hostFace, size, weight, numerals, ink } = await readingOf('unresolved');
+    assert.deepEqual(
+      { text, mono, hostFace, size, weight, numerals, ink },
+      {
+        text: 'Unresolved',
+        mono: false,
+        hostFace: true,
+        size: '10px',
+        weight: '600',
+        numerals: 'normal',
+        ink: await colourOf(tab, '--fab-text-secondary'),
+      }
+    );
+  });
+
+  it("stands the reading first on the row's first line, centred against a token, and wraps a token to the row's left edge", async () => {
+    const chip = await readingOf('both');
+    const [first] = chip.tokens;
+    assert.equal(chip.tokens.length, ENTRY_TERMS.length);
+    assert.ok(Math.abs(chip.left) <= EPSILON, `the reading starts ${chip.left}px into its row`);
+    assert.ok(first.left > chip.left, 'the first token follows the reading');
+    assert.ok(
+      Math.abs(first.middle - chip.middle) <= EPSILON,
+      `the reading's middle is ${chip.middle}px against the first token's ${first.middle}px`
+    );
+    const wrapped = chip.tokens.filter((token) => token.top > first.top + EPSILON);
+    assert.ok(wrapped.length > 0, 'three terms and a reading stand on one line of a 300px host');
+    assert.ok(
+      Math.abs(wrapped[0].left) <= EPSILON,
+      `the wrapped token starts ${wrapped[0].left}px into its row, not at its left edge`
+    );
+  });
+
+  it('wraps a statement longer than its host inside its chip, written whole', async () => {
+    const drawn = await tab.evaluate((reading) => {
+      const root = document.querySelector('[data-case="long"]');
+      const chip = root.querySelector(reading);
+      const box = chip.getBoundingClientRect();
+      const row = root.querySelector('.fab-expr-input-row').getBoundingClientRect();
+      return {
+        statement: chip.textContent,
+        clipsColumns: chip.scrollWidth - chip.clientWidth,
+        height: box.height,
+        pastRow: box.right - row.right,
+        rowPastHost: row.right - root.getBoundingClientRect().right,
+      };
+    }, READING);
+    assert.equal(drawn.statement, LONG_STATEMENT, 'the statement is never truncated');
+    assert.ok(drawn.clipsColumns <= 0, `the chip clips ${drawn.clipsColumns}px of its statement`);
+    assert.ok(drawn.height > 20, `a wrapped chip is taller than one line: ${drawn.height}px`);
+    assert.ok(
+      drawn.pastRow <= EPSILON && drawn.rowPastHost <= EPSILON,
+      `the chip runs ${drawn.pastRow}px past its row, the row ${drawn.rowPastHost}px past its host`
+    );
+  });
+
+  it('clips the status region to one pixel out of flow, so a blank field is no taller for it', async () => {
+    const drawn = await tab.evaluate((status) => {
+      const height = (name) =>
+        document.querySelector(`[data-case="${name}"]`).getBoundingClientRect().height;
+      const region = document.querySelector(`[data-case="blank"] ${status}`);
+      const style = getComputedStyle(region);
+      return {
+        blank: height('blank'),
+        plain: height('plain'),
+        row: Boolean(document.querySelector('[data-case="blank"] .fab-expr-input-row')),
+        region: [style.position, style.width, style.height, style.overflow, style.clipPath],
+      };
+    }, STATUS);
+    assert.equal(drawn.row, false, 'a blank expression draws no row');
+    assert.ok(drawn.plain > 0, 'the plain field has a height to compare against');
+    assert.equal(drawn.blank, drawn.plain);
+    assert.deepEqual(drawn.region, ['absolute', '1px', '1px', 'hidden', 'inset(50%)']);
   });
 });
 
@@ -523,6 +667,126 @@ describe('ExprInput, pressed (issue 2465)', () => {
         await colourOf(page, '--fab-accent'),
       ]);
     } finally {
+      await page.close();
+    }
+  });
+
+  /** Record every write to the status region, with where focus stood and how long since a key. */
+  function watchStatus(page) {
+    return page.evaluate(
+      ({ field, status }) => {
+        const region = document.querySelector(status);
+        const input = document.querySelector(field);
+        const heard = [];
+        let lastKey = 0;
+        input.addEventListener('input', () => {
+          lastKey = performance.now();
+        });
+        new MutationObserver(() => {
+          heard.push({
+            said: region.textContent,
+            focus: document.activeElement === input ? 'field' : 'elsewhere',
+            sinceLastKey: performance.now() - lastKey,
+          });
+          document.documentElement.dataset.exprInputHeard = JSON.stringify(heard);
+        }).observe(region, { childList: true, characterData: true, subtree: true });
+      },
+      { field: FIELD, status: STATUS }
+    );
+  }
+
+  /** Every write to the status region, once there is one. */
+  async function firstSpoken(page) {
+    await page.waitForFunction(() => 'exprInputHeard' in document.documentElement.dataset);
+    return page.evaluate(() => JSON.parse(document.documentElement.dataset.exprInputHeard));
+  }
+
+  it('says nothing while a reading is typed, then the reading once typing has rested', async () => {
+    const page = await open({ value: '', resolve: '1' });
+    try {
+      await watchStatus(page);
+      await page.focus(FIELD);
+      await page.keyboard.type('@prof + 8');
+      const heard = await firstSpoken(page);
+      assert.equal(heard.length, 1, 'nine keystrokes are one write');
+      assert.equal(heard[0].said, '= 11');
+      assert.equal(await page.locator(READING).textContent(), '= 11', "and it is the chip's text");
+      assert.ok(
+        heard[0].sinceLastKey >= 490,
+        `the region was written ${heard[0].sinceLastKey}ms after the last key, inside the 500ms rest`
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('speaks a pressed token with focus already back on the field', async () => {
+    const page = await open({ value: '@prof', resolve: '1' });
+    try {
+      await watchStatus(page);
+      await pressPointerOn(page, TOKEN);
+      const [spoken] = await firstSpoken(page);
+      assert.deepEqual(
+        { said: spoken.said, focus: spoken.focus },
+        { said: '= 6', focus: 'field' },
+        'the region changes after the focus move it must not be cancelled by'
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('lists the reading, then the named group of tokens alone, then the status region', async () => {
+    const page = await open({ value: '@prof', resolve: '1' });
+    try {
+      const lines = String(await page.locator('[data-host]').ariaSnapshot()).split('\n');
+      const at = (pattern) => lines.findIndex((line) => pattern.test(line));
+      const reading = at(/= 3/u);
+      const group = at(/^- group "Add a term":/u);
+      const status = at(/^- status\b/u);
+      assert.ok(reading >= 0 && group > reading && status > group, lines.join(' | '));
+      assert.deepEqual(
+        lines.slice(group + 1, status),
+        ['  - button "@prof"', '  - button "1d4"'],
+        'the group holds the two tokens and nothing else'
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("keeps the group's role and name in Chromium's own accessibility tree, around the tokens alone", async () => {
+    const page = await open({ value: '@prof', resolve: '1' });
+    const session = await page.context().newCDPSession(page);
+    try {
+      const { nodes } = await session.send('Accessibility.getFullAXTree');
+      const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+      const named = (node) => `${node.role?.value} "${node.name?.value ?? ''}"`;
+      const descendants = (node) =>
+        (node.childIds ?? [])
+          .map((id) => byId.get(id))
+          .flatMap((child) => [child, ...descendants(child)]);
+      const groups = nodes.filter((node) => named(node) === 'group "Add a term"');
+      assert.equal(groups.length, 1, 'the engine exposes one group by that name');
+      const held = descendants(groups[0]).filter((node) => !node.ignored);
+      assert.deepEqual(
+        held.filter((node) => node.role?.value === 'button').map((node) => named(node)),
+        ['button "@prof"', 'button "1d4"']
+      );
+      assert.deepEqual(
+        held.filter((node) => /= 3/u.test(node.name?.value ?? '')).map((node) => named(node)),
+        [],
+        'the reading is no descendant of the group'
+      );
+      assert.deepEqual(
+        nodes
+          .filter((node) => node.role?.value === 'textbox')
+          .map((node) => [named(node), node.description?.value]),
+        [['textbox "Expression"', '= 3']],
+        'the engine does expose the reading: it is the description of the field'
+      );
+    } finally {
+      await session.detach();
       await page.close();
     }
   });

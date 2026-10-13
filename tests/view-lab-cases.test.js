@@ -60,6 +60,7 @@ import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { componentAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
+import { scopedComponentCss } from './helpers/scoped-component-css.js';
 import { importedModules } from './helpers/svelteStructureContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
@@ -1430,6 +1431,60 @@ test('no expectSelector nests one :has() inside another', () => {
     nested.map((viewCase) => viewCase.id),
     []
   );
+});
+
+test('no roll-under parity case scrolls or gains a step: a frame re-aimed at one field is a sibling case', () => {
+  const parity = VIEW_LAB_CASES.filter(({ label }) => label.includes('roll-under parity'));
+  assert.deepEqual(
+    Object.fromEntries(parity.map(({ id, steps }) => [id, steps.length])),
+    {
+      'manager-checks-parity-over-fixed': 27,
+      'manager-checks-parity-over-attribute': 25,
+      'manager-checks-parity-under-fixed': 24,
+      'manager-checks-parity-under-attribute': 26,
+      'manager-checks-parity-under-multiply': 21,
+      'manager-checks-parity-progressive': 2,
+      'manager-checks-parity-under-attribute-no-actor': 24,
+      'manager-checks-parity-outcomes-multiply': 37,
+      'manager-checks-parity-outcomes-under-fixed': 30,
+    },
+    'each parity case holds the steps its prototype state was captured with'
+  );
+  assert.deepEqual(
+    parity.filter(({ steps }) => steps.some((step) => step?.scroll)).map(({ id }) => id),
+    [],
+    'a parity case is photographed where its prototype state leaves it'
+  );
+  assert.equal(
+    getCaseById('manager-checks-character-value-unresolved').steps.at(-1)?.scroll,
+    true,
+    'the sibling case ends on the scroll that brings its field back into view'
+  );
+});
+
+test('no case selects the character-value line by a tone the line no longer carries', () => {
+  // The hooks callers hand `CheckCharacterValueField` for its line, whose value is the line's tone.
+  const lineHooks = [
+    'data-check-target-resolution',
+    'data-check-count-base-resolution',
+    'data-check-count-threshold-resolution',
+    'data-check-additional-dice-path-line',
+  ];
+  const { css } = scopedComponentCss(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte')
+  );
+  const tones = new Set(
+    [...css.matchAll(/\.manager-checks-value-resolution\.is-([a-z]+)/gu)].map(([, tone]) => tone)
+  );
+  assert.deepEqual([...tones].sort(byCodePoint), ['danger', 'muted', 'unresolved', 'warning']);
+  const stale = VIEW_LAB_CASES.flatMap(({ id, expectSelector = '', steps = [] }) =>
+    [expectSelector, ...steps.map((step) => step?.selector ?? '')].flatMap((selector) =>
+      [...String(selector).matchAll(/\[(data-check-[\w-]+)="([^"]+)"\]/gu)]
+        .filter(([, hook, tone]) => lineHooks.includes(hook) && !tones.has(tone))
+        .map(([, hook, tone]) => `${id}: ${hook}="${tone}"`)
+    )
+  );
+  assert.deepEqual(stale, [], "the resolved value is the field's reading, never a line");
 });
 
 test('all Journal lifecycle captures assert defining product state rather than a populated shell', () => {

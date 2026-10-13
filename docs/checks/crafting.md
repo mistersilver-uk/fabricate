@@ -332,6 +332,8 @@ Below **Which way is better**, **What the roll is measured against** picks where
 - **Character value** reads a value from the crafting, salvage, or gathering character instead.
 Write a character-data path such as `@skills.craft.value`, the same way a modifier's expression is written.
 See [Defining modifiers]({% link checks/index.md %}#defining-modifiers).
+With a character chosen in **Preview as**, a chip under the field reads `= 12` when the value reduces to a number for that character, or `Unresolved` when it does not, with a sentence beneath it saying why.
+The chip follows the **Preview as** character, and with none chosen the field asks you to choose one instead.
 
 A **Character value** target then takes a **Difficulty adjustment**.
 **Add a number** adds a flat amount to the character value.
@@ -494,6 +496,7 @@ Choosing **Count successes** replaces the formula field with a row of pool contr
 - **Base pool** sets how many dice are rolled.
 Above the field, a **Number** / **Character value** choice decides whether you type a plain count or a character-data path such as `@skills.smith.rank`, the same way a roll-under target does.
 A character value can also be arithmetic on more than one value, for example `@abilities.int.value + @skills.repair.value`, so a pool sized from two character values no longer needs an Active Effect to compute it first.
+A character value here, and under **Success on** below, shows the same `= 12` or `Unresolved` chip for the **Preview as** character.
 
 ### Success on
 
@@ -582,6 +585,7 @@ Choose what pays for them with **Paid for by**.
 
 - **Value on the crafting character** spends a number stored on the character, such as a resource your game system tracks on the character sheet.
 Type its path under **Path on the crafting character**.
+With a character chosen in **Preview as**, a chip under the path reads the number stored there, for example `= 2`, or `Unresolved` when there is none or an Active Effect overrides it.
 Fabricate reads and writes that value directly, so a player can only spend from a character they themselves can edit, and the roll prompt tells them so when they cannot.
 An Active Effect currently changing that value also makes it unavailable to spend from, because spending would not actually lower a value the effect is holding in place.
 - **Read and spend macros** hand the whole question to two Script Macros you write and drop into the **Read macro** and **Spend macro** areas: one that reports how many units the character, or whatever the resource represents, can currently afford, and one that deducts the cost once dice are bought.

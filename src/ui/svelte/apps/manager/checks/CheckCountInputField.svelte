@@ -157,7 +157,7 @@
       {character}
       {label}
       hooks={VALUE_HOOKS[field]}
-      inputAttrs={{ 'data-validation-target': validationTarget }}
+      {validationTarget}
       onChange={(next) => write('value', next)}
     />
   </span>

@@ -7,6 +7,7 @@
     tokens = [],
     shell = false,
     disabled = false,
+    resolve = undefined,
     echo = (next) => next,
     onWrite = () => {},
   } = $props();
@@ -28,6 +29,8 @@
     {tokens}
     {disabled}
     tokensLabel="Add a term"
+    {resolve}
+    unresolvedLabel="Unresolved"
     onChange={write}
   />
 </div>

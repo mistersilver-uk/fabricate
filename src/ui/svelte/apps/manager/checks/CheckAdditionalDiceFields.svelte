@@ -257,7 +257,7 @@
             expression: 'data-check-additional-dice-path',
             resolution: 'data-check-additional-dice-path-line',
           }}
-          inputAttrs={{ 'data-validation-target': 'checks-additional-dice-path' }}
+          validationTarget="checks-additional-dice-path"
           placeholder="system.resources.momentum.value"
           documentPath={pathCopy}
           onChange={(next) => write('path', next)}

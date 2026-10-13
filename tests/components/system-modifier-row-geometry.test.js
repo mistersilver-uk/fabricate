@@ -180,23 +180,30 @@ test('the un-capped expression field renders as an ordinary field, with no affix
   );
   assert.deepEqual(
     roots.map((node) => (node.type === 'IfBlock' ? '{#if}' : node.name)),
-    ['input', '{#if}'],
-    "the template's root elements are the input, then one `{#if}`, and nothing wraps the input"
+    ['input', '{#if}', '{#if}'],
+    "the template's root elements are the input, then two `{#if}`s, and nothing wraps the input"
   );
-  const [, branch] = roots;
-  assert.deepEqual(
+  const held = (branch) =>
     [branch.consequent, branch.alternate].flatMap((arm) =>
       (arm?.nodes ?? [])
         .filter((node) => ELEMENT_TYPES.includes(node.type))
         .map((node) => [node.name, ...classTokens(node)])
-    ),
+    );
+  const [, row, status] = roots;
+  assert.deepEqual(
+    held(row),
     [['div', 'fab-expr-input-row']],
-    'the `{#if}` holds the one row of tokens, which stands after the input and never beside it'
+    'the first `{#if}` holds the one row, which stands after the input and never beside it'
+  );
+  assert.deepEqual(
+    held(status),
+    [['span', 'visually-hidden']],
+    'the second holds the status region, beside the row and never inside it'
   );
   assert.equal(
     [...walkNodes(fragment)].filter((node) => node.type === 'IfBlock').length,
-    1,
-    'and it is the single `{#if}`: the field has no second form to branch into'
+    4,
+    'the row, the reading and the group of tokens inside it, and the status region: no other form'
   );
   const wrapper = [...walkNodes(componentAstOf(PREREQUISITES_CARD).fragment)].find((node) =>
     classTokens(node).includes('manager-prerequisite-path-input')

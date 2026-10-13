@@ -334,7 +334,7 @@
               hint: 'data-check-target-expression-hint',
               resolution: 'data-check-target-resolution',
             }}
-            inputAttrs={{ 'data-validation-target': 'checks-target-expression' }}
+            validationTarget="checks-target-expression"
             onChange={(next) => emitTarget({ expression: next })}
           />
         </div>
