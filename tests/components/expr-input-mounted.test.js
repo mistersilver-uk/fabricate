@@ -187,6 +187,8 @@ const INSERTIONS = Object.freeze([
   ['a caret inside a die appends', '2d|6', '2d6 + 1d4|'],
   ['a caret inside a number appends', '1|0', '10 + 1d4|'],
   ['a caret between a function and its bracket appends', 'floor|(@a)', 'floor(@a) + 1d4|'],
+  ['a selection cut inside a path appends', '2d6 + @|prof|', '2d6 + @prof + 1d4|'],
+  ['so does one cut at both ends', '@ab|c + d|ef', '@abc + def + 1d4|'],
 ]);
 
 before(() => harness.setup());

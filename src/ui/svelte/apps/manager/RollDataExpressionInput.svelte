@@ -25,7 +25,8 @@
   - The input is the first root and nothing wraps it; the one further node is the token row, drawn
     only when a token is left to draw. Nothing adds or strips an `@`.
   - A pressed token replaces a partial selection, and joins the end when the whole expression is
-    selected or the caret stands inside a term; it then returns focus with the caret after it.
+    selected or the caret or an edge of the selection stands inside a term; it then returns focus
+    with the caret after it.
   - A caller's `oninput` is not honoured: the component's own follows the spread. All pinned by
     `tests/components/expr-input-mounted.test.js`.
 -->
@@ -65,10 +66,9 @@
   /** Where a token lands: the selection, or the end where no insertion point was placed. */
   function insertionRange(text, start, end) {
     const wholeValue = start === 0 && end === text.length && text.trim() !== '';
-    const insideTerm =
-      start === end &&
-      isTermCharacter(text[start - 1]) &&
-      (isTermCharacter(text[start]) || text[start] === '(');
+    const splits = (index) =>
+      isTermCharacter(text[index - 1]) && (isTermCharacter(text[index]) || text[index] === '(');
+    const insideTerm = splits(start) || splits(end);
     return wholeValue || insideTerm ? [text.length, text.length] : [start, end];
   }
 
@@ -83,13 +83,13 @@
   }
 
   function insertToken(token) {
-    const text = input.value;
-    const [start, end] = insertionRange(text, input.selectionStart, input.selectionEnd);
-    const left = text.slice(0, start).trim();
-    const right = text.slice(end).trim();
+    const expression = input.value;
+    const [start, end] = insertionRange(expression, input.selectionStart, input.selectionEnd);
+    const left = expression.slice(0, start).trim();
+    const right = expression.slice(end).trim();
     const head = `${left}${leftJoin(left)}${token}`;
     // Written whole and with explicit indices; the caret is then set, since `'end'` leaves it last.
-    input.setRangeText(`${head}${rightJoin(right)}${right}`, 0, text.length, 'end');
+    input.setRangeText(`${head}${rightJoin(right)}${right}`, 0, expression.length, 'end');
     onChange(input.value);
     input.focus();
     input.setSelectionRange(head.length, head.length);

@@ -324,6 +324,49 @@ describe('ExprInput, pressed (issue 2465)', () => {
     }
   });
 
+  /** The page point at the middle of the field's characters from `from` to `to`. */
+  function pointInText(page, from, to) {
+    return page.evaluate(
+      ({ field, range }) => {
+        const input = document.querySelector(field);
+        const style = getComputedStyle(input);
+        const pen = document.createElement('canvas').getContext('2d');
+        pen.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        const box = input.getBoundingClientRect();
+        const inset =
+          Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft);
+        const [start, end] = range.map(
+          (index) => pen.measureText(input.value.slice(0, index)).width
+        );
+        return { x: box.left + inset + (start + end) / 2, y: box.top + box.height / 2 };
+      },
+      { field: FIELD, range: [from, to] }
+    );
+  }
+
+  it('joins the end when a double-click selected one word of a path, cutting the term', async () => {
+    const page = await open({ value: '2d6 + @prof' });
+    try {
+      const { x, y } = await pointInText(page, 7, 11);
+      await page.mouse.dblclick(x, y);
+      assert.deepEqual(
+        (await read(page)).selection,
+        [7, 11],
+        'Chromium selects the word `prof`, and leaves the `@` outside it'
+      );
+
+      await pressPointerOn(page, TOKEN);
+      assert.deepEqual(await read(page), {
+        value: '2d6 + @prof + @prof',
+        selection: [19, 19],
+        focus: 'field',
+        writes: ['2d6 + @prof + @prof'],
+      });
+    } finally {
+      await page.close();
+    }
+  });
+
   it('joins the end when the field was reached with Tab, which selects all of it', async () => {
     const page = await open({ value: '@a + @b' });
     try {
