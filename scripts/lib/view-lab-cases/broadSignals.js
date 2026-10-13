@@ -305,6 +305,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
     'manager-world-downtime-tracking-described',
     'manager-world-downtime-narrow-settings',
+    // One frame per remaining render site, and the tool strip's 832 to 900px rung (issue 2464).
+    'manager-tool-parity-05-validation-1280x720',
+    'manager-tool-parity-06-breakage-900x700',
+    'manager-essence-edit-validation',
+    'manager-recipe-edit-validation',
+    'manager-gathering-task-editor-normal',
+    'manager-component-edit-validation',
+    'world-component-entry-validation',
+    'world-essence-entry',
+    'world-tool-entry-validation',
+    'player-salvage',
+    'player-gathering-events',
   ]),
   // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([

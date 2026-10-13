@@ -454,6 +454,21 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
     ],
     [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-component-edit-validation',
+      'the frame that draws the strip as a row of the component entry column',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'player-gathering-events',
+      'a frame that draws the strip outside the manager',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-tool-parity-06-breakage-900x700',
+      'the one frame in the tool strip`s 832 to 900px rung, where it wraps',
+    ],
+    [
       'src/ui/svelte/components/Callout.svelte',
       'manager-essence-edit-unscoped-on-craft',
       'the one frame that draws the `items` form, the essence On craft primer',
