@@ -81,7 +81,7 @@ function type(input, text) {
   input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
 }
 
-/** Every call-site tag of the component under `src/ui/svelte`, with the attribute names it passes. */
+/** Every call-site tag of the component under `src/ui/svelte`: its attribute names and spreads. */
 function callSiteTags() {
   return templates.flatMap(({ file, ast }) =>
     [...walkNodes(ast.fragment)]
@@ -91,6 +91,7 @@ function callSiteTags() {
         names: node.attributes
           .filter((attribute) => attribute.type === 'Attribute')
           .map((attribute) => attribute.name),
+        spreads: node.attributes.filter((attribute) => attribute.type === 'SpreadAttribute').length,
       }))
   );
 }
@@ -170,9 +171,18 @@ const INSERTIONS = Object.freeze([
   ['so is a + with spaces after it', '@a +   |', '@a + 1d4|'],
   ['a trailing - is kept', '@a -|', '@a - 1d4|'],
   ['a trailing % is an operator too', '@a %|', '@a % 1d4|'],
+  ['a trailing / is an operator', '@a /|', '@a / 1d4|'],
+  ['a ** is completed', '2 **|', '2 ** 1d4|'],
   ['an open bracket takes no operator', 'floor((|', 'floor(( 1d4|'],
   ['the start of a non-blank value joins the operand after it', '|@a', '1d4| + @a'],
   ['between an operand and an operator', '@a| + @b', '@a + 1d4| + @b'],
+  ['before a -', '@a| - @b', '@a + 1d4| - @b'],
+  ['before a *', '@a| * 2', '@a + 1d4| * 2'],
+  ['before a /', '@a| / 2', '@a + 1d4| / 2'],
+  ['before a %', '@a |% 2', '@a + 1d4| % 2'],
+  ['between the two stars of a power', '2 *|* 3', '2 * 1d4| * 3'],
+  ['an unspaced / bounds a term', '@a/|@b', '@a/ 1d4| + @b'],
+  ['an unspaced % bounds a term', '@a%|@b', '@a% 1d4| + @b'],
   ['a selected term is replaced', '@a + |@b| + @c', '@a + 1d4| + @c'],
   ['before a closing bracket', 'floor(@a|)', 'floor(@a + 1d4|)'],
   ['after a comma', 'max(@a,|', 'max(@a, 1d4|'],
@@ -353,6 +363,16 @@ describe('ExprInput (issue 2465)', () => {
       tags.some(({ names }) => names.includes('tokens')),
       'no call site passes `tokens`, so the two clauses above read nothing'
     );
+    assert.deepEqual(
+      [...new Set(tags.filter(({ spreads }) => spreads > 0).map(({ file }) => file))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+      [
+        'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+        'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+      ],
+      'a spread can carry `tokens` or a retired prop unread; a new one is read by hand before it joins this list'
+    );
   });
 
   it('left no hand-rolled row of tokens behind: no hook in a template, no rule in the sheet', () => {
@@ -474,22 +494,27 @@ describe('ExprInput: the row of tokens (issue 2465)', () => {
     });
   }
 
-  it('appends to a field that was never focused', async () => {
-    const written = [];
-    const target = await harness.mount({
-      value: '@a',
-      tokens: ['1d4'],
-      tokensLabel: 'Add a term',
-      onChange: (expression) => {
-        written.push(expression);
-      },
+  for (const [name, value, expected] of [
+    ['holding a value', '@a', '@a + 1d4|'],
+    ['whose expression is absent', undefined, '1d4|'],
+  ]) {
+    it(`appends to a field that was never focused, ${name}`, async () => {
+      const written = [];
+      const target = await harness.mount({
+        value,
+        tokens: ['1d4'],
+        tokensLabel: 'Add a term',
+        onChange: (expression) => {
+          written.push(expression);
+        },
+      });
+      const input = target.querySelector('input');
+      const [button] = tokenButtons(target);
+      button.focus();
+      button.click();
+      assertInserted({ input, written }, expected, name);
     });
-    const input = target.querySelector('input');
-    const [button] = tokenButtons(target);
-    button.focus();
-    button.click();
-    assertInserted({ input, written }, '@a + 1d4|', 'never focused');
-  });
+  }
 
   it('builds one compound expression from two presses', async () => {
     const written = [];

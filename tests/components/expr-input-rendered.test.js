@@ -470,6 +470,19 @@ describe('ExprInput, pressed (issue 2465)', () => {
     }
   });
 
+  it('delivers no press from a disabled token, and takes no focus for its field', async () => {
+    const page = await open({ value: '@a', disabled: '1' });
+    try {
+      const box = await page.locator(TOKEN).first().boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      const { value, focus, writes } = await read(page);
+      assert.deepEqual({ value, writes }, { value: '@a', writes: [] });
+      assert.notEqual(focus, 'field', 'a disabled token hands the field no focus');
+    } finally {
+      await page.close();
+    }
+  });
+
   it('lights a hovered token with the accent border', async () => {
     const page = await open({ value: '@a' });
     try {

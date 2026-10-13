@@ -565,7 +565,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     assert.ok(note, 'the error surface is not a casualty of the relayout');
   });
 
-  // DEFECT 3. The expression field's tokens, derived from the active world, which APPEND.
+  // DEFECT 3. The expression field's tokens, derived from the active world, which append.
   it('offers roll-data tokens under the expression, derived from the active world', async () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
 
@@ -582,7 +582,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
         expression.compareDocumentPosition(suggestions) &
         globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
       ),
-      'the tokens sit UNDER the field they fill in'
+      'the tokens sit under the field they fill in'
     );
     assert.equal(
       suggestions.getAttribute('aria-label'),

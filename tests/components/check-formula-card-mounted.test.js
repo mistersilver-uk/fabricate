@@ -199,8 +199,8 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
   });
 });
 
-// ── The token row, THROUGH THE RENDERED CONTROL ───────────────────────────────────────
-describe('a formula token inserts its term when CLICKED (issue 2465)', () => {
+// ── The token row, through the rendered control ───────────────────────────────────────
+describe('a formula token inserts its term when clicked (issue 2465)', () => {
   const TOKEN = '.fab-expr-input-token';
 
   it('joins an authored formula with a +', async () => {
