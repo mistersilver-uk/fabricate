@@ -406,6 +406,17 @@ describe('ExprInput (issue 2465)', () => {
       tags.some(({ names }) => names.includes('tokens')),
       'no call site passes `tokens`, so the two clauses above read nothing'
     );
+    const resolving = tags.filter(({ names }) => names.includes('resolve'));
+    assert.deepEqual(
+      [...new Set(resolving.map(({ file }) => file))],
+      [CCVF],
+      'a resolver needs an actor in scope, and one file has one: a second is read by hand first'
+    );
+    assert.deepEqual(
+      resolving.filter(({ names }) => !names.includes('unresolvedLabel')).map(({ file }) => file),
+      [],
+      'a reading that does not reduce is stated, and the statement is the caller’s to give'
+    );
     assert.deepEqual(
       [...new Set(tags.filter(({ spreads }) => spreads > 0).map(({ file }) => file))].sort((a, b) =>
         a.localeCompare(b)

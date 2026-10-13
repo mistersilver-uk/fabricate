@@ -1,15 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  A character-value expression field with its live reading for the Preview-as actor: the
-  roll-under target, and a counting pool's base and threshold (issue 2006), share this one field.
+  A check's character value: the expression field with its reading for the Preview-as actor, and
+  the Studio's own line for what that reading cannot say. The roll-under target, and a counting
+  pool's base and threshold (issue 2006), share this one field.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The stored expression, shown byte for byte. |
-  | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the reading resolves against. |
+  | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the reading resolves against; `null` passes the field no resolver. |
   | `label` | localized string | `''` | The input's accessible name; the field draws no visible caption. |
-  | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the reading line, spelled out so each stays greppable. |
+  | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the Studio's line, spelled out so each stays greppable. |
   | `validationTarget` | string | `''` | The Validation route's id for the input, written as its `data-validation-target` in either mode. |
   | `placeholder` | string | `'@skills.craft.value'` | The input's placeholder. |
   | `documentPath` | `{ empty, unresolved, overridden }` \| `null` | `null` | Sentences (`{actor}`, `{path}`) that make this a plain stored-path input read through `character.readStored`. |
@@ -18,7 +19,10 @@
   - `onChange(expression)` — every keystroke, with the raw text.
 
   Invariants:
-  - The reading never reads a missing path as zero: it names the path, and with no actor it says
+  - An expression's reading is the field's: `= {n}` where it reduces for the actor, the
+    `Unresolved` statement where it does not, and none with no actor. A resolved value draws no
+    line — `tests/components/check-under-authoring-mounted.test.js`.
+  - The line never reads a missing path as zero: it names the path, and with no actor it says
     to choose one — `targetValueStatus`, pinned by `tests/components/check-count-authoring-mounted.test.js`.
   - A stored path is read from the document, never roll data, so an active effect's value reads as
     overridden — `tests/components/check-additional-dice-fields-mounted.test.js`.
@@ -27,7 +31,7 @@
   import { localizeOr } from '../../../util/localizeOr.js';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import { interpolate } from './checksCopy.js';
-  import { targetValueStatus } from './checkTargetStatus.js';
+  import { resolveCharacterValue, targetValueStatus } from './checkTargetStatus.js';
 
   let {
     value = '',
@@ -70,6 +74,13 @@
       ? storedPathStatus(value, documentPath)
       : targetValueStatus(value, character, localizeOr)
   );
+  const unresolvedLabel = localizeOr(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved',
+    'Unresolved'
+  );
+  const resolveExpression = $derived(
+    character ? (expression) => resolveCharacterValue(expression, character.rollData) : undefined
+  );
   const uid = $props.id();
   const hintId = `${uid}-value-hint`;
   const resolutionId = `${uid}-value-resolution`;
@@ -96,9 +107,11 @@
       {...attr(hooks.expression)}
       data-validation-target={validationTarget || undefined}
       aria-label={label || undefined}
-      aria-describedby={resolution ? `${hintId} ${resolutionId}` : hintId}
+      aria-describedby={resolution ? `${resolutionId} ${hintId}` : hintId}
       {value}
       {placeholder}
+      resolve={resolveExpression}
+      {unresolvedLabel}
       {onChange}
     />
     <!-- The path syntax stays the field's description for assistive tech; the prototype draws only

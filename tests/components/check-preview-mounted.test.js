@@ -491,12 +491,11 @@ describe('the evaluation reaches the stack, the editors and the preview (issue 2
   });
 
   it('reads the character value for the Preview-as actor in the routed and simple editors', async () => {
+    const TARGET_READING = '[data-check-attribute-fields] [data-expr-input-reading="resolved"]';
     const routed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
     await choosePreviewActor(routed, 'sera');
-    assert.equal(
-      routed.querySelector('[data-check-target-resolution]')?.textContent.trim(),
-      'Sera Vane → 3'
-    );
+    assert.equal(routed.querySelector(TARGET_READING)?.textContent, '= 3');
+    assert.ok(!routed.querySelector('[data-check-target-resolution]'), 'a resolved value draws no line');
     harness.remount();
     const simple = await mountChecks({
       resolutionMode: 'simple',
@@ -504,10 +503,7 @@ describe('the evaluation reaches the stack, the editors and the preview (issue 2
       craftingCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
     });
     await choosePreviewActor(simple, 'sera');
-    assert.equal(
-      simple.querySelector('[data-check-target-resolution]')?.textContent.trim(),
-      'Sera Vane → 3'
-    );
+    assert.equal(simple.querySelector(TARGET_READING)?.textContent, '= 3');
   });
 
   const KIT = {

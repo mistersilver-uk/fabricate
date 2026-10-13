@@ -21,6 +21,7 @@ import { classifyCheckTotal } from '../src/systems/checkRouting.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   missingTargetPaths,
+  resolveCharacterValue,
   targetValueStatus,
 } from '../src/ui/svelte/apps/manager/checks/checkTargetStatus.js';
 
@@ -375,12 +376,11 @@ describe('targetValueStatus', () => {
     assert.equal(targetValueStatus('  ', idrin, fallback), null);
   });
 
-  it('asks for a character before reading a path, and resolves one for the actor', () => {
+  it('asks for a character before reading a path, and says nothing where the actor resolves it', () => {
     assert.equal(targetValueStatus('@skills.craft.value', null, fallback).tone, 'muted');
-    assert.deepEqual(targetValueStatus('@skills.craft.value - 2', idrin, fallback), {
-      tone: 'resolved',
-      text: 'Idrin → 53',
-    });
+    assert.equal(targetValueStatus('@skills.craft.value - 2', idrin, fallback), null);
+    assert.equal(targetValueStatus('14', idrin, fallback), null);
+    assert.equal(targetValueStatus('14', null, fallback).tone, 'muted', 'no actor still asks for one');
   });
 
   it('names only the missing paths, and states any other refusal as the runtime does', () => {
@@ -393,6 +393,23 @@ describe('targetValueStatus', () => {
       text: 'This check cannot roll: its target formula rolls dice, but a target must be a fixed number.',
     });
     assert.deepEqual(missingTargetPaths('@a + @{b.c} + @a', { a: 1 }), ['@{b.c}']);
+  });
+});
+
+describe('resolveCharacterValue (issue 2465)', () => {
+  const rollData = { skills: { craft: { value: 55 } } };
+
+  it('reduces arithmetic over roll data to its number', () => {
+    assert.equal(resolveCharacterValue('@skills.craft.value - 2', rollData), 53);
+    assert.equal(resolveCharacterValue('@{skills.craft.value} / 2', rollData), 27.5);
+    assert.equal(resolveCharacterValue('14'), 14, 'a literal needs no roll data');
+  });
+
+  it('answers null for everything the status line has a sentence for', () => {
+    for (const expression of ['@skills.nope.mod + 40', '1d4 + 10', '2 +', '1 / 0', '', '  ']) {
+      assert.equal(resolveCharacterValue(expression, rollData), null, JSON.stringify(expression));
+    }
+    assert.equal(resolveCharacterValue('@skills.craft.value', undefined), null, 'no roll data');
   });
 });
 

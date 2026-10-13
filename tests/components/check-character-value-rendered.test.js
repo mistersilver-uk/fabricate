@@ -1,7 +1,7 @@
 /**
  * Issue 2465 — what a check's character value draws in Chromium, computed from the component's
- * mounted markup: the box the field shell gives its stored-path field, and the border the
- * component's own rules state over that shell's.
+ * mounted markup: the box the field shell gives its stored-path field, the border the component's
+ * own rules state over that shell's, and where the field's reading stands against the line.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -30,15 +30,45 @@ const PATH_COPY = Object.freeze({
   overridden: "An active effect changes {actor}'s {path}.",
 });
 
-/** Each stored-path case, mounted in a field shell as the additional-dice group stands it. */
-const STORED_PATH = Object.freeze({
-  danger: { value: '', character: brenna({ value: 2, overridden: false }) },
-  warning: { value: PATH, character: brenna({}) },
-  resolved: { value: PATH, character: brenna({ value: 2, overridden: false }) },
-});
-
 const inShell = (name, field) =>
   `<div class="fabricate-field" data-case="${name}"><span>Path</span>${field}</div>`;
+
+const storedPath = (props) => ({
+  props: {
+    label: 'Path on the crafting character',
+    hooks: { expression: 'data-field', resolution: 'data-line' },
+    documentPath: PATH_COPY,
+    ...props,
+  },
+  host: inShell,
+});
+
+/** Each stored-path case, mounted in a field shell as the additional-dice group stands it. */
+const STORED_PATH = Object.freeze({
+  danger: storedPath({ value: '', character: brenna({ value: 2, overridden: false }) }),
+  warning: storedPath({ value: PATH, character: brenna({}) }),
+  resolved: storedPath({ value: PATH, character: brenna({ value: 2, overridden: false }) }),
+});
+
+const inDifficultyField = (name, field) =>
+  `<div class="manager-checks-difficulty-field is-expression" data-case="${name}" style="width:320px">` +
+  `<span class="manager-checks-difficulty-label">Character value</span>${field}</div>`;
+
+const expression = (value) => ({
+  props: {
+    value,
+    label: 'Character value',
+    character: { name: 'Idrin', rollData: { skills: { craft: { value: 12 } } } },
+    hooks: { expression: 'data-field', hint: 'data-hint', resolution: 'data-line' },
+  },
+  host: inDifficultyField,
+});
+
+/** Each expression case, mounted in the Difficulty card's own field host. */
+const EXPRESSION = Object.freeze({
+  'expression-resolved': expression('@skills.craft.value'),
+  'expression-unresolved': expression('@skills.lore.value'),
+});
 
 describe("a check's character value, drawn (issue 2465)", () => {
   let browser;
@@ -55,14 +85,9 @@ describe("a check's character value, drawn (issue 2465)", () => {
     await harness.setup();
     const hosts = [];
     try {
-      for (const [name, props] of Object.entries(STORED_PATH)) {
-        const target = await harness.mount({
-          label: 'Path on the crafting character',
-          hooks: { expression: 'data-path', resolution: 'data-path-line' },
-          documentPath: PATH_COPY,
-          ...props,
-        });
-        hosts.push(inShell(name, target.innerHTML));
+      for (const [name, { props, host }] of Object.entries({ ...STORED_PATH, ...EXPRESSION })) {
+        const target = await harness.mount(props);
+        hosts.push(host(name, target.innerHTML));
         harness.remount();
       }
     } finally {
@@ -80,7 +105,7 @@ describe("a check's character value, drawn (issue 2465)", () => {
   /** The stored-path input of one case, as the figures the clauses below read. */
   function pathInputOf(name) {
     return page.evaluate((host) => {
-      const input = document.querySelector(`[data-case="${host}"] input[data-path]`);
+      const input = document.querySelector(`[data-case="${host}"] input[data-field]`);
       const style = getComputedStyle(input);
       return {
         border: style.borderTopColor,
@@ -118,4 +143,49 @@ describe("a check's character value, drawn (issue 2465)", () => {
       });
     });
   }
+
+  /** One case's parts top to bottom, each as its edges against the field's left edge. */
+  function stackOf(name) {
+    return page.evaluate((host) => {
+      const root = document.querySelector(`[data-case="${host}"]`);
+      const field = root.querySelector('input[data-field]').getBoundingClientRect();
+      const edges = (selector) => {
+        const node = root.querySelector(selector);
+        if (!node) return null;
+        const box = node.getBoundingClientRect();
+        return { left: box.left - field.left, top: box.top, bottom: box.bottom };
+      };
+      return {
+        fieldBottom: field.bottom,
+        row: edges('.fab-expr-input-row'),
+        reading: edges('[data-expr-input-reading]'),
+        tone: root.querySelector('[data-expr-input-reading]')?.dataset.exprInputReading ?? '',
+        line: edges('[data-line]'),
+      };
+    }, name);
+  }
+
+  /** The reading starts at the field's left edge, on a row of its own beneath the field. */
+  function assertReadingUnderField(stack, name) {
+    assert.ok(stack.row.top >= stack.fieldBottom, `${name}: the row stands beneath the field`);
+    assert.ok(
+      Math.abs(stack.reading.left) <= 0.5,
+      `${name}: the reading starts ${stack.reading.left}px from the field's left edge`
+    );
+  }
+
+  it('stands an expression’s reading between the field and the line, and alone where it resolves', async () => {
+    const resolved = await stackOf('expression-resolved');
+    assert.equal(resolved.tone, 'resolved');
+    assertReadingUnderField(resolved, 'resolved');
+    assert.equal(resolved.line, null, 'a resolved value draws no line');
+
+    const unresolved = await stackOf('expression-unresolved');
+    assert.equal(unresolved.tone, 'unresolved');
+    assertReadingUnderField(unresolved, 'unresolved');
+    assert.ok(
+      unresolved.line.top >= unresolved.row.bottom,
+      `the line starts at ${unresolved.line.top}px, above the row's bottom edge at ${unresolved.row.bottom}px`
+    );
+  });
 });

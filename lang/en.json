@@ -7263,6 +7263,7 @@
             "ValueNoActor": "Choose a character in Preview as to see what this resolves to.",
             "ValueResolved": "{actor} → {value}",
             "ValueUnresolved": "{actor} has no value at {path}. The check cannot resolve for them.",
+            "ReadingUnresolved": "Unresolved",
             "KindTitle": "Difficulty adjustment",
             "KindAdd": "Add a number",
             "KindMultiply": "Multiply, rounded down",

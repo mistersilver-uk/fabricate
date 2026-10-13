@@ -11,6 +11,7 @@ manager-checks-triggers-notice
 manager-checks-off
 manager-checks-stacked-floor
 manager-checks-formula-card
+manager-checks-character-value-unresolved
 manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
 manager-checks-alchemy-behaviour

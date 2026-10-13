@@ -1432,6 +1432,21 @@ test('no expectSelector nests one :has() inside another', () => {
   );
 });
 
+test('no roll-under parity case scrolls: a frame re-aimed at one field is a sibling case', () => {
+  const parity = VIEW_LAB_CASES.filter(({ label }) => label.includes('roll-under parity'));
+  assert.ok(parity.length >= 9, `only ${parity.length} parity cases were read`);
+  assert.deepEqual(
+    parity.filter(({ steps }) => steps.some((step) => step?.scroll)).map(({ id }) => id),
+    [],
+    'a parity case is photographed where its prototype state leaves it'
+  );
+  assert.equal(
+    getCaseById('manager-checks-character-value-unresolved').steps.at(-1)?.scroll,
+    true,
+    'the sibling case ends on the scroll that brings its field back into view'
+  );
+});
+
 test('all Journal lifecycle captures assert defining product state rather than a populated shell', () => {
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')

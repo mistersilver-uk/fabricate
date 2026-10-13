@@ -334,7 +334,13 @@ Its rule sentence reads `The dice are compared raw. Every modifier that applies 
 
 Every summed check that grades against a target offers the target source as a `RadioCardGroup`, `What the roll is measured against`: `Fixed difficulty` (`The same number for every character, set here and per recipe tier.`) or `Character value` (`Read from the crafting character. Difficulty adjusts it rather than replacing it.`).
 The Difficulty card's lead names the direction: fixed roll-under "The number the roll must stay {cmp}, and where that number comes from.", character value "The character value the roll must reach, and how difficulty adjusts it." or "…must stay {cmp}, and how difficulty adjusts it."
-A character value is a `RollDataExpressionInput` that shows and writes the stored text unchanged, whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form; with no Preview-as actor it reads "Choose a character in Preview as to see what this resolves to.", resolved `{actor} → {value}`, and unresolved `{actor} has no value at {path}. The check cannot resolve for them.`
+A character value is a `RollDataExpressionInput` that shows and writes the stored text unchanged, whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form.
+With a Preview-as actor chosen it passes the field a resolver over that actor's roll data, and the field draws the reading: `= {value}` where the expression reduces to a number, and `Unresolved` where it does not.
+The field draws only that reading; the line beneath it is the Studio's own and states what the reading cannot.
+With no Preview-as actor and an expression that is otherwise readable, the line reads "Choose a character in Preview as to see what this resolves to." and no reading is drawn.
+For a path the actor lacks it reads `{actor} has no value at {path}. The check cannot resolve for them.`, and for a formula that rolls dice or cannot be read it is the runtime's own refusal sentence.
+A resolved value draws no line, so the actor is named by the Preview-as picker and not beside the value.
+The reading describes the field, and is spoken after typing settles or after a pressed token, never because the Preview-as actor changed.
 Its static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
 The Comparison reads `At or under` / `Strictly under` under a roll-under check.
 Numeric and fractional values edit through the formatted `Stepper` (`ui-visual-style/spec.md` § Numeric entry), so a multiplier reads `×½` and stays directly typeable, including an off-list `×0.7`.

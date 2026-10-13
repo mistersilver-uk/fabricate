@@ -675,6 +675,32 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'checks'],
   }),
+  managerCase({
+    id: 'manager-checks-character-value-unresolved',
+    label: 'Manager — Checks character value the character lacks, reading and line',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      ...PARITY_NAV,
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.craft.value'),
+      // A closing click on the card's title takes focus off the field, so the frame is at rest.
+      { selector: '[data-check-difficulty-card] .manager-checks-card-title' },
+      // The click can scroll the panel; the field is brought back into view.
+      { selector: '[data-check-attribute-fields]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields]:has([data-expr-input-reading="unresolved"]):has([data-check-target-resolution="unresolved"])',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
   // The first open-panel frame in the checks studio (issue 1510), and the only way to photograph a
   // converted control's own subject: the list exists only while the panel is open, and an open panel
   // cannot double as this route's closed-state frame. Its list is ticked and it opens from inside a
@@ -1348,7 +1374,8 @@ export const CASES = Object.freeze([
       ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['+2', '0', '-2', '-4']),
       ...parityPreview(3),
     ],
-    expectSelector: '.fabricate-manager [data-check-target-resolution="resolved"]',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields] [data-expr-input-reading="resolved"]',
   }),
   parityCase({
     id: 'manager-checks-parity-under-multiply',
@@ -2108,6 +2135,10 @@ export const CASES = Object.freeze([
       COUNTING +
       ':has([data-check-count-base-mode-option="value"].is-active)' +
       ' [data-check-count-actor-line="resolved"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+    ],
   }),
   authoringCase({
     id: 'manager-checks-v3-count-under',

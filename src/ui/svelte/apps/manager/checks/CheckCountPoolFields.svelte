@@ -173,17 +173,21 @@
 {/snippet}
 
 {#snippet baseBody()}
-  <CheckCountInputField
-    field="base"
-    value={pool.base}
-    min={0}
-    max={20}
-    label={labels.base}
-    sourceLabel={text('FABRICATE.Admin.Manager.Checks.Count.BaseSource', 'Base pool source')}
-    validationTarget="checks-count-base"
-    {character}
-    onChange={(next) => emitPool({ base: next })}
-  />
+  <div class="manager-checks-count-stack">
+    <div class="manager-checks-count-line">
+      <CheckCountInputField
+        field="base"
+        value={pool.base}
+        min={0}
+        max={20}
+        label={labels.base}
+        sourceLabel={text('FABRICATE.Admin.Manager.Checks.Count.BaseSource', 'Base pool source')}
+        validationTarget="checks-count-base"
+        {character}
+        onChange={(next) => emitPool({ base: next })}
+      />
+    </div>
+  </div>
 {/snippet}
 
 {#snippet thresholdBody()}
