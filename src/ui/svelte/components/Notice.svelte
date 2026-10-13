@@ -8,8 +8,13 @@
   | --- | --- | --- | --- |
   | `tone` | `'danger'` \| `'warning'` \| `'info'` \| `'success'` \| `'accent'` | `'danger'` | Changes the edge, the fill, the glyph's ink and the title's ink, NEVER the geometry or type scale. An unknown tone falls back to `danger`, the unmodified specimen. |
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
-  | `action` | `{ label, onClick, description? }` | `null` | Rendered as one button; the handler is called with the click event, and an already-localized `description` becomes the button's accessible description. |
+  | `action` | `{ label, onClick?, description? }` | `null` | Rendered as one button when its `label` is a string with non-blank text and there is a function to call, its own `onClick` or else `onAction`; an already-localized `description` becomes the button's accessible description. |
   | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
+
+  Callbacks:
+  - `onAction(event)` — called on each press of the action button when `action.onClick` is not a
+    function, which wins when both are. The published seam passes it, because a function inside
+    `action` is refused there.
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class`, and exists for test and screenshot hooks.
@@ -33,13 +38,18 @@
   - `.fab-notice-hidden` restates the module's visually hidden set, because a companion's ancestor
     is not `.fabricate` — its clip, and the absence of `.visually-hidden`, are pinned by
     `tests/components/notice-mounted.test.js`.
+  - `.fab-notice-button` restates the module's focus pair and three declarations an ApplicationV1
+    host's `.app button` rule would otherwise set, for the same reason; the pair is held equal to
+    the module ring by `tests/published-component-controls.test.js`.
 
-  Six recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  Eight recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
   an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
-  resolve to the same tone; the rest spread, whose hooks carry no behaviour; and the body's 12rem
-  basis capped at its text, which wraps the action beneath it in a narrow host (issue 1773).
+  resolve to the same tone; the rest spread, whose hooks carry no behaviour; the body's 12rem
+  basis capped at its text, which wraps the action beneath it in a narrow host (issue 1773);
+  `onAction`, a top-level callback beside `action.onClick` (issue 2452); and the action button's
+  default role at every tone, where the danger specimen draws the danger role (issue 2452).
 -->
 <script>
   let {
@@ -48,6 +58,7 @@
     detail = '',
     icon = '',
     action = null,
+    onAction = undefined,
     dismissable = false,
     dismissLabel = '',
     blocking = false,
@@ -72,6 +83,12 @@
 
   const uid = $props.id();
   const descriptionId = `${uid}-action-description`;
+
+  const isLabel = (value) => typeof value === 'string' && value.trim() !== '';
+
+  /** What a press calls: `onClick` when it is a function, else `fallback` when it is one. */
+  const pressOf = (onClick, fallback) =>
+    [onClick, fallback].find((candidate) => typeof candidate === 'function');
 </script>
 
 {#if !dismissed}
@@ -87,14 +104,14 @@
       <div class="fab-notice-title">{title}</div>
       {#if detail}<div class="fab-notice-detail">{detail}</div>{/if}
     </div>
-    {#if action}
+    {#if isLabel(action?.label) && (typeof action.onClick === 'function' || typeof onAction === 'function')}
       <button
         type="button"
         class="fab-notice-button"
         data-keyboard-focus="true"
         data-notice-action
         aria-describedby={action.description ? descriptionId : undefined}
-        onclick={(event) => action.onClick?.(event)}>{action.label}</button
+        onclick={(event) => pressOf(action.onClick, onAction)?.(event)}>{action.label}</button
       >
       {#if action.description}<span class="fab-notice-hidden" id={descriptionId}
           >{action.description}</span
@@ -207,6 +224,10 @@
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
+    /* An ApplicationV1 host's `.app button` stretches a button and glows it under the pointer. */
+    width: auto;
+    margin: 0;
+    box-shadow: none;
   }
 
   .fab-notice-button:hover {
@@ -217,6 +238,18 @@
   .fab-notice-button.is-dismiss {
     width: 28px;
     padding: 0;
+  }
+
+  /* The module's focus pair, restated: under no `.fabricate` ancestor the host rings `button:focus`,
+     a pointer press included. */
+  .fab-notice-button:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .fab-notice-button:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   .fab-notice-hidden {

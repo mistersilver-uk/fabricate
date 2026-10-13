@@ -6,7 +6,10 @@
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451). The test-only probe runs beside the shipped entries;
- * the adapter's bindings are the mounted suite's.
+ * the adapter's bindings are the mounted suite's, and what a published control must also do is
+ * `published-component-controls.test.js`'s (issue 2452).
+ * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
+ * adds a mounted clause on each argument's type.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
  * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
@@ -27,7 +30,6 @@
  * takes Fabricate's private rule.
  */
 import assert from 'node:assert/strict';
-import { posix, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
@@ -35,17 +37,22 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 import {
-  importedModules,
-  lazilyImportedModules,
-  parseModule,
-  walkNodes,
-} from './helpers/moduleAst.js';
-import { componentAstOf, componentScopeOf, moduleAstOf } from './helpers/parsedSource.js';
-import { readScannedDirectory, repoRoot } from './helpers/sourceScan.js';
-import { parseComponentScope, readsGlobal } from './helpers/svelteStructureContract.js';
-
-const byName = (a, b) => a.localeCompare(b);
+  SHIPPED,
+  byName,
+  everyStylesheet,
+  focusableElements,
+  importClosure,
+  isComponent,
+  propLocals,
+  selectorsNaming,
+  selectorsOnAttribute,
+  syntheticReader,
+  writtenSelector,
+} from './helpers/publishedComponentGate.js';
+import { readsGlobal } from './helpers/svelteStructureContract.js';
 
 const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
 const APP_TOKENS = ['var(--fab-manager-'];
@@ -66,41 +73,6 @@ const FOUNDRY_GLOBALS = [
   'fromUuidSync',
   'getDocumentClass',
 ];
-
-/** The three parses the gate reads of a file: a component, its scopes, and a plain module. */
-const SHIPPED = Object.freeze({
-  component: componentAstOf,
-  componentScope: componentScopeOf,
-  module: moduleAstOf,
-});
-
-/** The same three parses over `sources`, a map of path to text. */
-function syntheticReader(sources) {
-  return {
-    component: (file) => templateOf(file, sources[file]).ast,
-    componentScope: (file) => parseComponentScope(sources[file]),
-    module: (file) => parseModule(sources[file]),
-  };
-}
-
-const isComponent = (file) => file.endsWith('.svelte');
-
-/** Each `$props()` key with its local name and whether it is `$bindable`. */
-function propLocals(ast) {
-  for (const node of walkNodes(ast.instance)) {
-    if (node.type !== 'VariableDeclarator' || node.init?.callee?.name !== '$props') continue;
-    return node.id.properties
-      .filter((property) => property.type === 'Property')
-      .map((property) => {
-        const value = property.value;
-        const local = value.type === 'AssignmentPattern' ? value.left.name : value.name;
-        const bindable =
-          value.type === 'AssignmentPattern' && value.right.callee?.name === '$bindable';
-        return { key: property.key.name ?? property.key.value, local, bindable };
-      });
-  }
-  return [];
-}
 
 /**
  * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
@@ -167,7 +139,7 @@ function renderedLocals(ast) {
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text', 'slot']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
@@ -215,9 +187,18 @@ function slotFaults(key, spec, calls) {
   return faults;
 }
 
+/** What a key's `args` breaks: stated on a `callback` key only, as a non-negative integer. */
+function argsFaults(key, spec) {
+  if (spec.args === undefined) return [];
+  if (spec.kind !== 'callback') return [`${key} states args, which only a callback key takes`];
+  const counts = Number.isInteger(spec.args) && spec.args >= 0;
+  return counts ? [] : [`${key} states args that is not a non-negative integer`];
+}
+
 /**
  * Each rule an entry's published keys break against the component's parsed declaration, as
  * `<key> <rule>`. An unpublished prop is not judged: it may be `$bindable` or rendered either way.
+ * Where a `callback` key is called from is `published-component-controls.test.js`'s.
  */
 function declarationFaults(entry, ast) {
   const declared = new Map(propLocals(ast).map((prop) => [prop.key, prop]));
@@ -240,7 +221,10 @@ function declarationFaults(entry, ast) {
     if (spec.kind === 'data' && calls.length > 0) {
       faults.push(`${key} is a data key rendered as a snippet`);
     }
-    return faults;
+    if (spec.kind === 'callback' && calls.length > 0) {
+      faults.push(`${key} is a callback key a render tag calls`);
+    }
+    return [...faults, ...argsFaults(key, spec)];
   });
 }
 
@@ -363,31 +347,6 @@ function cannotMatchPublished(complex, shape, spelled = new Set()) {
   return unwritable || disabled || classedChild || pinnedAncestor;
 }
 
-/** Every selector of one parsed stylesheet with a part `test` passes, wherever in the selector. */
-function selectorsHolding(css, test) {
-  const found = [];
-  for (const node of walkNodes(css)) {
-    if (node.type !== 'Rule') continue;
-    for (const complex of node.prelude.children) {
-      if ([...walkNodes(complex)].some(test)) found.push(complex);
-    }
-  }
-  return found;
-}
-
-const selectorsNaming = (css, root) =>
-  selectorsHolding(css, (part) => part.type === 'ClassSelector' && part.name === root);
-
-/** A selector as its stylesheet writes it. */
-const writtenSelector = (css, complex) =>
-  css.content.styles.slice(complex.start - css.content.start, complex.end - css.content.start);
-
-/** Every selector of one parsed stylesheet with an attribute selector named `name`, as written. */
-const selectorsOnAttribute = (file, css, name) =>
-  selectorsHolding(css, (part) => part.type === 'AttributeSelector' && part.name === name).map(
-    (complex) => `${file}: ${writtenSelector(css, complex)}`
-  );
-
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
   const { source, ast } = templateOf(file, `<style>${css}</style>`);
@@ -451,17 +410,6 @@ function censusSelectors(file, css, shape, { spelled, own = new Set() } = {}) {
     }));
 }
 
-/** Every `.svelte` file under `dir`, recursively, by path. */
-function componentPathsUnder(dir, isRoot = true) {
-  return readScannedDirectory(resolve(repoRoot, dir), { isRoot })
-    .flatMap((entry) => {
-      const path = `${dir}/${entry.name}`;
-      if (entry.isDirectory()) return componentPathsUnder(path, false);
-      return path.endsWith('.svelte') ? [path] : [];
-    })
-    .sort(byName);
-}
-
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
 const CARD_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-card.fabricate-card',
@@ -502,21 +450,6 @@ function ancestorDependencies(ast, root = 'any') {
     if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
   }
   return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
-}
-
-/**
- * The file at `path` and every relative `.svelte` or `.js` file it reaches by `import`,
- * `export … from`, `export * from` or a literal `import()`, so a re-export-only barrel is walked.
- */
-function importClosure(path, reader, seen = new Set()) {
-  if (seen.has(path)) return seen;
-  seen.add(path);
-  const ast = isComponent(path) ? reader.component(path) : reader.module(path).ast;
-  for (const specifier of [...importedModules(ast), ...lazilyImportedModules(ast)]) {
-    if (!specifier.startsWith('.') || !/\.(?:svelte|js)$/.test(specifier)) continue;
-    importClosure(posix.join(posix.dirname(path), specifier), reader, seen);
-  }
-  return seen;
 }
 
 /** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
@@ -610,47 +543,6 @@ function publishedManagerClasses() {
   return new Set(tokens.filter((token) => token.startsWith('manager-')));
 }
 
-const FOCUSABLE_TAGS = new Set(['button', 'a']);
-const FORM_CONTROLS = new Set(['button', 'input', 'select', 'textarea']);
-
-const attributeOf = (element, name) =>
-  element.attributes.find((attribute) => attribute.type === 'Attribute' && attribute.name === name);
-
-/** An attribute's text when it is static, `''` when bare, else `undefined`. */
-function staticText(attribute) {
-  if (!attribute) return undefined;
-  if (attribute.value === true) return '';
-  const parts = [attribute.value].flat();
-  if (parts.some((part) => part.type !== 'Text')) return undefined;
-  return parts.map((part) => part.data).join('');
-}
-
-/**
- * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
- * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
- * `name`. Answers each element it judged beside each fault, both as `<file>: <tag> …`.
- */
-function focusableElements(file, ast) {
-  const judged = [];
-  const faults = [];
-  for (const node of walkNodes(ast.fragment)) {
-    if (node.type !== 'RegularElement') continue;
-    const focusable = FOCUSABLE_TAGS.has(node.name) || Boolean(attributeOf(node, 'tabindex'));
-    const control = FORM_CONTROLS.has(node.name);
-    if (!focusable && !control) continue;
-    const states = (name, value) => staticText(attributeOf(node, name)) === value;
-    judged.push(`${file}: ${node.name}`);
-    if (focusable && !states('data-keyboard-focus', 'true')) {
-      faults.push(`${file}: ${node.name} does not state data-keyboard-focus="true"`);
-    }
-    if (node.name === 'button' && !states('type', 'button')) {
-      faults.push(`${file}: button does not state type="button"`);
-    }
-    if (control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
-  }
-  return { judged, faults };
-}
-
 /** Rule 9 over an entry's whole closure: every element judged, and every fault. */
 function closureFocusables(path, reader = SHIPPED) {
   const scans = [...importClosure(path, reader)]
@@ -701,7 +593,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges three focusable elements across the shipped closures, each file read once: the Chip remove button and the Notice action and dismiss buttons', () => {
+  it('judges four focusable elements across the shipped closures, each file read once: the Chip remove button, the Notice action and dismiss buttons, and the probe button', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -714,7 +606,21 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
+  });
+
+  it('pins every shipped callback key with how many arguments it forwards', () => {
+    const shipped = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) =>
+      Object.entries(entry.props)
+        .filter(([, spec]) => spec.kind === 'callback')
+        .map(([key, spec]) => `${entry.name}.${key}: ${spec.args ?? 0}`)
+    );
+    assert.deepEqual(
+      shipped,
+      ['Notice.onAction: 0'],
+      'a forwarded argument needs a mounted clause on its type'
+    );
   });
 
   it('spells no sheet-named class in an any closure but the four pinned: the Chip pair, and the EmptyState and Notice roots', () => {
@@ -789,7 +695,33 @@ describe('each entry matches its component declaration', () => {
       ['body is an optional text key rendered without ?. or an {#if} guard'],
     ],
     ['a data key with a render tag', { note: data }, ['note is a data key rendered as a snippet']],
-    ['a callback kind', { note: { kind: 'callback' } }, ['note has the unshipped kind callback']],
+    ['a value kind', { note: { kind: 'value' } }, ['note has the unshipped kind value']],
+    [
+      'a callback key a render tag calls',
+      { note: { kind: 'callback' } },
+      ['note is a callback key a render tag calls'],
+    ],
+    ['a $bindable callback key', { value: { kind: 'callback' } }, ['value is $bindable']],
+    [
+      'element on a callback key',
+      { label: { kind: 'callback', element: 'div' } },
+      ['label states element, which only a slot key takes'],
+    ],
+    [
+      'a callback key whose args is negative',
+      { label: { kind: 'callback', args: -1 } },
+      ['label states args that is not a non-negative integer'],
+    ],
+    [
+      'a callback key whose args is a fraction',
+      { label: { kind: 'callback', args: 1.5 } },
+      ['label states args that is not a non-negative integer'],
+    ],
+    [
+      'args on a key that is no callback',
+      { label: { kind: 'data', args: 0 } },
+      ['label states args, which only a callback key takes'],
+    ],
     [
       'element on a key that is no slot',
       { label: { kind: 'data', element: 'div' } },
@@ -1190,24 +1122,6 @@ const syntheticCensus = (shape, css, options = {}) =>
   );
 const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector }) => selector);
 
-let stylesheets;
-/** Every module sheet partial and every component `<style>` under `src/ui/svelte`, as `[file, css]`. */
-function everyStylesheet() {
-  if (stylesheets) return stylesheets;
-  const sheets = stylesheetSources().parts.map(({ file, text }) => [
-    file,
-    templateOf(file, `<style>${text}</style>`).ast.css,
-  ]);
-  const blocks = componentPathsUnder('src/ui/svelte').map((file) => [
-    file,
-    componentAstOf(file).css,
-  ]);
-  assert.equal(sheets.length, 14, 'the fourteen partials');
-  assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
-  stylesheets = [...sheets, ...blocks];
-  return stylesheets;
-}
-
 const entryNamed = (name) => PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
 const ownFilesOf = (name) => importClosure(entryNamed(name).path, SHIPPED);
 
@@ -1417,7 +1331,7 @@ describe('the module sheet and every component style against the published Notic
     );
     assert.deepEqual(
       publishedShapeOf('Notice'),
-      [['tone', 'title', 'detail', 'icon'], 'any'],
+      [['tone', 'title', 'detail', 'icon', 'action', 'onAction'], 'any'],
       'a published key that writes a class reopens cannotMatchPublished'
     );
   });

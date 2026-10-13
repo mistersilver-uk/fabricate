@@ -4,6 +4,16 @@
   `explode`, and clips its hidden text with its own style. `note` is its `text` snippet, drawn over
   a literal fallback. `aside` and `body` are its content slots (issue 2451): `aside` inside the
   paragraph, `body` inside a host whose element `bodyAs` names.
+
+  Callbacks (issue 2452):
+  - `onPing()` — called on each press of the button `label` names; omitted, the probe counts the
+    press itself in `data-probe-default-pings`. `data-probe-bindings` counts how often an effect
+    reading `$derived(onPing)` ran, which a forwarder that changed would raise.
+  - `onPick(picked)` — called after `onPing` on each press, with the probe's `$state` object and a
+    second value the entry does not forward, then with `'outer'` by the click of the `<span>`
+    around the button. An effect also calls it once per distinct `pickAt`, which no shipped
+    component may do: `tests/published-component-controls.test.js` pins both keys as its
+    exceptions.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
@@ -26,8 +36,34 @@
     aside = undefined,
     body = undefined,
     bodyAs = 'div',
+    label = undefined,
+    pickAt = undefined,
+    onPing = countPing,
+    onPick = undefined,
     ...rest
   } = $props();
+
+  const picked = $state({ id: 'probe', presses: 0 });
+  let defaultPings = $state(0);
+  let bindings = $state(0);
+
+  function countPing() {
+    defaultPings += 1;
+  }
+
+  // Each derived holds one value across an update that changes nothing it reads, so neither effect
+  // runs again for an update alone.
+  const ping = $derived(onPing);
+  const pick = $derived(onPick);
+  const pickedAt = $derived(pickAt);
+
+  $effect(() => {
+    if (ping) untrack(() => (bindings += 1));
+  });
+
+  $effect(() => {
+    if (pickedAt !== undefined) pick?.(picked, 'effect');
+  });
 
   if (untrack(() => throwAt) === 'init') throw PROBE_FAULTS.init;
 
@@ -46,12 +82,32 @@
 </script>
 
 {#if leading}<span class="probe-leading">Leading</span>{/if}
-<p class="probe" {...rest}>
+<p
+  class="probe"
+  data-probe-bindings={bindings}
+  data-probe-default-pings={defaultPings}
+  data-probe-picked={picked.id}
+  {...rest}
+>
   <span class="probe-text">{text}</span>{guard(explode)}<span class="probe-hidden">Hidden</span>
   <span class="probe-note"
     >{#if note}{@render note?.()}{:else}NO NOTE{/if}</span
   >
   <span class="probe-aside">{@render aside?.()}</span>
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <span class="probe-outer" onclick={() => onPick?.('outer')}>
+    <button
+      type="button"
+      class="probe-press"
+      data-keyboard-focus="true"
+      data-probe-press
+      onclick={() => {
+        picked.presses += 1;
+        onPing?.();
+        onPick?.(picked, 'second');
+      }}>{label}</button
+    >
+  </span>
 </p>
 <svelte:element this={bodyAs} class="probe-body">{@render body?.()}</svelte:element>
 
@@ -68,5 +124,15 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  .probe-press:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .probe-press:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 </style>

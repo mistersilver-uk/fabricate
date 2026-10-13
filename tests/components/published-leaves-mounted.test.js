@@ -3,8 +3,9 @@
  * `EmptyState` and `Notice`, on Fabricate's real Svelte runtime, each through a fresh seam
  * registered with the adapter's own table, into a bare companion target or the shell its root
  * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
- * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; and what
- * each `any` leaf draws from its own stylesheet under no Fabricate ancestor.
+ * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
+ * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
+ * button with its `onAction` callback (issue 2452).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -12,6 +13,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import {
+  CALLBACK_REPORT,
   FAULT_REPORT,
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -254,7 +256,6 @@ describe('a key a leaf does not publish', () => {
     ['EmptyState', 'field', 'is not a data attribute'],
     ['EmptyState', 'fill', 'is not a data attribute'],
     ['EmptyState', 'note', 'is not a data attribute'],
-    ['Notice', 'action', 'is not a data attribute'],
     ['Notice', 'dismissable', 'is not a data attribute'],
     ['Notice', 'dismissLabel', 'is not a data attribute'],
     ['Notice', 'blocking', 'is not a data attribute'],
@@ -293,22 +294,38 @@ describe('a required prop', () => {
 });
 
 describe('the order a rest entry refuses in', () => {
-  const FUNCTION = 'functions are phase 2 (issue 2427)';
+  const FUNCTION = (key) => `"${key}" must not hold a function`;
   for (const [claim, name, props, refusal] of [
     [
-      'a function inside an unpublished key before the key (M10), and a missing title last',
+      'a function inside its action (M10) before a missing title (M9)',
       'Notice',
       { action: { label: 'Review', onClick: () => {} } },
-      FUNCTION,
+      FUNCTION('action'),
     ],
     [
-      'an unpublished key holding data (M13) before a missing title (M9)',
+      'a missing title (M9) when its action holds data alone',
       'Notice',
       { action: { label: 'Review' } },
-      '"action" is not a data attribute',
+      'Notice requires a non-empty "title"',
     ],
-    ['a function for its unpublished evidence (M10)', 'Notice', { evidence: () => {} }, FUNCTION],
-    ['a function for its content slot (M10)', 'EmptyState', { children: () => {} }, FUNCTION],
+    [
+      'a value that is no function for onAction (M17) before a missing title (M9)',
+      'Notice',
+      { onAction: 'review' },
+      '"onAction" must be a function',
+    ],
+    [
+      'a function for its unpublished evidence (M10)',
+      'Notice',
+      { evidence: () => {} },
+      FUNCTION('evidence'),
+    ],
+    [
+      'a function for its content slot (M10)',
+      'EmptyState',
+      { children: () => {} },
+      FUNCTION('children'),
+    ],
   ]) {
     it(`${name} refuses ${claim}, and renders nothing`, () => {
       const target = targetFor(name);
@@ -380,7 +397,7 @@ describe('a text key through the shipped seam', () => {
     const props = { children: 'Locked', onRemove: () => {} };
     assert.throws(() => ui().mount('Chip', { target, props }), {
       name: 'TypeError',
-      message: `${REFUSAL}functions are phase 2 (issue 2427)`,
+      message: `${REFUSAL}"onRemove" must not hold a function`,
     });
     assert.equal(target.childNodes.length, 0);
   });
@@ -634,7 +651,7 @@ describe('Notice under a bare ancestor', () => {
     assert.deepEqual(reports, []);
   });
 
-  it('writes its root class and one tone class, and draws no control whatever its published keys', () => {
+  it('writes its root class and one tone class, and draws no control without an action', () => {
     const { target, handle } = mountLeaf('Notice', {
       tone: 'warning',
       title: 'Over the limit',
@@ -657,6 +674,247 @@ describe('Notice under a bare ancestor', () => {
       assert.equal(title.color, 'rgb(4, 5, 6)');
       handle.destroy();
     });
+  });
+});
+
+describe('Notice with an action under a bare ancestor', () => {
+  let stopRecording;
+  before(() => {
+    stopRecording = recordEscapes(recordEscape);
+  });
+  after(() => stopRecording());
+  afterEach(() => {
+    assert.deepEqual(escaped, [], 'nothing was thrown past the seam');
+  });
+
+  const TITLE = 'This stage is held by the failed check.';
+  const LABEL = 'Allow another attempt';
+  const actionOf = (target) => target.querySelector('[data-notice-action]');
+
+  /**
+   * A notice mounted with `props` over a title: its target, the faults its `onFault` was told of,
+   * and its handle, which a callback reads from the answer once `mount` has returned.
+   */
+  function mountNotice(props) {
+    const target = companionTarget(targets);
+    const held = { target, faults: [] };
+    const onFault = (fault) => {
+      held.faults.push(fault);
+    };
+    held.handle = ui().mount('Notice', { target, props: { title: TITLE, ...props }, onFault });
+    return held;
+  }
+
+  /** An element the companion owns beside `target`, focusable as a region heading is. */
+  function ownedHeading(target) {
+    const heading = target.ownerDocument.createElement('h2');
+    heading.tabIndex = -1;
+    target.before(heading);
+    return heading;
+  }
+
+  it('draws one button named by its label, the only focusable element, and calls onAction with no argument on a press', async () => {
+    const calls = [];
+    const onAction = (...args) => {
+      calls.push(args);
+    };
+    const { target, handle } = mountNotice({ action: { label: LABEL }, onAction });
+    await settle();
+    const focusable = [...target.querySelectorAll(FOCUSABLE)];
+    assert.equal(focusable.length, 1, 'one focusable element');
+    const [button] = focusable;
+    assert.ok(button === actionOf(target), 'the action button');
+    assert.equal(button.localName, 'button');
+    assert.equal(button.getAttribute('type'), 'button');
+    assert.equal(button.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(button.textContent, LABEL);
+    assert.ok(!button.hasAttribute('aria-describedby'), 'nothing describes it');
+    button.click();
+    assert.deepEqual(calls, [[]], 'once, inside the click, with no argument');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('keeps the same focused button across an update that keeps action and onAction', async () => {
+    const onAction = () => {};
+    const { target, handle } = mountNotice({ action: { label: LABEL }, onAction });
+    await settle();
+    const button = actionOf(target);
+    button.focus();
+    assert.ok(document.activeElement === button, 'the button takes focus');
+    const next = { title: TITLE, tone: 'warning', action: { label: 'Working…' }, onAction };
+    assert.equal(handle.update(next), true);
+    await settle();
+    assert.ok(actionOf(target) === button, 'the same button node');
+    assert.equal(button.textContent, 'Working…');
+    assert.ok(document.activeElement === button, 'focus stays on it');
+    handle.destroy();
+  });
+
+  it('is empty when a press whose onAction destroys it returns, and focus is not Fabricate’s to move', async () => {
+    const held = mountNotice({
+      action: { label: LABEL },
+      onAction: () => held.handle.destroy(),
+    });
+    await settle();
+    const button = actionOf(held.target);
+    button.focus();
+    button.click();
+    assert.equal(held.target.childNodes.length, 0, 'empty when the press returns');
+    assert.equal(held.handle.update({ title: TITLE }), false);
+    // happy-dom's model, not a browser's: it answers the body once the focused node is detached.
+    assert.ok(document.activeElement === document.body, 'focus fell to the body');
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
+  for (const [what, end] of [
+    ['updates without action', (handle) => handle.update({ title: 'The hold has cleared.' })],
+    ['destroys', (handle) => handle.destroy()],
+  ]) {
+    it(`leaves focus on the companion’s own element when onAction focuses it and then ${what}`, async () => {
+      const held = mountNotice({
+        action: { label: LABEL },
+        onAction() {
+          held.heading.focus();
+          end(held.handle);
+        },
+      });
+      held.heading = ownedHeading(held.target);
+      await settle();
+      const button = actionOf(held.target);
+      button.focus();
+      button.click();
+      await settle();
+      assert.ok(!actionOf(held.target), 'the button is gone');
+      assert.ok(document.activeElement === held.heading, 'focus is where the companion put it');
+      held.heading.remove();
+      held.handle.destroy();
+      assert.deepEqual(reports, []);
+    });
+  }
+
+  const failure = new Error('the companion write failed');
+  for (const [what, onAction] of [
+    [
+      'throws',
+      () => {
+        throw failure;
+      },
+    ],
+    ['rejects', () => Promise.reject(failure)],
+  ]) {
+    it(`reports an onAction that ${what} once, stays drawn and live, and never calls onFault`, async () => {
+      const { target, handle, faults } = mountNotice({ action: { label: LABEL }, onAction });
+      await settle();
+      actionOf(target).click();
+      await settle();
+      assert.deepEqual(reports, [[CALLBACK_REPORT, 'Notice', 'onAction', failure]]);
+      assert.ok(Boolean(actionOf(target)), 'the button is still drawn');
+      assert.equal(handle.update({ title: TITLE }), true);
+      assert.deepEqual(faults, []);
+      handle.destroy();
+    });
+  }
+
+  for (const [what, props] of [
+    ['action without onAction', { action: { label: LABEL } }],
+    ['onAction without action', { onAction: () => {} }],
+    ['an action with no label', { action: {}, onAction: () => {} }],
+    ['an action whose label is empty', { action: { label: '' }, onAction: () => {} }],
+    ['an action whose label is blank', { action: { label: ' ' }, onAction: () => {} }],
+    ['an action whose label is an object', { action: { label: {} }, onAction: () => {} }],
+    ['an action whose label is true', { action: { label: true }, onAction: () => {} }],
+    ['an action that is a string', { action: 'x', onAction: () => {} }],
+  ]) {
+    it(`draws no button for ${what}`, async () => {
+      const { target, handle } = mountNotice(props);
+      await settle();
+      assert.equal(target.querySelector('.fab-notice-title').textContent, TITLE);
+      assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
+      handle.destroy();
+      assert.deepEqual(reports, []);
+    });
+  }
+
+  it('calls onAction once for an action that carries a string onClick, and throws and reports nothing', async () => {
+    const calls = [];
+    const onAction = (...args) => {
+      calls.push(args);
+    };
+    const { target, handle } = mountNotice({ action: { label: LABEL, onClick: 'x' }, onAction });
+    await settle();
+    assert.equal(actionOf(target).textContent, LABEL, 'the button is drawn');
+    actionOf(target).click();
+    await settle();
+    assert.deepEqual(calls, [[]]);
+    assert.deepEqual(reports, []);
+    handle.destroy();
+  });
+
+  it('removes the button on an update that omits onAction, and draws it again when both are passed', async () => {
+    const action = { label: LABEL };
+    const { target, handle } = mountNotice({ action, onAction: () => {} });
+    await settle();
+    assert.ok(Boolean(actionOf(target)), 'drawn');
+    assert.equal(handle.update({ title: TITLE, action }), true);
+    await settle();
+    assert.ok(!actionOf(target), 'no callback, so no inert button');
+    assert.equal(handle.update({ title: TITLE, action, onAction: () => {} }), true);
+    await settle();
+    assert.equal(actionOf(target).textContent, LABEL);
+    handle.destroy();
+  });
+
+  // The known gap: a `data` key is copied whole, so a member the group does not state is drawn.
+  it('draws a passed description as the button’s hidden description, which the group does not publish', async () => {
+    const action = { label: LABEL, description: 'Clears the hold on this stage.' };
+    const { target, handle } = mountNotice({ action, onAction: () => {} });
+    await settle();
+    const id = actionOf(target).getAttribute('aria-describedby');
+    assert.ok(id, 'the button is described');
+    const description = target.querySelector(`#${id}`);
+    assert.equal(description.textContent, 'Clears the hold on this stage.');
+    assertClipped(description, 'the action description');
+    assert.equal(target.querySelectorAll(FOCUSABLE).length, 1, 'still one focusable element');
+    handle.destroy();
+  });
+
+  it('draws no dismissal whatever its published props, and still refuses dismissable (M13)', async () => {
+    const { target, handle } = mountNotice({
+      tone: 'success',
+      detail: 'Remove a project to continue.',
+      icon: 'fas fa-bell',
+      action: { label: LABEL },
+      onAction: () => {},
+      'data-companion-notice': 'hold',
+    });
+    await settle();
+    assert.ok(!target.querySelector('[data-notice-dismiss]'), 'no dismiss control');
+    assert.throws(() => handle.update({ title: TITLE, dismissable: true }), {
+      name: 'TypeError',
+      message: `${REFUSAL}"dismissable" is not a data attribute`,
+    });
+    handle.destroy();
+  });
+
+  it('raises no click from a key press on the button, so the key press is the View Lab’s', async () => {
+    const calls = [];
+    const { target, handle } = mountNotice({
+      action: { label: LABEL },
+      onAction: () => {
+        calls.push('press');
+      },
+    });
+    await settle();
+    const button = actionOf(target);
+    button.focus();
+    const KeyboardEvent = target.ownerDocument.defaultView.KeyboardEvent;
+    for (const type of ['keydown', 'keyup']) {
+      button.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', bubbles: true }));
+    }
+    assert.deepEqual(calls, [], 'happy-dom activates no button from a key');
+    handle.destroy();
   });
 });
 

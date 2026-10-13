@@ -711,6 +711,24 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
   }
 });
 
+test('(a) a Notice change publishes both specimens that mount it, after the frame that draws it', () => {
+  const file = 'src/ui/svelte/components/Notice.svelte';
+  const frames = [
+    'player-inventory-bulk-report',
+    'manager-published-leaves-specimen',
+    'manager-published-controls-specimen',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Notice change does not select '${caseId}'`);
+  }
+});
+
 test('(a) a ViewToggle change publishes the essence browser in both arrangements', () => {
   const selected = mapChangedFilesToCases(['src/ui/svelte/components/ViewToggle.svelte']).map(
     (viewCase) => viewCase.id

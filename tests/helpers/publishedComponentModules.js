@@ -9,12 +9,14 @@ import assert from 'node:assert/strict';
 export const PUBLISHED_SEAM = 'src/ui/publishedComponentSeam.js';
 export const PUBLISHED_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
-/** The first argument of the seam's report of a contained fault. */
+/** The first argument of the seam's report of a contained fault, and of a callback failure. */
 export const FAULT_REPORT = 'Fabricate | Published component render failed:';
+export const CALLBACK_REPORT = 'Fabricate | Published component callback failed:';
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
   'src/ui/publishedComponentProps.js',
+  'src/ui/publishedComponentCallbacks.js',
   'src/ui/publishedComponentManifest.js',
   'src/ui/svelte/util/dropRateTier.js',
 ]);

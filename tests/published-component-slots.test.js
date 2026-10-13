@@ -69,7 +69,7 @@ describe('a slot key', () => {
     const { ui } = panelSeam();
     assert.throws(
       () => ui.mount('Panel', { target: new FakeTarget(), props: { body: () => true } }),
-      refusal('functions are phase 2 (issue 2427)')
+      refusal('"body" must not hold a function')
     );
   });
 
