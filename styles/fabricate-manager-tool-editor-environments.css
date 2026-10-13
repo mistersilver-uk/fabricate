@@ -128,10 +128,6 @@
   grid-row: 2;
 }
 
-.fabricate-manager .manager-tool-editor-tabs > button.is-danger {
-  color: var(--fab-danger-text);
-}
-
 /* THE TOOL STRIP'S BADGE IS A SQUARE, AND THIS RULE HAD TO SAY SO OUT LOUD (issue 1373). */
 .fabricate-manager .manager-tool-editor-tabs .manager-chip.manager-editor-tab-badge {
   min-width: 18px;
@@ -1050,25 +1046,9 @@
 
 @container fabricate-manager (min-width: 832px) and (max-width: 900px) {
   .fabricate-manager .manager-tool-editor-tabs {
-    justify-content: space-between;
-    gap: var(--fab-space-1);
     padding-right: var(--fab-space-2);
     padding-left: var(--fab-space-2);
   }
-
-  .fabricate-manager .manager-tool-editor-tabs > button {
-    flex: 0 1 auto;
-    min-width: 0;
-    gap: var(--fab-space-2xs);
-    font-size: 0.625rem;
-  }
-
-  .fabricate-manager .manager-tool-editor-tabs > button > span {
-    min-width: 15px;
-    padding-right: var(--fab-space-2xs);
-    padding-left: var(--fab-space-2xs);
-  }
-
 }
 
 @container fabricate-manager (max-width: 960px) {
@@ -1426,46 +1406,6 @@
   min-height: 0;
 }
 
-.fabricate-manager .manager-environment-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: var(--fab-space-1);
-  flex-wrap: wrap;
-  min-width: 0;
-  border-bottom: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-environment-tab-button {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  min-height: 38px;
-  padding: 0 var(--fab-space-3);
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  border-radius: 0;
-  color: var(--fab-text-muted);
-  background: none;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-environment-tab-button:hover {
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-environment-tab-button.is-active {
-  color: var(--fab-text);
-  border-bottom-color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-environment-tab-badge {
-  margin-left: var(--fab-space-2xs);
-}
-
 /* The editor workspace: tab panel + 300px side rail (issue 1096). */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
@@ -1592,43 +1532,48 @@
 }
 
 /* Shared editor tab + validation primitives. Generic so the recipe editor reuses the same tab strip and readiness/issue layout the environment editor pioneered without duplicating the rules per editor. */
-.fabricate-tabs.manager-editor-tabs {
+.fabricate-tabs.manager-editor-tabs,
+.fabricate-tabs.manager-environment-tabs {
   display: flex;
   align-items: stretch;
-  gap: var(--fab-space-1);
   flex-wrap: wrap;
   min-width: 0;
   border-bottom: 1px solid var(--fab-border);
 }
 
-.fabricate-tabs .manager-editor-tab-button {
+/* `height: auto` releases Foundry core's fixed button height, and `line-height` is stated because the font floor resets it to the host's: 12 + 20 + 12 over the 2px border is 46px in every host (issue 2464). */
+.fabricate-tabs .manager-editor-tab-button,
+.fabricate-tabs .manager-environment-tab-button {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
-  min-height: 38px;
-  padding: 0 var(--fab-space-3);
+  height: auto;
+  padding: var(--fab-space-3);
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   border-radius: 0;
   color: var(--fab-text-muted);
   background: none;
-
-  /* A notch below body text so the tab strip reads as chrome, not content, matching the prototype's compact tabs at ~12.5px (issue 643 font-size audit). */
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.6;
   cursor: pointer;
 }
 
-.fabricate-tabs .manager-editor-tab-button:hover {
+.fabricate-tabs .manager-editor-tab-button:hover,
+.fabricate-tabs .manager-environment-tab-button:hover {
   color: var(--fab-text);
 }
 
-.fabricate-tabs .manager-editor-tab-button.is-active {
-  color: var(--fab-text);
+/* After the hover rule, which it ties, so a hovered current tab keeps the accent. */
+.fabricate-tabs .manager-editor-tab-button.is-active,
+.fabricate-tabs .manager-environment-tab-button.is-active {
+  color: var(--fab-accent);
   border-bottom-color: var(--fab-accent);
+  font-weight: 600;
 }
 
 /* THE STRIP'S STRIP HALF, on the precedent `.fabricate-pagination button:focus` set and for its reason: Foundry core's `a.button:focus, button:focus` paints an orange outline and a 4px glow, the module reset removes it only inside `.fabricate`, and this family now renders in hosts carrying no Fabricate root at all — where the repaint below would lay the accent ring OVER core's treatment instead of replacing it (issue 1509). */
@@ -1647,7 +1592,6 @@
 
 /* Written at THREE classes, and issue 1509 keeps all three rather than restating the reason issue 883 gave for them, because that reason is FALSE and the correction belongs beside the rule it was written on (issue 1507). */
 .fabricate-tabs .manager-chip.manager-editor-tab-badge {
-  margin-left: var(--fab-space-2xs);
   min-width: 1.4rem;
   min-height: 18px;
   padding: 0 var(--fab-space-2xs);

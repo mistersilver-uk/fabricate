@@ -309,7 +309,7 @@ const EXPECTED = {
   title: 22, // 1.375rem — the page header specimen's title (issue 2257 D2)
   subtitle: 12,
   'header-button': 11.52, // 0.72rem
-  'tab-label': 12.48, // 0.78rem
+  'tab-label': 12.5,
   'tab-badge': 8.96, // 0.56rem
   'nav-label': 12.48, // 0.78rem — bleed fix (was inheriting 14)
   'nav-count': 10, // 0.625rem
