@@ -427,6 +427,8 @@ An unmapped token passes through rather than defaulting to `public`, because V14
 `applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so every caller sets `speaker` before the visibility pass, and a build exposing neither applier makes `applyBulkChatVisibility` throw into the caller's `catch` rather than post with core's public default.
 - **DialogV2's `default` button option only sets `autofocus`; Enter submits through the FIRST `type="submit"` button in document order.**
 So every non-default action MUST declare `type: "button"`, or Enter fires whichever submit button renders first, whatever `default` names (issue 2021).
+DialogV2 also closes on ANY submit of its `<form>`, and a button a companion draws inside it is no configured action, so `_onSubmit` finds nothing for it, calls `options.submit(undefined)` and closes because `closeOnSubmit` is true.
+Content drawn inside a Foundry window therefore states `type="button"` on every `<button>` (`client/applications/api/dialog.mjs`, V13.351 and V14.365; issue 2451).
 - **DialogV2 has no subtitle slot, and `window.frame: false` removes the close control and dragging along with the header.**
 A secondary heading belongs in the dialog's own content, and a frameless dialog needs its own dismiss action (issue 2021).
 - **`KeyboardManager` listens on `window` in the bubble phase, and `hasFocus` reads only `document.activeElement`; while it is false, `core.dismiss` (Escape) closes every framed window.**
@@ -438,6 +440,15 @@ Every keybinding is skipped while such an element holds focus, so Escape in a ty
 `.fabricate-manager`'s `container-type` does not make it one either (measured in Chromium), so a fixed overlay's `%` sizes resolve against the viewport at scale 1 and against the scaled window otherwise, which is why the roll prompt caps its height with `%` rather than `vh` (`client/applications/api/application.mjs`, V13.351; issue 2021).
 - **ApplicationV2's `[data-action]` click delegation on the frame reaches every descendant, portaled overlays included, and `close`, `tab` and `toggleControls` are reserved there.**
 An overlay button portaled into a window whose `data-action` is `close` closes the window, and any other unregistered action falls through to the no-op `_onClickAction` (`client/applications/api/application.mjs`, V13.351; issue 2021).
+DialogV2 also registers each button's `action` name as a window action that submits (`client/applications/api/dialog.mjs`, V13.351 and V14.365), and `type="button"` does not stop that.
+Content drawn inside a window therefore puts `data-action` on nothing it does not mean the window to handle (`application.mjs` 13.351:1394–1436 and 14.365:1918–1953; issue 2451).
+- **`--font-primary` is declared only under `body.game .app`, the ApplicationV1 root, in Foundry 13.351 and 14.365; the face an ApplicationV2 window inherits is `--font-body` on `body`.**
+No Fabricate window carries `.app`, so `var(--font-primary)` with no fallback is invalid at computed-value time there and the element inherits `body`'s `font-family: var(--font-body)`.
+`var(--font-primary, sans-serif)` is worse: the fallback applies and the text computes the generic `sans-serif`, not Signika.
+A published component may render under no Fabricate ancestor, so it reads the face as `var(--font-body, var(--font-primary, sans-serif))` or inherits (`public/css/foundry2.css` lines 61 and 132, both versions; `--font-body` on `body` at 13.351:245–248 and 14.365:262–265; issue 2451).
+- **Foundry core ships no live region and no `.visually-hidden` class.**
+A grep of the core `client/` files and templates finds no `aria-live`, `aria-atomic`, or `status`, `alert` or `log` role, and `ui.notifications` is a bare `<ol>` (`client/applications/ui/notifications.mjs`, V13.351 and V14.365).
+So an announcement is the module's to make, and the hidden-text declarations are restated per component, because `.fabricate .visually-hidden` exists only under a Fabricate ancestor (issue 2451).
 - **A check with modifier pre-rolls posts one message carrying multiple live rolls.**
 `Roll#toMessage` replaces the message's `rolls` with its own roll, so `postBundledCheckRoll` uses `ChatMessage.create` with `[mainRoll, ...preRolls]` and the main total as content, as `Roll#toMessage` sets it; the pre-rolls are actual evaluated rolls, not another animation of their numeric totals.
 With no explicit roll mode, the bundled post reads the posting client's current `core.rollMode` on V13 or `core.messageMode` on V14 through `chatModeOption`; passing an explicit mode keeps its precedence and the same speaker and flavor apply to the bundle.
