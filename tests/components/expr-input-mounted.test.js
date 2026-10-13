@@ -1,20 +1,23 @@
 /**
  * Issue 2465 — `<ExprInput>` (`RollDataExpressionInput.svelte`): one input that shows and writes
- * the stored expression unchanged and carries its caller's class and attributes, and the row of
- * tokens it draws after it, each of which inserts its term at the caret.
+ * the stored expression unchanged and carries its caller's class and attributes, the reading it
+ * draws of what the expression resolves to, the row of tokens that each insert a term at the caret,
+ * and the one status region that speaks the reading after an edit.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Window } from 'happy-dom';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { declarationViolations, readDeclaration } from '../helpers/apiConvention.js';
 import { parseDesignLibrary, readDesignLibrary } from '../helpers/designLibrary.js';
 import { walkNodes } from '../helpers/moduleAst.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
+import { attributeValue } from '../helpers/svelteStructureContract.js';
 import { parsedTemplates } from '../helpers/svelteTemplateScan.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -23,8 +26,12 @@ const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-expr-input-',
-  rawModules: [],
-  compiledModules: ['src/ui/svelte/components/Button.svelte', RDE],
+  rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
+  compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/Chip.svelte',
+    RDE,
+  ],
   componentPath: RDE,
 });
 
@@ -108,22 +115,49 @@ function marked(text) {
   return { value: text.replaceAll('|', ''), start, end: last === start ? start : last - 1 };
 }
 
-/** Every `console.warn` line logged while `run` resolves. */
-async function warningsDuring(run) {
-  const warnings = [];
-  const original = console.warn;
-  console.warn = (...parts) => {
-    warnings.push(parts.join(' '));
+const tokenButtons = (target) => [...target.querySelectorAll('.fab-expr-input-token')];
+
+/** The template element whose static `class` holds `className`. */
+function elementByClass(nodes, className) {
+  return nodes.find(
+    (node) =>
+      node.type === 'RegularElement' &&
+      (attributeValue(node, 'class') ?? '').split(/\s+/u).includes(className)
+  );
+}
+
+/** A resolver over sums of numbers: `6 + 6` is 12, and anything else does not reduce. */
+function sums(expression) {
+  const total = expression
+    .split('+')
+    .reduce((held, term) => held + (term.trim() === '' ? NaN : Number(term)), 0);
+  return Number.isFinite(total) ? total : null;
+}
+
+/** What a caller passes for a reading: the resolver and its statement. */
+const READING = Object.freeze({ resolve: sums, unresolvedLabel: 'Unresolved' });
+
+const readingOf = (target) => target.querySelector('[data-expr-input-reading]');
+const statusOf = (target) => target.querySelector('[data-expr-input-status]');
+
+/** A node's tag and classes, less the compiler's scoping class. */
+const shapeOf = (node) =>
+  [node.tagName, ...node.classList].filter((name) => !name.startsWith('svelte-'));
+
+/** Every `console[level]` line logged while `run` resolves. */
+async function loggedDuring(level, run) {
+  const lines = [];
+  const original = console[level];
+  console[level] = (...parts) => {
+    lines.push(parts.join(' '));
   };
   try {
     await run();
   } finally {
-    console.warn = original;
+    console[level] = original;
   }
-  return warnings;
+  return lines;
 }
-
-const tokenButtons = (target) => [...target.querySelectorAll('.fab-expr-input-token')];
 
 /**
  * Mount the field over `from`, put its selection where `from` marks it, and press `token` as a
@@ -236,11 +270,17 @@ describe('ExprInput (issue 2465)', () => {
       ['fab-expr-input', 'site-x']
     );
     const row = target.querySelector('.fab-expr-input-row');
+    const group = row.querySelector('.fab-expr-input-tokens');
     for (const [name, value] of Object.entries(attributes)) {
       assert.equal(input.getAttribute(name), value, name);
-      if (name !== 'aria-label') assert.ok(!row.hasAttribute(name), `${name} is not on the row`);
+      assert.ok(!row.hasAttribute(name), `${name} is not on the row`);
+      if (name !== 'aria-label') {
+        assert.ok(!group.hasAttribute(name), `${name} is not on the group`);
+      }
     }
-    assert.ok(!row.classList.contains('site-x'), "the caller's class is not on the row");
+    for (const node of [row, group]) {
+      assert.ok(!node.classList.contains('site-x'), "the caller's class stays on the input");
+    }
   });
 
   it('removes an attribute its caller unsets', async () => {
@@ -296,15 +336,17 @@ describe('ExprInput (issue 2465)', () => {
     assert.equal(input.getAttribute('placeholder') ?? '', '');
   });
 
-  it('declares exactly the props its entry gives the field and its row', () => {
+  it('declares exactly the props its entry gives the field, its reading and its row', () => {
     assert.deepEqual(declaredPropNames(component.source), [
       '...rest',
       'class',
       'disabled',
       'onChange',
       'placeholder',
+      'resolve',
       'tokens',
       'tokensLabel',
+      'unresolvedLabel',
       'value',
     ]);
   });
@@ -329,8 +371,8 @@ describe('ExprInput (issue 2465)', () => {
     }
     assert.deepEqual(
       unbuilt,
-      new Set(['resolve']),
-      'what the entry still holds at target; a PR that builds it strikes it from this set, the entry hint and the planned-migrations row together'
+      new Set(),
+      'the entry holds no prop at target that the file does not build: only its place is still to come'
     );
     assert.ok(
       subjects.includes(MIGRATION_SUBJECT),
@@ -427,10 +469,16 @@ describe('ExprInput: the row of tokens (issue 2465)', () => {
       'the input, then the row, and nothing around either'
     );
     const row = target.querySelector('.fab-expr-input-row');
-    assert.equal(row.getAttribute('role'), 'group');
-    assert.equal(row.getAttribute('aria-label'), 'Add a term');
+    assert.deepEqual(
+      [row.hasAttribute('role'), row.hasAttribute('aria-label')],
+      [false, false],
+      'the row is layout alone: it carries no role and no name'
+    );
+    const group = row.querySelector('.fab-expr-input-tokens');
+    assert.equal(group.getAttribute('role'), 'group');
+    assert.equal(group.getAttribute('aria-label'), 'Add a term');
 
-    const buttons = [...row.children];
+    const buttons = [...group.children];
     assert.deepEqual(
       buttons.map((button) => button.textContent),
       ['@prof', '1d4'],
@@ -447,30 +495,37 @@ describe('ExprInput: the row of tokens (issue 2465)', () => {
     }
   });
 
-  it('draws each token through the shared Button, never a button of its own', () => {
+  it('draws the reading and each token through the shared primitives, never its own markup', () => {
     const nodes = [...walkNodes(component.ast.fragment)];
-    const row = nodes.find(
-      (node) => node.type === 'RegularElement' && node.name === 'div' && node.fragment
-    );
-    assert.deepEqual(
-      [...walkNodes(row.fragment)]
+    const componentsIn = (className) =>
+      [...walkNodes(elementByClass(nodes, className).fragment)]
         .filter((node) => node.type === 'Component')
-        .map((node) => node.name),
+        .map((node) => node.name);
+    assert.deepEqual(
+      componentsIn('fab-expr-input-tokens'),
       ['Button'],
-      'the row holds the one Button tag its `{#each}` repeats'
+      'the group holds the one Button tag its `{#each}` repeats, and nothing else'
     );
     assert.deepEqual(
-      nodes.filter((node) => node.type === 'RegularElement' && node.name === 'button'),
-      [],
-      'and the template writes no `<button>` element'
+      componentsIn('fab-expr-input-row'),
+      ['Chip', 'Button'],
+      'the row holds the reading, a Chip, ahead of that group'
+    );
+    assert.deepEqual(
+      nodes
+        .filter((node) => node.type === 'RegularElement')
+        .map((node) => node.name)
+        .sort((a, b) => a.localeCompare(b)),
+      ['div', 'div', 'input', 'span', 'span'],
+      'the template writes no `<button>`, and its two spans are a token label and the status region'
     );
   });
 
-  it('leaves the row unnamed, and says so once, when its caller passes no label', async () => {
-    const warnings = await warningsDuring(async () => {
+  it('leaves the group unnamed, and says so once, when its caller passes no label', async () => {
+    const warnings = await loggedDuring('warn', async () => {
       const target = await harness.mount({ tokens: ['@prof', '1d4'] });
       assert.ok(
-        !target.querySelector('.fab-expr-input-row').hasAttribute('aria-label'),
+        !target.querySelector('.fab-expr-input-tokens').hasAttribute('aria-label'),
         'no `aria-label` attribute is written, and none is invented'
       );
       await harness.setProps({ value: '@prof' });
@@ -480,7 +535,7 @@ describe('ExprInput: the row of tokens (issue 2465)', () => {
   });
 
   it('logs nothing when the row is named, or when there is no row', async () => {
-    const warnings = await warningsDuring(async () => {
+    const warnings = await loggedDuring('warn', async () => {
       await harness.mount({ tokens: ['@prof'], tokensLabel: 'Add a term' });
       harness.remount();
       await harness.mount({ value: '@prof' });
@@ -585,4 +640,505 @@ describe('ExprInput: the row of tokens (issue 2465)', () => {
       [false, false]
     );
   });
+});
+
+describe('ExprInput: the reading (issue 2465)', () => {
+  const NUMBER_CHIP = Object.freeze([
+    'SPAN',
+    'manager-chip',
+    'is-info',
+    'is-mono',
+    'is-inspector',
+    'fab-expr-input-reading',
+  ]);
+  const STATEMENT_CHIP = Object.freeze([
+    'SPAN',
+    'manager-chip',
+    'is-secondary',
+    'is-inspector',
+    'fab-expr-input-reading',
+  ]);
+  const TOKENS = Object.freeze({ tokens: ['@prof', '1d4'], tokensLabel: 'Add a term' });
+  const GROUP = Object.freeze(['DIV', 'fab-expr-input-tokens']);
+  const INPUT = Object.freeze(['INPUT', 'fab-expr-input']);
+  const ROW = Object.freeze(['DIV', 'fab-expr-input-row']);
+  const STATUS = Object.freeze(['SPAN', 'visually-hidden']);
+
+  it('draws no reading, no status region and no description without a resolver', async () => {
+    const target = await harness.mount({ value: '12', unresolvedLabel: 'Unresolved' });
+    assert.deepEqual([...target.children].map(shapeOf), [INPUT]);
+    assert.ok(!readingOf(target), 'no chip');
+    assert.ok(!target.querySelector('[role="status"]'), 'no status region');
+    assert.ok(!target.querySelector('input').hasAttribute('aria-describedby'));
+  });
+
+  it('never asks the resolver about a blank expression, and draws no row for one', async () => {
+    for (const value of ['', ' \t ', undefined, null]) {
+      harness.remount();
+      const asked = [];
+      const target = await harness.mount({
+        value,
+        unresolvedLabel: 'Unresolved',
+        resolve: (expression) => {
+          asked.push(expression);
+          return 12;
+        },
+      });
+      const name = `value ${JSON.stringify(value)}`;
+      assert.deepEqual(asked, [], `${name}: the resolver is not called`);
+      assert.deepEqual(
+        [...target.children].map(shapeOf),
+        [INPUT, STATUS],
+        `${name}: the roots are the input and the status region, which stays mounted`
+      );
+      assert.ok(!target.querySelector('input').hasAttribute('aria-describedby'), name);
+    }
+  });
+
+  it('draws a number through the chip: info tone, inspector density, the mono face', async () => {
+    const target = await harness.mount({ value: '6 + 6', ...READING });
+    const chip = readingOf(target);
+    assert.deepEqual(shapeOf(chip), NUMBER_CHIP);
+    assert.equal(chip.getAttribute('data-expr-input-reading'), 'resolved');
+    assert.equal(chip.textContent, '= 12');
+  });
+
+  it('writes the number as JavaScript writes it, a zero included', async () => {
+    for (const [answer, drawn] of [
+      [7.5, '= 7.5'],
+      [-2, '= -2'],
+      [0, '= 0'],
+    ]) {
+      harness.remount();
+      const target = await harness.mount({
+        value: '@a',
+        unresolvedLabel: 'Unresolved',
+        resolve: () => answer,
+      });
+      assert.equal(readingOf(target).textContent, drawn);
+      assert.equal(readingOf(target).getAttribute('data-expr-input-reading'), 'resolved', drawn);
+    }
+  });
+
+  it("draws the caller's statement at the secondary tone, in the UI face, where it does not reduce", async () => {
+    const target = await harness.mount({ value: '@nope', ...READING });
+    const chip = readingOf(target);
+    assert.deepEqual(shapeOf(chip), STATEMENT_CHIP);
+    assert.equal(chip.getAttribute('data-expr-input-reading'), 'unresolved');
+    assert.equal(chip.textContent, 'Unresolved');
+  });
+
+  it('reads anything but a finite number as not reducing', async () => {
+    for (const [name, answer] of [
+      ['NaN', NaN],
+      ['Infinity', Infinity],
+      ['a numeric string', '12'],
+      ['undefined', undefined],
+      ['an object', {}],
+      ['a promise', Promise.resolve(12)],
+    ]) {
+      harness.remount();
+      const target = await harness.mount({
+        value: '@a',
+        unresolvedLabel: 'Unresolved',
+        resolve: () => answer,
+      });
+      assert.deepEqual(shapeOf(readingOf(target)), STATEMENT_CHIP, name);
+      assert.equal(readingOf(target).textContent, 'Unresolved', name);
+    }
+  });
+
+  it('reads a resolver that throws as not reducing, logs it once, and stays mounted', async () => {
+    let target;
+    const errors = await loggedDuring('error', async () => {
+      target = await harness.mount({
+        value: '1',
+        unresolvedLabel: 'Unresolved',
+        resolve: () => {
+          throw new Error('no roll data');
+        },
+      });
+      await harness.setProps({ value: '2' });
+      await harness.setProps({ value: '3' });
+    });
+    assert.equal(errors.length, 1, `one line across three expressions: ${errors.join(' | ')}`);
+    assert.match(errors[0], /`resolve` threw/u);
+    assert.equal(readingOf(target).textContent, 'Unresolved');
+    assert.equal(target.querySelector('input').value, '3', 'the field still follows its value');
+  });
+
+  it('asks the resolver once per expression, and not for a new placeholder or statement', async () => {
+    const asked = [];
+    const target = await harness.mount({
+      value: '6 + 6',
+      unresolvedLabel: 'Unresolved',
+      resolve: (expression) => {
+        asked.push(expression);
+        return sums(expression);
+      },
+    });
+    assert.deepEqual(asked, ['6 + 6']);
+    await harness.setProps({ placeholder: '@prof' });
+    await harness.setProps({ disabled: true });
+    await harness.setProps({ unresolvedLabel: 'No number' });
+    assert.deepEqual(asked, ['6 + 6'], 'none of the three is a new expression');
+    await harness.setProps({ value: ' @nope ' });
+    assert.deepEqual(asked, ['6 + 6', ' @nope '], 'the text as shown, untrimmed');
+    assert.equal(readingOf(target).textContent, 'No number', 'the statement is read as it stands');
+  });
+
+  it('keeps the reading on a disabled field', async () => {
+    const target = await harness.mount({ value: '12', disabled: true, ...READING });
+    assert.equal(target.querySelector('input').disabled, true);
+    assert.equal(readingOf(target).textContent, '= 12');
+  });
+
+  it('warns once, naming the prop, when a resolver arrives with no statement, and draws no blank chip', async () => {
+    let target;
+    const warnings = await loggedDuring('warn', async () => {
+      target = await harness.mount({ value: '@nope', resolve: sums, 'aria-describedby': 'hint' });
+      await harness.setProps({ value: '@none' });
+    });
+    assert.equal(warnings.length, 1, `one warning: ${warnings.join(' | ')}`);
+    assert.match(warnings[0], /unresolvedLabel/u);
+    assert.ok(!readingOf(target), 'no chip is drawn, and no statement is invented');
+    assert.ok(!target.querySelector('.fab-expr-input-row'), 'so no row is drawn for it');
+    assert.equal(
+      target.querySelector('input').getAttribute('aria-describedby'),
+      'hint',
+      "the description holds the caller's id alone, and no id of a chip that is not there"
+    );
+  });
+
+  for (const [name, props, roots, children] of [
+    ['tokens alone', { ...TOKENS }, [INPUT, ROW], [GROUP]],
+    ['a reading alone', { ...READING }, [INPUT, ROW, STATUS], [NUMBER_CHIP]],
+    ['both', { ...READING, ...TOKENS }, [INPUT, ROW, STATUS], [NUMBER_CHIP, GROUP]],
+  ]) {
+    it(`holds ${name} in one row, the reading first and the group around the tokens only`, async () => {
+      const target = await harness.mount({ value: '12', ...props });
+      assert.deepEqual([...target.children].map(shapeOf), roots);
+      const row = target.querySelector('.fab-expr-input-row');
+      assert.deepEqual([...row.children].map(shapeOf), children);
+      assert.deepEqual(
+        [row.hasAttribute('role'), row.hasAttribute('aria-label')],
+        [false, false],
+        'the row carries no role and no name'
+      );
+      const groups = [...target.querySelectorAll('[role="group"]')];
+      if (!children.includes(GROUP)) {
+        assert.equal(groups.length, 0, 'with no token there is no group, and no name is owed');
+        return;
+      }
+      assert.equal(groups.length, 1);
+      assert.equal(groups[0].getAttribute('aria-label'), 'Add a term');
+      assert.deepEqual(
+        [...groups[0].children].map((child) => child.matches('button.fab-expr-input-token')),
+        [true, true],
+        'the group holds the tokens alone, never the reading'
+      );
+    });
+  }
+});
+
+describe('ExprInput: the reading describes the field (issue 2465)', () => {
+  const described = (target) => target.querySelector('input').getAttribute('aria-describedby');
+
+  it("writes the reading's id ahead of the description its caller passes", async () => {
+    const target = await harness.mount({
+      value: '12',
+      ...READING,
+      'aria-describedby': 'hint-a hint-b',
+    });
+    const { id } = readingOf(target);
+    assert.ok(id, 'the chip carries an id');
+    assert.equal(described(target), `${id} hint-a hint-b`);
+  });
+
+  it("writes the reading's id alone where its caller passes none", async () => {
+    const target = await harness.mount({ value: '@nope', ...READING });
+    assert.equal(described(target), readingOf(target).id);
+  });
+
+  it("keeps the caller's description alone where no reading is drawn", async () => {
+    for (const props of [{ value: '12' }, { value: '', ...READING }]) {
+      harness.remount();
+      const target = await harness.mount({ ...props, 'aria-describedby': 'hint-a' });
+      assert.equal(described(target), 'hint-a');
+    }
+  });
+
+  it('drops the id when the expression is cleared, and takes it back with the reading', async () => {
+    const target = await harness.mount({ value: '12', ...READING, 'aria-describedby': 'hint-a' });
+    const { id } = readingOf(target);
+    await harness.setProps({ value: '' });
+    assert.equal(described(target), 'hint-a');
+    await harness.setProps({ 'aria-describedby': undefined });
+    assert.ok(
+      !target.querySelector('input').hasAttribute('aria-describedby'),
+      'no attribute at all'
+    );
+    await harness.setProps({ value: '7' });
+    assert.equal(described(target), id);
+  });
+});
+
+describe('ExprInput: the announced reading (issue 2465)', () => {
+  /** The caller's floating echoes, awaited by `settle` so none outlives its test. */
+  const echoed = [];
+
+  /** Cross a real macrotask, so every microtask the last act queued has run. */
+  async function settle() {
+    await new Promise((done) => setImmediate(done));
+    const landing = [...echoed];
+    echoed.length = 0;
+    await Promise.all(landing);
+  }
+
+  async function advance(ms) {
+    mock.timers.tick(ms);
+    await settle();
+  }
+
+  // `setImmediate` stays real: every `harness.mount` awaits one.
+  beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+  afterEach(() => mock.timers.reset());
+
+  /** How a caller hands the written value back: inside `onChange`, or a microtask after it. */
+  const ECHOES = Object.freeze([
+    [
+      'inside onChange',
+      (next) => {
+        echoed.push(harness.setProps({ value: next }));
+      },
+    ],
+    [
+      'a microtask later',
+      (next) => {
+        echoed.push(Promise.resolve().then(() => harness.setProps({ value: next })));
+      },
+    ],
+  ]);
+
+  const ONE_TOKEN = Object.freeze({ tokens: ['1'], tokensLabel: 'Add a term' });
+
+  async function mountSpeaking(echo, props = {}) {
+    const target = await harness.mount({ value: '', ...READING, ...props, onChange: echo });
+    const input = target.querySelector('input');
+    return {
+      target,
+      input,
+      said: () => statusOf(target).textContent,
+      drawn: () => readingOf(target)?.textContent ?? '',
+      key: async (expression) => {
+        type(input, expression);
+        await settle();
+      },
+      press: async () => {
+        const [button] = tokenButtons(target);
+        button.focus();
+        button.click();
+        await settle();
+      },
+    };
+  }
+
+  /** Every handle the typing wait armed, and every handle `clearTimeout` was handed. */
+  function watchTimers() {
+    const armed = mock.method(globalThis, 'setTimeout');
+    const cleared = mock.method(globalThis, 'clearTimeout');
+    return {
+      typed: () =>
+        armed.mock.calls.filter((call) => call.arguments[1] === 500).map((call) => call.result),
+      cleared: () => cleared.mock.calls.map((call) => call.arguments[0]),
+      restore: () => {
+        armed.mock.restore();
+        cleared.mock.restore();
+      },
+    };
+  }
+
+  /** Every warning and error logged while the mounted field is destroyed and a second passes. */
+  async function loggedByDestroying() {
+    let warnings = [];
+    const errors = await loggedDuring('error', async () => {
+      warnings = await loggedDuring('warn', async () => {
+        harness.remount();
+        await advance(1000);
+      });
+    });
+    return [...warnings, ...errors];
+  }
+
+  for (const [when, echo] of ECHOES) {
+    describe(`under a caller that echoes the value ${when}`, () => {
+      it('mounts one empty status region beside the row, and no `aria-live` anywhere', async () => {
+        const field = await mountSpeaking(echo, { value: '12', ...ONE_TOKEN });
+        const regions = [...field.target.querySelectorAll('[role="status"]')];
+        assert.equal(regions.length, 1);
+        assert.ok(regions[0] === statusOf(field.target), 'and it is the hooked region');
+        assert.ok(regions[0].parentElement === field.target, 'a root, never a child of the row');
+        assert.equal(field.drawn(), '= 12');
+        assert.equal(field.said(), '', 'a reading that was there at mount is not spoken');
+        assert.ok(!field.target.querySelector('[aria-live]'), 'the role carries polite');
+        assert.ok(!readingOf(field.target).hasAttribute('role'), 'the chip is no live region');
+      });
+
+      it('speaks a typed edit once typing has rested for 500ms', async () => {
+        const field = await mountSpeaking(echo);
+        await field.key('12');
+        assert.equal(field.drawn(), '= 12', 'the chip follows the keystroke');
+        await advance(499);
+        assert.equal(field.said(), '', 'silent at 499ms');
+        await advance(1);
+        assert.equal(field.said(), '= 12');
+      });
+
+      it('restarts the wait on a keystroke, and speaks the last reading once', async () => {
+        const timers = watchTimers();
+        try {
+          const field = await mountSpeaking(echo);
+          await field.key('1');
+          await advance(400);
+          await field.key('12');
+          const [first, second] = timers.typed();
+          assert.ok(first && second, 'each keystroke arms its own wait');
+          assert.ok(timers.cleared().includes(first), "and the second clears the first's");
+          await advance(100);
+          assert.equal(field.said(), '', 'silent at 500ms');
+          await advance(399);
+          assert.equal(field.said(), '', 'and at 899ms');
+          await advance(1);
+          assert.equal(field.said(), '= 12', 'the last reading, at 900ms');
+        } finally {
+          timers.restore();
+        }
+      });
+
+      it('stays silent where an edit leaves the reading as it was', async () => {
+        const field = await mountSpeaking(echo, { value: '12' });
+        await field.key('6 + 6');
+        await advance(500);
+        assert.equal(field.said(), '', 'the reading was `= 12` before the edit and is after it');
+        await field.key('7');
+        await advance(500);
+        assert.equal(field.said(), '= 7', 'and the next edit, which changes it, is spoken');
+      });
+
+      it('speaks the statement where a number stops reducing, and the number when it returns', async () => {
+        const field = await mountSpeaking(echo, { value: '12' });
+        await field.key('@nope');
+        await advance(500);
+        assert.equal(field.said(), 'Unresolved');
+        await field.key('12');
+        await advance(500);
+        assert.equal(field.said(), '= 12');
+      });
+
+      it('empties the region on an edit to blank, once that edit has settled', async () => {
+        const field = await mountSpeaking(echo);
+        await field.key('12');
+        await advance(500);
+        assert.equal(field.said(), '= 12');
+        await field.key('');
+        await advance(499);
+        assert.equal(field.said(), '= 12', 'not per keystroke');
+        await advance(1);
+        assert.equal(field.said(), '');
+      });
+
+      it('never speaks a reading its resolver changed, and empties the region for the next', async () => {
+        const field = await mountSpeaking(echo);
+        await field.key('12');
+        await advance(500);
+        assert.equal(field.said(), '= 12');
+
+        await harness.setProps({ resolve: (expression) => sums(expression) * 2 });
+        assert.equal(field.drawn(), '= 24', 'the chip follows the resolver');
+        assert.equal(field.said(), '', 'and the region is emptied, not rewritten');
+        await advance(1000);
+        assert.equal(field.said(), '', 'at any later tick too');
+
+        await field.key('6');
+        await advance(500);
+        assert.equal(
+          field.said(),
+          '= 12',
+          'an edit back to a text spoken earlier is written again'
+        );
+      });
+
+      it('speaks a pressed token once focus is back on the field, with no typing wait', async () => {
+        const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
+        const [button] = tokenButtons(field.target);
+        button.focus();
+        button.click();
+        assert.ok(globalThis.document.activeElement === field.input, 'focus is on the field');
+        assert.equal(field.said(), '', 'while the region is still empty');
+        await settle();
+        assert.equal(field.drawn(), '= 6');
+        assert.equal(field.said(), '', 'and nothing is said until the focus move has been heard');
+        await advance(ANNOUNCE_AFTER_FOCUS_MS - 1);
+        assert.equal(field.said(), '');
+        await advance(1);
+        assert.equal(field.said(), '= 6', `at ${ANNOUNCE_AFTER_FOCUS_MS}ms, not at 500ms`);
+      });
+
+      it('hands the announcement to a keystroke that follows a press', async () => {
+        const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
+        await field.press();
+        await advance(100);
+        await field.key('9');
+        await advance(50);
+        assert.equal(field.said(), '', "empty at 150ms, when the press's own wait ends");
+        await advance(449);
+        assert.equal(field.said(), '', 'and at 599ms');
+        await advance(1);
+        assert.equal(field.said(), '= 9', "one write, at the keystroke's 500ms");
+      });
+
+      it('hands the announcement to a press that follows a keystroke', async () => {
+        const timers = watchTimers();
+        try {
+          const field = await mountSpeaking(echo, ONE_TOKEN);
+          await field.key('5');
+          await advance(200);
+          await field.press();
+          assert.ok(
+            timers.cleared().includes(timers.typed()[0]),
+            "the keystroke's wait is cleared"
+          );
+          await advance(ANNOUNCE_AFTER_FOCUS_MS - 1);
+          assert.equal(field.said(), '');
+          await advance(1);
+          assert.equal(field.said(), '= 6', `at 200ms + ${ANNOUNCE_AFTER_FOCUS_MS}ms`);
+          await advance(500);
+          assert.equal(field.said(), '= 6', "and the keystroke's 500ms writes nothing");
+        } finally {
+          timers.restore();
+        }
+      });
+
+      it('clears its typing wait when it is destroyed, and reads nothing afterwards', async () => {
+        const timers = watchTimers();
+        try {
+          const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
+          await field.press();
+          await field.key('9');
+          const typed = timers.typed().at(-1);
+          assert.ok(typed, 'a typing wait is pending beside the press');
+          assert.deepEqual(await loggedByDestroying(), []);
+          assert.ok(timers.cleared().includes(typed), 'the typing wait was cleared');
+        } finally {
+          timers.restore();
+        }
+      });
+
+      it('speaks nothing for a press still waiting when it is destroyed', async () => {
+        const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
+        await field.press();
+        assert.deepEqual(await loggedByDestroying(), []);
+      });
+    });
+  }
 });

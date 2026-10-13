@@ -38,6 +38,7 @@ const harness = createMountedComponentHarness({
     ...KIND_MENU_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',

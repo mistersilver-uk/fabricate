@@ -1,16 +1,18 @@
 <!--
   The design system's `<ExprInput>`: a roll-expression field that shows and writes the stored text
-  unchanged, with an optional row of tokens that insert a term at the caret. It states the mono
-  face and draws no box; the box is its host's.
+  unchanged, with an optional reading of what it resolves to and an optional row of tokens that
+  insert a term at the caret. It states the mono face and draws no box; the box is its host's.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The stored expression, shown byte for byte. |
   | `placeholder` | string | `''` | The caller's example, which is where a leading `@` is taught. |
-  | `disabled` | boolean | `false` | Disables the input and every token together. |
+  | `disabled` | boolean | `false` | Disables the input and every token together; the reading stays. |
   | `tokens` | string[] | `[]` | The insertable terms in row order, each a single term; a blank one is dropped. |
-  | `tokensLabel` | string | `''` | The row's accessible name, required with `tokens` and never defaulted. |
+  | `tokensLabel` | string | `''` | The token group's accessible name, required with `tokens` and never defaulted. |
+  | `resolve` | `(expression) => number \| null` | `undefined` | Synchronous, and absent where no actor is in scope. Never called for a blank expression; a throw, or a result that is not a finite number, reads as `null`. |
+  | `unresolvedLabel` | string | `''` | The caller's statement that the expression does not reduce, required with `resolve` and never defaulted. |
   | `class` | class string | `''` | An extra class, appended to `fab-expr-input`. |
 
   Callbacks:
@@ -22,16 +24,27 @@
     description and invalid state.
 
   Invariants:
-  - The input is the first root and nothing wraps it; the one further node is the token row, drawn
-    only when a token is left to draw. Nothing adds or strips an `@`.
+  - Three roots and nothing wrapping the input: the input; one row, drawn only while it holds a
+    reading or a token; and the status region, mounted with `resolve` and beside the row.
+  - The row holds the reading first, then the tokens in a group named by `tokensLabel`; the group
+    holds the tokens alone, and the row carries no role and no name.
+  - The reading describes the field: its id is written ahead of the caller's `aria-describedby`.
+  - The status region speaks the reading once typing has settled, or once focus has returned to
+    the field after a pressed token, and only where that edit changed it; a reading that changes
+    for any other reason empties the region.
   - A pressed token replaces a partial selection, and joins the end when the whole expression is
     selected or the caret or an edge of the selection stands inside a term; it then returns focus
-    with the caret after it.
+    with the caret after it. Nothing adds or strips an `@`.
   - A caller's `oninput` is not honoured: the component's own follows the spread. All pinned by
     `tests/components/expr-input-mounted.test.js`.
 -->
 <script>
   import Button from '../../components/Button.svelte';
+  import Chip from '../../components/Chip.svelte';
+  import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
+
+  /** How long typing must rest before the reading is spoken. */
+  const TYPING_SETTLE_MS = 500;
 
   let {
     value = '',
@@ -39,12 +52,24 @@
     disabled = false,
     tokens = [],
     tokensLabel = '',
+    resolve = undefined,
+    unresolvedLabel = '',
     class: extraClass = '',
     onChange = () => {},
     ...rest
   } = $props();
 
+  const uid = $props.id();
+  const readingId = `${uid}-reading`;
+
   let input = $state(null);
+  let spoken = $state('');
+  // Plain, not `$state`: the effect below must re-run for a changed reading and for nothing else.
+  let heard = '';
+  let pending = false;
+  let serial = 0;
+  let timer;
+  let resolverThrew = false;
 
   const drawnTokens = $derived(
     (Array.isArray(tokens) ? tokens : []).map((token) => String(token ?? '').trim()).filter(Boolean)
@@ -57,6 +82,86 @@
         'is a group with no accessible name.'
     );
   });
+
+  $effect(() => {
+    if (typeof resolve !== 'function' || unresolvedLabel) return;
+    console.warn(
+      'Fabricate | ExprInput: `resolve` was passed with no `unresolvedLabel`, so an expression ' +
+        'that does not reduce draws no reading.'
+    );
+  });
+
+  /** What `resolver` makes of `expression`: a finite number, else `null`, a throw included. */
+  function resolvedNumber(resolver, expression) {
+    try {
+      const answer = resolver(expression);
+      return typeof answer === 'number' && Number.isFinite(answer) ? answer : null;
+    } catch (error) {
+      if (!resolverThrew) {
+        resolverThrew = true;
+        console.error(
+          'Fabricate | ExprInput: `resolve` threw, so the expression reads as unresolved.',
+          error
+        );
+      }
+      return null;
+    }
+  }
+
+  // Over `value` and `resolve` alone, so the resolver is called once per expression.
+  const result = $derived.by(() => {
+    const expression = String(value ?? '');
+    if (typeof resolve !== 'function' || expression.trim() === '') return undefined;
+    return resolvedNumber(resolve, expression);
+  });
+  const reduced = $derived(typeof result === 'number');
+
+  function readingOf(outcome, label) {
+    if (outcome === undefined) return '';
+    return outcome === null ? String(label ?? '') : `= ${outcome}`;
+  }
+
+  const readingText = $derived(readingOf(result, unresolvedLabel));
+
+  /** The reading's id, then the caller's own description; `undefined` writes no attribute. */
+  function describedBy(own, callers) {
+    return `${own} ${callers ?? ''}`.trim() || undefined;
+  }
+
+  // Reads `readingText` alone. A reading no pending edit made is taken as heard, never spoken.
+  $effect(() => {
+    const drawn = readingText;
+    if (pending) return;
+    heard = drawn;
+    spoken = '';
+  });
+
+  $effect(() => () => {
+    serial += 1;
+    clearTimeout(timer);
+  });
+
+  /** Opens an edit and answers its serial: only the latest edit's announcement may speak. */
+  function openEdit() {
+    pending = true;
+    serial += 1;
+    clearTimeout(timer);
+    return serial;
+  }
+
+  function speak(mine) {
+    if (mine !== serial) return;
+    pending = false;
+    if (readingText === heard) return;
+    heard = readingText;
+    spoken = readingText;
+  }
+
+  function typed(event) {
+    const mine = openEdit();
+    onChange(event.currentTarget.value);
+    timer = setTimeout(() => speak(mine), TYPING_SETTLE_MS);
+  }
 
   /** Whether `character` belongs to a term: anything but whitespace, an operator, a bracket or a comma. */
   function isTermCharacter(character) {
@@ -83,6 +188,7 @@
   }
 
   function insertToken(token) {
+    const mine = openEdit();
     const expression = input.value;
     const [start, end] = insertionRange(expression, input.selectionStart, input.selectionEnd);
     const left = expression.slice(0, start).trim();
@@ -93,6 +199,10 @@
     onChange(input.value);
     input.focus();
     input.setSelectionRange(head.length, head.length);
+    announceAfterFocusMove(
+      () => document.activeElement === input,
+      () => speak(mine)
+    );
   }
 </script>
 
@@ -104,21 +214,39 @@
   {placeholder}
   {disabled}
   {...rest}
-  oninput={(event) => onChange(event.currentTarget.value)}
+  aria-describedby={describedBy(readingText ? readingId : '', rest['aria-describedby'])}
+  oninput={typed}
 />
-{#if drawnTokens.length > 0}
-  <div class="fab-expr-input-row" role="group" aria-label={tokensLabel || undefined}>
-    {#each drawnTokens as token, index (index)}
-      <Button
-        role="dashed"
-        class="fab-expr-input-token"
-        {disabled}
-        onclick={() => insertToken(token)}
+{#if readingText || drawnTokens.length > 0}
+  <div class="fab-expr-input-row">
+    {#if readingText}
+      <Chip
+        id={readingId}
+        class="fab-expr-input-reading"
+        tone={reduced ? 'info' : 'secondary'}
+        density="inspector"
+        mono={reduced}
+        data-expr-input-reading={reduced ? 'resolved' : 'unresolved'}>{readingText}</Chip
       >
-        <span class="fab-truncate">{token}</span>
-      </Button>
-    {/each}
+    {/if}
+    {#if drawnTokens.length > 0}
+      <div class="fab-expr-input-tokens" role="group" aria-label={tokensLabel || undefined}>
+        {#each drawnTokens as token, index (index)}
+          <Button
+            role="dashed"
+            class="fab-expr-input-token"
+            {disabled}
+            onclick={() => insertToken(token)}
+          >
+            <span class="fab-truncate">{token}</span>
+          </Button>
+        {/each}
+      </div>
+    {/if}
   </div>
+{/if}
+{#if typeof resolve === 'function'}
+  <span class="visually-hidden" role="status" data-expr-input-status>{spoken}</span>
 {/if}
 
 <style>
@@ -131,8 +259,14 @@
   .fab-expr-input-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--fab-space-chip);
     min-width: 0;
+  }
+
+  /* The group is a name around the tokens, never a box: the row stays the one wrapping line. */
+  .fab-expr-input-tokens {
+    display: contents;
   }
 
   /* Clears the dashed role's 34px height and 600 weight, which the module sheet states at (0,4,0). */

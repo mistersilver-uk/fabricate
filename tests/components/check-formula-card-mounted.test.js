@@ -247,7 +247,7 @@ describe('a formula token inserts its term when clicked (issue 2465)', () => {
       ['@abilities.int.mod', '@abilities.wis.mod', '@skills.sur.total', '2', '1d4']
     );
     assert.equal(
-      target.querySelector('.fab-expr-input-row').getAttribute('aria-label'),
+      target.querySelector('.fab-expr-input-tokens').getAttribute('aria-label'),
       lookup('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTokensLabel')
     );
   });
