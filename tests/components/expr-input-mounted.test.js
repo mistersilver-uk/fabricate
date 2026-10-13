@@ -1267,6 +1267,25 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
     assert.equal(field.said(), '', 'the statement moved the reading, not the edit');
   });
 
+  it('takes a reading the resolver moved while an edit waited as heard, so a later edit that keeps it is silent', async () => {
+    const field = await mountSpeaking((next) => {
+      echoed.push(harness.setProps({ value: next }));
+    });
+    await field.key('12');
+    await advance(500);
+    assert.equal(field.said(), '= 12');
+
+    await field.key('6 + 6');
+    await advance(200);
+    await harness.setProps({ resolve: doubled });
+    assert.equal(field.drawn(), '= 24');
+    assert.equal(field.said(), '', 'the resolver moved the reading, so the region is emptied at once');
+    await field.key('12');
+    await advance(500);
+    assert.equal(field.drawn(), '= 24', 'the second edit kept the reading the resolver made');
+    assert.equal(field.said(), '', 'nothing the user changed moved the reading');
+  });
+
   it("settles an edit whose caller's `onChange` throws, so the next reading is not left stale", async () => {
     const refused = [];
     const field = await mountSpeaking((next) => {

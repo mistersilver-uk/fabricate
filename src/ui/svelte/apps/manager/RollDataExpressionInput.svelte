@@ -35,6 +35,7 @@
     the statement moved the reading under an expression that stood.
   - A caller that echoes the value later than that wait (500ms typed, the focus helper's delay
     pressed) draws the reading, which is then not spoken.
+  - A `value` the caller changes for another reason while an edit waits is spoken with that edit.
   - A pressed token replaces a partial selection, and joins the end when the whole expression is
     selected or the caret or an edge of the selection stands inside a term; it then returns focus
     with the caret after it. Nothing adds or strips an `@`.
@@ -151,6 +152,8 @@
       spoken = '';
     } else if (!edited) {
       overtaken = true;
+      heard = now.reading;
+      spoken = '';
     }
   });
 
@@ -172,7 +175,7 @@
   function speak(mine) {
     if (mine !== serial) return;
     pending = false;
-    if (!overtaken && readingText === heard) return;
+    if (readingText === heard) return;
     heard = readingText;
     spoken = overtaken ? '' : readingText;
   }
