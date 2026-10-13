@@ -2339,7 +2339,7 @@ A `text` prop that is `undefined`, absent or `''` is omitted, so the component's
 A `slot` prop is a content slot, a place where the component draws your own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it, and it is never required.
 A `callback` prop takes a function, and `undefined` or absence omits it, so the component's own default applies.
-The component receives one forwarder for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
+The component holds one stable stand-in for your function for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
 Fabricate calls your function with the arguments the component's section states, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
 The call is synchronous, inside the user's event, after the component has finished its own state change; a published callback is never called while Fabricate renders or runs an effect.
 It runs under Fabricate's `untrack`, which covers Fabricate's runtime only, so if you are called back inside an effect of your own, untrack your own reads.
