@@ -53,7 +53,7 @@ const RETIRED_CLASSES = Object.freeze([
 ]);
 
 /** The planned-migrations row that names what the entry specifies and the file does not ship. */
-const MIGRATION_SUBJECT = 'Expression field tokens and reading';
+const MIGRATION_SUBJECT = 'Expression field reading';
 
 /** The entry's status, the prop names its API list sets in bold, and the migration subjects. */
 function readEntry() {
