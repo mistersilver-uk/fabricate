@@ -1279,7 +1279,11 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
     await advance(200);
     await harness.setProps({ resolve: doubled });
     assert.equal(field.drawn(), '= 24');
-    assert.equal(field.said(), '', 'the resolver moved the reading, so the region is emptied at once');
+    assert.equal(
+      field.said(),
+      '',
+      'the resolver moved the reading, so the region is emptied at once'
+    );
     await field.key('12');
     await advance(500);
     assert.equal(field.drawn(), '= 24', 'the second edit kept the reading the resolver made');
