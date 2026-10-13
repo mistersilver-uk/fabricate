@@ -188,7 +188,7 @@ export function selectorsHolding(css, test) {
   for (const node of walkNodes(css)) {
     if (node.type !== 'Rule') continue;
     for (const complex of node.prelude.children) {
-      if ([...walkNodes(complex)].some(test)) found.push(complex);
+      if ([...walkNodes(complex)].some((part) => test(part))) found.push(complex);
     }
   }
   return found;
