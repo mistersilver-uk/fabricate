@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { assertClipped } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -169,6 +170,20 @@ describe('1505 Notice — the API the library states', () => {
     harness.remount();
     const plain = await harness.mount({ title: 'x', action: { label: 'Review', onClick: () => {} } });
     assert.ok(!plain.querySelector('[data-notice-action]').hasAttribute('aria-describedby'));
+    harness.remount();
+  });
+
+  it('clips that description from its own stylesheet, under no Fabricate ancestor', async () => {
+    const target = await harness.mount({
+      title: 'This formula counts successes',
+      action: { label: 'Convert', description: 'Copies the DCs.', onClick: () => {} },
+    });
+    target.className = 'companion-sheet';
+    const id = target.querySelector('[data-notice-action]').getAttribute('aria-describedby');
+    const description = target.querySelector(`#${id}`);
+    assert.ok(!description.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
+    assert.ok(!description.classList.contains('visually-hidden'), 'not the module sheet utility');
+    assertClipped(description, 'the action description');
     harness.remount();
   });
 
