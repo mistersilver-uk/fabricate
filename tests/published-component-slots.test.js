@@ -1,8 +1,9 @@
 /**
  * The published component seam's content slots (issue 2451), driven through its factory with the
  * fake runtime: the `slot` kind and M15, the slot element's creation, life and removal,
- * `handle.slot`, the teardown of mounts nested in a slot element, and a runtime `unmount` that
- * rejects. The real Svelte runtime is `components/published-slots-mounted.test.js`'s.
+ * `handle.slot`, the teardown of mounts nested in a slot element, a runtime `unmount` that
+ * rejects, and the required ancestor root with M16. The real Svelte runtime is
+ * `components/published-slots-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -30,6 +31,7 @@ const PANEL = Object.freeze({
     rank: { kind: 'data' },
   },
   rest: true,
+  root: 'any',
   component: Object.freeze({ role: 'Panel' }),
 });
 
@@ -446,5 +448,169 @@ describe('a runtime whose unmount returns a rejected Promise', () => {
       assert.equal(reports.length, 1, 'only the fault itself is reported');
     }
     assert.deepEqual(unhandled, []);
+  });
+});
+
+describe('M16: the required ancestor root', () => {
+  const WINDOWED = Object.freeze({ ...PANEL, name: 'Windowed', root: 'fabricate' });
+  const MANAGED = Object.freeze({ ...PANEL, name: 'Managed', root: 'manager' });
+  const WINDOW = 'Windowed needs a Fabricate window ancestor';
+  const MANAGER = 'Managed needs a Fabricate manager ancestor';
+
+  /** A seam whose `hasAncestor` answers from `rooted`, logging each question in `asked`. */
+  function rootedSeam(options = {}) {
+    const asked = [];
+    const rooted = new Set();
+    const hasAncestor = (target, selector) => {
+      asked.push([target, selector]);
+      return rooted.has(target);
+    };
+    const fake = seamWith({ table: [PANEL, ZETA, WINDOWED, MANAGED], hasAncestor, ...options });
+    const under = (parent = null) => {
+      const target = new FakeTarget();
+      parent?.append(target);
+      return target;
+    };
+    return { ...fake, asked, rooted, under };
+  }
+
+  it('refuses a target outside the root, asking for the selector of that root', () => {
+    const { ui, asked, mounts, under } = rootedSeam();
+    const first = under();
+    assert.throws(() => ui.mount('Windowed', { target: first }), refusal(WINDOW));
+    const second = under();
+    assert.throws(() => ui.mount('Managed', { target: second }), refusal(MANAGER));
+    assert.deepEqual(asked, [
+      [first, '.fabricate'],
+      [second, '.fabricate-manager'],
+    ]);
+    assert.equal(mounts.length, 0);
+    assert.equal(first.ownerDocument.created.length, 0, 'no slot element for a refused mount');
+  });
+
+  it('mounts a target inside the root', () => {
+    const { ui, rooted, under } = rootedSeam();
+    for (const name of ['Windowed', 'Managed']) {
+      const target = under();
+      rooted.add(target);
+      assert.equal(ui.mount(name, { target, props: {} }).update({}), true);
+    }
+  });
+
+  it('never asks for an ancestor of an entry whose root is any', () => {
+    const { ui, asked, under } = rootedSeam();
+    ui.mount('Panel', { target: under(), props: { body: true } });
+    ui.mount('Zeta', { target: under(), props: zetaProps() });
+    assert.deepEqual(asked, []);
+  });
+
+  it('follows M4, and precedes M5, M6 and M7', () => {
+    const { ui, asked, under } = rootedSeam();
+    assert.throws(() => ui.mount('Windowed', { target: {} }), refusal('target must be an element'));
+    assert.deepEqual(asked, [], 'M4 first');
+    const held = under();
+    ui.mount('Zeta', { target: held, props: zetaProps() });
+    assert.throws(() => ui.mount('Windowed', { target: held }), refusal(WINDOW), 'before M5');
+    const full = under();
+    full.childNodes.push({ role: 'companion text' });
+    assert.throws(() => ui.mount('Windowed', { target: full }), refusal(WINDOW), 'before M6');
+    assert.throws(
+      () => ui.mount('Windowed', { target: under(), props: null }),
+      refusal(WINDOW),
+      'before M7'
+    );
+  });
+
+  it("leaves a stale claim's mount live when it refuses", () => {
+    const { ui, unmounts, under } = rootedSeam();
+    const target = under();
+    const stale = ui.mount('Zeta', { target, props: zetaProps() });
+    target.childNodes.length = 0;
+    assert.throws(() => ui.mount('Windowed', { target }), refusal(WINDOW));
+    assert.equal(unmounts.length, 0, 'the refusal came before the claim was superseded');
+    assert.equal(stale.update(zetaProps()), true);
+  });
+
+  it("judges a target inside a detached slot element by its owner's target", () => {
+    const { ui, asked, rooted, under } = rootedSeam();
+    const inside = under();
+    rooted.add(inside);
+    const outer = ui.mount('Panel', { target: inside, props: { body: true } });
+    const nested = under(outer.slot('body'));
+    assert.equal(ui.mount('Windowed', { target: nested, props: {} }).update({}), true);
+    assert.deepEqual(asked, [
+      [nested, '.fabricate'],
+      [inside, '.fabricate'],
+    ]);
+
+    const outside = ui.mount('Panel', { target: under(), props: { body: true } });
+    assert.throws(
+      () => ui.mount('Windowed', { target: under(outside.slot('body')) }),
+      refusal(WINDOW),
+      "refused when the owner's target is outside the root too"
+    );
+    assert.throws(
+      () => ui.mount('Managed', { target: outside.slot('body') }),
+      refusal(MANAGER),
+      'and when the target is the slot element itself'
+    );
+  });
+
+  it('judges two levels of detached slot elements by the outermost target', () => {
+    const { ui, asked, rooted, under } = rootedSeam();
+    const top = under();
+    rooted.add(top);
+    const a = ui.mount('Panel', { target: top, props: { body: true } });
+    const middle = under(a.slot('body'));
+    const b = ui.mount('Panel', { target: middle, props: { body: true } });
+    const inner = under(b.slot('body'));
+    assert.equal(ui.mount('Managed', { target: inner, props: {} }).update({}), true);
+    assert.deepEqual(
+      asked.map(([target]) => target),
+      [inner, middle, top]
+    );
+    assert.ok(asked.every(([, selector]) => selector === '.fabricate-manager'));
+  });
+
+  it('refuses a mount moved into its own detached slot element, without recursing', () => {
+    const { ui, under } = rootedSeam();
+    const target = under();
+    const looped = ui.mount('Panel', { target, props: { body: true } });
+    looped.slot('body').append(target);
+    assert.throws(
+      () => ui.mount('Windowed', { target: under(looped.slot('body')) }),
+      refusal(WINDOW)
+    );
+  });
+
+  it("refuses two mounts moved into each other's detached slot elements", () => {
+    const { ui, under } = rootedSeam();
+    const [firstTarget, secondTarget] = [under(), under()];
+    const first = ui.mount('Panel', { target: firstTarget, props: { body: true } });
+    const second = ui.mount('Panel', { target: secondTarget, props: { body: true } });
+    first.slot('body').append(secondTarget);
+    second.slot('body').append(firstTarget);
+    assert.throws(
+      () => ui.mount('Managed', { target: under(first.slot('body')) }),
+      refusal(MANAGER)
+    );
+  });
+
+  it('decides by closest when no hasAncestor is injected, and refuses a node with none', () => {
+    const { ui } = seamWith({ table: [WINDOWED, MANAGED] });
+    const asked = [];
+    const framed = new FakeTarget();
+    framed.closest = (selector) => {
+      asked.push(selector);
+      return selector === '.fabricate' ? framed : null;
+    };
+    assert.equal(ui.mount('Windowed', { target: framed, props: {} }).update({}), true);
+    assert.throws(() => ui.mount('Managed', { target: framed }), refusal(MANAGER));
+    assert.deepEqual(asked, ['.fabricate', '.fabricate-manager']);
+    assert.throws(
+      () => ui.mount('Windowed', { target: new FakeTarget() }),
+      refusal(WINDOW),
+      'a node with no closest is outside every root, not a raw TypeError'
+    );
   });
 });

@@ -1,10 +1,16 @@
 /**
  * The published component manifest (issue 2426) against each component's parsed declaration: its
- * props, rest and each key's kind, then its import closure of `.svelte` and `.js` files: a
- * stylesheet and template that need no Fabricate ancestor, and no read of a Foundry global; then
- * the module sheet's selectors that name the published `Chip`'s root class (issue 2451). The
- * test-only probe runs beside the shipped entries; the adapter's bindings are the mounted suite's.
+ * props, rest, root and each key's kind, then its import closure of `.svelte` and `.js` files: a
+ * stylesheet and template that need no ancestor above the entry's root, no read of a Foundry
+ * global, no class the module sheet names under an `any` root, and focusable elements marked as
+ * admission rule 9 asks; then the module sheet's selectors that name the published `Chip`'s root
+ * class (issue 2451). The test-only probe runs beside the shipped entries; the adapter's bindings
+ * are the mounted suite's.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
+ * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
+ * Limit: sheet reach does not see a class composed across an interpolation, a class a published
+ * `data` value writes (`icon` on `Medallion`, `StatBox` and `InfoStrip`), or an unprefixed state
+ * class.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
  * Limit: `renderedLocals` sees `{@render local()}` and `{@render local?.()}` on the prop's own
  * local, not a snippet forwarded to a child, read through an alias, or tested in `{#if}`; a
@@ -34,6 +40,9 @@ const byName = (a, b) => a.localeCompare(b);
 
 const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
 const APP_TOKENS = ['var(--fab-manager-'];
+/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
+const MANAGER_ROOTS = new Set(['fabricate-manager']);
+const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
 // A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
 const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
 const FOUNDRY_GLOBALS = [
@@ -266,11 +275,17 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** What a component's own stylesheet and template borrow from a Fabricate window, by rule. */
-function ancestorDependencies(ast) {
+/**
+ * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
+ * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
+ */
+function ancestorDependencies(ast, root = 'any') {
+  if (root === 'manager') return [];
+  const windowed = root === 'fabricate';
+  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
   const found = new Set();
   for (const node of walkNodes(ast.css)) {
-    if (node.type === 'ClassSelector' && APP_ROOTS.has(node.name)) found.add('app-root selector');
+    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
     if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
     if (node.type !== 'Declaration') continue;
     for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
@@ -281,7 +296,7 @@ function ancestorDependencies(ast) {
   for (const node of walkNodes(ast.fragment)) {
     if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
   }
-  return [...found].sort(byName);
+  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
 }
 
 /**
@@ -306,10 +321,10 @@ function foundryReads(file, reader) {
 }
 
 /** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
-function closureDependencies(path, reader = SHIPPED) {
+function closureDependencies(path, reader = SHIPPED, root = 'any') {
   return [...importClosure(path, reader)].flatMap((file) =>
     [
-      ...(isComponent(file) ? ancestorDependencies(reader.component(file)) : []),
+      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
       ...foundryReads(file, reader),
     ].map((rule) => `${file}: ${rule}`)
   );
@@ -320,6 +335,113 @@ function classNames(node) {
   if (node.type === 'ClassDirective') return [node.name];
   if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
   return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
+}
+
+const SHEET_PREFIXES = ['fab-', 'fabricate-', 'manager-'];
+
+/** Every class name a module sheet selector names. */
+function sheetClassNames() {
+  const names = new Set();
+  for (const { file, text } of stylesheetSources().parts) {
+    const { ast } = templateOf(file, `<style>${text}</style>`);
+    for (const node of walkNodes(ast.css)) if (node.type === 'ClassSelector') names.add(node.name);
+  }
+  return names;
+}
+
+/**
+ * Every string one closure file spells where a class may be written: each string literal and
+ * template-literal chunk of its scripts and template expressions, its class attribute text and its
+ * `class:` directive names.
+ */
+function spelledStrings(file, reader) {
+  const component = isComponent(file) ? reader.component(file) : null;
+  const roots = component
+    ? [component.module, component.instance, component.fragment]
+    : [reader.module(file).ast];
+  const strings = [];
+  for (const node of roots.flatMap((root) => [...walkNodes(root)])) {
+    if (node.type === 'Literal' && typeof node.value === 'string') strings.push(node.value);
+    if (node.type === 'TemplateElement') strings.push(node.value.cooked ?? node.value.raw);
+    strings.push(...classNames(node));
+  }
+  return strings;
+}
+
+/**
+ * Sheet reach: each `fab-`, `fabricate-` or `manager-` class token an `any` entry's closure
+ * spells that a selector in `sheet` names, as `<file>: <token>`. Another root is not judged.
+ */
+function sheetReach({ path, root }, sheet, reader = SHIPPED) {
+  if (root !== 'any') return [];
+  return [...importClosure(path, reader)].flatMap((file) => {
+    const tokens = spelledStrings(file, reader).flatMap((text) => text.split(/\s+/));
+    return [...new Set(tokens)]
+      .filter((token) => SHEET_PREFIXES.some((prefix) => token.startsWith(prefix)))
+      .filter((token) => sheet.has(token))
+      .sort(byName)
+      .map((token) => `${file}: ${token}`);
+  });
+}
+
+/** The sheet-named tokens the shipped `any` closures spell, each kept off a published mount. */
+const SHEET_REACH_PINS = Object.freeze([
+  // On the remove control, which no published key draws.
+  'src/ui/svelte/components/Chip.svelte: fab-hit-area',
+  // The chip's root class, which the 18-selector census below holds.
+  'src/ui/svelte/components/Chip.svelte: manager-chip',
+]);
+
+const FOCUSABLE_TAGS = new Set(['button', 'a']);
+const FORM_CONTROLS = new Set(['button', 'input', 'select', 'textarea']);
+
+const attributeOf = (element, name) =>
+  element.attributes.find((attribute) => attribute.type === 'Attribute' && attribute.name === name);
+
+/** An attribute's text when it is static, `''` when bare, else `undefined`. */
+function staticText(attribute) {
+  if (!attribute) return undefined;
+  if (attribute.value === true) return '';
+  const parts = [attribute.value].flat();
+  if (parts.some((part) => part.type !== 'Text')) return undefined;
+  return parts.map((part) => part.data).join('');
+}
+
+/**
+ * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
+ * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
+ * `name`. Answers each element it judged beside each fault, both as `<file>: <tag> …`.
+ */
+function focusableElements(file, ast) {
+  const judged = [];
+  const faults = [];
+  for (const node of walkNodes(ast.fragment)) {
+    if (node.type !== 'RegularElement') continue;
+    const focusable = FOCUSABLE_TAGS.has(node.name) || Boolean(attributeOf(node, 'tabindex'));
+    const control = FORM_CONTROLS.has(node.name);
+    if (!focusable && !control) continue;
+    const states = (name, value) => staticText(attributeOf(node, name)) === value;
+    judged.push(`${file}: ${node.name}`);
+    if (focusable && !states('data-keyboard-focus', 'true')) {
+      faults.push(`${file}: ${node.name} does not state data-keyboard-focus="true"`);
+    }
+    if (node.name === 'button' && !states('type', 'button')) {
+      faults.push(`${file}: button does not state type="button"`);
+    }
+    if (control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
+  }
+  return { judged, faults };
+}
+
+/** Rule 9 over an entry's whole closure: every element judged, and every fault. */
+function closureFocusables(path, reader = SHIPPED) {
+  const scans = [...importClosure(path, reader)]
+    .filter(isComponent)
+    .map((file) => focusableElements(file, reader.component(file)));
+  return {
+    judged: scans.flatMap((scan) => scan.judged),
+    faults: scans.flatMap((scan) => scan.faults),
+  };
 }
 
 describe('the manifest', () => {
@@ -335,25 +457,47 @@ describe('the manifest', () => {
 
 describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
-    it(`${entry.name} publishes only declared props at a shipped kind, and rest exactly when declared`, () => {
+    it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
       assert.deepEqual(Object.keys(entry).sort(byName), [
         'name',
         'path',
         'props',
         'rest',
+        'root',
         'version',
       ]);
+      assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);
       assert.equal(entry.rest, declaration.rest !== null, 'rest matches the rest declaration');
       assert.deepEqual(declarationFaults(entry, declaration.ast), []);
     });
 
-    it(`${entry.name} needs no Fabricate ancestor and reads no Foundry global, closure included`, () => {
-      assert.deepEqual(closureDependencies(entry.path), []);
+    it(`${entry.name} needs no ancestor above its root and reads no Foundry global, closure included`, () => {
+      assert.deepEqual(closureDependencies(entry.path, SHIPPED, entry.root), []);
+    });
+
+    it(`${entry.name} marks every focusable element it draws, and names no form control`, () => {
+      assert.deepEqual(closureFocusables(entry.path).faults, []);
     });
   }
+
+  it('judges one focusable element across the shipped closures, the Chip remove button', () => {
+    const judged = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap(
+      (entry) => closureFocusables(entry.path).judged
+    );
+    assert.deepEqual([...new Set(judged)], ['src/ui/svelte/components/Chip.svelte: button']);
+  });
+
+  it('spells no sheet-named class in an any closure but the pinned Chip pair', () => {
+    const sheet = sheetClassNames();
+    assert.ok(sheet.has('fabricate-card') && sheet.size > 500, 'the module sheet was read');
+    const reach = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) =>
+      sheetReach(entry, sheet)
+    );
+    assert.deepEqual([...new Set(reach)].sort(byName), [...SHEET_REACH_PINS]);
+  });
 
   it('reads a snippet, a bindable and a rest prop from a declaration, so the gate can see them', () => {
     const { ast } = templateOf(
@@ -528,6 +672,129 @@ describe('each entry matches its component declaration', () => {
     }
   });
 
+  const MANAGER_BORROWS = [
+    ['a .fabricate-manager selector', ':global(.fabricate-manager) .a { color: red; }'],
+    ['a --fab-manager- token', '.a { color: var(--fab-manager-ink); }'],
+  ];
+  const WINDOW_BORROWS = [
+    ['a .fabricate selector', ':global(.fabricate) .a { color: red; }'],
+    ['a .fabricate-app selector', ':global(.fabricate-app) .a { color: red; }'],
+  ];
+  const rootRule = (css, root) =>
+    closureDependencies(
+      'src/E.svelte',
+      syntheticReader({ 'src/E.svelte': `<style>${css}</style>` }),
+      root
+    );
+
+  for (const [claim, css] of WINDOW_BORROWS) {
+    it(`admits ${claim} to a fabricate entry and a manager entry, and refuses it to an any entry`, () => {
+      assert.deepEqual(rootRule(css, 'fabricate'), []);
+      assert.deepEqual(rootRule(css, 'manager'), []);
+      assert.deepEqual(rootRule(css, 'any'), ['src/E.svelte: app-root selector']);
+    });
+  }
+
+  for (const [claim, css] of MANAGER_BORROWS) {
+    it(`refuses ${claim} to a fabricate entry and an any entry, and admits it to a manager entry`, () => {
+      assert.equal(rootRule(css, 'fabricate').length, 1);
+      assert.deepEqual(rootRule(css, 'fabricate'), rootRule(css, 'any'));
+      assert.deepEqual(rootRule(css, 'manager'), []);
+    });
+  }
+
+  it('admits what only a Fabricate window supplies to a fabricate entry, and never a Foundry read', () => {
+    const windowed =
+      '<span class="visually-hidden"></span><style>@container app (width > 1px) { .a { font-family: var(--font-primary); } }</style>';
+    const reader = syntheticReader({
+      'src/E.svelte': windowed,
+      'src/G.svelte': '<script>const read = game;</script>',
+    });
+    assert.deepEqual(closureDependencies('src/E.svelte', reader, 'fabricate'), []);
+    assert.equal(closureDependencies('src/E.svelte', reader, 'any').length, 3);
+    for (const root of ['any', 'fabricate', 'manager']) {
+      assert.deepEqual(closureDependencies('src/G.svelte', reader, root), [
+        'src/G.svelte: reads game',
+      ]);
+    }
+  });
+
+  const CARD = new Set(['fabricate-card']);
+  const reachOf = (sources, root = 'any') =>
+    sheetReach({ path: 'src/E.svelte', root }, CARD, syntheticReader(sources));
+
+  for (const [spelling, source] of [
+    ['class attribute text', '<section class="a fabricate-card"></section>'],
+    ['a class: directive', '<section class:fabricate-card={on}></section>'],
+    ['a template class array', "<section class={['fabricate-card', extra]}></section>"],
+    ['a script literal', "<script>const classes = ['fabricate-card'];</script>"],
+    [
+      'a template-literal chunk',
+      '<script>const classes = `fabricate-card ${extra}`;</script>{classes}',
+    ],
+    ['a module script literal', "<script module>export const ROOT = 'fabricate-card';</script>"],
+  ]) {
+    it(`names a sheet-named class an any entry spells as ${spelling}`, () => {
+      assert.deepEqual(reachOf({ 'src/E.svelte': source }), ['src/E.svelte: fabricate-card']);
+      assert.deepEqual(reachOf({ 'src/E.svelte': source }, 'fabricate'), [], 'not at fabricate');
+    });
+  }
+
+  it('names a sheet-named class only a file reached by import spells', () => {
+    const sources = {
+      'src/E.svelte': "<script>import Leaf from './Leaf.svelte';</script><Leaf />",
+      'src/Leaf.svelte': "<script>import { ROOT } from './root.js';</script><p class={ROOT}></p>",
+      'src/root.js': "export const ROOT = 'fabricate-card';",
+    };
+    assert.deepEqual(reachOf(sources), ['src/root.js: fabricate-card']);
+  });
+
+  it('reads a class token whole, so a longer name and a token inside a value are not the class', () => {
+    const source =
+      '<script>const style = `--x:var(--fabricate-card-${tone})`;</script><p class="fabricate-card-row not-fabricate-card" {style}></p>';
+    assert.deepEqual(reachOf({ 'src/E.svelte': source }), []);
+  });
+
+  const focusOf = (markup) =>
+    closureFocusables('src/E.svelte', syntheticReader({ 'src/E.svelte': markup }));
+
+  it('passes a marked button and an unnamed input, and reports both as judged', () => {
+    assert.deepEqual(
+      focusOf('<button type="button" data-keyboard-focus="true">x</button><input /><p>x</p>'),
+      { judged: ['src/E.svelte: button', 'src/E.svelte: input'], faults: [] }
+    );
+  });
+
+  for (const [claim, markup, fault] of [
+    [
+      'a button without data-keyboard-focus',
+      '<button type="button">x</button>',
+      'button does not state data-keyboard-focus="true"',
+    ],
+    [
+      'a button whose data-keyboard-focus is not static',
+      '<button type="button" data-keyboard-focus={on}>x</button>',
+      'button does not state data-keyboard-focus="true"',
+    ],
+    [
+      'a button without type',
+      '<button data-keyboard-focus="true">x</button>',
+      'button does not state type="button"',
+    ],
+    ['a link', '<a href="#x">x</a>', 'a does not state data-keyboard-focus="true"'],
+    [
+      'an element with tabindex',
+      '<span tabindex="0">x</span>',
+      'span does not state data-keyboard-focus="true"',
+    ],
+    ['a named input', '<input name="q" />', 'input states name'],
+    ['a named select', '<select name={field}></select>', 'select states name'],
+  ]) {
+    it(`names ${claim} as a rule 9 fault`, () => {
+      assert.deepEqual(focusOf(markup).faults, [`src/E.svelte: ${fault}`]);
+    });
+  }
+
   const faceRule = (value) =>
     ancestorDependencies(
       templateOf('Face.svelte', `<style>.a { font-family: ${value}; }</style>`).ast
@@ -622,7 +889,7 @@ describe('the module sheet against the published Chip', () => {
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
       ['tone', 'density', 'children'],
-      'a published key that draws a classed child reopens cannotMatchPublishedChip'
+      'a published key that draws a classed child reopens cannotMatchPublishedChip and fab-hit-area'
     );
   });
 

@@ -2,8 +2,9 @@
  * The published component seam's content slots on Fabricate's real Svelte runtime (issue 2451),
  * drawing the test-only probe into bare companion-owned targets: the slot element inside its
  * private wrapper, its detach and re-attach, a host element replaced around it, the teardown of a
- * published mount nested in it, and a teardown that throws during the unmount. The fake runtime's
- * order and timing clauses are `published-component-slots.test.js`'s.
+ * published mount nested in it, a teardown that throws during the unmount, and the required
+ * ancestor root decided by `closest`. The fake runtime's order and timing clauses are
+ * `published-component-slots.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -18,6 +19,7 @@ import {
   PUBLISHED_RUNE_MODULES,
   PUBLISHED_SEAM as SEAM,
   companionTarget,
+  fabricateTarget,
   recordEscapes,
   settle,
 } from '../helpers/publishedComponentModules.js';
@@ -297,5 +299,84 @@ describe('a published teardown that throws on the real runtime', () => {
     assert.deepEqual(reports[0].slice(0, 2), [FAULT_REPORT, 'PublishedProbe']);
     assert.ok(reports[0][2] === probe.PROBE_FAULTS.teardown, "the probe's own Error");
     assert.equal(handle.update({}), false);
+  });
+});
+
+describe('the required ancestor root on the real runtime', () => {
+  const WINDOW =
+    /^TypeError: Fabricate \| published components: WindowProbe needs a Fabricate window ancestor$/;
+  const MANAGER =
+    /^TypeError: Fabricate \| published components: ManagerProbe needs a Fabricate manager ancestor$/;
+
+  /** A seam publishing the probe at each root: `PublishedProbe`, `WindowProbe` and `ManagerProbe`. */
+  function rooted() {
+    const component = probe.default;
+    const table = [
+      { ...PROBE_ENTRY, component },
+      { ...PROBE_ENTRY, name: 'WindowProbe', root: 'fabricate', component },
+      { ...PROBE_ENTRY, name: 'ManagerProbe', root: 'manager', component },
+    ];
+    return seam({ table });
+  }
+
+  it('refuses a bare target, before it draws or claims anything', () => {
+    const instance = rooted();
+    const target = companionTarget(targets);
+    assert.throws(() => instance.publicApi.mount('WindowProbe', { target, props: {} }), WINDOW);
+    assert.throws(() => instance.publicApi.mount('ManagerProbe', { target, props: {} }), MANAGER);
+    assert.equal(target.childNodes.length, 0);
+    assert.equal(instance.liveMountCount(), 0);
+    instance.publicApi.mount('PublishedProbe', { target, props: {} }).destroy();
+  });
+
+  it('mounts a fabricate entry under a .fabricate shell, which is no manager root', () => {
+    const instance = rooted();
+    const target = fabricateTarget(targets);
+    assert.throws(() => instance.publicApi.mount('ManagerProbe', { target, props: {} }), MANAGER);
+    const handle = instance.publicApi.mount('WindowProbe', { target, props: { text: 'Framed' } });
+    assert.equal(target.querySelector('.probe-text').textContent, 'Framed');
+    handle.destroy();
+  });
+
+  it('mounts both under a .fabricate-manager root inside the frame', () => {
+    const instance = rooted();
+    const manager = ownedIn(fabricateTarget(targets).parentElement);
+    manager.className = 'fabricate-manager';
+    for (const name of ['WindowProbe', 'ManagerProbe']) {
+      const target = ownedIn(manager);
+      const handle = instance.publicApi.mount(name, { target, props: {} });
+      assert.equal(target.querySelector('.probe-text').textContent, 'DEFAULT', name);
+      handle.destroy();
+    }
+  });
+
+  it("judges a target in a detached slot element by its owner's target", async () => {
+    const instance = rooted();
+    const framed = instance.publicApi.mount('PublishedProbe', {
+      target: fabricateTarget(targets),
+      props: {},
+    });
+    assert.equal(framed.update({ body: true }), true);
+    const pending = ownedIn(framed.slot('body'));
+    assert.ok(!pending.isConnected, 'the slot element is not attached before the flush');
+    const inner = instance.publicApi.mount('WindowProbe', { target: pending, props: {} });
+    assert.equal(pending.querySelector('.probe-text').textContent, 'DEFAULT');
+    await settle();
+    assert.ok(pending.isConnected && pending.closest('.fabricate'), 'attached by the flush');
+
+    const bare = instance.publicApi.mount('PublishedProbe', {
+      target: companionTarget(targets),
+      props: {},
+    });
+    assert.equal(bare.update({ body: true }), true);
+    assert.throws(
+      () =>
+        instance.publicApi.mount('WindowProbe', { target: ownedIn(bare.slot('body')), props: {} }),
+      WINDOW
+    );
+    framed.destroy();
+    bare.destroy();
+    assert.equal(inner.update({}), false, 'the nested mount ended with its owner');
+    assert.equal(instance.liveMountCount(), 0);
   });
 });

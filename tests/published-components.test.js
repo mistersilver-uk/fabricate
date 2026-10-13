@@ -2,7 +2,8 @@
  * The published component seam (issue 2426), driven through its factory with a fake runtime: the
  * frozen descriptor, every fixed refusal, the `text` kind, replace-not-merge and atomic updates,
  * destroy, the claim on a target, `load`, and the fault path with its `onFault` notice. Content
- * slots are `published-component-slots.test.js`'s, and the real Svelte runtime the mounted suites'.
+ * slots and the required root are `published-component-slots.test.js`'s, and the real Svelte
+ * runtime the mounted suites'.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -40,14 +41,15 @@ describe('the published-components descriptor', () => {
     assert.ok(Object.isFrozen(ui.components));
   });
 
-  it('describes an entry as a frozen version, its props by kind and rest, with nothing else', () => {
+  it('describes an entry as a frozen version, its props by kind, rest and root, with nothing else', () => {
     const { ui } = seamWith();
     const described = ui.describe('Zeta');
-    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest']);
+    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root']);
     assert.deepEqual(described, {
       version: 3,
       props: { label: { kind: 'data', required: true }, items: { kind: 'data', required: false } },
       rest: true,
+      root: 'any',
     });
     assert.ok(Object.isFrozen(described));
     assert.ok(Object.isFrozen(described.props));
@@ -56,6 +58,7 @@ describe('the published-components descriptor', () => {
       version: 1,
       props: { value: { kind: 'data', required: false } },
       rest: false,
+      root: 'any',
     });
     assert.deepEqual(ui.describe('Titled').props, {
       title: { kind: 'text', required: true },
@@ -727,6 +730,33 @@ describe('registration', () => {
       );
     });
   }
+
+  for (const [root, written] of [
+    ['window', 'window'],
+    [undefined, 'undefined'],
+    ['Any', 'Any'],
+    ['toString', 'toString'],
+  ]) {
+    it(`refuses a manifest entry whose root is ${written}, naming the entry and the root`, () => {
+      const unknown = { ...ALPHA, root };
+      const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(error.message, exactly(`${PREFIX}Alpha has an unknown root "${written}"`));
+          return true;
+        }
+      );
+    });
+  }
+
+  it('registers each shipped root, and describes it', () => {
+    for (const root of ['any', 'fabricate', 'manager']) {
+      const { ui } = seamWith({ table: [{ ...ALPHA, root }] });
+      assert.equal(ui.describe('Alpha').root, root);
+    }
+  });
 
   it('refuses a second registration, keeping the first runtime', () => {
     const { seam, ui, mounts } = seamWith();

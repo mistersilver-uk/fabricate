@@ -2027,22 +2027,23 @@ The published components, in publication order:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Component | Version | Props | Rest |
-| --- | --- | --- | --- |
-| `TierTrack` | 1 | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
-| `Avatar` | 1 | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
-| `Medallion` | 1 | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
-| `FillBar` | 1 | `value`, `tone`, `color`, `density` | yes |
-| `Meter` | 1 | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
-| `BandedBar` | 1 | `rows` (required), `direction`, `density` | yes |
-| `StatBox` | 1 | `value` (required), `label` (required), `icon`, `tone` | yes |
-| `InfoStrip` | 1 | `label` (required), `facts` (required), `badge` | yes |
-| `Kicker` | 1 | `as`, `tone`, `children` (text, required) | yes |
-| `Chip` | 1 | `tone`, `density`, `children` (text, required) | yes |
+| Component | Version | Root | Props | Rest |
+| --- | --- | --- | --- | --- |
+| `TierTrack` | 1 | `any` | `tiers` (required), `currentIndex`, `direction`, `layout`, `ariaLabel` (required), `currentLabel` (required), `reachedLabel` (required), `aheadLabel` (required), `hint` | yes |
+| `Avatar` | 1 | `any` | `art`, `name` (required), `alt`, `size`, `shape`, `tint` | no |
+| `Medallion` | 1 | `any` | `art`, `icon`, `size` (required), `alt`, `tint`, `glyph`, `variant`, `tone`, `ink` | no |
+| `FillBar` | 1 | `any` | `value`, `tone`, `color`, `density` | yes |
+| `Meter` | 1 | `any` | `value`, `max`, `segments`, `valueText`, `label` (required) | yes |
+| `BandedBar` | 1 | `any` | `rows` (required), `direction`, `density` | yes |
+| `StatBox` | 1 | `any` | `value` (required), `label` (required), `icon`, `tone` | yes |
+| `InfoStrip` | 1 | `any` | `label` (required), `facts` (required), `badge` | yes |
+| `Kicker` | 1 | `any` | `as`, `tone`, `children` (text, required) | yes |
+| `Chip` | 1 | `any` | `tone`, `density`, `children` (text, required) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data and marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.

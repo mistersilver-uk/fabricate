@@ -12,7 +12,15 @@ import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentPr
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
 const INERT_HANDLE = Object.freeze({ update: () => false, destroy: () => {}, slot: () => null });
 
+/** Each required ancestor root: the selector `target` needs above it, and what M16 says it needs. */
+const ROOTS = Object.freeze({
+  any: null,
+  fabricate: Object.freeze({ selector: '.fabricate', needs: 'a Fabricate window ancestor' }),
+  manager: Object.freeze({ selector: '.fabricate-manager', needs: 'a Fabricate manager ancestor' }),
+});
+
 const isElementNode = (target) => target?.nodeType === 1;
+const hasAncestorBySelector = (target, selector) => Boolean(target.closest?.(selector));
 const isFabricateReady = () => globalThis.game?.fabricate?.ready === true;
 const reportToConsole = (...args) => console.error(...args);
 
@@ -25,14 +33,18 @@ function describeEntry(entry) {
     version: entry.version,
     props: Object.freeze(props),
     rest: entry.rest === true,
+    root: entry.root,
   });
 }
 
-function assertKnownKinds(entry) {
+function assertKnownEntry(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
       throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown kind "${spec.kind}"`);
     }
+  }
+  if (!Object.hasOwn(ROOTS, entry.root)) {
+    throw new Error(`${PREFIX}${entry.name} has an unknown root "${entry.root}"`);
   }
 }
 
@@ -91,6 +103,31 @@ function nestedIn(record, live) {
   return [...live].filter(
     (other) => other !== record && elements.some((element) => element.contains(other.target))
   );
+}
+
+/** The live mount one of whose slot elements contains `target`, or `null`. */
+function ownerOf(target, live) {
+  for (const record of live) {
+    for (const element of record.slots.values()) if (element.contains(target)) return record;
+  }
+  return null;
+}
+
+/**
+ * Whether `target` has the ancestor `selector` names (M16). A target inside a slot element that
+ * is not attached is judged by the target of the mount owning that element, and so on up; a mount
+ * met twice is a cycle, which has no such ancestor.
+ */
+function underRoot(target, selector, hasAncestor, owner) {
+  const met = new Set();
+  let judged = target;
+  while (!hasAncestor(judged, selector)) {
+    const record = owner(judged);
+    if (!record || met.has(record)) return false;
+    met.add(record);
+    judged = record.target;
+  }
+  return true;
 }
 
 /** What the host receives beside its component; `slots` answers a requested key's element. */
@@ -208,12 +245,14 @@ function createMountLifecycle({ runtime, report }) {
     if (target.firstChild) throw refuse('target must be empty');
   }
 
-  return { start, claimTarget, liveCount: () => live.size };
+  const owner = (target) => ownerOf(target, live);
+  return { start, claimTarget, owner, liveCount: () => live.size };
 }
 
 /**
  * One seam over `table` (the manifest by default). Passing `mount` registers the runtime at once,
  * binding each entry's own `component`; otherwise the adapter calls `register`, once.
+ * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
   table = PUBLISHED_COMPONENT_MANIFEST,
@@ -222,6 +261,7 @@ export function createPublishedComponents({
   unmount,
   report = reportToConsole,
   isElement = isElementNode,
+  hasAncestor = hasAncestorBySelector,
   isReady = isFabricateReady,
 } = {}) {
   const entries = new Map(table.map((entry) => [entry.name, entry]));
@@ -236,6 +276,10 @@ export function createPublishedComponents({
     if (!entry) throw refuse(`"${String(name)}" is not published`);
     const { target, props = {}, onFault } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
+    const root = ROOTS[entry.root];
+    if (root && !underRoot(target, root.selector, hasAncestor, lifecycle.owner)) {
+      throw refuse(`${entry.name} needs ${root.needs}`);
+    }
     lifecycle.claimTarget(target);
     const notify = typeof onFault === 'function' ? onFault : null;
     return lifecycle.start(entry, target, copyProps(entry, props), notify);
@@ -251,7 +295,7 @@ export function createPublishedComponents({
 
   function register(adapter) {
     if (runtime) throw new Error(`${PREFIX}already registered`);
-    for (const entry of table) assertKnownKinds(entry);
+    for (const entry of table) assertKnownEntry(entry);
     const { components, host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
     runtime = Object.freeze({
       components,

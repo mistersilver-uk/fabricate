@@ -14,4 +14,5 @@ export const PROBE_ENTRY = Object.freeze({
     bodyAs: Object.freeze({ kind: 'data' }),
   }),
   rest: true,
+  root: 'any',
 });

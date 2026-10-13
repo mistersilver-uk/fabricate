@@ -19,6 +19,7 @@ export const ZETA = Object.freeze({
   version: 3,
   props: { label: { kind: 'data', required: true }, items: { kind: 'data' } },
   rest: true,
+  root: 'any',
   component: ZETA_COMPONENT,
 });
 export const ALPHA = Object.freeze({
@@ -27,6 +28,7 @@ export const ALPHA = Object.freeze({
   version: 1,
   props: { value: { kind: 'data' } },
   rest: false,
+  root: 'any',
   component: ALPHA_COMPONENT,
 });
 // A required and an optional `text` key beside a `data` one.
@@ -40,6 +42,7 @@ export const TITLED = Object.freeze({
     rank: { kind: 'data' },
   },
   rest: true,
+  root: 'any',
   component: TITLED_COMPONENT,
 });
 export const TABLE = Object.freeze([ZETA, ALPHA, TITLED]);
@@ -181,9 +184,14 @@ export function fakeRuntime({
   return { runtime, mounts, unmounts, reports, events };
 }
 
-export function seamWith({ table = TABLE, isReady = () => true, ...runtimeOptions } = {}) {
+export function seamWith({
+  table = TABLE,
+  isReady = () => true,
+  hasAncestor,
+  ...runtimeOptions
+} = {}) {
   const fake = fakeRuntime(runtimeOptions);
-  const seam = createPublishedComponents({ table, isReady, ...fake.runtime });
+  const seam = createPublishedComponents({ table, isReady, hasAncestor, ...fake.runtime });
   return { ...fake, seam, ui: seam.publicApi };
 }
 
