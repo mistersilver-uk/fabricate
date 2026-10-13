@@ -679,12 +679,24 @@ describe('ExprInput: the reading (issue 2465)', () => {
   const ROW = Object.freeze(['DIV', 'fab-expr-input-row']);
   const STATUS = Object.freeze(['SPAN', 'visually-hidden']);
 
-  it('draws no reading, no status region and no description without a resolver', async () => {
-    const target = await harness.mount({ value: '12', unresolvedLabel: 'Unresolved' });
-    assert.deepEqual([...target.children].map(shapeOf), [INPUT]);
-    assert.ok(!readingOf(target), 'no chip');
-    assert.ok(!target.querySelector('[role="status"]'), 'no status region');
-    assert.ok(!target.querySelector('input').hasAttribute('aria-describedby'));
+  it('draws no reading, no status region and no description without a resolver, or with one that is no function', async () => {
+    for (const resolver of [undefined, null, 'x', 12, {}, true]) {
+      harness.remount();
+      const name = `resolve ${JSON.stringify(resolver)}`;
+      let target;
+      const errors = await loggedDuring('error', async () => {
+        target = await harness.mount({
+          value: '12',
+          unresolvedLabel: 'Unresolved',
+          resolve: resolver,
+        });
+      });
+      assert.deepEqual([...target.children].map(shapeOf), [INPUT], name);
+      assert.ok(!readingOf(target), `${name}: no chip`);
+      assert.ok(!target.querySelector('[role="status"]'), `${name}: no status region`);
+      assert.ok(!target.querySelector('input').hasAttribute('aria-describedby'), name);
+      assert.deepEqual(errors, [], `${name}: nothing is called, so nothing throws`);
+    }
   });
 
   it('never asks the resolver about a blank expression, and draws no row for one', async () => {
@@ -808,21 +820,49 @@ describe('ExprInput: the reading (issue 2465)', () => {
     assert.equal(readingOf(target).textContent, '= 12');
   });
 
-  it('warns once, naming the prop, when a resolver arrives with no statement, and draws no blank chip', async () => {
-    let target;
-    const warnings = await loggedDuring('warn', async () => {
-      target = await harness.mount({ value: '@nope', resolve: sums, 'aria-describedby': 'hint' });
-      await harness.setProps({ value: '@none' });
+  for (const [name, unresolvedLabel] of [
+    ['no statement', undefined],
+    ['a statement of whitespace', ' \t '],
+  ]) {
+    it(`warns once, naming the prop, when a resolver arrives with ${name}, and draws no blank chip`, async () => {
+      let target;
+      const warnings = await loggedDuring('warn', async () => {
+        target = await harness.mount({
+          value: '@nope',
+          resolve: sums,
+          unresolvedLabel,
+          'aria-describedby': 'hint',
+        });
+        await harness.setProps({ value: '@none' });
+      });
+      assert.equal(warnings.length, 1, `one warning: ${warnings.join(' | ')}`);
+      assert.match(warnings[0], /unresolvedLabel/u);
+      assert.ok(!readingOf(target), 'no chip is drawn, and no statement is invented');
+      assert.ok(!target.querySelector('.fab-expr-input-row'), 'so no row is drawn for it');
+      assert.equal(
+        target.querySelector('input').getAttribute('aria-describedby'),
+        'hint',
+        "the description holds the caller's id alone, and no id of a chip that is not there"
+      );
     });
-    assert.equal(warnings.length, 1, `one warning: ${warnings.join(' | ')}`);
-    assert.match(warnings[0], /unresolvedLabel/u);
-    assert.ok(!readingOf(target), 'no chip is drawn, and no statement is invented');
-    assert.ok(!target.querySelector('.fab-expr-input-row'), 'so no row is drawn for it');
-    assert.equal(
-      target.querySelector('input').getAttribute('aria-describedby'),
-      'hint',
-      "the description holds the caller's id alone, and no id of a chip that is not there"
-    );
+  }
+
+  it('warns once for a missing statement, however many resolvers the field is handed', async () => {
+    const warnings = await loggedDuring('warn', async () => {
+      await harness.mount({ value: '@nope', resolve: sums });
+      await harness.setProps({ resolve: (expression) => sums(expression) });
+      await harness.setProps({ resolve: (expression) => sums(expression) });
+    });
+    assert.equal(warnings.length, 1, `one warning across three resolvers: ${warnings.join(' | ')}`);
+  });
+
+  it('draws the statement trimmed', async () => {
+    const target = await harness.mount({
+      value: '@nope',
+      resolve: sums,
+      unresolvedLabel: '  Unresolved ',
+    });
+    assert.equal(readingOf(target).textContent, 'Unresolved');
   });
 
   for (const [name, props, roots, children] of [
@@ -973,17 +1013,24 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
     };
   }
 
-  /** Every warning and error logged while the mounted field is destroyed and a second passes. */
-  async function loggedByDestroying() {
+  /**
+   * Every warning and error logged while the mounted field is destroyed, `afterDestroy` runs, and
+   * a second passes.
+   */
+  async function loggedByDestroying(afterDestroy = () => {}) {
     let warnings = [];
     const errors = await loggedDuring('error', async () => {
       warnings = await loggedDuring('warn', async () => {
         harness.remount();
+        afterDestroy();
         await advance(1000);
       });
     });
     return [...warnings, ...errors];
   }
+
+  /** A second resolver, whose every reading differs from `sums`'s. */
+  const doubled = (expression) => sums(expression) * 2;
 
   for (const [when, echo] of ECHOES) {
     describe(`under a caller that echoes the value ${when}`, () => {
@@ -1068,7 +1115,7 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
         await advance(500);
         assert.equal(field.said(), '= 12');
 
-        await harness.setProps({ resolve: (expression) => sums(expression) * 2 });
+        await harness.setProps({ resolve: doubled });
         assert.equal(field.drawn(), '= 24', 'the chip follows the resolver');
         assert.equal(field.said(), '', 'and the region is emptied, not rewritten');
         await advance(1000);
@@ -1081,6 +1128,33 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
           '= 12',
           'an edit back to a text spoken earlier is written again'
         );
+      });
+
+      it('never speaks a resolver that changed while an edit waited, and takes its reading as heard', async () => {
+        const field = await mountSpeaking(echo);
+        await field.key('12');
+        await advance(500);
+        assert.equal(field.said(), '= 12');
+
+        await field.key('6 + 6');
+        await advance(200);
+        await harness.setProps({ resolve: doubled });
+        assert.equal(field.drawn(), '= 24', 'the chip follows the resolver');
+        await advance(300);
+        assert.equal(field.said(), '', 'empty at 500ms: the edit left the reading as it was');
+        await advance(1000);
+        assert.equal(field.said(), '', 'and at any later tick');
+
+        await field.key('12');
+        await advance(500);
+        assert.equal(
+          field.said(),
+          '',
+          'an edit that keeps `= 24` is silent: it was taken as heard'
+        );
+        await field.key('6');
+        await advance(500);
+        assert.equal(field.said(), '= 12', 'and the next edit that changes it is spoken');
       });
 
       it('speaks a pressed token once focus is back on the field, with no typing wait', async () => {
@@ -1134,7 +1208,7 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
         }
       });
 
-      it('clears its typing wait when it is destroyed, and reads nothing afterwards', async () => {
+      it('clears its typing wait when it is destroyed', async () => {
         const timers = watchTimers();
         try {
           const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
@@ -1149,11 +1223,73 @@ describe('ExprInput: the announced reading (issue 2465)', () => {
         }
       });
 
-      it('speaks nothing for a press still waiting when it is destroyed', async () => {
+      it('leaves a press still waiting inert when it is destroyed: a later write of its value reads nothing', async () => {
         const field = await mountSpeaking(echo, { value: '5', ...ONE_TOKEN });
         await field.press();
-        assert.deepEqual(await loggedByDestroying(), []);
+        const destroyed = harness.component;
+        assert.deepEqual(await loggedByDestroying(() => destroyed.$set({ value: '77' })), []);
       });
     });
   }
+
+  it('speaks an edit whose caller hands it a new resolver of the same readings, with the echo and after it', async () => {
+    // The Studio's field re-derives its resolver on every write, and again when its route re-emits.
+    const field = await mountSpeaking((next) => {
+      echoed.push(harness.setProps({ value: next, resolve: (expression) => sums(expression) }));
+    });
+    await field.key('12');
+    await advance(200);
+    await harness.setProps({ resolve: (expression) => sums(expression) });
+    await advance(300);
+    assert.equal(field.said(), '= 12', 'the reading is the edit’s: no resolver moved it');
+  });
+
+  it('keeps what it said when its caller rewrites the expression to one of the same reading', async () => {
+    const field = await mountSpeaking((next) => {
+      echoed.push(harness.setProps({ value: next }));
+    });
+    await field.key('12');
+    await advance(500);
+    assert.equal(field.said(), '= 12');
+    await harness.setProps({ value: '6 + 6' });
+    assert.equal(field.said(), '= 12', 'no reading moved, so the region is left as it was');
+  });
+
+  it('takes a statement that changed while an edit waited as heard, as it does a resolver', async () => {
+    const field = await mountSpeaking((next) => {
+      echoed.push(harness.setProps({ value: next }));
+    });
+    await field.key('@nope');
+    await advance(200);
+    await harness.setProps({ unresolvedLabel: 'No number' });
+    await advance(300);
+    assert.equal(field.drawn(), 'No number');
+    assert.equal(field.said(), '', 'the statement moved the reading, not the edit');
+  });
+
+  it("settles an edit whose caller's `onChange` throws, so the next reading is not left stale", async () => {
+    const refused = [];
+    const field = await mountSpeaking((next) => {
+      if (next === '13') {
+        refused.push(next);
+        throw new Error('the caller failed');
+      }
+      echoed.push(harness.setProps({ value: next }));
+    });
+    await field.key('12');
+    await advance(500);
+    assert.equal(field.said(), '= 12');
+
+    // The page reports a listener's throw; it never reaches the dispatch.
+    await field.key('13');
+    assert.deepEqual(refused, ['13'], 'the caller threw on that keystroke');
+    await advance(500);
+    await harness.setProps({ resolve: doubled });
+    assert.equal(field.drawn(), '= 24', 'the caller kept `12`, which the new resolver doubles');
+    assert.equal(field.said(), '', 'the region is emptied, not left on `= 12` under a `= 24` chip');
+
+    await field.key('6');
+    await advance(500);
+    assert.equal(field.said(), '= 12', 'and an edit back to that text is spoken');
+  });
 });

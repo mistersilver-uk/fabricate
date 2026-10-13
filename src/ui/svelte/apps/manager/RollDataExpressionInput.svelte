@@ -12,7 +12,7 @@
   | `tokens` | string[] | `[]` | The insertable terms in row order, each a single term; a blank one is dropped. |
   | `tokensLabel` | string | `''` | The token group's accessible name, required with `tokens` and never defaulted. |
   | `resolve` | `(expression) => number \| null` | `undefined` | Synchronous, and absent where no actor is in scope. Never called for a blank expression; a throw, or a result that is not a finite number, reads as `null`. |
-  | `unresolvedLabel` | string | `''` | The caller's statement that the expression does not reduce, required with `resolve` and never defaulted. |
+  | `unresolvedLabel` | string | `''` | The caller's statement that the expression does not reduce, drawn trimmed; required with `resolve` and never defaulted. |
   | `class` | class string | `''` | An extra class, appended to `fab-expr-input`. |
 
   Callbacks:
@@ -31,7 +31,10 @@
   - The reading describes the field: its id is written ahead of the caller's `aria-describedby`.
   - The status region speaks the reading once typing has settled, or once focus has returned to
     the field after a pressed token, and only where that edit changed it; a reading that changes
-    for any other reason empties the region.
+    for any other reason empties the region, as does an edit that settles after the resolver or
+    the statement moved the reading under an expression that stood.
+  - A caller that echoes the value later than that wait (500ms typed, the focus helper's delay
+    pressed) draws the reading, which is then not spoken.
   - A pressed token replaces a partial selection, and joins the end when the whole expression is
     selected or the caret or an edge of the selection stands inside a term; it then returns focus
     with the caret after it. Nothing adds or strips an `@`.
@@ -64,12 +67,15 @@
 
   let input = $state(null);
   let spoken = $state('');
-  // Plain, not `$state`: the effect below must re-run for a changed reading and for nothing else.
+  // Plain, not `$state`: the effect below must re-run for a changed reading or expression alone.
   let heard = '';
   let pending = false;
+  let overtaken = false;
+  let seen = { expression: '', reading: '' };
   let serial = 0;
   let timer;
   let resolverThrew = false;
+  let statementMissed = false;
 
   const drawnTokens = $derived(
     (Array.isArray(tokens) ? tokens : []).map((token) => String(token ?? '').trim()).filter(Boolean)
@@ -83,8 +89,11 @@
     );
   });
 
+  const statement = $derived(String(unresolvedLabel ?? '').trim());
+
   $effect(() => {
-    if (typeof resolve !== 'function' || unresolvedLabel) return;
+    if (typeof resolve !== 'function' || statement || statementMissed) return;
+    statementMissed = true;
     console.warn(
       'Fabricate | ExprInput: `resolve` was passed with no `unresolvedLabel`, so an expression ' +
         'that does not reduce draws no reading.'
@@ -118,22 +127,31 @@
 
   function readingOf(outcome, label) {
     if (outcome === undefined) return '';
-    return outcome === null ? String(label ?? '') : `= ${outcome}`;
+    return outcome === null ? label : `= ${outcome}`;
   }
 
-  const readingText = $derived(readingOf(result, unresolvedLabel));
+  const readingText = $derived(readingOf(result, statement));
 
   /** The reading's id, then the caller's own description; `undefined` writes no attribute. */
   function describedBy(own, callers) {
     return `${own} ${callers ?? ''}`.trim() || undefined;
   }
 
-  // Reads `readingText` alone. A reading no pending edit made is taken as heard, never spoken.
+  // A reading no pending edit made is taken as heard, never spoken. One that moves while an edit
+  // waits, under an expression that stood, overtook that edit: the resolver or the statement moved
+  // it. The resolver's identity says nothing, since a caller may hand a new one with every echo.
   $effect(() => {
-    const drawn = readingText;
-    if (pending) return;
-    heard = drawn;
-    spoken = '';
+    const now = { expression: String(value ?? ''), reading: readingText };
+    const moved = now.reading !== seen.reading;
+    const edited = now.expression !== seen.expression;
+    seen = now;
+    if (!moved) return;
+    if (!pending) {
+      heard = now.reading;
+      spoken = '';
+    } else if (!edited) {
+      overtaken = true;
+    }
   });
 
   $effect(() => () => {
@@ -144,23 +162,26 @@
   /** Opens an edit and answers its serial: only the latest edit's announcement may speak. */
   function openEdit() {
     pending = true;
+    overtaken = false;
     serial += 1;
     clearTimeout(timer);
     return serial;
   }
 
+  /** Speaks the edit's reading; one the resolver or the statement overtook is taken as heard. */
   function speak(mine) {
     if (mine !== serial) return;
     pending = false;
-    if (readingText === heard) return;
+    if (!overtaken && readingText === heard) return;
     heard = readingText;
-    spoken = readingText;
+    spoken = overtaken ? '' : readingText;
   }
 
   function typed(event) {
     const mine = openEdit();
-    onChange(event.currentTarget.value);
+    // Armed first: a caller whose `onChange` throws must not leave the edit open.
     timer = setTimeout(() => speak(mine), TYPING_SETTLE_MS);
+    onChange(event.currentTarget.value);
   }
 
   /** Whether `character` belongs to a term: anything but whitespace, an operator, a bracket or a comma. */
