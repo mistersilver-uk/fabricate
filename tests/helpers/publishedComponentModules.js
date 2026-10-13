@@ -14,6 +14,7 @@ export const FAULT_REPORT = 'Fabricate | Published component render failed:';
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
+  'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentManifest.js',
   'src/ui/svelte/util/dropRateTier.js',
 ]);

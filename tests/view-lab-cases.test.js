@@ -5465,13 +5465,12 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('the published component seam selects both specimens it mounts', () => {
-  for (const file of [
-    'src/ui/publishedComponentSeam.js',
-    'src/ui/publishedComponentManifest.js',
-    'src/ui/publishedComponents.svelte.js',
-    'src/ui/svelte/published/PublishedComponentHost.svelte',
-  ]) {
+test('every published component seam module, and the host, selects both specimens it mounts', () => {
+  const modules = readdirSync(resolve(ROOT, 'src/ui'))
+    .filter((name) => /^publishedComponent.*\.js$/.test(name))
+    .map((name) => `src/ui/${name}`);
+  assert.ok(modules.length >= 4, 'the seam, its prop kinds, its manifest and its adapter');
+  for (const file of [...modules, 'src/ui/svelte/published/PublishedComponentHost.svelte']) {
     const selected = selectedIds([file], {});
     for (const id of [
       'manager-published-tier-track-specimen',

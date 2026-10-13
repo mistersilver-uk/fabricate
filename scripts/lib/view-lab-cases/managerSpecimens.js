@@ -6,9 +6,10 @@
 
 import { managerCase } from './caseFactories.js';
 
-/** The seam, its manifest, its adapter and its host: a change to any redraws what it mounts. */
+/** The seam, its prop kinds, its manifest, its adapter and its host: each redraws what it mounts. */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
+  /^src\/ui\/publishedComponentProps\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
