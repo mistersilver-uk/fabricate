@@ -22,6 +22,7 @@ import {
   drained,
   exactly,
   fakeRuntime,
+  RESERVED_REST_NAMES,
   refusal,
   seamWith,
   zetaProps,
@@ -311,24 +312,16 @@ const PRESS_SHAPE = Object.freeze({
 const PRESSED = Object.freeze({ ...PRESS_SHAPE, name: 'Pressed', restOn: 'control' });
 const ROOTED = Object.freeze({ ...PRESS_SHAPE, name: 'Rooted' });
 
-const RESERVED_NAMES = [
-  ['data-keyboard-focus', 'false'],
-  ['data-keyboard-focus', false],
-  ['data-keyboard-focus', 'true'],
-  ['data-action', 'close'],
-  ['data-cursor', 'wait'],
-  ['data-tooltip', 'Why'],
-  ['data-tooltip-', 'x'],
-  ['data-tooltip-text', 'Why'],
-  ['data-tooltip-html', '<b>Why</b>'],
-  ['data-tooltip-direction', 'UP'],
-];
 const UNRESERVED_NAMES = [
   'data-tooltips',
   'data-tooltipx',
   'data-actions',
   'data-cursors',
   'data-keyboard-focused',
+  'data-validation-focus',
+  'data-validation-focused-x',
+  'data-essence-sort',
+  'data-essence-sort-directions',
   'data-acme-id',
 ];
 
@@ -343,7 +336,7 @@ describe('a rest key on an entry whose rest lands on a control', () => {
     assert.deepEqual(ui.describe('Pressed'), { ...ui.describe('Rooted') });
   });
 
-  for (const [key, value] of RESERVED_NAMES) {
+  for (const [key, value] of RESERVED_REST_NAMES) {
     it(`M13: refuses ${key} holding ${JSON.stringify(value)} as reserved, and accepts it where rest lands on no control`, () => {
       const { ui, mounts } = pressed();
       assert.throws(
@@ -395,7 +388,7 @@ describe('a rest key on an entry whose rest lands on a control', () => {
     };
     const handle = mountOf(ui, 'Pressed', pressedProps({ onclick: noting('first') }));
     const next = pressedProps({ children: 'Next', onclick: noting('next') });
-    for (const [key, value] of RESERVED_NAMES) {
+    for (const [key, value] of RESERVED_REST_NAMES) {
       assert.throws(
         () => handle.update({ ...next, [key]: value }),
         refusal(`"${key}" is reserved on Pressed`)

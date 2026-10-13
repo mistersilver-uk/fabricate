@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
-import { recorder } from '../helpers/publishedComponentFakes.js';
+import { RESERVED_REST_NAMES, recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
   PUBLISHED_ADAPTER,
@@ -40,19 +40,6 @@ const ROLES = Object.freeze([
   ['dashed', ['is-dashed']],
   ['danger', ['is-danger']],
   ['warning', ['is-warning-action']],
-]);
-/** Every rest name the entry reserves, as `tests/published-components.test.js` holds the seam to. */
-const RESERVED = Object.freeze([
-  ['data-keyboard-focus', 'false'],
-  ['data-keyboard-focus', false],
-  ['data-keyboard-focus', 'true'],
-  ['data-action', 'close'],
-  ['data-cursor', 'wait'],
-  ['data-tooltip', 'Why'],
-  ['data-tooltip-', 'x'],
-  ['data-tooltip-text', 'Why'],
-  ['data-tooltip-html', '<b>Why</b>'],
-  ['data-tooltip-direction', 'UP'],
 ]);
 
 const harness = createMountedComponentHarness({
@@ -343,7 +330,7 @@ describe('what the published Button refuses', () => {
     });
   }
 
-  for (const [key, value] of RESERVED) {
+  for (const [key, value] of RESERVED_REST_NAMES) {
     it(`refuses ${key} holding ${JSON.stringify(value)} as reserved (M13), on mount and on update`, async () => {
       assertRefused({ [key]: value }, `"${key}" is reserved on Button`);
       const { handle, calls, button } = mountButton();
@@ -361,14 +348,25 @@ describe('what the published Button refuses', () => {
     });
   }
 
-  it('leaves a Notice, whose rest lands on its root, accepting a tooltip attribute', async () => {
-    const target = companionTarget(targets);
-    const props = { title: 'Over the limit', 'data-tooltip-text': 'Why', 'data-action': 'x' };
-    const handle = ui().mount('Notice', { target, props });
-    await settle();
-    assert.equal(target.firstElementChild.getAttribute('data-tooltip-text'), 'Why');
-    handle.destroy();
-  });
+  for (const [name, props] of [
+    ['Rail', { label: 'Standing' }],
+    ['Notice', { title: 'Over the limit' }],
+  ]) {
+    it(`leaves ${name}, whose rest lands on a root that is no control, accepting every name Button reserves`, async () => {
+      const target = companionTarget(targets);
+      // One value per name, the last the list gives it, which is a string for each.
+      const rest = Object.fromEntries(RESERVED_REST_NAMES);
+      const handle = ui().mount(name, { target, props: { ...props, ...rest } });
+      await settle();
+      const root = target.firstElementChild;
+      assert.deepEqual(
+        Object.keys(rest).map((key) => [key, root.getAttribute(key)]),
+        Object.entries(rest),
+        'each is written on the root'
+      );
+      handle.destroy();
+    });
+  }
 
   for (const [claim, props, tail] of [
     [

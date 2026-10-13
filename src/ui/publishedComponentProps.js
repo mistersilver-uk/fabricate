@@ -10,11 +10,12 @@ const ATTRIBUTE_TYPES = new Set(['string', 'number', 'boolean']);
 
 /**
  * The rest names an entry whose `restOn` is `'control'` refuses: each would replace the control's
- * own keyboard mark, or be read off the pressed or entered element by Foundry (a window action,
- * a cursor, a tooltip). `data-tooltip-` itself is refused, as every name that starts with it is.
+ * own keyboard mark, or be read off the control by Foundry (a window action on a press, a cursor
+ * at any pointer release, a tooltip on pointer entry), or match a rule the module sheet draws a
+ * button by. `data-tooltip-` itself is refused, as every name that starts with it is.
  */
 export const RESERVED_ON_A_CONTROL =
-  /^data-(?:keyboard-focus|action|cursor|tooltip(?:-[a-z0-9-]*)?)$/;
+  /^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/;
 
 export const refuse = (message) => new TypeError(PREFIX + message);
 

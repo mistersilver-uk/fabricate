@@ -32,7 +32,9 @@
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
  * takes Fabricate's private rule.
- * Limit: the button censuses read no universal or attribute-only compound. Their pinned ancestors
+ * Limit: the button censuses read no universal or attribute-only compound, so a `data-*` hook on
+ * one is not among the names M13 reserves: the spec's rule that a companion passes only names that
+ * carry its own module id is what keeps a rest key off it. Their pinned ancestors
  * `fabricate-tabs`, `fabricate-pagination` and `fabricate-filter-bar` reopen when one is published
  * with a content slot, as `FilterBar` already renders `children`.
  * Limit: `components/re-rooted-controls-host-independence.test.js` measures the neutral button
@@ -629,7 +631,7 @@ const isBareButton = (compound, shape) =>
 
 /**
  * Every selector of one parsed stylesheet with a bare `button` compound, as
- * `{ written, safe, under, rule }`: safe under a class of `ancestors` above that compound. A
+ * `{ written, safe, under, rule, complex }`: safe under a class of `ancestors` above that compound. A
  * component's selector is read only where `:global` reaches it, and one that names `button` in no
  * compound of its own, so only inside a pseudo-class, fails closed.
  */
@@ -641,13 +643,23 @@ function bareButtonSelectors(file, css, shape, ancestors) {
       const compounds = compoundsOf(complex);
       const written = `${file}: ${writtenSelector(css, complex)}`;
       const types = compounds.flatMap((compound) => typesOf(compound));
-      if (!types.includes('button')) return [{ written, safe: false, under: [], rule }];
+      if (!types.includes('button')) return [{ written, safe: false, under: [], rule, complex }];
       const at = compounds.findLastIndex((compound) => isBareButton(compound, shape));
       if (at === -1) return [];
       const above = compounds.slice(0, at).flatMap((compound) => classesOf(compound));
       const under = above.filter((name) => ancestors.has(name));
-      return [{ written, safe: under.length > 0, under, rule }];
+      return [{ written, safe: under.length > 0, under, rule, complex }];
     });
+}
+
+/** Every `data-*` attribute name the selectors of `census` hold, wherever in the selector. */
+function dataHooksOf(census) {
+  const names = census.flatMap(({ complex }) =>
+    [...walkNodes(complex)]
+      .filter((part) => part.type === 'AttributeSelector' && part.name.startsWith('data-'))
+      .map((part) => part.name)
+  );
+  return [...new Set(names)].sort(byName);
 }
 
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
@@ -841,6 +853,14 @@ function closureComponents(entries, reader = SHIPPED) {
 }
 
 describe('the manifest', () => {
+  it('pins the names a control-landing rest reserves, which are fixed for an entry’s version', () => {
+    assert.equal(
+      String(RESERVED_ON_A_CONTROL),
+      '/^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/',
+      'reserving another name narrows every restOn entry and bumps its version'
+    );
+  });
+
   it('is a frozen list of frozen entries with unique names', () => {
     assert.ok(Object.isFrozen(PUBLISHED_COMPONENT_MANIFEST));
     const names = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name);
@@ -1974,6 +1994,23 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
+  it('reserves every data-* name a rule that reaches a published button reads, by its class or as a bare button', () => {
+    const hooks = dataHooksOf([
+      ...reachingOf(shippedCensus(BUTTON, 'Button')),
+      ...reachingOf(shippedBareButtons()),
+    ]);
+    assert.deepEqual(
+      hooks,
+      ['data-essence-sort-direction', 'data-validation-focused'],
+      'the hooks both censuses read at this head'
+    );
+    assert.deepEqual(
+      hooks.filter((name) => !RESERVED_ON_A_CONTROL.test(name)),
+      [],
+      'a rest key of that name would take a rule of Fabricate’s, so M13 refuses it on a control'
+    );
+  });
+
   it('declares only the family floor in the Manager’s bare button rule, so both windows draw alike', () => {
     const floorOf = (census, written) =>
       census.filter((row) => row.written === written).map(({ rule }) => declarationsOf(rule));
@@ -2150,6 +2187,14 @@ describe('the module sheet and every component style against the published Butto
       ]);
     });
   }
+
+  it('reads a data-* hook wherever a reaching selector holds it, inside :not() included', () => {
+    const classed = buttonCensus('.fabricate-button[data-x]:not([data-y="1"]) { gap: 0 }');
+    assert.deepEqual(dataHooksOf(reachingOf(classed)), ['data-x', 'data-y']);
+    const bare = bareIn('.fabricate button[data-z], .fabricate-tabs button[data-tab] { gap: 0 }');
+    assert.deepEqual(dataHooksOf(reachingOf(bare)), ['data-z'], 'a pinned ancestor keeps one off');
+    assert.equal(RESERVED_ON_A_CONTROL.test('data-x'), false, 'so a new hook reds the clause');
+  });
 
   it('reads a component’s bare button rule only where :global reaches it', () => {
     const file = 'src/Host.svelte';

@@ -20,6 +20,7 @@ import { managerExtensions } from '../src/ui/managerExtensions.js';
 import { playerExtensions } from '../src/ui/playerExtensions.js';
 import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { publishedComponentSeam } from '../src/ui/publishedComponentSeam.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { defineStructureContract } from './helpers/structureContract.js';
@@ -205,6 +206,16 @@ function specifiedComponentGroups() {
   });
   return new Map(groups);
 }
+
+/** One token for each family of rest name M13 reserves where an entry's rest lands on a control. */
+const RESERVED_REST_FAMILIES = Object.freeze([
+  '`data-keyboard-focus`',
+  '`data-action`',
+  '`data-cursor`',
+  '`data-tooltip`',
+  '`data-validation-focused`',
+  '`data-essence-sort-direction`',
+]);
 
 /** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
 function linesOpenedBy(text, key) {
@@ -498,14 +509,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     const from = DOCUMENTED.indexOf('\n### Mounting, updating and destroying\n');
     const to = DOCUMENTED.indexOf('\n### ', from + 1);
     assert.ok(from !== -1 && to !== -1, 'the mounting section, then another heading');
-    const stated = [
-      'is reserved on <name>',
-      '`data-keyboard-focus`',
-      '`data-action`',
-      '`data-cursor`',
-      '`data-tooltip`',
-      '`data-tooltip-`',
-    ];
+    const stated = ['is reserved on <name>', ...RESERVED_REST_FAMILIES, '`data-tooltip-`'];
     for (const [where, prose] of [
       ['the spec’s M13 row', row[0]],
       ['### Mounting, updating and destroying', DOCUMENTED.slice(from, to)],
@@ -515,6 +519,28 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         [],
         `${where} states each reserved name and the tail that refuses it`
       );
+    }
+  });
+
+  it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
+    const names = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control').map(
+      (entry) => entry.name
+    );
+    assert.ok(names.length > 0, 'an entry states restOn');
+    const groups = specifiedComponentGroups();
+    const sections = documentedComponentSections();
+    for (const name of names) {
+      const section = sections.find((candidate) => candidate.startsWith(`${name}\n`));
+      for (const [where, prose] of [
+        [`the ${name} group`, groups.get(name) ?? ''],
+        [`### ${name}`, section ?? ''],
+      ]) {
+        assert.deepEqual(
+          RESERVED_REST_FAMILIES.filter((token) => !prose.includes(token)),
+          [],
+          `${where} is where a companion learns the names it reserves`
+        );
+      }
     }
   });
 

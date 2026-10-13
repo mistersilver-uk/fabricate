@@ -2051,7 +2051,7 @@ Each row lists the component's published props, noting a prop's kind when it is 
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
-On `Button` the root is the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor` and every `data-tooltip` name are refused there.
+On `Button` the root is the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet draws a button from, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
 A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
@@ -2382,7 +2382,7 @@ What the button draws for a `role` value outside its set is private.
 So are its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
-They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor` and every `data-tooltip` name are refused with `"<key>" is reserved on Button`.
+They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet draws a button from, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on Button`.
 That includes `data-tooltip-text`, which the sections above advise for a component whose rest lands on a root that is no control: a button opens no tooltip.
 The button keeps its own cursor too, so put a hint in the label or in text beside the button, where a keyboard user reads it as well.
 
@@ -2450,7 +2450,7 @@ It returns a frozen `{ update(props), destroy(), slot(key) }`.
   A `text` prop holds a string, and anything else there throws `"<key>" must be a string`.
   A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
-  Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip` and every name that starts `data-tooltip-` throw `"<key>" is reserved on <name>`.
+  Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet draws from, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
 - `onFault` is optional, and is described with faults below.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
 - `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
@@ -2601,6 +2601,7 @@ A published component draws a control only where its section says so, and each c
   Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
 - A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
+  Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: each is a name Fabricate's own stylesheet draws from, and the first draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, and Fabricate supplies none.
 - Fabricate moves no focus.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
