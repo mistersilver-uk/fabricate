@@ -13,6 +13,10 @@ manager-gathering-time-of-day-bar
 manager-gathering-time-of-day-rail-seeded
 manager-gathering-time-of-day-fallback
 manager-gathering-biome-colour-popover
+manager-gathering-biome-colour-popover-cursor
+manager-gathering-biome-colour-popover-cursor-hearth-herb
+manager-gathering-biome-colour-popover-cursor-selected
+manager-gathering-biome-colour-popover-cursor-selected-hearth-herb
 manager-gathering-rules-select-open
 manager-gathering-condition-current-list
 manager-gathering-economy-actors
