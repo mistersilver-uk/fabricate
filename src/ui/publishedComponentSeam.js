@@ -1,8 +1,9 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
  * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot }`, draws its
- * own content in a content slot, is told of a contained fault through `onFault` (issue 2451), and
- * is told of a press through a callback prop (issue 2452).
+ * own content in a content slot, is told of a contained fault through `onFault` (issue 2451), is
+ * told of a press through a callback prop, and sets an ARIA attribute on a control through an
+ * `aria` prop (issue 2452).
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
  * `mount` and `unmount`.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
@@ -50,11 +51,19 @@ function assertKnownEntry(entry) {
   }
 }
 
-/** The entry's keys that are not `data`, as the frozen `{ <key>: <kind> }` the host draws from. */
+// The kinds the host builds something for: a snippet (`text`), a slot element (`slot`) or a
+// delivering function (`callback`). A `data` or `aria` key needs none, because its copied value
+// is already what the component takes.
+const HOST_DRAWN_KINDS = new Set(['text', 'slot', 'callback']);
+
+/**
+ * The entry's keys the host draws, as the frozen `{ <key>: <kind> }` it draws from. A `data` or
+ * `aria` key is left out, so it reaches the component as passed.
+ */
 function contentKinds(entry) {
   const kinds = {};
   for (const [key, spec] of Object.entries(entry.props)) {
-    if (spec.kind !== 'data') kinds[key] = spec.kind;
+    if (HOST_DRAWN_KINDS.has(spec.kind)) kinds[key] = spec.kind;
   }
   return Object.freeze(kinds);
 }

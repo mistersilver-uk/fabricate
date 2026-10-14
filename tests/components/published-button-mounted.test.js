@@ -3,7 +3,7 @@
  * registered with the adapter's own table, under the Fabricate window root it needs: the one
  * native button it draws at each visual role, a press and its `onclick`, an update that keeps the
  * node and its focus, the native `disabled`, every refusal the entry adds, its required root, and a
- * button in a published `EmptyState`'s content slot.
+ * button in a published `EmptyState`'s content slot; then its two `aria` keys, read off the button.
  * The `type` and the mark for keyboard focus are read here because the component writes both on a
  * `svelte:element`, where the static gates see the mark and not the type.
  * Limit: happy-dom moves no focus when a focused button is disabled and activates no button from
@@ -390,6 +390,253 @@ describe('what the published Button refuses', () => {
   ]) {
     it(`refuses ${claim}, and renders nothing`, () => {
       assertRefused(props, tail);
+    });
+  }
+});
+
+const HINT_ID = 'acme-clear-hint';
+const NO_SCALAR = '"aria-expanded" must be a string, number or boolean';
+
+describe('an aria key on the published Button', () => {
+  const base = (overrides = {}) => ({ children: LABEL, onclick() {}, ...overrides });
+
+  for (const [claim, value, written] of [
+    ['false', false, 'false'],
+    ['true', true, 'true'],
+    ["the string 'true'", 'true', 'true'],
+    ['0', 0, '0'],
+    ['an empty string', '', ''],
+    ['NaN, which Fabricate does not check', NaN, 'NaN'],
+  ]) {
+    it(`writes aria-expanded on the button as passed, for ${claim}`, async () => {
+      const { handle, button } = mountButton({ 'aria-expanded': value });
+      await settle();
+      assert.ok(button().hasAttribute('aria-expanded'), 'the attribute is on the button');
+      assert.equal(button().getAttribute('aria-expanded'), written);
+      handle.destroy();
+      assert.deepEqual(reports, []);
+    });
+  }
+
+  it('draws neither attribute for a mount that omits its key, or passes undefined', async () => {
+    const omitted = mountButton();
+    const absent = mountButton({ 'aria-expanded': undefined, 'aria-describedby': undefined });
+    await settle();
+    for (const { handle, button } of [omitted, absent]) {
+      assert.ok(!button().hasAttribute('aria-expanded'), 'no aria-expanded');
+      assert.ok(!button().hasAttribute('aria-describedby'), 'no aria-describedby');
+      handle.destroy();
+    }
+  });
+
+  it('rewrites aria-expanded on the same focused button, and removes it when an update omits the key', async () => {
+    const { handle, button } = mountButton({ 'aria-expanded': false });
+    await settle();
+    const node = button();
+    node.focus();
+    assert.equal(handle.update(base({ 'aria-expanded': true })), true);
+    await settle();
+    assert.ok(button() === node, 'the same button node');
+    assert.ok(document.activeElement === node, 'focus stays on it');
+    assert.equal(node.getAttribute('aria-expanded'), 'true');
+    assert.equal(handle.update(base()), true);
+    await settle();
+    assert.ok(button() === node && !node.hasAttribute('aria-expanded'), 'removed, on that node');
+    assert.equal(handle.update(base({ 'aria-expanded': false })), true);
+    await settle();
+    assert.equal(node.getAttribute('aria-expanded'), 'false');
+    assert.equal(handle.update(base({ 'aria-expanded': undefined })), true);
+    await settle();
+    assert.ok(!node.hasAttribute('aria-expanded'), 'undefined removes it too');
+    handle.destroy();
+  });
+
+  it('draws an update made inside onclick on the next flush, on the same button', async () => {
+    let open = false;
+    const props = () => ({
+      'aria-expanded': open,
+      onclick: () => {
+        open = !open;
+        held.handle.update({ children: LABEL, ...props() });
+      },
+    });
+    const held = mountButton(props());
+    await settle();
+    const node = held.button();
+    assert.equal(node.getAttribute('aria-expanded'), 'false');
+    node.click();
+    await settle();
+    assert.ok(held.button() === node, 'the same node');
+    assert.equal(node.getAttribute('aria-expanded'), 'true');
+    held.handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('lands aria-describedby on the button, where it names a companion element beside target', async () => {
+    const { target, handle, button } = mountButton({ 'aria-describedby': HINT_ID });
+    const hint = target.ownerDocument.createElement('p');
+    hint.id = HINT_ID;
+    target.after(hint);
+    await settle();
+    assert.equal(button().getAttribute('aria-describedby'), HINT_ID);
+    const named = target.ownerDocument.querySelector(
+      `#${button().getAttribute('aria-describedby')}`
+    );
+    assert.ok(named === hint, 'the id resolves across the mount');
+    assert.ok(button().getRootNode() === target.getRootNode(), 'one root node holds both');
+    handle.destroy();
+  });
+
+  it('lands both aria keys beside a rest data attribute, and keeps the button’s own mark and type', async () => {
+    const described = `${HINT_ID} acme-other-hint`;
+    const { handle, button } = mountButton({
+      'aria-expanded': true,
+      'aria-describedby': described,
+      'data-acme-id': 'notes',
+    });
+    await settle();
+    const names = [
+      'aria-expanded',
+      'aria-describedby',
+      'data-acme-id',
+      'data-keyboard-focus',
+      'type',
+    ];
+    assert.deepEqual(
+      names.map((name) => button().getAttribute(name)),
+      ['true', described, 'notes', 'true', 'button']
+    );
+    handle.destroy();
+  });
+
+  it('puts back nothing other code replaced or removed, until an update omits the key, is flushed, and another passes it', async () => {
+    const props = base({ 'aria-describedby': HINT_ID });
+    const { handle, button } = mountButton(props);
+    await settle();
+    const node = button();
+    node.setAttribute('aria-describedby', 'tooltip');
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), 'tooltip', 'the value did not change');
+    node.removeAttribute('aria-describedby');
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.ok(!node.hasAttribute('aria-describedby'), 'nor is a removed one put back');
+    assert.equal(handle.update(base()), true);
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.ok(
+      !node.hasAttribute('aria-describedby'),
+      'two updates in one run draw the second alone'
+    );
+    assert.equal(handle.update(base()), true);
+    await Promise.resolve();
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID, 'omitted, flushed, passed again');
+    handle.destroy();
+  });
+
+  it('restores a removed aria-describedby on the same focused button when a timeout separates the update that omits it from the one that passes it', async () => {
+    const props = base({ 'aria-describedby': HINT_ID });
+    const { handle, button } = mountButton(props);
+    await settle();
+    const node = button();
+    node.focus();
+    node.removeAttribute('aria-describedby');
+    assert.equal(handle.update(base()), true);
+    await new Promise((done) => setTimeout(done, 0));
+    assert.ok(!node.hasAttribute('aria-describedby'), 'still absent before the second update');
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID);
+    assert.ok(button() === node && document.activeElement === node, 'that node, still focused');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('restores it when onclick omits the key and passes it again after an awaited promise', async () => {
+    const described = { 'aria-describedby': HINT_ID };
+    const props = (aria = {}) => ({
+      children: LABEL,
+      ...aria,
+      onclick: async () => {
+        held.handle.update(props());
+        await Promise.resolve();
+        held.handle.update(props(described));
+      },
+    });
+    const held = mountButton(props(described));
+    await settle();
+    const node = held.button();
+    node.removeAttribute('aria-describedby');
+    node.click();
+    await settle();
+    assert.ok(held.button() === node, 'the same node');
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID);
+    held.handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  for (const key of [
+    'aria-label',
+    'aria-labelledby',
+    'aria-pressed',
+    'aria-checked',
+    'aria-disabled',
+    'aria-hidden',
+    'aria-controls',
+    'aria-haspopup',
+    'aria-busy',
+    'ARIA-EXPANDED',
+  ]) {
+    it(`refuses ${key}, which is no aria key of the button (M13), on mount and on update`, async () => {
+      const tail = `"${key}" is not a data attribute`;
+      assertRefused({ [key]: 'true' }, tail);
+      const { handle, button } = mountButton({ 'aria-expanded': false });
+      await settle();
+      assert.throws(() => handle.update(base({ children: 'Next', [key]: 'true' })), {
+        name: 'TypeError',
+        message: REFUSAL + tail,
+      });
+      await settle();
+      assert.equal(button().textContent, LABEL, 'the earlier props stay rendered');
+      assert.equal(button().getAttribute('aria-expanded'), 'false');
+      handle.destroy();
+    });
+  }
+
+  for (const [claim, value, tail] of [
+    ['null (M13)', null, NO_SCALAR],
+    ['an object (M13)', {}, NO_SCALAR],
+    ['a function (M10)', () => true, '"aria-expanded" must not hold a function'],
+  ]) {
+    it(`refuses ${claim} for aria-expanded, on mount and on update`, async () => {
+      assertRefused({ 'aria-expanded': value }, tail);
+      const { handle, button } = mountButton({ 'aria-expanded': false });
+      await settle();
+      assert.throws(() => handle.update(base({ 'aria-expanded': value })), {
+        name: 'TypeError',
+        message: REFUSAL + tail,
+      });
+      await settle();
+      assert.equal(button().getAttribute('aria-expanded'), 'false', 'the earlier value stays');
+      handle.destroy();
+    });
+  }
+
+  for (const [name, props, tail] of [
+    ['Notice', { title: 'Over the limit' }, '"aria-expanded" is not a data attribute'],
+    ['Rail', { label: 'Standing' }, '"aria-expanded" is not a data attribute'],
+    ['Avatar', { name: 'Ada' }, '"aria-expanded" is not a prop of Avatar'],
+  ]) {
+    it(`leaves ${name} refusing aria-expanded as it did`, () => {
+      const target = companionTarget(targets);
+      assert.throws(
+        () => ui().mount(name, { target, props: { ...props, 'aria-expanded': false } }),
+        { name: 'TypeError', message: REFUSAL + tail }
+      );
+      assert.equal(target.childNodes.length, 0, 'nothing is rendered');
     });
   }
 });

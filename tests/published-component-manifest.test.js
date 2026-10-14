@@ -6,7 +6,8 @@
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
- * that names a bare `button` (issue 2452). The test-only probe runs beside the shipped entries;
+ * that names a bare `button`, and every selector that reads a shipped `aria` key off any element
+ * (issue 2452). The test-only probe runs beside the shipped entries;
  * the adapter's bindings are the mounted suite's, and what a published control must also do is
  * `published-component-controls.test.js`'s (issue 2452).
  * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
@@ -18,6 +19,11 @@
  * fails closed, as does a closure file that passes a child a prop its pinned tags rest on the
  * default of; a child drawn through an alias, `svelte:component` or a re-exporting module is not
  * followed.
+ * Limit: on an element a control-landing rest is spread on, a spread is followed only into an
+ * object literal a top-level `const` holds, so `$derived.by`, an alias, a computed key, a call and
+ * a local written to after its declaration fail closed, as an action, an `{@attach}`, a transition
+ * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, or
+ * by an event-handler attribute on `event.currentTarget`, is not seen.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -56,7 +62,10 @@ import { componentAstOf } from './helpers/parsedSource.js';
 import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
+  ariaFaults,
+  attributeSelectors,
   byName,
+  controlRestFaults,
   declarationsOf,
   dynamicElementFaults,
   dynamicElements,
@@ -74,6 +83,7 @@ import {
   selectorsNaming,
   selectorsWithRules,
   selectorsOnAttribute,
+  spreadKeys,
   syntheticReader,
   tagKeys,
   writtenSelector,
@@ -165,7 +175,7 @@ function renderedLocals(ast) {
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
@@ -221,9 +231,16 @@ function argsFaults(key, spec) {
   return counts ? [] : [`${key} states args that is not a non-negative integer`];
 }
 
+/** What a key's `element` breaks: stated on a `slot` key only. */
+const elementFaults = (key, spec) =>
+  spec.kind !== 'slot' && spec.element !== undefined
+    ? [`${key} states element, which only a slot key takes`]
+    : [];
+
 /**
  * Each rule an entry's published keys break against the component's parsed declaration, as
  * `<key> <rule>`. An unpublished prop is not judged: it may be `$bindable` or rendered either way.
+ * An `aria` key is judged by `ariaFaults`, since the component declares no prop for it.
  * Where a `callback` key is called from is `published-component-controls.test.js`'s.
  */
 function declarationFaults(entry, ast) {
@@ -231,9 +248,18 @@ function declarationFaults(entry, ast) {
   const rendered = renderedLocals(ast);
   return Object.entries(entry.props).flatMap(([key, spec]) => {
     const prop = declared.get(key);
-    if (!prop) return [`${key} is not a declared prop`];
-    const faults = [];
-    if (!SHIPPED_KINDS.has(spec.kind)) faults.push(`${key} has the unshipped kind ${spec.kind}`);
+    const unshipped = SHIPPED_KINDS.has(spec.kind)
+      ? []
+      : [`${key} has the unshipped kind ${spec.kind}`];
+    if (spec.kind === 'aria') {
+      const own = ariaFaults(key, spec, entry, Boolean(prop));
+      return [...unshipped, ...own, ...elementFaults(key, spec), ...argsFaults(key, spec)];
+    }
+    const faults = key.startsWith('aria-')
+      ? [`${key} is spelled as an ARIA attribute and is not an aria key`]
+      : [];
+    if (!prop) return [...faults, `${key} is not a declared prop`];
+    faults.push(...unshipped);
     if (spec.required !== undefined && typeof spec.required !== 'boolean') {
       faults.push(`${key} is required by something other than a boolean`);
     }
@@ -241,9 +267,7 @@ function declarationFaults(entry, ast) {
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
     if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
-    if (spec.kind !== 'slot' && spec.element !== undefined) {
-      faults.push(`${key} states element, which only a slot key takes`);
-    }
+    faults.push(...elementFaults(key, spec));
     if (spec.kind === 'data' && calls.length > 0) {
       faults.push(`${key} is a data key rendered as a snippet`);
     }
@@ -253,6 +277,16 @@ function declarationFaults(entry, ast) {
     return [...faults, ...argsFaults(key, spec)];
   });
 }
+
+/** An entry's `aria` keys; an entry a synthetic row gives no props has none. */
+const ariaKeysOf = (entry) =>
+  Object.keys(entry.props ?? {}).filter((key) => entry.props[key].kind === 'aria');
+
+/** Every shipped `aria` key, as `<entry>.<key>`, in manifest order. */
+const shippedAriaKeys = () =>
+  PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) =>
+    ariaKeysOf(entry).map((key) => `${entry.name}.${key}`)
+  );
 
 /** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
@@ -625,6 +659,17 @@ const BARE_BUTTON_RULES = Object.freeze([
 /** What `.fabricate-manager button` declares, which the family's floor rule also declares. */
 const MANAGER_BUTTON_FLOOR = Object.freeze([['font', 'inherit']]);
 
+/**
+ * Every selector that reads a shipped `aria` key, as written, beside the class above it that keeps
+ * it off a published control: a pinned ancestor, which no extension target sits under.
+ */
+const ARIA_KEY_SELECTORS = Object.freeze([
+  [
+    "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte: .fab-im-toolbar :global(.fabricate-button[aria-expanded='true'])",
+    'fab-im-toolbar',
+  ],
+]);
+
 /** Whether a compound is a `button` that names no class a published button lacks. */
 const isBareButton = (compound, shape) =>
   typesOf(compound).includes('button') &&
@@ -817,8 +862,8 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
  * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
- * Where rest lands on a control, every `data-*` attribute written ahead of the spread is a name M13
- * refuses there.
+ * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
+ * the entry's `aria` keys among it.
  */
 function restOnFaults(entry, ast, dynamic = undefined) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
@@ -829,15 +874,12 @@ function restOnFaults(entry, ast, dynamic = undefined) {
   if (controls.length > 0 && controls.length < landed.length) return [MIXED_REST];
   const lands = controls.length > 0;
   const stated = entry.restOn === 'control';
-  const overridable = controls
-    .flatMap(({ before }) => before)
-    .filter((name) => !RESERVED_ON_A_CONTROL.test(name));
   return [
     ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
-    ...overridable.map(
-      (name) => `${name} is written before a control-landing rest and is not reserved`
+    ...controls.flatMap((control) =>
+      controlRestFaults(control, RESERVED_ON_A_CONTROL, ariaKeysOf(entry))
     ),
   ];
 }
@@ -948,6 +990,14 @@ describe('each entry matches its component declaration', () => {
       shipped,
       ['Notice.onAction: 0', 'Button.onclick: 0'],
       'a forwarded argument needs a mounted clause on its type'
+    );
+  });
+
+  it('pins every shipped aria key', () => {
+    assert.deepEqual(
+      shippedAriaKeys(),
+      ['Button.aria-expanded', 'Button.aria-describedby'],
+      'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
     );
   });
 
@@ -1626,6 +1676,12 @@ describe('each entry matches its component declaration', () => {
       'control',
       ['data-open is written before a control-landing rest and is not reserved'],
     ],
+    [
+      'a data attribute in mixed case written before a control-landing spread',
+      pressed(' DATA-State {...rest}'),
+      'control',
+      ['data-state is written before a control-landing rest and is not reserved'],
+    ],
   ]) {
     it(`names ${claim} as a restOn fault`, () => {
       assert.deepEqual(restFaultsOf(template, restOn), faults);
@@ -1673,6 +1729,318 @@ describe('each entry matches its component declaration', () => {
     const { ast } = templateOf(entry.path, '<script>let { label } = $props();</script><p>x</p>');
     assert.deepEqual(restOnFaults(entry, ast), [OVERSTATED_REST]);
   });
+
+  const SPREAD = '<script>let { open, role, ...rest } = $props(); ';
+  const BUILT = 'const build = () => ({ type: "button" });';
+  const LITERAL = 'const attrs = { type: "button" };';
+  /** The spreads `restElements` reads beside the rest on the one element of `template`, under a script `body`. */
+  const spreadsOf = (body, template = pressed(' {...attrs} {...rest}')) =>
+    restElements(templateOf('src/E.svelte', `${SPREAD}${body}</script>${template}`).ast)[0].spreads;
+  const followed = (keys, local = 'attrs') => [{ local, before: true, keys }];
+
+  for (const [claim, body, keys] of [
+    [
+      'an object literal',
+      'const attrs = { type: "button", "data-state": role };',
+      ['type', 'data-state'],
+    ],
+    ['shorthand keys', 'const attrs = { open, role };', ['open', 'role']],
+    ['a $derived object literal', 'const attrs = $derived({ disabled: open });', ['disabled']],
+    [
+      'both branches of a conditional',
+      'const attrs = $derived(open ? { href: role } : { type: "button", disabled: open });',
+      ['href', 'type', 'disabled'],
+    ],
+    [
+      'the right of &&',
+      'const attrs = $derived(open && { "aria-expanded": true });',
+      ['aria-expanded'],
+    ],
+    ['both sides of ||', 'const attrs = { title: role } || { type: "button" };', ['title', 'type']],
+    ['both sides of ??', 'const attrs = { title: role } ?? { type: "button" };', ['title', 'type']],
+  ]) {
+    it(`follows a spread of ${claim} to its keys`, () => {
+      assert.deepEqual(spreadsOf(body), followed(keys));
+    });
+  }
+
+  for (const [claim, body] of [
+    ['an object literal that spreads another', 'const attrs = { ...role, type: "button" };'],
+    ['a computed key', 'const NAME = "aria-expanded"; const attrs = { [NAME]: open };'],
+    ['$derived.by', 'const attrs = $derived.by(() => ({ "aria-expanded": open }));'],
+    ['$state', 'const attrs = $state({ type: "button" });'],
+    ['$state.raw', 'const attrs = $state.raw({ type: "button" });'],
+    ['a let', 'let attrs = { type: "button" };'],
+    ['an import', 'import { attrs } from "./attrs.js";'],
+    ['a function', 'function attrs() {}'],
+    ['a destructured name', 'const { attrs } = role;'],
+    ['a call', `${BUILT} const attrs = build();`],
+    ['an alias', 'const base = { type: "button" }; const attrs = base;'],
+    [
+      'a conditional with a branch that is a call',
+      `${BUILT} const attrs = $derived(open ? { type: "button" } : build());`,
+    ],
+    [
+      '|| whose left is a name',
+      'const other = { type: "button" }; const attrs = $derived(other || { disabled: open });',
+    ],
+    ['a local a member write follows', `${LITERAL} attrs["aria-expanded"] = open;`],
+    [
+      'a local Object.assign writes to',
+      `${LITERAL} Object.assign(attrs, { "aria-expanded": open });`,
+    ],
+    ['a local another object holds', `${LITERAL} const held = { attrs };`],
+    ['a local a function reads', `${LITERAL} const widen = () => { attrs.role = role; };`],
+    [
+      'a local an alias is then written through',
+      `${LITERAL} const alias = attrs; alias["aria-expanded"] = open;`,
+    ],
+    ['a local the script exports', `export ${LITERAL}`],
+    ['an undeclared name', ''],
+  ]) {
+    it(`fails closed on a spread of ${claim}, which it cannot follow`, () => {
+      assert.deepEqual(spreadsOf(body), followed(null));
+    });
+  }
+
+  it('follows a spread of a local a module script holds, and fails closed where that script writes to it or exports it', () => {
+    const under = (module) =>
+      `<script module>${module}</script>${pressed(' {...attrs} {...rest}')}`;
+    assert.deepEqual(spreadsOf('', under(LITERAL)), followed(['type']));
+    const written = `${LITERAL} attrs["aria-expanded"] = true;`;
+    assert.deepEqual(spreadsOf('', under(written)), followed(null), 'written to');
+    assert.deepEqual(spreadsOf('', under(`export ${LITERAL}`)), followed(null), 'exported');
+  });
+
+  it('fails closed on a spread of a name a template block binds, and of anything that is no name', () => {
+    for (const [open, close] of [
+      ['{#each [{ "aria-expanded": true }] as attrs}', '{/each}'],
+      ['{#if open}{@const attrs = { "aria-expanded": true }}', '{/if}'],
+    ]) {
+      const bound = `${open}${pressed(' {...attrs} {...rest}')}${close}`;
+      assert.deepEqual(spreadsOf(LITERAL, bound), followed(null), open);
+    }
+    for (const spread of ['{ "aria-expanded": open }', 'role.button', 'build()']) {
+      const template = pressed(` {...${spread}} {...rest}`);
+      assert.deepEqual(spreadsOf(BUILT, template), followed(null, 'an expression'), spread);
+    }
+  });
+
+  it('reads a spread on either side of the rest, and no second spread of the rest itself', () => {
+    const template = pressed(' {...attrs} {...rest} {...rest} {...build()}');
+    assert.deepEqual(spreadsOf(`${BUILT} ${LITERAL}`, template), [
+      { local: 'attrs', before: true, keys: ['type'] },
+      { local: 'an expression', before: false, keys: null },
+    ]);
+    assert.equal(spreadKeys(templateOf('src/E.svelte', '<p></p>').ast, undefined), null);
+  });
+
+  it('follows the spread the shipped Button writes ahead of its rest', () => {
+    const [{ spreads, handed }] = restElements(componentAstOf(entryNamed('Button').path));
+    assert.deepEqual(
+      spreads,
+      followed(['href', 'target', 'rel', 'type', 'disabled'], 'attributes')
+    );
+    assert.deepEqual(handed, []);
+  });
+
+  const CANNOT_FOLLOW_SPREAD = (local) =>
+    `a spread of ${local} sits on a control-landing rest element and the gate cannot follow it`;
+  const HANDED = (what) =>
+    `${what} hands a control-landing rest element to code the gate cannot follow`;
+  const UNRESERVED = (name) =>
+    `${name} is written before a control-landing rest and is not reserved`;
+  /** The `restOn` faults of a control-landing entry whose script is `body` and whose button states `attributes`. */
+  const controlFaultsOf = (body, attributes) =>
+    restFaultsOf(pressed(attributes), 'control', `${SPREAD}${body}</script>`);
+  const AHEAD = ' {...attrs} {...rest}';
+
+  it('passes a control-landing rest behind a followed spread of no data-* name, or of a reserved one', () => {
+    assert.deepEqual(
+      controlFaultsOf('const attrs = { type: "button", disabled: open };', AHEAD),
+      []
+    );
+    assert.deepEqual(controlFaultsOf('const attrs = { "data-action": role };', AHEAD), []);
+    assert.deepEqual(
+      controlFaultsOf('const attrs = { "data-state": role };', ' {...rest} {...attrs}'),
+      [],
+      'a data-* name written after the rest is the component’s to keep'
+    );
+  });
+
+  for (const [claim, body, attributes, faults] of [
+    [
+      'a followed spread of an unreserved data-* name ahead of the rest',
+      'const attrs = $derived(open ? { type: "button" } : { "data-state": role });',
+      AHEAD,
+      [UNRESERVED('data-state')],
+    ],
+    [
+      'an attribute and a followed spread that each write one',
+      'const attrs = { "data-state": role, "data-action": role };',
+      ` data-open${AHEAD}`,
+      [UNRESERVED('data-open'), UNRESERVED('data-state')],
+    ],
+    [
+      'a spread it cannot follow ahead of the rest',
+      `${BUILT} const attrs = build();`,
+      AHEAD,
+      [CANNOT_FOLLOW_SPREAD('attrs')],
+    ],
+    [
+      'a spread it cannot follow behind the rest',
+      `${BUILT} const attrs = build();`,
+      ' {...rest} {...attrs}',
+      [CANNOT_FOLLOW_SPREAD('attrs')],
+    ],
+    [
+      'a spread of a call behind the rest',
+      BUILT,
+      ' {...rest} {...build()}',
+      [CANNOT_FOLLOW_SPREAD('an expression')],
+    ],
+    ['an action', BUILT, ' use:build {...rest}', [HANDED('a use: action')]],
+    ['an {@attach}', BUILT, ' {@attach build} {...rest}', [HANDED('an {@attach}')]],
+    ['a transition', BUILT, ' transition:build {...rest}', [HANDED('a transition')]],
+    ['an in: transition', BUILT, ' {...rest} in:build', [HANDED('a transition')]],
+    ['an animate: directive', BUILT, ' animate:build {...rest}', [HANDED('an animate: directive')]],
+  ]) {
+    it(`names ${claim} as a fault of a control-landing rest`, () => {
+      assert.deepEqual(controlFaultsOf(body, attributes), faults);
+    });
+  }
+
+  it('judges none of them on an element that is no control', () => {
+    const script = `${SPREAD}${BUILT}</script>`;
+    const template = '<div data-open use:build {...build()} {...rest}></div>';
+    assert.deepEqual(restFaultsOf(template, null, script), []);
+  });
+
+  const aria = { kind: 'aria' };
+  const CONTROL = templateOf(
+    'Control.svelte',
+    `<script>let { label, 'aria-busy': busy, ...rest } = $props();</script>${pressed(' {...rest}')}`
+  ).ast;
+  const LANDING = { rest: true, restOn: 'control' };
+  /** The declaration faults of `props` on an entry over a button, whose rest lands on it unless `landing` says otherwise. */
+  const ariaFaultsOf = (props, landing = LANDING) =>
+    declarationFaults({ props, ...landing }, CONTROL);
+  const ARIA = (key, rule) => `${key} is an aria key ${rule}`;
+  const NO_CONTROL = ARIA('aria-expanded', 'on an entry whose rest lands on no control');
+  const MISSPELLED = (key) => `${key} is spelled as an ARIA attribute and is not an aria key`;
+
+  it('passes an aria key spelled aria-<name> on an entry whose rest lands on a control, a held name included', () => {
+    const published = { label: data, 'aria-expanded': aria, 'aria-describedby': aria };
+    assert.deepEqual(ariaFaultsOf(published), []);
+    assert.deepEqual(ariaFaultsOf({ 'aria-labelledby': aria }), [], 'held, and not never');
+  });
+
+  for (const [claim, props, landing, faults] of [
+    [
+      'an aria key spelled as a prop',
+      { ariaExpanded: aria },
+      LANDING,
+      [ARIA('ariaExpanded', 'not spelled aria-<name>')],
+    ],
+    [
+      'an aria key spelled in upper case',
+      { 'aria-Expanded': aria },
+      LANDING,
+      [ARIA('aria-Expanded', 'not spelled aria-<name>')],
+    ],
+    [
+      'an aria key the component declares',
+      { 'aria-busy': aria },
+      LANDING,
+      [ARIA('aria-busy', 'the component declares as a prop')],
+    ],
+    [
+      'an aria key that states required',
+      { 'aria-expanded': { kind: 'aria', required: false } },
+      LANDING,
+      [ARIA('aria-expanded', 'that states required')],
+    ],
+    [
+      'an aria key on an entry with no restOn',
+      { 'aria-expanded': aria },
+      { rest: true },
+      [NO_CONTROL],
+    ],
+    [
+      'an aria key on an entry that takes no rest',
+      { 'aria-expanded': aria },
+      { rest: false, restOn: 'control' },
+      [NO_CONTROL],
+    ],
+    [
+      'element on an aria key',
+      { 'aria-expanded': { kind: 'aria', element: 'div' } },
+      LANDING,
+      ['aria-expanded states element, which only a slot key takes'],
+    ],
+    [
+      'args on an aria key',
+      { 'aria-expanded': { kind: 'aria', args: 0 } },
+      LANDING,
+      ['aria-expanded states args, which only a callback key takes'],
+    ],
+    [
+      'a data key spelled as an ARIA attribute',
+      { 'aria-expanded': data },
+      LANDING,
+      [MISSPELLED('aria-expanded'), 'aria-expanded is not a declared prop'],
+    ],
+    [
+      'a declared callback key spelled as one',
+      { 'aria-busy': { kind: 'callback' } },
+      LANDING,
+      [MISSPELLED('aria-busy')],
+    ],
+  ]) {
+    it(`names ${claim} as a fault`, () => {
+      assert.deepEqual(ariaFaultsOf(props, landing), faults);
+    });
+  }
+
+  for (const key of ['aria-pressed', 'aria-disabled', 'aria-hidden', 'aria-live', 'aria-owns']) {
+    it(`names ${key} as an ARIA attribute the seam never publishes`, () => {
+      assert.deepEqual(ariaFaultsOf({ [key]: aria }), [
+        `${key} is an ARIA attribute the seam never publishes`,
+      ]);
+    });
+  }
+
+  const WRITTEN = 'aria-expanded is written by the component and published as an aria key';
+  /**
+   * The `restOn` faults of a control-landing entry publishing `keys` as `aria` keys, over a button
+   * that states `attributes` and a local `attrs` whose one key is `spelled`.
+   */
+  const writtenFaultsOf = (attributes, keys, spelled = 'aria-expanded') => {
+    const props = Object.fromEntries(keys.map((key) => [key, aria]));
+    const entry = { path: 'src/E.svelte', ...LANDING, props };
+    const script = `${SPREAD}const attrs = { "${spelled}": open };</script>`;
+    return restOnFaults(entry, templateOf(entry.path, script + pressed(attributes)).ast);
+  };
+
+  for (const [claim, attributes, spelled] of [
+    ['ahead of the rest', ' aria-expanded={open} {...rest}'],
+    ['behind the rest', ' {...rest} aria-expanded={open}'],
+    ['behind the rest in upper case', ' {...rest} ARIA-EXPANDED={open}'],
+    ['as static text', ' aria-expanded="false" {...rest}'],
+    ['through a followed spread ahead of the rest', ' {...attrs} {...rest}'],
+    ['through a followed spread behind the rest', ' {...rest} {...attrs}'],
+    [
+      'through a followed spread that spells it in mixed case',
+      ' {...rest} {...attrs}',
+      'ARIA-Expanded',
+    ],
+  ]) {
+    it(`names an aria key the component writes ${claim} as a fault, and none where the entry does not publish it`, () => {
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-expanded'], spelled), [WRITTEN]);
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-describedby'], spelled), []);
+      assert.deepEqual(writtenFaultsOf(attributes, [], spelled), []);
+    });
+  }
 
   const faceRule = (value) =>
     ancestorDependencies(
@@ -2051,9 +2419,84 @@ describe('the module sheet and every component style against the published Butto
     );
     assert.deepEqual(
       publishedShapeOf('Button'),
-      [['role', 'fullWidth', 'disabled', 'children', 'onclick'], 'fabricate'],
+      [
+        [
+          'role',
+          'fullWidth',
+          'disabled',
+          'children',
+          'onclick',
+          'aria-expanded',
+          'aria-describedby',
+        ],
+        'fabricate',
+      ],
       'a published size, class or tag reopens the census'
     );
+  });
+
+  it('reads a shipped aria key in one selector of any stylesheet, which a pinned ancestor keeps off a published control', () => {
+    const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
+    const names = [...new Set(keys)];
+    assert.deepEqual(names, ['aria-expanded', 'aria-describedby'], 'the names the census reads');
+    const reading = names.flatMap((name) => attributeSelectors(everyStylesheet(), name));
+    assert.deepEqual(
+      reading.map(({ written }) => written),
+      ARIA_KEY_SELECTORS.map(([written]) => written),
+      'a rule that reads an aria key off an element restyles a published control a companion sets it on'
+    );
+    const pinned = new Set([...BUTTON.ancestors, ...BARE_BUTTON_ANCESTORS]);
+    for (const [index, [written, ancestor]] of ARIA_KEY_SELECTORS.entries()) {
+      assert.ok(
+        pinned.has(ancestor) && reading[index].above.includes(ancestor),
+        `${written} sits under ${ancestor}, a pinned ancestor`
+      );
+    }
+  });
+
+  /**
+   * Holds what `attributeSelectors` reads of `aria-expanded` in one sheet of `rules` to each rule's
+   * stated `above`, `null` marking a rule it must not read.
+   */
+  const assertAbove = (rules) => {
+    const written = rules.map(([rule]) => rule);
+    const { css } = templateOf('sheet.css', `<style>${written.join(', ')} { gap: 0 }</style>`).ast;
+    assert.deepEqual(
+      attributeSelectors([['sheet.css', css]], 'aria-expanded'),
+      rules
+        .filter(([, above]) => above !== null)
+        .map(([rule, above]) => ({ written: `sheet.css: ${rule}`, above }))
+    );
+  };
+
+  it('reads an attribute selector wherever a selector holds it, beside the classes above it', () => {
+    assertAbove([
+      [".fabricate [aria-expanded='true']", ['fabricate']],
+      [
+        '.fab-im-toolbar.is-open > :global(.fabricate-button[aria-expanded]) i',
+        ['fab-im-toolbar', 'is-open'],
+      ],
+      ['.a:not([aria-expanded]) .b', []],
+      ['[aria-expanded]', []],
+      ['.c[aria-describedby]', null],
+    ]);
+  });
+
+  it('reads an attribute name in any case and through a CSS escape, as HTML matches it', () => {
+    assertAbove([
+      [".d [ARIA-EXPANDED='true']", ['d']],
+      [String.raw`.e [aria\-expanded]`, ['e']],
+      [String.raw`.f [\41 ria-expanded]`, ['f']],
+    ]);
+  });
+
+  it('counts as above only a class an ancestor of the attribute’s element must carry', () => {
+    assertAbove([
+      [':not(.fab-im-toolbar) .x[aria-expanded]', []],
+      ['.g + .h ~ .i > .j .k[aria-expanded]', ['i', 'j']],
+      [':is(.l, .m) :has(.n) :where(.o) :global(.p.q) .r[aria-expanded]', ['p', 'q']],
+      [':global(.s .t) .u[aria-expanded]', []],
+    ]);
   });
 
   it('draws a published button alike under any ancestor, with the module ring and no other', () => {

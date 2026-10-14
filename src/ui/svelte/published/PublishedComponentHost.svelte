@@ -1,6 +1,6 @@
 <!--
   The boundary a published component renders in (issue 2426): `component`, its `initial` props,
-  `onfault(error)`, `kinds` (the entry's keys that are not `data`), `slots(key)`, the seam's
+  `onfault(error)`, `kinds` (the entry's keys the host draws), `slots(key)`, the seam's
   element for a requested `slot` key, and `callbacks(key)`, the seam's `{ arity, deliver }` for a
   `callback` key. `setProps` replaces the props cell, never merges it, and nothing remounts. A
   `text` key reaches the component as a snippet built once per mount, whose one element's
