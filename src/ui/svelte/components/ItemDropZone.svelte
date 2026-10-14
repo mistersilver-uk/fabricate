@@ -122,15 +122,6 @@
 </div>
 
 <style>
-  .manager-item-drop-zone.is-missing {
-    border-color: var(--fab-danger-border);
-    color: var(--fab-danger-text);
-  }
-
-  .manager-item-drop-zone.is-missing strong {
-    color: var(--fab-danger-text);
-  }
-
   /* A bold host's caption would otherwise reach the title as 900 and the mono uuid as 700. */
   .manager-item-drop-zone-copy {
     font-weight: 400;
@@ -140,10 +131,14 @@
     display: block;
     font-family: var(--fab-font-mono);
     font-size: 0.68rem;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     /* Foundry's `code` keeps one unbroken line, which ran the uuid beneath the actions. */
     white-space: normal;
     word-break: normal;
     overflow-wrap: anywhere;
+  }
+
+  .manager-item-drop-zone.is-missing .manager-item-drop-zone-uuid {
+    color: var(--fab-text-secondary);
   }
 </style>

@@ -140,6 +140,8 @@ function readParams() {
     systemBlocked: params.get('systemBlocked') === '1',
     // Give Prospect the Seam a depleted-marker image, for the art picker's filled frame (issue 1522).
     depletedImage: params.get('depletedImage') === '1',
+    // List the lab's script macro in `game.macros`, for a macro picker's option (issue 2466).
+    scriptMacros: params.get('scriptMacros') === '1',
     // Bend Horseshoe asks for any ingot, for the held-stack picker's frame (issue 1644).
     tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
@@ -991,6 +993,7 @@ async function boot() {
         learnableBook: params.learnableBook,
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,
+        scriptMacros: params.scriptMacros,
         tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);

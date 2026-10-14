@@ -450,6 +450,72 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the frame that draws the `note` variant inside the picker popover it was made for — both ' +
         'representative frames are populated states',
     ],
+    // The link field's other hosts (issue 2466): one frame of each, beside the world Tool screens.
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-component-entry-definition',
+      'the frame that draws the compact prompt, on its one caller`s source card',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-component-catalogue',
+      'the frame that draws the empty prompt above the world component catalogue',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-essence-entry',
+      'the frame that draws a linked zone whose name is the stored address',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-environment-edit-scene-linked',
+      'the one frame that draws a linked document`s image in the tile',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-environment-edit-scene-unlinked-narrow',
+      'the frame that draws the empty prompt in the scene card at 1000px',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-recipe-item-overview',
+      'the frame that draws a linked source with its image, a hint and both actions in a column',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-essence-edit-on-craft',
+      'the frame that draws a missing link with a hint and a subline',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-crafting-dynamic-dc',
+      'the frame that draws the empty prompt in the Checks card`s DC macro well',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro',
+      'the frame that draws a linked well beside an empty one',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-narrow',
+      'the frame that draws a linked well beside an empty one near the 220px floor',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-pair',
+      'the frame that draws two linked wells, each with a uuid and two actions',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-pair-narrow',
+      'the frame that draws two linked wells near the 220px floor',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-component-complications-macro-linked',
+      'the frame that draws the complication macro zone linked, with its uuid as the hint',
+    ],
     [
       'src/ui/svelte/components/EditorTabs.svelte',
       'interactables-browser-tasks',

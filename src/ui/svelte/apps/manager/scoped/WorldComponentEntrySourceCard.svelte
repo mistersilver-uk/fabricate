@@ -84,7 +84,7 @@
       <p class="manager-subtitle">
         {text(
           'FABRICATE.Admin.Manager.Scoped.Component.Entry.SourceSubtitle',
-          'How the world recognises this item on import, so two copies never become two entries.'
+          'How the world recognises this item on import, so two copies never become two entries. Replacing the source takes effect in every system at once.'
         )}
       </p>
     </div>
@@ -149,7 +149,7 @@
     )}
     hint={text(
       'FABRICATE.Admin.Manager.Scoped.Component.Entry.SourceDropNote',
-      'World item, compendium entry, or pack — the uuid, name, art and description come from it. Every system sees the change at once.'
+      'World item or compendium entry'
     )}
     onDrop={onSourceDrop}
   />

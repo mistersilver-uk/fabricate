@@ -977,25 +977,20 @@
                   >
                     <!-- The browse control acts on the WHOLE macro card, so it sits in the head. -->
                     {#snippet headAction()}
+                      {@const browseLabel = text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
+                        'Browse macros'
+                      )}
                       <SearchablePopover
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
                         triggerClass="fabricate-button"
                         triggerIcon="fas fa-scroll"
-                        triggerLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
-                          'Browse macros'
-                        )}
+                        triggerLabel={browseLabel}
                         triggerProps={{ 'data-complication-macro-browse': 'true' }}
-                        ariaLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
-                          'Browse macros'
-                        )}
-                        panelLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
-                          'Browse macros'
-                        )}
+                        ariaLabel={browseLabel}
+                        panelLabel={browseLabel}
                         searchPlaceholder={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
                           'Search macros...'
@@ -1011,28 +1006,32 @@
                         onSelect={(uuid) => setMacro(complication.id, uuid)}
                       />
                     {/snippet}
+                    {@const macro = macroDisplay(complication.macroUuid)}
                     <div class="fab-complication-macro-controls">
                       <!-- `ItemDropZone` has no click handler, only `use:dragDrop`, and
                            `SearchablePopover` owns its own trigger. The recorded deviation from the
                            prototype is that browse is a separate button beside the drop target. -->
                       <ItemDropZone
-                        item={complication.macroUuid
-                          ? { name: macroDisplay(complication.macroUuid).name }
-                          : null}
+                        item={complication.macroUuid ? { name: macro.name } : null}
                         documentType="Macro"
                         kind="complication-macro"
                         emptyIcon="fas fa-scroll"
-                        state={macroDisplay(complication.macroUuid).missing ? 'missing' : 'linked'}
+                        state={macro.missing ? 'missing' : 'linked'}
                         title={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.DropTitle',
                           'Drop a macro here'
                         )}
-                        hint={complication.macroUuid
-                          ? complication.macroUuid
-                          : text(
-                              'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
-                              'Or browse this world’s script macros.'
-                            )}
+                        hint={complication.macroUuid ||
+                          text(
+                            'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
+                            'Or browse this world’s script macros.'
+                          )}
+                        subline={macro.missing
+                          ? text(
+                              'FABRICATE.Admin.Manager.Component.Complications.Macro.Missing',
+                              'This macro no longer resolves. Drop or browse another to replace it.'
+                            )
+                          : ''}
                         disabled={saving}
                         unlinkLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Unlink',

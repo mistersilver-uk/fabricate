@@ -334,6 +334,11 @@
     gap: var(--fab-space-2);
   }
 
+  /* Each zone fills its well's flex column, so paired wells end level. */
+  .manager-checks-additional-dice-macros :global(.fabricate-link-field) {
+    flex: 1 1 auto;
+  }
+
   .manager-checks-additional-dice-hint {
     margin: var(--fab-space-1) 0 0;
     color: var(--fab-text-subtle);

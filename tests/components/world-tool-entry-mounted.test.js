@@ -9,8 +9,8 @@ import { tick } from 'svelte';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
   CHOICE_GROUP_COMPILED_MODULES,
@@ -28,6 +28,7 @@ import {
 } from '../helpers/toolMountModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const LANG = createLangBackedI18n(repoRoot);
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -782,7 +783,7 @@ describe('the world Tool entry (issue 1373)', () => {
       const linkedZone = linked.querySelector('[data-tool-source-card]');
       assert.ok(
         linkedZone.classList.contains('is-linked'),
-        'a resolved source is the LINKED face, which the solid filled tile keys on'
+        'a resolved source takes the link field`s linked face, which keys on `is-linked`'
       );
 
       const scope = scopeFor();
@@ -793,68 +794,30 @@ describe('the world Tool entry (issue 1373)', () => {
       const unlinkedZone = unlinked.querySelector('[data-tool-source-card]');
       assert.ok(
         !unlinkedZone.classList.contains('is-linked'),
-        'and an unlinked record is not, which is what the danger-dashed prompt keys on'
+        'and a record with no source item takes its empty face, the zone without `is-linked`'
       );
     });
 
-    // ── E5 ────────────────────────────────────────────────────────────────────────────────
-    // THE LINKED ITEM'S NAME IS SET IN THE DESIGN SERIF, AND THE RULE THAT DOES IT REACHES.
-    // A `:global()` rule addressing another component's markup can compile to a selector that
-    // matches NOTHING, silently and with no warning, so proving the declarations alone would
-    // prove nothing. This holds both halves: the three properties the design states, and the
-    // COMPILED selector run against the markup the primitive actually renders. Selector matching
-    // is what happy-dom can do; which declaration WINS is proved by the recaptured
-    // `world-tool-entry-overview` frame, because happy-dom cannot compute a cascade.
-    it('sets the LINKED source name in the design serif, in a rule that reaches the primitive', async () => {
-      const { css } = scopedComponentCss(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte')
-      );
-      // Comments are stripped first: a `{` inside one would split a rule at the wrong place and
-      // the gate would report a missing rule that is present.
-      const rules = [
-        ...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g),
-      ].map(([, selector, body]) => ({ selector: selector.trim().replaceAll(/\s+/g, ' '), body }));
-      const serif = rules.find(
-        ({ selector, body }) =>
-          selector.includes('.manager-item-drop-zone-copy strong') &&
-          /font-family:\s*var\(--fab-font-serif\)/.test(body)
-      );
-      assert.ok(
-        Boolean(serif),
-        'no rule gives the drop zone name `var(--fab-font-serif)`; `proto:2091` states the serif'
-      );
-      // 600, NOT the UA's bare-`<strong>` 700.
-      assert.match(serif.body, /font-weight:\s*600/, '`proto:2091` states weight 600');
-      assert.match(serif.body, /font-size:\s*0\.84rem/, '`proto:2091` states 13.5px = 0.84rem');
-
+    // This screen declares no rule on the zone, which `link-field-caller-placement.test.js` holds,
+    // so each face is the link field's own.
+    it('draws the source name through the link field in both faces', async () => {
       const linked = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
-      const card = linked.querySelector('[data-world-tool-entry-card="linked-item"]');
-      const name = card.querySelector('.manager-item-drop-zone-copy strong');
-      assert.ok(Boolean(name), 'the primitive still renders the name as a `<strong>`');
-      // The scoping hash is re-stamped from the LIVE element rather than trusted to match across
-      // two compiles, so this asserts the selector's SHAPE reaches - which is the half that rots
-      // when the primitive's markup moves.
-      const hash = [...card.classList].find((token) => token.startsWith('svelte-'));
-      assert.ok(Boolean(hash), "the card wrapper carries this component's scoping hash");
-      const selector = serif.selector.replaceAll(/svelte-[\da-z]+/g, hash);
-      assert.ok(
-        [...linked.querySelectorAll(selector)].includes(name),
-        `the compiled rule matches nothing the primitive renders: ${selector}`
+      const name = linked.querySelector(
+        '[data-world-tool-entry-card="linked-item"] .is-linked .manager-item-drop-zone-copy strong'
       );
+      assert.ok(Boolean(name), 'the linked face draws the name as the link field`s `<strong>`');
+      assert.match(name.textContent, /Mining Pick/);
 
       const scope = scopeFor();
       scope.entries[0].originItemUuid = '';
       scope.entries[0].registeredItemUuid = '';
       scope.entries[0].hasSourceLink = false;
-      const unlinked = await mountTab({ scope });
-      const prompt = unlinked.querySelector(
-        '[data-world-tool-entry-card="linked-item"] .manager-item-drop-zone-copy strong'
+      const empty = await mountTab({ scope });
+      const prompt = empty.querySelector(
+        '[data-world-tool-entry-card="linked-item"] .manager-item-drop-zone:not(.is-linked) strong'
       );
-      assert.ok(Boolean(prompt), 'the unlinked face still draws its own copy');
-      assert.ok(
-        ![...unlinked.querySelectorAll(selector)].includes(prompt),
-        "the serif is the LINKED tile's; `proto:2098` keeps the unlinked prompt in the sans"
-      );
+      assert.ok(Boolean(prompt), 'a record with no source item draws the empty face`s title');
+      assert.ok(prompt.textContent.trim().length > 0, 'and the title is not blank');
     });
 
     it('draws the display label as OPTIONAL, naming what a blank falls back to', async () => {
@@ -898,11 +861,51 @@ describe('the world Tool entry (issue 1373)', () => {
         loaded.querySelector('[data-tool-source-card]').dataset.itemDropState,
         'missing'
       );
+      assert.equal(
+        loaded.querySelector('[data-tool-source-drop-hint]').textContent.trim(),
+        LANG.lookup('FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint'),
+        'a missing source says so in the hint, in the words `lang/en.json` ships'
+      );
 
       const unloaded = await mountTab({ scope: scopeFor(), worldItems: [] });
       assert.ok(
         !unloaded.querySelector('[data-tool-source-card]').hasAttribute('data-item-drop-state'),
         'an EMPTY roster is a roster that has not loaded, not a broken link'
+      );
+      assert.match(
+        unloaded.querySelector('[data-tool-source-drop-hint]').textContent,
+        /replace the linked source/,
+        'and it keeps the healthy link`s hint'
+      );
+    });
+
+    it('never marks a COMPENDIUM source missing, since the roster holds world Items only', async () => {
+      const scope = scopeFor();
+      const entry = scope.entries.find((candidate) => candidate.id === 'pick');
+      entry.entity = {
+        ...entry.entity,
+        originItemUuid: 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB',
+        registeredItemUuid: '',
+      };
+      const target = await mountTab({ scope, worldItems: [LINKED_ITEM] });
+      const zone = target.querySelector('[data-tool-source-card]');
+      assert.ok(
+        !zone.hasAttribute('data-item-drop-state'),
+        'a compendium source draws no drop state'
+      );
+      assert.match(
+        zone.querySelector('[data-tool-source-drop-hint]').textContent,
+        /replace the linked source/
+      );
+
+      const gone = await mountTab({
+        scope: scopeFor(),
+        worldItems: [{ uuid: 'Item.something-else', name: 'Other' }],
+      });
+      assert.equal(
+        gone.querySelector('[data-tool-source-card]').dataset.itemDropState,
+        'missing',
+        'while a world address absent from a loaded roster still draws missing'
       );
     });
   });

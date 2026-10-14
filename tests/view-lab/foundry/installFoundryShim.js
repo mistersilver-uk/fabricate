@@ -379,7 +379,7 @@ export function installFoundryShim(world) {
     }),
     journal: createCollection([]),
     folders: createCollection([]),
-    macros: createCollection([]),
+    macros: createCollection(world.macros ?? []),
     tables: createCollection([]),
     packs: createHeroPacks(),
     system: {
