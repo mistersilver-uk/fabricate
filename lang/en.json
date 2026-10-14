@@ -8095,7 +8095,21 @@
             "ValidationSub": "Every system that inherits reads what is set here.",
             "ValidationTitle": "World defaults",
             "WorldBanner": "World definition · shared by every system",
-            "WorldDefaults": "World defaults"
+            "WorldDefaults": "World defaults",
+            "BulkEdit": {
+              "HeadingOne": "1 essence selected",
+              "Heading": "{count} essences selected",
+              "ApplyOne": "Apply to 1 essence",
+              "Apply": "Apply to {count} essences",
+              "IconStaged": "Every selected essence, on its world entry and catalogue",
+              "ColourStaged": "Every selected essence, on GM screens in every crafting system",
+              "PerEssenceNote": "Names, descriptions, linked sources and property macros stay per-essence: open an essence to edit them. Enabling an essence happens on each crafting system's Essence Rules screen; adding one to a system or removing it happens there or on the essence's own page, and deleting one happens on its own page.",
+              "WriteFailedOne": "{name} could not be updated. The other selected essences were updated.",
+              "WriteFailed": "{count} essences could not be updated: {names}. The other selected essences were updated.",
+              "WriteFailedAllOne": "{name} could not be updated.",
+              "WriteFailedAll": "None of the {count} selected essences could be updated: {names}.",
+              "WriteFailedMore": "{names}, and {more} more"
+            }
           },
           "Tool": {
             "Save": "Save tool",

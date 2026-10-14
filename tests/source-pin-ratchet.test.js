@@ -83,6 +83,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/domCensus.js': 'fixture',
   'tests/helpers/extension-composition-harness.js': 'fixture',
   'tests/helpers/harvestedFoundryChrome.js': 'fixture',
+  'tests/helpers/inspectorDockGeometry.js': 'fixture',
   'tests/helpers/interactablesSmokeLocators.js': 'legacy-scan',
   'tests/helpers/interactablesWindowContract.js': 'ast',
   'tests/helpers/langBackedI18n.js': 'fixture',

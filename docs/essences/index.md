@@ -254,10 +254,21 @@ From there you can:
 
 The colour control is withheld, with a note in its place, whenever one or more of the selected essences already belongs to the world Essence Catalogue.
 Colour is authored once on the world essence, and this system's own copy is not what any screen draws, so the axis is offered only when every selected essence is one the world does not hold.
+To colour world essences in bulk, use the world Essence Catalogue's bulk edit, described below.
 Staging a colour and then adding a world-known essence to the selection clears the staged colour along with the control, so nothing you can no longer see is still applied.
 
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
+
+The world Essence Catalogue has its own bulk edit.
+Tick essences there to open a panel with **Icon** and **Colour** in place of the single-essence inspector.
+Each starts as **Leave unchanged**, and Colour can also be cleared with **No colour**.
+**Apply**, in the dock at the foot of the inspector, writes the staged fields to the world essences one at a time, then clears the selection.
+The colour shows on every manager screen that tints essences, but not on the recipe editor's essence choices or on player screens.
+The icon shows on the world catalogue and entry and on the shared-definition callout and header, but a crafting system's own essence row keeps the icon it has.
+If any essence cannot be updated, a notice names up to three of them and says how many more, and the rest are still applied.
+Names, descriptions, effect sources and macros, enabled state, and adding an essence to a system or removing it stay per essence, and the panel has no bulk delete.
+Delete an essence from its own page.
 
 The **Apply** button sits at the foot of the inspector, and the delete sits directly under it, so both stay in view while you scroll the staged changes.
 **Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.

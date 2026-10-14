@@ -740,6 +740,42 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // The selection's own face (issue 2485), staging a colour none of the three ticked essences carries.
+    id: 'world-essence-catalogue-bulk',
+    label: 'Manager — World Essence Catalogue, bulk edit',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: 'label:has(input[data-scoped-list-select="earth"])' },
+      { selector: 'label:has(input[data-scoped-list-select="fire"])' },
+      { selector: 'label:has(input[data-scoped-list-select="water"])' },
+      { selector: '[data-world-essence-bulk-colour] [data-manager-color-token="rose"]' },
+    ],
+    expectView: 'world-essences',
+    expectSelector: '[data-world-essence-bulk-panel]',
+    expectContained: [
+      { container: '[data-scoped-list-inspector]', target: '[data-world-essence-bulk-panel]' },
+      { container: '[data-world-essence-bulk-panel]', target: '[data-world-essence-bulk-colour]' },
+      {
+        container: '[data-world-essence-bulk-panel]',
+        target: '[data-world-essence-bulk-colour-state="rose"]',
+      },
+      { container: '[data-world-essence-bulk-panel]', target: '[data-world-essence-bulk-apply]' },
+      { container: '.manager-scoped-list-column', target: '[data-scoped-list-selection-count]' },
+    ],
+    expectCenterHit: '[data-world-essence-bulk-apply]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EssenceCatalogueBulkPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      // The shared bulk chrome the panel composes.
+      /^src\/ui\/svelte\/apps\/manager\/Bulk(?:EditPanelShell|EditSection|SelectionToolbar)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-essence-entry',
     label: 'Manager — World Essence entry',
     reaches: 'beyond',

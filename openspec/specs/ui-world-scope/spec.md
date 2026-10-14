@@ -583,6 +583,28 @@ They are stated here rather than left to `## Scoped entity editor patterns` beca
     The system rules row built its own run from the map's own key order and was the last site outside the model, which is how one component printed `Earth · Fire · Air` on the list beside `Air · Earth · Fire` on the rail.
     **AND THE DRAWN RUN IS NOT THE AUTHORING ONE** (issue 1371 r22-store4): the chip model drops an id the system's roster cannot name, which is right for a chip and wrong for a SEED, so the GM component card publishes the drawn run beside the whole resolved map rather than in place of it.
     The row, the inspector and the browser's essence filter read the drawn one; the component editor is seeded from the whole one, because an editor seeded from a narrowed map drops every id outside the roster on its next save (`data-models/spec.md` `### Component scope` requirement 2a).
+22. **THE WORLD ESSENCE CATALOGUE'S SELECTION HAS A BULK FACE WITH TWO AXES, `Icon` AND `Colour`, BECAUSE THOSE ARE THE ONLY WORLD RECORD FIELDS WHOSE VALUE IS CLOSED AND MEANS THE SAME FOR EVERY ESSENCE.**
+    Ticking a row replaces the inspector's identity panel with the bulk panel, on `## Scoped entity list shells` requirement 23.
+    The panel states the count the selection register states and offers `Clear selection`.
+    `Icon` is offered from the essence icon set and `Colour` from the tint palette with no custom value, the same controls the world essence entry draws.
+    Each axis is staged as leave unchanged or a value, and `Colour` alone may also stage no colour.
+    Applying writes only the staged fields to each selected essence's WORLD record, through the essence family's `updateEntity`, one essence at a time with both staged fields in one patch.
+    A cleared colour writes the empty token the entry's own clear writes.
+    A write that does not answer `true`, or throws, is counted and the run continues.
+    The selection clears when the run ends, and the count of essences that did not update is notified once, with nothing notified when every write landed.
+    **THE REACH IS THE WORLD RECORD'S, AND THE TWO FIELDS DIFFER.**
+    A colour reaches every GM manager surface the world colour overlay reaches under requirement 21.
+    It does not reach the recipe editor's essence choices or any player surface.
+    An icon reaches only the surfaces that draw the world record's icon under requirements 11 and 12, and an icon a system's own essence row carries is not changed.
+    The staged hints claim no more than this.
+    **EVERYTHING ELSE IS NAMED AS STAYING PER-ESSENCE, IN ONE STANDING NOTE.**
+    - Name and description are values of the essence's own.
+    - The `effectSource` and `macro` world defaults are per-essence referents carrying behaviour.
+    - Whether an essence is enabled is each crafting system's own flag, because an essence's world defaults carry none (`data-models/spec.md` `## Scoped Entity Definitions` requirement 7).
+    - Adding an essence to a system, or removing it, is done per essence, on its entry's `Systems using this essence` card (requirement 2) or on that system's Essence Rules screen (requirement 15).
+
+    **THE PANEL OFFERS NO DELETE.** Deleting a world essence stays on its entry, where its reach is stated before it is armed.
+    The bulk face is the page's lane snippet over the shared composition and adds no prop to it.
 
 ## GM World Tool Screens
 
@@ -870,7 +892,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
     Without one, a control mutating a value every caller passes explicitly reddens nothing and reads as a proof that held — which is the silently-ineffective-mutation trap, and it fired once on this change before the control caught it.
     **THE DECLARED PROP SET OF EACH SHELL IS PINNED AS A LITERAL LIST, and the two lists are pinned as a DIFFERENCE rather than independently**, because the reason they are nearly identical is the point: one composition, configured per scope, and a prop appearing on one shell alone states which question that scope is the only one to ask.
     A prop that a shell threads onward to a composed primitive is pinned on the primitive too, and both halves default to OFF: a surface gated on the class every caller already passes is not opt-in, it is the in-place edit wearing a prop's name.
-    **TWO MORE SWITCHES JOINED UNDER THE MAINTAINER'S LIVE-TEST RULINGS, each named for the question it splits**: `autoSelectFirst` (M14, requirement 12) separates WHETHER a list opens inspected from WHICH row a GM has chosen, and `flushBulkDock` (M24) moves the pane inset from the column onto the bulk scroller so the pinned dock can reach the inspector's edges — each default OFF, with the world Component, Essence and Tools catalogues opting into `autoSelectFirst` and the world Component and Tools catalogues, the two that draw a bulk face, opting into `flushBulkDock`.
+    **TWO MORE SWITCHES JOINED UNDER THE MAINTAINER'S LIVE-TEST RULINGS, each named for the question it splits**: `autoSelectFirst` (M14, requirement 12) separates WHETHER a list opens inspected from WHICH row a GM has chosen, and `flushBulkDock` (M24) moves the pane inset from the column onto the bulk scroller so the pinned dock can reach the inspector's edges — each default OFF, with the world Component, Essence and Tools catalogues opting into `autoSelectFirst` and the world Component, Essence and Tools catalogues, the three that draw a bulk face, opting into `flushBulkDock`.
     M21's flush list column is not a switch: requirement 25 makes it the composition's own geometry, because a geometry every mounted caller needs is stated once as the composition's own and is not given a default.
 
 25. **THE LIST COLUMN CARRIES NO INSET: ITS BANDS RUN TO THE PANE'S EDGES AND ITS CONTENT KEEPS A GUTTER** (maintainer ruling M21, revision 16 of issue 1371; every world catalogue since issue 2373).
