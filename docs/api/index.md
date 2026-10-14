@@ -2393,7 +2393,7 @@ While the button holds focus Escape reaches no Foundry keybinding, though a dial
 The button draws no chevron and opens nothing itself.
 `aria-describedby` is an `aria` prop: Fabricate writes it on the button.
 It is the id of one element of your own, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
-Each id must exist in `target`'s tree while the button is shown, and the element it names must not be `hidden`, which would still be read to a screen-reader user though a sighted user never sees it; an id that does not exist is skipped and the others are still read.
+Each id must exist in the tree that holds `target` while the button is shown, and the element it names, which may sit beside `target` and need not be inside it, must not be `hidden`, which would still be read to a screen-reader user though a sighted user never sees it; an id that does not exist is skipped and the others are still read.
 The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
 The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: keep the button enabled and answer the press with the reason, or state the reason in the surrounding text.
 Rest `data-*` is for your own hooks.
@@ -2460,34 +2460,35 @@ A choice between two named things is not a switch: draw your own control for it.
 `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
 Fabricate coerces nothing, so only `true` and `false` are in the contract.
 The button changes nothing itself: a press reports through `onclick`, and the switch shows the new state when your `update` passes it, which may be after the press returns.
+The switch shows no pending state, so if your change takes time, say so in text of your own, and treat a press that arrives before your `update` as another press from the state you last passed.
 To refuse the change, pass `on` unchanged and say why in text of your own, so the switch never shows a state you do not hold.
 `onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
-`ariaLabel` is required and is the switch's name, final display text, the same in both states, because `aria-pressed` says which holds.
+`ariaLabel` is the switch's name and is required whether or not you pass `aria-labelledby`.
+It is final display text, the same in both states, because `aria-pressed` says which holds.
 `ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
 It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
-It does not change between states.
-`ariaLabel` is required whether or not you pass `aria-labelledby`.
-Draw the setting's name as visible text beside the switch, from one string that you also pass as `ariaLabel`, and pass both again in any `update` that changes the text, so the spoken name always contains the words the user sees.
+Draw the setting's name as visible text beside the switch, from one string that you also pass as `ariaLabel`, and pass both again in any `update` that changes the text, so the spoken name always contains the words the user sees; the label does not press the switch unless you wire it to `onclick`.
 A name of white space alone leaves the switch with no name, so never pass one.
 `aria-labelledby` is an `aria` prop: Fabricate writes it on the button.
-It is the id of your element that holds the visible name and nothing else, or several such ids separated by spaces, in `target`'s tree.
+It is the id of your element that holds the visible name and nothing else, or several such ids separated by spaces, in the tree that holds `target`.
+The element may sit beside `target`; it need not be inside it.
 When at least one id names an element, that element's text is the switch's name and `ariaLabel` is not read.
 When none does, the switch is named by `ariaLabel`, so a mistyped id never leaves it nameless.
 `aria-describedby` is an `aria` prop: Fabricate writes it on the button.
 It is the id of one element of your own, or several ids separated by spaces, holding a sentence that is visible text beside the switch and that says what the setting does without repeating its name.
-Each id must exist in `target`'s tree while the switch is shown, and the element it names must not be `hidden`; an id that does not exist is skipped and the others are still read.
+Each id must exist in the tree that holds `target` while the switch is shown, and the element it names, which may sit beside `target` and need not be inside it, must not be `hidden`; an id that does not exist is skipped and the others are still read.
 The switch has no unavailable state at version 1.
 Keep the switch of a setting the user cannot change right now enabled.
 Answer its press with the reason, in a `Notice` or a notification of your own, and pass `on` unchanged; do not draw a setting that can never change here as a switch.
 Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
 It needs a Fabricate window ancestor, so its root is `fabricate`, and its track is drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the switch is refused there with `StatusToggle needs a Fabricate window ancestor`.
-Foundry sizes a button at least twice its font size, so the switch's button is 24px tall at an inherited font size of 12px or less, 2em tall above that, and taller inside a Foundry form or dialog row, and its 20px track is centred in it; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
+Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 20px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
 The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
 An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side; leave that much inside any edge of your own that clips.
 The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
-Give a switch you mount inside a `.tabs` element no `data-group`, because Foundry writes `aria-pressed` on a button inside `.tabs` whose own `data-group` names the tab group it changes.
+Give a switch you mount inside a `.tabs` element no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
 Its track and knob sizes, its button's width, its 78px cap, its colours beyond what this section states, and what it draws for an `on` value other than `true` or `false` are private.
 Rest `data-*` is for your own hooks; name them for your module, as `data-<module-id>-…`.
 They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on StatusToggle`.
@@ -2741,7 +2742,7 @@ A published component draws a control only where its section says so, and each c
 - A control is unavailable only through a prop its section names.
   A natively `disabled` control leaves the tab order and cannot take focus, so never disable the control that holds focus: ignore the press instead, and where the control must then become unavailable, first move focus to the destination the "Fabricate moves no focus" bullet orders.
   Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
-  In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so mount a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
+  In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, apart from a switch's pointer cursor, which becomes `not-allowed`, so mount a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` prop and exposes it in the accessibility tree as well as in colour.
   A press reports through the callback, and the control shows the new state when your `update` passes it; its section says where a native control changes itself first.
   The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as props.

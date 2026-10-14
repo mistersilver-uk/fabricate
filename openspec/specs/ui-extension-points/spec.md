@@ -508,7 +508,7 @@ The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of it
 - A control is unavailable only through a key its group names.
 A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the "Fabricate moves no focus" bullet orders.
 Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
-In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
+In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, apart from a switch's pointer cursor, which becomes `not-allowed`, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
 The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as keys (M13).
@@ -764,7 +764,7 @@ Each group states the accepted values of every key that entry publishes.
     The button draws no chevron and opens nothing itself.
   - `aria-describedby` is an `aria` key: Fabricate writes it on the button.
     It is the id of one element of the companion's, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
-    Each id exists in `target`'s tree while the button is shown, and the element it names is not `hidden`, which would still be read to a screen-reader user though a sighted user never sees it; an id that does not exist is skipped and the others are still read.
+    Each id exists in the tree that holds `target` while the button is shown, and the element it names, which may be beside `target` and need not be inside it, is not `hidden`, which would still be read to a screen-reader user though a sighted user never sees it; an id that does not exist is skipped and the others are still read.
     The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
     The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: the companion keeps the button enabled and answers the press with the reason, or states the reason in the surrounding text.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
@@ -781,33 +781,33 @@ Each group states the accepted values of every key that entry publishes.
   - `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
     Fabricate coerces nothing, so only `true` and `false` are in the contract.
     The button changes nothing itself: a press reports through `onclick`, and the switch shows the new state when the companion's `update` passes it, which may be after the press returns.
+    The switch draws no pending state, so a companion whose change takes time says so in text of its own, and its `onclick` treats a press that arrives before the `update` as another press from the state last passed.
     A companion that refuses the change passes `on` unchanged and says why in text of its own, so the switch never shows a state the companion does not hold.
   - `onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
-  - `ariaLabel` is required and is the switch's name, final display text, the same in both states, because `aria-pressed` says which holds.
+  - `ariaLabel` is the switch's name and is required whether or not `aria-labelledby` is passed.
+    It is final display text, the same in both states, because `aria-pressed` says which holds.
   - `ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
     It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
-    It does not change between states.
-  - `ariaLabel` is required whether or not `aria-labelledby` is passed.
-    The companion draws the setting's name as visible text beside the switch, from one string that it also passes as `ariaLabel`, and passes both again in any `update` that changes the text, so the spoken name always contains the words the user sees.
+  - The companion draws the setting's name as visible text beside the switch, from one string that it also passes as `ariaLabel`, and passes both again in any `update` that changes the text, so the spoken name always contains the words the user sees; the label does not press the switch unless the companion wires it to `onclick`.
     A name of white space alone leaves the switch with no name, so the companion never passes one.
   - `aria-labelledby` is an `aria` key: Fabricate writes it on the button.
-    It is the id of the companion's element that holds the visible name and nothing else, or several such ids separated by spaces, in `target`'s tree.
+    It is the id of the companion's element that holds the visible name and nothing else, or several such ids separated by spaces, in the tree that holds `target`, which may be beside `target` and need not be inside it.
     When at least one id names an element, that element's text is the switch's name and `ariaLabel` is not read.
     When none does, the switch is named by `ariaLabel`, so a mistyped id never leaves it nameless.
   - `aria-describedby` is an `aria` key: Fabricate writes it on the button.
     It is the id of one element of the companion's, or several ids separated by spaces, holding a sentence that is visible text beside the switch and that says what the setting does without repeating its name.
-    Each id exists in `target`'s tree while the switch is shown, and the element it names is not `hidden`; an id that does not exist is skipped and the others are still read.
+    Each id exists in the tree that holds `target` while the switch is shown, and the element it names, which may be beside `target` and need not be inside it, is not `hidden`; an id that does not exist is skipped and the others are still read.
   - The switch has no unavailable state at version 1.
     A setting the user cannot change right now keeps its switch enabled.
     Its press answers with the reason, in a `Notice` or a notification of the companion's, and `on` is passed unchanged; a setting that can never change here is not drawn as a switch.
     A setting that is unavailable also says so in the visible text `aria-describedby` points at, so it is heard when the switch takes focus, not only after a press.
   - It needs a Fabricate window ancestor, and its track is drawn the same in the Manager and the player window.
-    Foundry sizes a button at least twice its font size, so the switch's button is 24px tall at an inherited font size of 12px or less, 2em tall above that, and taller inside a Foundry form or dialog row, and its 20px track is centred in it; the companion gives `target` `display: flex` and `align-items: center`, and centres its own label against the switch.
+    Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 20px track is centred in the button; the companion gives `target` `display: flex` and `align-items: center`, and centres its own label against the switch.
   - The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
     An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side, and the companion leaves that much inside any edge of its own that clips.
   - The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
-  - A switch mounted inside a `.tabs` element carries no `data-group`, because Foundry writes `aria-pressed` on a button inside `.tabs` whose own `data-group` names the tab group it changes.
+  - A switch mounted inside a `.tabs` element carries no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The switch therefore opens no tooltip and keeps its own cursor, so the pointer is shown its name only as the companion's label beside it, and what the setting does goes in text beside it, tied to it with `aria-describedby`.
 - **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards.

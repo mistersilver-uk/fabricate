@@ -398,7 +398,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-toggles-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window without Foundry’s own sheet, so the button stands 24px tall here and taller in a Foundry window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window under Foundry 14’s own core sheet, so the button stands 28px tall here at the window’s 14px type size, and taller in a form or dialog row; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -411,8 +411,9 @@ export const CASES = Object.freeze([
     expectContained: CONTROLS_CONTAINMENT,
     expectLayout: {
       controls: [
-        // The sheet's declared track, and its quiet and accent grounds; no host height, which
-        // Foundry's own sheet sets in a window and the lab does not load.
+        // The sheet's declared track, and its quiet and accent grounds; no host height: it follows
+        // the inherited font size and the container, which a companion's own window sets, so a lab
+        // figure would pin the fixture rather than the contract.
         {
           selector: TOGGLE_TRACK('group'),
           styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
