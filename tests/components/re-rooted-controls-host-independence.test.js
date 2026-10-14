@@ -430,7 +430,7 @@ const CONTROLS = Object.freeze([
     id: 'link-field-compact',
     classes: `${LINK_FIELD_CLASSES} is-compact`,
     markup: (host) =>
-      `<div class="fabricate-link-field manager-item-drop-zone is-compact" data-manager-item-drop-zone="" data-probe="${host}-link-field-compact"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-compact-icon"><i class="fas fa-right-left"></i></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-compact-copy"><strong data-probe="${host}-link-field-compact-name">Drop an item to replace the source</strong><small data-probe="${host}-link-field-compact-hint">World item, compendium entry, or pack.</small></span></div>`,
+      `<div class="fabricate-link-field manager-item-drop-zone is-compact" data-manager-item-drop-zone="" data-probe="${host}-link-field-compact"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-compact-icon"><i class="fas fa-right-left"></i></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-compact-copy"><strong data-probe="${host}-link-field-compact-name">Drop an item to replace the source</strong><small data-probe="${host}-link-field-compact-hint">World item or compendium entry</small></span></div>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE PILL SELECT EITHER (issue 1515). Its root is the
   // `<Field as="div">` it renders, so that element carries `fabricate-field` and
@@ -1137,7 +1137,7 @@ const TOGGLE_CARD_TITLE_COMPARED = Object.freeze(['margin-top', 'margin-bottom',
 /** The sub-line, scoped to what this family owns. */
 const TOGGLE_CARD_SUB_COMPARED = Object.freeze(['min-width']);
 
-/** The link field's default face: the three-column linked card on a dashed edge. */
+/** The link field's linked face: the three-column card on a solid edge. */
 const LINK_FIELD_COMPARED = Object.freeze([
   'display',
   'grid-template-columns',
@@ -1155,7 +1155,7 @@ const LINK_FIELD_COMPARED = Object.freeze([
   'background-color',
 ]);
 
-/** The compact face: a centred glyph over a title over a note, on a narrower well. */
+/** The compact face: a centred glyph over a title over a note, with no floor and no ground. */
 const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
   'display',
   'flex-direction',
@@ -1167,10 +1167,11 @@ const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
   'padding-top',
   'padding-left',
   'border-radius',
+  'background-color',
   'text-align',
 ]);
 
-/** The 44px art tile. */
+/** The linked face's 44px art tile. */
 const LINK_FIELD_ICON_COMPARED = Object.freeze([
   'display',
   'align-items',
@@ -1186,7 +1187,7 @@ const LINK_FIELD_ICON_COMPARED = Object.freeze([
 /** And the art inside it, which the family sizes and crops. */
 const LINK_FIELD_ART_COMPARED = Object.freeze(['width', 'height', 'object-fit']);
 
-/** The compact face's glyph, which the family re-sizes and re-tones rather than re-boxes. */
+/** The compact face's glyph, which the family re-sizes: it keeps the empty glyph's ink and no box. */
 const LINK_FIELD_COMPACT_ICON_COMPARED = Object.freeze(['width', 'height', 'font-size', 'color']);
 
 /** The copy column. */
@@ -1201,8 +1202,15 @@ const LINK_FIELD_COMPACT_COPY_COMPARED = Object.freeze([
   'text-align',
 ]);
 
-/** The name line: the family's whole claim on it is that it truncates. */
-const LINK_FIELD_NAME_COMPARED = Object.freeze(['overflow-x', 'text-overflow']);
+/** The linked name, which the family types and caps at two lines. */
+const LINK_FIELD_NAME_COMPARED = Object.freeze([
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'overflow-x',
+  '-webkit-line-clamp',
+]);
 
 /** The compact face's name line, which the family also types down. */
 const LINK_FIELD_COMPACT_NAME_COMPARED = Object.freeze([
@@ -1218,7 +1226,7 @@ const LINK_FIELD_HINT_COMPARED = Object.freeze([
   'font-size',
   'line-height',
   'overflow-x',
-  'text-overflow',
+  '-webkit-line-clamp',
 ]);
 
 /** The compact face's note. */
@@ -2897,15 +2905,15 @@ test('the link field family declares no font floor and no focus pair', async () 
     // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY.
     assert.equal(
       endingInBareElement(family).length,
-      5,
-      'the link field no longer ends five rules in a bare element, so `floorShaped`s zero above ' +
+      9,
+      'the link field no longer ends nine rules in a bare element, so `floorShaped`s zero above ' +
         'has stopped discriminating and the docblock`s contrast with the status card is stale: ' +
         endingInBareElement(family)
           .map((rule) => rule.selectorText)
           .join(', ')
     );
 
-    // Of those five, the three that TYPE it. Asserted separately because the zero above cannot be
+    // Of those nine, the five that TYPE it. Asserted separately because the zero above cannot be
     // mistaken for "this family types nothing" — the predicate is shape, not absence, and a
     // reader reconciling the two needs the second number.
     const typedBareElement = endingInBareElement(family).filter((rule) =>
@@ -2913,9 +2921,10 @@ test('the link field family declares no font floor and no focus pair', async () 
     );
     assert.equal(
       typedBareElement.length,
-      3,
-      'expected exactly the three name-and-note rules to type a bare element under this root — ' +
-        'the default face`s `small`, and the compact face`s `strong` and `small` — found ' +
+      5,
+      'expected exactly the five name-and-note rules to type a bare element under this root — ' +
+        'the family`s `small`, the empty and the linked face`s `strong`, and the compact face`s ' +
+        '`strong` and `small` — found ' +
         `${typedBareElement.length}: ` +
         typedBareElement.map((rule) => rule.selectorText).join(', ')
     );

@@ -539,11 +539,33 @@
    */
   const source = $derived(toolSourceSnapshot(entity, worldItems));
 
-  /**
-   */
+  // `worldItems` is the world's Items only, so a compendium address is never reported missing,
+  // as `componentSourceBroken` rules.
   const sourceMissing = $derived(
-    sourceLinked && worldItems.length > 0 && !worldItems.some((item) => item?.uuid === sourceUuid)
+    sourceLinked &&
+      worldItems.length > 0 &&
+      !sourceUuid.trim().startsWith('Compendium.') &&
+      !worldItems.some((item) => item?.uuid === sourceUuid)
   );
+
+  const sourceDropHint = $derived.by(() => {
+    if (sourceMissing) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint',
+        'This Item no longer resolves. Drop another Item here to replace it.'
+      );
+    }
+    if (sourceLinked) {
+      return text(
+        'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
+        'Drop another Item here to replace the linked source.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
+      'Drop an Item from the Items directory or a compendium to link this Tool.'
+    );
+  });
 
   /**
    * THE NAME THIS SCREEN SHOWS, and the ONE place the optional display label is resolved: the
@@ -819,15 +841,7 @@
               item={sourceLinked ? source : null}
               state={sourceMissing ? 'missing' : 'linked'}
               title={entryName}
-              hint={sourceLinked
-                ? text(
-                    'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
-                    'Drop another Item here to replace the linked source.'
-                  )
-                : text(
-                    'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
-                    'Drop an Item from the Items directory or a compendium to link this Tool.'
-                  )}
+              hint={sourceDropHint}
               onDrop={onSourceDrop}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
               unlinkDataAttr="data-world-tool-entry-source-unlink"
@@ -1313,63 +1327,6 @@
     justify-content: space-between;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  /* THE LINKED TILE IS SOLID AND FILLED; DASHED MEANS UNLINKED. The shipped `ItemDropZone` paints
-     ONE box for both faces, so a healthy link wore the design's broken state; `proto:2089` draws
-     the LINKED tile filled and reserves the dashed edge for the UNLINKED prompt. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    > :global(.manager-item-drop-zone.is-linked) {
-    gap: var(--fab-space-3);
-    min-height: 0;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 11px;
-    background: var(--fab-surface-soft);
-  }
-
-  /* THE LINKED ITEM'S NAME IS SET IN THE DISPLAY SERIF (`proto:2091`), where nothing declared a
-     face, a size or a weight on that element at all. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong) {
-    font-family: var(--fab-font-serif);
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
-
-  /* THE UNLINKED FACE KEEPS THE DASH AND GAINS THE DANGER INK. `2px` rather than the design's
-     1.5: a fractional border rounds per device pixel ratio and reads as a hairline at 1x. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    > :global(.manager-item-drop-zone:not(.is-linked)) {
-    border: 2px dashed var(--fab-danger-border);
-    background: transparent;
-  }
-
-  /* A BARE DANGER GLYPH, NOT A FILLED TILE (`proto:2099`): the 44px square is the mount for a
-     linked Item's ART, and with no Item it reads as a picture that failed to load. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-icon) {
-    color: var(--fab-danger-text);
-    background: transparent;
-  }
-
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy strong),
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy small) {
-    color: var(--fab-danger-text);
-  }
-
-  /* THE UNLINK IS A DESTRUCTIVE CONTROL AND IS DRAWN AS ONE (`proto:2093`): `IconButton.is-danger`
-     carries the danger edge and ink but leaves the resting fill neutral. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone-actions .fabricate-icon-button) {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-    background: var(--fab-danger-soft);
-    font-size: 0.68rem;
   }
 
   /* THE LINKED ITEM'S OWN DESCRIPTION, in a bordered read-only box: a surface rather than a

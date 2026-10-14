@@ -3765,7 +3765,8 @@
               "None": "No script macros in this world",
               "Unlink": "Remove macro",
               "NotScript": "That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.",
-              "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium."
+              "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium.",
+              "Missing": "This macro no longer resolves. Drop or browse another to replace it."
             },
             "Summary": {
               "StageMissed": "the award is missed",
@@ -7708,6 +7709,7 @@
             "TabRequirements": "Requirements",
             "TabValidation": "Validation",
             "SourceEmptyDropHint": "Drop an Item from the Items directory or a compendium to link this Tool.",
+            "SourceMissingDropHint": "This Item no longer resolves. Drop another Item here to replace it.",
             "BackToTools": "Back to tools",
             "Delete": "Delete",
             "DeleteConfirm": "Delete for good?",
@@ -7897,10 +7899,10 @@
               "Unsaved": "Unsaved changes",
               "IdentityNote": "Name, image and description refresh from the linked item. Every system shows the same three.",
               "SourceTitle": "Source identity",
-              "SourceSubtitle": "How the world recognises this item on import, so two copies never become two entries.",
+              "SourceSubtitle": "How the world recognises this item on import, so two copies never become two entries. Replacing the source takes effect in every system at once.",
               "SourceUuidLabel": "Source item uuid",
               "SourceDropTitle": "Drop an item to replace the source",
-              "SourceDropNote": "World item, compendium entry, or pack — the uuid, name, art and description come from it. Every system sees the change at once.",
+              "SourceDropNote": "World item or compendium entry",
               "AliasesLabel": "Aliases · matched on import",
               "AliasPlaceholder": "Paste an item uuid, then Enter",
               "DuplicateNote": "{count} other catalogue entries name the same source item, so an import can create a second record for one item.",

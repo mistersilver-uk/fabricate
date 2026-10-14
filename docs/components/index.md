@@ -178,6 +178,7 @@ If you leave with unsaved changes, Fabricate asks whether to save, discard, or k
 Drop an item onto this card's drop zone to link or replace it, or choose **Unlink** to remove the link.
 It is the only drop zone on the entry, and the identity card above it carries none.
 Replacing the link takes a fresh name, image, and description snapshot from the new item.
+Replacing the source takes effect in every crafting system at once.
 **Copy** copies the linked item's identifying address.
 
 **Aliases** lets you add other item addresses this component should also be recognised as.

@@ -1050,6 +1050,33 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-component-complications-macro-linked',
+    label: 'Manager — Component complications macro linked',
+    // The macro zone's linked face, picked through Browse; `scriptMacros` gives the picker its option.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', scriptMacros: '1' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
+      },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-macro-browse]' },
+      { selector: '[data-popover-option="Macro.lab-macro-read-momentum"]' },
+      { selector: '[data-item-drop-zone="complication-macro"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
+      '[data-item-drop-zone="complication-macro"].is-linked',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-component-complications-check-trigger',
     label: 'Manager — Component complications check trigger',
     // Beyond the smoke: the check-trigger Select appears only once a check-trigger condition is chosen on an open complication.

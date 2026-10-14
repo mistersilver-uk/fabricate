@@ -16,6 +16,7 @@ export const MINIMAL_LAB_WORLD_FIELDS = Object.freeze([
   'i18n',
   'worldTime',
   'documents',
+  'macros',
 ]);
 
 /**
@@ -41,5 +42,6 @@ export function createMinimalLabWorld({ i18n, seed = 20_260_601 } = {}) {
     i18n,
     worldTime: MINIMAL_LAB_WORLD_TIME,
     documents: new Map(),
+    macros: [],
   };
 }
