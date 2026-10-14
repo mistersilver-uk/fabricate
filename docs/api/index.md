@@ -2481,7 +2481,7 @@ The switch has no unavailable state at version 1.
 Keep the switch of a setting the user cannot change right now enabled.
 Answer its press with the reason, in a `Notice` or a notification of your own, and pass `on` unchanged; do not draw a setting that can never change here as a switch.
 Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
-It needs a Fabricate window ancestor, so its root is `fabricate`, and its track is drawn the same in the Manager and the player window.
+`StatusToggle` needs a Fabricate window ancestor, so its root is `fabricate`, and its track is drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the switch is refused there with `StatusToggle needs a Fabricate window ancestor`.
 Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 20px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
 The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
@@ -2665,7 +2665,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice` and `Button` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button` and `StatusToggle` were published with `load`, so call it for each before mounting.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
