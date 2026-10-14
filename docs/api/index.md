@@ -2383,14 +2383,16 @@ What the button draws for a `role` value outside its set is private.
 So are its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
 `aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
 It is for a button whose press shows and hides a region you draw: pass `false` while the region is hidden and `true` while it is shown, in the same `onclick` that shows or hides it, and omit the prop on a button that does no such thing.
-Hide the region from assistive technology too, with `hidden` and not by height alone, and never pass a value that never changes, because it says something false.
+Hide the region from assistive technology too, with `hidden` and not by height alone, because a region hidden by height alone is still read, and pass `true` only while the region is shown.
 The label is the same in both states, because the attribute says which holds.
-Focus stays on the button when the region opens or closes, and before you hide a region that holds focus, move focus to the button, because that focus otherwise falls to the page and the next Escape closes the window.
-Foundry reads the attribute nowhere and gives the region no key: Escape does nothing while the button holds focus, and with focus in the region on anything but a field or a published control it closes every Foundry window.
+Draw the region directly after the button in reading order, so the person who hears "expanded" reaches it with the next move.
+Focus stays on the button when the region opens or closes, and before you hide a region that holds focus, move focus to the button, because that focus otherwise falls to the page and the next Escape runs Foundry's dismiss, which closes the window.
+Foundry reads the attribute nowhere and gives the region no key.
+While the button holds focus Escape reaches no Foundry keybinding, though a dialog still closes on it, as [Ownership and theme](#ownership-and-theme) states; with focus in the region on an element of yours that Foundry does not count as taking keys (a link, a button outside a form, a `tabindex` container) Escape runs Foundry's dismiss, which, when no drag, menu, context menu or Tour is open, closes every Foundry window.
 The button draws no chevron and opens nothing itself.
 `aria-describedby` is an `aria` prop: Fabricate writes it on the button.
 It is the id of one element of your own, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
-The id exists in the tree while the button is shown; one that does not describes nothing.
+Each id must exist in the tree while the button is shown, and the element it names must not be `hidden`, which would still be read to a screen-reader user though a sighted user never sees it; an id that does not exist is skipped and the others are still read.
 The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
 The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: keep the button enabled and answer the press with the reason, or state the reason in the surrounding text.
 Rest `data-*` is for your own hooks.
@@ -2399,6 +2401,7 @@ They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-c
 That includes `data-tooltip-text`, which the sections above advise for a component whose rest lands on a root that is no control: a button opens no tooltip.
 The button keeps its own cursor too, so put a hint in the label or in text beside the button, where a keyboard user reads it as well.
 Tie a hint in text beside the button to it with `aria-describedby`.
+Give the hint element a stable `id` of your own, for example `<p id="acme-notes-hint">`, and pass `'aria-describedby': 'acme-notes-hint'` beside `children`, in the props you give `mount` and each `update`.
 
 A worked way out follows: an empty panel that holds the one verb that fills it.
 The panel sits inside a Fabricate window, because the button needs that ancestor wherever it is mounted, a content slot included.
@@ -2677,10 +2680,11 @@ A published component draws a control only where its section says so, and each c
 - An `aria` prop that takes an id (`aria-describedby`) names an element you own, in the same tree as `target`, outside `target` or inside one of its content slots.
   The element it names holds text you also draw visibly; Fabricate does not check this.
   Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, describes nothing, and keeping it unique is yours.
-  In a Foundry 14 detached window both ends sit inside the one Foundry window's element, because Foundry moves that element whole to the other document and anything you appended to `body` stays behind.
+  In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything you appended to `body` stays behind.
 - Foundry's tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
   A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it.
-  Restore the prop then with an `update` that omits it and, after Fabricate's next microtask flush, one that passes it again; made in one synchronous run the two are drawn as the second alone, which writes nothing.
+  Restore the prop once the tooltip has closed, which you can see when `game.tooltip.element` is no longer your control or after calling `game.tooltip.deactivate()` yourself: call `update` without the prop, `await` anything once that call has returned (`await Promise.resolve()` is enough), and call `update` with it again.
+  Without the `await` between them the two are drawn as the second alone, which writes nothing, and a restore you make while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
   Where a component's rest lands on the control itself, `data-cursor` is refused: at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is the fade of its own state change.
