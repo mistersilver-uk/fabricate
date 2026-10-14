@@ -20,6 +20,7 @@ import Meter from './svelte/components/Meter.svelte';
 import Notice from './svelte/components/Notice.svelte';
 import Rail from './svelte/components/Rail.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
+import StatusToggle from './svelte/components/StatusToggle.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 
@@ -40,6 +41,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/EmptyState.svelte': EmptyState,
   'src/ui/svelte/components/Notice.svelte': Notice,
   'src/ui/svelte/components/Button.svelte': Button,
+  'src/ui/svelte/components/StatusToggle.svelte': StatusToggle,
 });
 
 export const publishedComponentRuntime = Object.freeze({

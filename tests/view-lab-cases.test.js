@@ -816,6 +816,8 @@ const RUN_HEADING = '[data-journal-detail] .fab-run-progress-heading';
 const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 /** One published button of the controls fixture, by its section's key. */
 const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button`;
+/** One published switch of the same fixture, by its section's key. */
+const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -1102,6 +1104,24 @@ const NON_VERB_CONTROLS = Object.freeze({
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
     },
     { selector: labButton('clear'), styles: 'background-color: var(--fab-surface-raised)' },
+  ],
+  // The same fixture after its two switch presses (issue 2452): the off and on tracks in the
+  // sheet's declared size and grounds, the switch beside a wrapping label at its own width, and the
+  // focused switch's ring by its shape alone.
+  'manager-published-toggles-specimen': [
+    {
+      selector: `${labToggle('group')} > .manager-status-toggle-track`,
+      styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+    },
+    {
+      selector: `${labToggle('hide')} > .manager-status-toggle-track`,
+      styles: 'background-color: var(--fab-accent)',
+    },
+    { selector: labToggle('long'), styles: 'width: 34px' },
+    {
+      selector: `${labToggle('key')}:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5636,7 +5656,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the four specimens it mounts', () => {
+test('every published component seam module, and the host, selects the five specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5651,13 +5671,17 @@ test('every published component seam module, and the host, selects the four spec
       'manager-published-leaves-specimen',
       'manager-published-controls-specimen',
       'manager-published-buttons-specimen',
+      'manager-published-toggles-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount, nested ones included', () => {
+/** The published components a specimen other than the leaves one draws: the tier track's own, and the controls fixture's switch. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle']);
+
+test('the leaves specimen mounts every published component but TierTrack and StatusToggle and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -5731,9 +5755,9 @@ test('the leaves specimen mounts every published component but TierTrack and che
   assert.deepEqual(
     [...new Set(drawn)].sort(byCodePoint),
     PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
-      .filter((name) => name !== 'TierTrack')
+      .filter((name) => !SPECIMENED_ELSEWHERE.has(name))
       .sort(byCodePoint),
-    'every published component but TierTrack, which has its own specimen, and no other'
+    'every published component but TierTrack and StatusToggle, which other specimens draw, and no other'
   );
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
   const [{ container: ground }] = expectContained;
@@ -5823,8 +5847,8 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
   );
   assert.equal(
     expectContained.length,
-    19,
-    'five notices and thirteen buttons in the ground, and the ground in the window'
+    27,
+    'five notices, thirteen buttons and eight switches in the ground, and the ground in the window'
   );
 });
 
@@ -5873,7 +5897,58 @@ test('the buttons specimen presses two published buttons of the controls fixture
   assert.deepEqual(
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
-    'the same nineteen containments as the fixture’s other case'
+    'the same twenty-seven containments as the fixture’s other case'
+  );
+});
+
+test('the toggles specimen presses two published switches of the controls fixture: a click, then Space', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedControls.svelte');
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'StatusToggle'
+    ),
+    'the fixture mounts StatusToggle through the seam’s mount'
+  );
+  for (const hook of ['data-lab-toggles', 'data-lab-toggle']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit, expectContained, query } = getCaseById(
+    'manager-published-toggles-specimen'
+  );
+  assert.deepEqual(query, getCaseById('manager-published-controls-specimen').query);
+  assert.deepEqual(
+    steps.map((step) => step.press ?? 'click'),
+    ['click', 'Space'],
+    'a pointer press, then a keyboard press'
+  );
+  assert.deepEqual(
+    steps.map((step) => /\[data-lab-toggle="([a-z-]+)"\] button$/.exec(step.selector)?.[1]),
+    ['press', 'key'],
+    'each step acts on a switch the fixture mounted'
+  );
+  const focused = '[data-lab-toggle="key"] button';
+  assert.ok(
+    expectSelector.endsWith(`${focused}[aria-pressed="true"]:focus-visible`) &&
+      expectCenterHit.endsWith(focused),
+    'the frame is taken with keyboard focus on the switch the Space press turned on'
+  );
+  assert.ok(
+    expectSelector.includes(
+      '[data-lab-toggle="press"] button[data-lab-presses="1"][aria-pressed="true"]'
+    ),
+    'the frame is taken only after the click turned the first switch on'
+  );
+  assert.deepEqual(
+    expectContained,
+    getCaseById('manager-published-controls-specimen').expectContained,
+    'the same twenty-seven containments as the fixture’s other cases'
   );
 });
 
