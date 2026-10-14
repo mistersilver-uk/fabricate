@@ -56,37 +56,52 @@ describe('inventory view, rendered: the pager is the left column footer', () => 
   });
 });
 
-/** The bulk panel's footer against the detail column's scroller, at three scroll offsets. */
-async function bulkFooterAt(rows) {
+/** Open the bulk panel on `rows` queued components and evaluate `measure` in the page. */
+async function onBulkPanel(rows, measure) {
   const page = await fixtureServer.newPage({ viewport: { width: 1240, height: 900 } });
   try {
     await page.goto(fixtureServer.url(`${VIEW.url}?width=1200&bulk=${rows}`));
     await page.waitForSelector(
       'html[data-inventory-view-ready="true"] [data-inventory-bulk-footer]'
     );
-    return await page.evaluate(() => {
-      // The scroller is the shell's root inside the column section; both carry the hook.
-      const column = document.querySelector('.inventory-detail[data-inventory-detail]');
-      const footer = column.querySelector('[data-inventory-bulk-footer]');
-      const sampleAt = (scrollTop) => {
-        column.scrollTop = scrollTop;
-        const box = column.getBoundingClientRect();
-        const foot = footer.getBoundingClientRect();
-        return {
-          scrollTop: column.scrollTop,
-          column: { left: box.left + column.clientLeft, right: box.right, bottom: box.bottom },
-          footer: { left: foot.left, right: foot.right, bottom: foot.bottom },
-        };
-      };
-      const overflow = column.scrollHeight - column.clientHeight;
-      return {
-        overflow,
-        samples: [sampleAt(0), sampleAt(Math.floor(overflow / 2)), sampleAt(column.scrollHeight)],
-      };
-    });
+    return await page.evaluate(measure);
   } finally {
     await page.close();
   }
+}
+
+/** The footer and its first and last actions against the column's scroller, at three offsets. */
+function footerSamples() {
+  // The scroller is the shell's root inside the column section; both carry the hook.
+  const column = document.querySelector('.inventory-detail[data-inventory-detail]');
+  const footer = column.querySelector('[data-inventory-bulk-footer]');
+  const actions = [...footer.querySelectorAll('button')];
+  const style = getComputedStyle(column);
+  const edges = (node) => {
+    const { left, right, bottom } = node.getBoundingClientRect();
+    return { left, right, bottom };
+  };
+  const sampleAt = (scrollTop) => {
+    column.scrollTop = scrollTop;
+    const box = column.getBoundingClientRect();
+    const left = box.left + column.clientLeft;
+    return {
+      scrollTop: column.scrollTop,
+      column: { left, right: box.right, bottom: box.bottom },
+      content: {
+        left: left + parseFloat(style.paddingLeft),
+        right: left + column.clientWidth - parseFloat(style.paddingRight),
+      },
+      footer: edges(footer),
+      actions: [edges(actions[0]), edges(actions.at(-1))],
+    };
+  };
+  const overflow = column.scrollHeight - column.clientHeight;
+  return {
+    overflow,
+    actionCount: actions.length,
+    samples: [sampleAt(0), sampleAt(Math.floor(overflow / 2)), sampleAt(column.scrollHeight)],
+  };
 }
 
 /** Two edges within a pixel: a clamped integer `scrollTop` leaves a sub-pixel residue. */
@@ -100,12 +115,13 @@ describe("inventory view, rendered: the bulk footer sits on the detail column's 
     ['a queue taller than the column', 25],
   ]) {
     it(`meets the column's bottom and both sides with ${label}`, async () => {
-      const { overflow, samples } = await bulkFooterAt(rows);
+      const { overflow, actionCount, samples } = await onBulkPanel(rows, footerSamples);
       assert.ok(
         rows === 1 ? overflow === 0 : overflow >= 48,
         `NON-VACUITY: ${label} overflows the column by ${overflow}px`
       );
-      for (const { scrollTop, column, footer } of samples) {
+      assert.equal(actionCount, 2, 'NON-VACUITY: the footer carries Destroy and Salvage');
+      for (const { scrollTop, column, content, footer, actions } of samples) {
         within(
           footer.bottom,
           column.bottom,
@@ -113,6 +129,20 @@ describe("inventory view, rendered: the bulk footer sits on the detail column's 
         );
         within(footer.left, column.left, `its left edge on the column's at ${scrollTop}px`);
         within(footer.right, column.right, `its right edge on the column's at ${scrollTop}px`);
+        // The footer's inline padding pays its bleed back, as the shell's dock does for Apply.
+        for (const [index, action] of actions.entries()) {
+          const name = index === 0 ? 'first' : 'last';
+          within(
+            action.left,
+            content.left,
+            `its ${name} action on the content's left at ${scrollTop}px`
+          );
+          within(
+            action.right,
+            content.right,
+            `its ${name} action on the content's right at ${scrollTop}px`
+          );
+        }
       }
     });
   }
