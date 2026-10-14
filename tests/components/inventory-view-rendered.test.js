@@ -64,6 +64,10 @@ async function onBulkPanel(rows, measure) {
     await page.waitForSelector(
       'html[data-inventory-view-ready="true"] [data-inventory-bulk-footer]'
     );
+    // A ResizeObserver publishes the footer's height before the next paint; wait for two.
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+    );
     return await page.evaluate(measure);
   } finally {
     await page.close();
@@ -102,6 +106,34 @@ function footerSamples() {
     actionCount: actions.length,
     samples: [sampleAt(0), sampleAt(Math.floor(overflow / 2)), sampleAt(column.scrollHeight)],
   };
+}
+
+/** Focus every control above the footer from the top, then the last of them from scroll top. */
+function focusWalk() {
+  const column = document.querySelector('.inventory-detail[data-inventory-detail]');
+  const footer = column.querySelector('[data-inventory-bulk-footer]');
+  const controls = [...column.querySelectorAll('button')].filter((node) => !footer.contains(node));
+  const under = (control) => {
+    const bottom = control.getBoundingClientRect().bottom;
+    const top = footer.getBoundingClientRect().top;
+    return bottom > top + 1
+      ? `${control.getAttribute('aria-label') ?? 'a control'} ends ${bottom}px, footer top ${top}px`
+      : '';
+  };
+  column.scrollTop = 0;
+  let scrolls = 0;
+  const obscured = [];
+  for (const control of controls) {
+    const before = column.scrollTop;
+    control.focus();
+    if (column.scrollTop !== before) scrolls += 1;
+    if (under(control)) obscured.push(under(control));
+  }
+  // Blurred first: focusing the element that already has focus does not scroll.
+  document.activeElement.blur();
+  column.scrollTop = 0;
+  controls.at(-1).focus();
+  return { count: controls.length, scrolls, obscured, last: under(controls.at(-1)) };
 }
 
 /** Two edges within a pixel: a clamped integer `scrollTop` leaves a sub-pixel residue. */
@@ -146,4 +178,18 @@ describe("inventory view, rendered: the bulk footer sits on the detail column's 
       }
     });
   }
+
+  it('stops a focus scroll above the footer on a 25-row queue (WCAG 2.4.11)', async () => {
+    const walk = await onBulkPanel(25, focusWalk);
+    assert.ok(
+      walk.count >= 26 && walk.scrolls > 0,
+      `NON-VACUITY: ${walk.count} controls, ${walk.scrolls} focus scrolls`
+    );
+    assert.deepEqual(walk.obscured, [], 'a focused control sat under the footer');
+    assert.equal(
+      walk.last,
+      '',
+      'the last control above the footer, focused from scroll top, sat under it'
+    );
+  });
 });

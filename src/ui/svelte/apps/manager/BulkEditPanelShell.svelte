@@ -22,6 +22,8 @@
   Invariants:
   - The panel is its rail's last child and fills it, so the dock sits on the rail's foot whether
     or not the axes overflow — pinned by `tests/components/bulk-edit-dock-pinning.test.js`.
+  - The dock publishes its height, and everything above it takes that as `scroll-margin-block-end`,
+    so a focus scroll stops above the dock (WCAG 2.4.11) — pinned by the same suite.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -56,6 +58,8 @@
   const clearHook = $derived({ [clearAttr]: '' });
   const countHook = $derived({ [countAttr]: '' });
   const applyHook = $derived({ [applyAttr]: '' });
+  // `bind:offsetHeight` is a ResizeObserver Svelte disconnects on destroy.
+  let dockHeight = $state(0);
 
   const blockedRows = $derived(Array.isArray(blocked) ? blocked : []);
   // Only a caller that names a positive subject can have every record blocked; unnamed, Apply
@@ -120,7 +124,11 @@
 {#snippet blockedReasons()}{@render reasonList(blockedRows)}{/snippet}
 {#snippet skippedReasons()}{@render reasonList(skippedRows)}{/snippet}
 
-<section class="fab-bulk-edit-panel" {...panelHook}>
+<section
+  class="fab-bulk-edit-panel"
+  {...panelHook}
+  style:--fab-bulk-edit-dock-block-size={dockHeight > 0 ? `${dockHeight}px` : undefined}
+>
   <header class="fab-bulk-edit-header">
     <p class="fab-bulk-edit-eyebrow">
       {localizeOr('FABRICATE.Admin.Manager.BulkEdit.PanelTitle', 'Bulk edit')}
@@ -171,6 +179,7 @@
 
   <div
     class="fab-bulk-edit-dock"
+    bind:offsetHeight={dockHeight}
     class:has-foot={Boolean(dockFoot)}
     class:is-bleed-space-4={dockBleed === 'space-4'}
   >
@@ -318,9 +327,10 @@
      `tests/components/bulk-edit-dock-pinning.test.js` samples the top of the scroll range as well
      as the bottom, because a dock that never sticks looks pinned at maximum scroll. Below the
      supported minimum the sheet's container query makes `.manager-body` the scrollport and the
-     dock does not pin, which is not a regression — do not reach into that block from here. No `z-index`, deliberately, and no shadow: the dock
-     sits at its scroll area's edge rather than floating over content, so it reads by its top
-     border and its fill, and a downward elevation token would be clipped at that edge. */
+     dock does not pin, which is not a regression — do not reach into that block from here.
+     No `z-index`, deliberately, and no shadow: the dock sits at its scroll area's edge rather
+     than floating over content, so it reads by its top border and its fill, and a downward
+     elevation token would be clipped at that edge. */
   .fab-bulk-edit-dock {
     position: sticky;
     bottom: -12px;
@@ -332,6 +342,14 @@
     padding-bottom: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
+  }
+
+  /* Not inherited, so set on every node above the dock: a focus scroll aligns the focused node's
+     margin box, which this extends by the dock's published height. `:global` because the axes are
+     the caller's. */
+  .fab-bulk-edit-panel > :global(:not(.fab-bulk-edit-dock)),
+  .fab-bulk-edit-panel > :global(:not(.fab-bulk-edit-dock) *) {
+    scroll-margin-block-end: var(--fab-bulk-edit-dock-block-size, 0);
   }
 
   /* Gated on the snippet: with no `dockFoot` the dock is byte-identical to what ships. */

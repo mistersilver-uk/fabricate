@@ -383,6 +383,7 @@ A GM who moved focus elsewhere while an awaited write was in flight keeps their 
 Apply's dock sits on its rail's bottom edge at the rail's full inner width whether or not the staged axes fill the rail: a panel shorter than its rail fills it, so the dock never stops under the axes with the rail empty beneath it.
 A set delete renders inside that dock, under Apply, rather than as a card after the panel, so Apply and the delete both sit at the rail's foot on every bulk edit panel (maintainer ruling, 2026-10-14).
 Nothing renders after the panel in its rail, because a sibling would shorten the dock's containing block and lift the dock off the rail's foot.
+A control that takes focus above the dock, or above the player inventory's sticky bulk footer, is scrolled to stop above it rather than under it (WCAG 2.4.11), whatever height the dock or footer currently has.
 
 #### Announcing after a focus move
 

@@ -129,6 +129,9 @@
   });
 
   const busy = $derived(running === true || destroying === true);
+  // The footer's height, by a ResizeObserver Svelte disconnects on destroy.
+  let footerHeight = $state(0);
+  const footerReserve = $derived(footerHeight > 0 ? `${footerHeight}px` : undefined);
   const hasReport = $derived(report != null);
   // How many QUEUED rows honour the player's own stage order. Only progressive rows
   // whose component permits player reorder qualify; a GM who pinned the authored order
@@ -331,7 +334,7 @@
   totalAttrs={state === 'report' ? {} : { 'aria-live': 'polite', 'aria-atomic': 'true' }}
   headerAction={state === 'report' ? null : clearAction}
 >
-  <div class="bulk-body">
+  <div class="bulk-body" style:--fab-inventory-bulk-footer-block-size={footerReserve}>
     {#if state === 'report'}
       <InventoryBulkReport {report} />
     {:else}
@@ -494,7 +497,7 @@
          committing, that one gesture rolls the whole batch — the dialog's own note
          arrives too late to change their mind about the selection. It is hidden
          entirely once a report stands, leaving only Done. -->
-    <div class="bulk-footer" data-inventory-bulk-footer={state}>
+    <div class="bulk-footer" data-inventory-bulk-footer={state} bind:offsetHeight={footerHeight}>
       {#if state === 'report'}
         <Button role="primary" fullWidth data-inventory-bulk-done="" onclick={() => onDone?.()}>
           <i class="fas fa-check" aria-hidden="true"></i>
@@ -558,6 +561,12 @@
     gap: var(--fab-space-4);
   }
 
+  /* Everything above the footer reserves its height, so a focus scroll stops above it (2.4.11). */
+  .bulk-body > :global(:not(.bulk-footer)),
+  .bulk-body > :global(:not(.bulk-footer) *) {
+    scroll-margin-block-end: var(--fab-inventory-bulk-footer-block-size, 0);
+  }
+
   .bulk-progress {
     display: flex;
     flex-direction: column;
@@ -590,15 +599,9 @@
     background: var(--fab-accent);
   }
 
-  /* The reason is BOUNDED, and that bound is the whole point of this rule.
-     `InventoryBulkRow`'s trailing group is `flex: 0 0 auto` and must stay that way — it
-     is what keeps a chip and the remove control from being squeezed — so the row's name
-     is the side that shrinks, and the only lever here that protects it is to cap the
-     reason itself. Uncapped, a long reason such as the unfinished-results one wins the
-     entire row at the 1024 floor and renders "Bent Clasp" as "B..". A reason attached to
-     a row the player cannot identify is worth nothing, so the name keeps a usable
-     minimum and the reason wraps into two or three short right-aligned lines instead —
-     which loses nothing, unlike an ellipsis. */
+  /* The reason is capped because `InventoryBulkRow`'s trailing group must stay `flex: 0 0 auto`,
+     so the name is the side that shrinks: uncapped, a long reason renders "Bent Clasp" as "B.."
+     at the 1024 floor. Capped, it wraps to short right-aligned lines, losing nothing. */
   .bulk-blocked-reason {
     flex: 0 1 auto;
     min-width: 0;
@@ -630,8 +633,9 @@
   /* Sticky, so the commit stays reachable below a long queue (issue 859). Its fill is the column's
      composite, an opaque `--fab-surface` that hides scrolled rows under the `::before`'s 5% soft
      layer (no gradient: `flat-ui-style-contract`). It sits on the column's foot at its full width
-     (maintainer ruling, 2026-10-14): the bleeds are `.inventory-detail`'s padding, as the manager's
-     bulk dock bleeds by its rail's, and the matching padding keeps the actions in the column. */
+     (maintainer ruling, 2026-10-14): the bleeds and `bottom` are `.inventory-detail`'s `--fab-space-4`
+     padding (a literal in `bottom`, where the spacing ratchet bars a token), as the manager's bulk
+     dock bleeds by its rail's, and the matching padding keeps the actions in the column. */
   .bulk-footer {
     position: sticky;
     bottom: -16px;
@@ -658,10 +662,8 @@
   }
 
   .bulk-footer-note {
-    /* MUST stay `auto`-basis. The footer is a COLUMN, so flex-basis is a HEIGHT here —
-       a row-style `flex: 1 1 22em` inflates the note to a ~22em-tall box, and because
-       the footer is `position: sticky` it then paints over the yield rows behind it,
-       hiding every row but the first (issue 859). Sized by its own text, nothing more. */
+    /* `auto`-basis: in this column a basis is a height, and a row-style `1 1 22em` paints a ~22em
+       note from the sticky footer over the yield rows (issue 859). */
     flex: 0 0 auto;
     margin: 0;
     min-width: 0;
@@ -672,9 +674,8 @@
   }
 
   .bulk-footer-actions {
-    /* Full-width stacked actions, matching the reference prototype: the commit control
-       is the widest thing on the panel rather than a right-aligned pair. This also
-       removes the 1024 wrap case entirely — there is nothing left to wrap. */
+    /* Full-width and stacked, as the reference prototype draws them: the commit control is the
+       widest thing on the panel, and there is no 1024 wrap case left. */
     display: flex;
     flex-direction: column;
     align-items: stretch;

@@ -31,7 +31,7 @@
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { before, describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
@@ -40,6 +40,7 @@ import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -557,4 +558,89 @@ describe('the bulk edit dock carrying the set delete', () => {
       }
     });
   }
+});
+
+/*
+ * ── THE LIVE SHELL: FOCUS ABOVE THE DOCK ────────────────────────────────────────────────
+ * The dock measures itself, which only a running component does, so these clauses mount the shell
+ * through Vite (`tests/fixtures/bulk-edit-dock/`) in the same inspector skeleton as above.
+ */
+const dockFixture = createViteFixtureServer({ styleMountPrefix: '/@bulk-edit-dock-styles/' });
+
+async function openDockFixture(query) {
+  const page = await dockFixture.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.goto(dockFixture.url(`/tests/fixtures/bulk-edit-dock/index.html?${query}`));
+  await page.waitForSelector('html[data-bulk-dock-ready="true"] .fab-bulk-edit-dock');
+  await settleDock(page);
+  return page;
+}
+
+/** A ResizeObserver delivers before the next paint and Svelte writes after it, so wait two frames. */
+function settleDock(page) {
+  return page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+  );
+}
+
+/** Focus every body control from the top in tab order, then the last one from scroll top. */
+function focusWalk() {
+  const inspector = document.querySelector('[data-probe-inspector]');
+  const dock = inspector.querySelector('.fab-bulk-edit-dock');
+  const controls = [...inspector.querySelectorAll('button')].filter((node) => !dock.contains(node));
+  const under = (control) => {
+    const bottom = control.getBoundingClientRect().bottom;
+    const dockTop = dock.getBoundingClientRect().top;
+    return bottom > dockTop + 1 ? `${control.textContent.trim()} ends ${bottom}px, dock top ${dockTop}px` : '';
+  };
+  inspector.scrollTop = 0;
+  let scrolls = 0;
+  const obscured = [];
+  for (const control of controls) {
+    const before = inspector.scrollTop;
+    control.focus();
+    if (inspector.scrollTop !== before) scrolls += 1;
+    if (under(control)) obscured.push(under(control));
+  }
+  // Blurred first: focusing the element that already has focus does not scroll.
+  document.activeElement.blur();
+  inspector.scrollTop = 0;
+  const last = controls.at(-1);
+  last.focus();
+  const published = dock.parentElement.style.getPropertyValue('--fab-bulk-edit-dock-block-size');
+  return { count: controls.length, scrolls, obscured, last: under(last), dockHeight: dock.offsetHeight, published };
+}
+
+function assertNoneObscured(walk, face) {
+  assert.ok(walk.count >= 18 && walk.scrolls > 0, `NON-VACUITY: ${face}, ${walk.count} controls, ${walk.scrolls} focus scrolls`);
+  assert.deepEqual(walk.obscured, [], `${face}: a focused control sat under the ${walk.dockHeight}px dock`);
+  assert.equal(walk.last, '', `${face}: the last body control, focused from scroll top, sat under the dock`);
+  assert.equal(walk.published, `${walk.dockHeight}px`, `${face}: the panel publishes the dock's current height`);
+}
+
+describe('the live bulk edit dock', () => {
+  before(() => dockFixture.start());
+  after(() => dockFixture.stop());
+
+  it('stops a focus scroll above the dock, idle and after the delete arms (WCAG 2.4.11)', async () => {
+    const page = await openDockFixture('');
+    try {
+      const idle = await page.evaluate(focusWalk);
+      assertNoneObscured(idle, 'idle');
+      await page.click('[data-arm-token]');
+      await page.waitForSelector('[data-arm-token][data-armed="true"]');
+      await settleDock(page);
+      assertNoneObscured(await page.evaluate(focusWalk), 'armed');
+      // The observer follows the dock after mount: a row the card did not have grows it by 60px.
+      await page.evaluate(() => {
+        const grown = Object.assign(document.createElement('div'), { style: 'height:60px' });
+        document.querySelector('.fab-bulk-edit-dock').append(grown);
+      });
+      await settleDock(page);
+      const grown = await page.evaluate(focusWalk);
+      assert.ok(grown.dockHeight >= idle.dockHeight + 60, `NON-VACUITY: the dock grew (${idle.dockHeight} → ${grown.dockHeight}px)`);
+      assertNoneObscured(grown, 'grown');
+    } finally {
+      await page.close();
+    }
+  });
 });

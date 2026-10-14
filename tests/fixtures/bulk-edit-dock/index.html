@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bulk edit dock — focus scroll and the smallest supported rail</title>
+    <!--
+      Served by `tests/components/bulk-edit-dock-pinning.test.js` from a Vite dev server, so the
+      shell runs live: its dock measures itself, which a static render cannot.
+    -->
+    <link rel="stylesheet" href="/@bulk-edit-dock-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      :root {
+        --font-primary: Arial, sans-serif;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .probe-axis {
+        display: block;
+        width: 100%;
+        height: 34px;
+        flex: none;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/bulk-edit-dock/mount.js"></script>
+  </body>
+</html>
