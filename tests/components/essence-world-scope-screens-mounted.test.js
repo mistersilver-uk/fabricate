@@ -10,6 +10,8 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import {
+  ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
+  ESSENCE_CATALOGUE_BULK_RAW_MODULES,
   ESSENCE_WORLD_SCOPE_RAW_MODULES as SCOPED_RAW_MODULES,
   ESSENCE_WORLD_SHELL_MODULES as SHELL_MODULES,
 } from '../helpers/essenceWorldScopeModules.js';
@@ -20,10 +22,11 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const pageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-catalogue-',
-  rawModules: SCOPED_RAW_MODULES,
+  rawModules: [...SCOPED_RAW_MODULES, ...ESSENCE_CATALOGUE_BULK_RAW_MODULES],
   compiledModules: [
     ...SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
+    ...ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',

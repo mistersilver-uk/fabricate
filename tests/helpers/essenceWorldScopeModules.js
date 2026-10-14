@@ -72,3 +72,21 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ]);
 
+/** The catalogue page's bulk face (issue 2485): its panel, the bulk chrome and both pickers. */
+export const ESSENCE_CATALOGUE_BULK_RAW_MODULES = Object.freeze([
+  'src/ui/model/essenceBulkEditModel.js',
+  'src/ui/svelte/util/essenceIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
+  'src/ui/svelte/util/managerColorTokens.js',
+]);
+
+export const ESSENCE_CATALOGUE_BULK_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/components/IconPicker.svelte',
+  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/apps/manager/scoped/EssenceCatalogueBulkPanel.svelte',
+]);
