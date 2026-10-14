@@ -73,7 +73,7 @@ const HARNESS = Object.freeze({
     raw: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   },
   ItemDropZone: {
-    compiled: [component('IconButton')],
+    compiled: [component('IconButton'), component('Medallion')],
     raw: [
       ...FOUNDRY_BRIDGE_RAW_MODULES,
       'src/ui/svelte/actions/dragDrop.js',

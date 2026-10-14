@@ -53,6 +53,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     // The shared numeric stepper the DC.

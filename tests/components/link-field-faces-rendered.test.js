@@ -1,8 +1,9 @@
 /**
  * The link field's faces as Chromium draws them (issue 2466): the 104px floor, the three grounds
- * and borders, the empty stack, the two-line caps, the action column and the compact face. The
- * sheet sits in `@layer modules` and the component's scoped block is unlayered, as Foundry loads
- * them, so each clause measures the cascade a selector reading cannot.
+ * and borders, the empty stack, the two-line caps, the action column, the compact face, the 38px
+ * chip and the uuid line. The sheet sits in `@layer modules`, Foundry's `code` rule in `@layer
+ * elements` and the scoped blocks unlayered, as Foundry loads them, so each clause measures the
+ * cascade a selector reading cannot.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,6 +20,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const ZONE = 'src/ui/svelte/components/ItemDropZone.svelte';
+const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 
 const noop = () => {};
 const ACTIONS = { copyLabel: 'Copy uuid', unlinkLabel: 'Unlink', onCopy: noop, onUnlink: noop };
@@ -27,6 +29,7 @@ const LONG_TITLE = 'Drop a game-world item here to link it to this record. '.rep
 /** A compendium address standing in for a name: 44 characters with no break opportunity. */
 const UUID_NAME = 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB';
 const LONG_NOTE = `From the Items directory or a compendium, ${'x'.repeat(40)} and from any pack this world has unlocked for editing.`;
+const ART = 'icons/svg/item-bag.svg';
 
 /** Each case: the host's width and the props the zone mounts with. */
 const CASES = Object.freeze({
@@ -65,12 +68,30 @@ const CASES = Object.freeze({
     props: { item: { name: LONG_TITLE }, hint: LONG_NOTE, subline: LONG_NOTE, ...ACTIONS },
   },
   'uuid-name': { width: 220, props: { item: { name: UUID_NAME }, uuid: UUID_NAME, ...ACTIONS } },
+  'linked-art': {
+    width: 280,
+    props: {
+      item: { name: 'Blacksmith’s Compendium', img: ART },
+      uuid: 'Item.kR3n',
+      hint: 'Drop another.',
+      ...ACTIONS,
+    },
+  },
+  'missing-art': {
+    width: 280,
+    props: { item: { name: 'Untitled', img: ART }, state: 'missing', emptyIcon: 'fas fa-link' },
+  },
+  'compact-missing': {
+    width: 280,
+    props: { item: { name: 'Untitled', img: ART }, state: 'missing', compact: true, ...PROMPT },
+  },
 });
 
 /** The tokens the clauses compare against, each read from an element that declares it. */
 const TOKENS = Object.freeze([
   'surface-soft',
   'bg-1',
+  'bg-3',
   'danger-soft',
   'accent-soft',
   'border-strong',
@@ -85,10 +106,15 @@ const TOKENS = Object.freeze([
 /** The page loads no Font Awesome, so the glyph is given a box; without one the stack has two rows. */
 const GLYPH_BOX = String.raw`.fas{display:inline-block;line-height:1}.fas::before{content:"\25A0"}`;
 
+/** Foundry 14.365's inline `code` rule, verbatim from `foundry2.css`, in the layer it ships in. */
+const FOUNDRY_CODE = `@layer elements { code { display: inline-block; padding: 1px 0.25rem; margin: -1px 0; word-break: keep-all; white-space: nowrap } }`;
+
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
+<style>${FOUNDRY_CODE}</style>
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, ZONE)).css}</style>
+<style>${scopedComponentCss(resolve(repoRoot, MEDALLION)).css}</style>
 <style>${GLYPH_BOX}</style>
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
 ${TOKENS.map((token) => `<span data-token="${token}" style="color:var(--fab-${token})"></span>`).join('')}
@@ -106,9 +132,13 @@ const readFaces = () => {
     'background-color',
     'border-top-color',
     'border-top-style',
+    'border-top-width',
     'border-top-left-radius',
     'min-height',
     'padding-top',
+    'padding-left',
+    'margin-top',
+    'margin-bottom',
     'opacity',
     'color',
     'font-size',
@@ -125,6 +155,9 @@ const readFaces = () => {
     uuid: '.manager-item-drop-zone-uuid',
     hint: '.manager-item-drop-zone-copy > small:not([data-item-drop-zone-subline])',
     subline: '[data-item-drop-zone-subline]',
+    chip: '.fab-medallion',
+    chipGlyph: '.fab-medallion > i',
+    chipArt: '.fab-medallion > img',
   };
   const part = (node) => {
     if (!node) return null;
@@ -149,6 +182,11 @@ const readFaces = () => {
     face.buttons = [...host.querySelectorAll(':scope .manager-item-drop-zone-actions button')].map(
       (button) => part(button).box
     );
+    face.glyphClass = host.querySelector('.fab-medallion > i')?.className ?? '';
+    const uuidLine = doc.createRange();
+    const uuidNode = host.querySelector(PARTS.uuid);
+    if (uuidNode) uuidLine.selectNodeContents(uuidNode);
+    face.uuidLine = uuidNode ? uuidLine.getClientRects()[0]?.height : 0;
     faces[host.dataset.case] = face;
   }
   const tokens = {};
@@ -174,7 +212,7 @@ before(async () => {
       'src/ui/svelte/actions/dragDrop.js',
       'src/ui/svelte/util/dropUtils.js',
     ],
-    compiledModules: ['src/ui/svelte/components/IconButton.svelte', ZONE],
+    compiledModules: ['src/ui/svelte/components/IconButton.svelte', MEDALLION, ZONE],
     componentPath: ZONE,
   });
   const markup = {};
@@ -246,14 +284,13 @@ it('draws the empty prompt as a centred stack on a dashed 104px box', () => {
 });
 
 it('draws a linked zone as a solid bg-1 row on the same floor, with its actions in a column', () => {
-  const { root, icon, name, uuid, hint, buttons } = faces.linked;
+  const { root, name, uuid, hint, buttons } = faces.linked;
   assert.equal(root.style['min-height'], '104px');
   assert.ok(root.box.height >= 104, `the linked box is ${root.box.height}px, under its floor`);
   assert.equal(root.style['border-top-style'], 'solid');
   assert.equal(root.style['border-top-color'], tokens['border-strong']);
   assert.equal(root.style['background-color'], tokens['bg-1']);
 
-  assert.deepEqual([icon.box.width, icon.box.height], [44, 44]);
   assert.equal(name.style['font-size'], '14px');
   assert.equal(name.style['font-weight'], '600');
   assert.equal(name.style['font-family'], tokens.serif);
@@ -272,14 +309,79 @@ it('draws a linked zone as a solid bg-1 row on the same floor, with its actions 
 });
 
 it('draws a missing zone on the danger ground', () => {
-  const { root, icon, name, uuid, hint } = faces.missing;
+  const { root, chipGlyph, name, uuid, hint } = faces.missing;
   assert.equal(root.style['border-top-style'], 'solid');
   assert.equal(root.style['border-top-color'], tokens['danger-border']);
   assert.equal(root.style['background-color'], tokens['danger-soft']);
   assert.equal(name.style.color, tokens['danger-text']);
-  assert.equal(icon.style.color, tokens['danger-text']);
+  assert.equal(chipGlyph.style.color, tokens['danger-text']);
   assert.equal(uuid.style.color, tokens['text-secondary']);
   assert.equal(hint.style.color, tokens['text-secondary']);
+});
+
+it('draws a linked zone`s chip as an unbordered 38px bg-3 tile, centred, 12px from the name', () => {
+  const { root, chip, name } = faces.linked;
+  assert.deepEqual([chip.box.width, chip.box.height], [38, 38]);
+  assert.equal(chip.style['border-top-left-radius'], '9px');
+  assert.equal(chip.style['border-top-style'], 'none', 'the chip is unbordered');
+  assert.equal(chip.style['border-top-width'], '0px');
+  assert.equal(chip.style['background-color'], tokens['bg-3']);
+  const gap = name.box.left - chip.box.right;
+  assert.ok(Math.abs(gap - 12) <= 0.5, `the name starts ${gap}px right of the chip, not 12px`);
+  const offset = middle(chip.box) - middle(root.box);
+  assert.ok(Math.abs(offset) <= 1, `the chip sits ${offset}px off the box's vertical centre`);
+  assert.ok(!faces.linked.chipArt, 'an item with no image draws the glyph');
+  assert.ok(Boolean(faces['linked-art'].chipArt), 'and an item with one draws it in the chip');
+});
+
+it('draws a missing chip as the alert glyph in danger ink, never the document`s art', () => {
+  for (const key of ['missing', 'missing-art']) {
+    const { chip, chipGlyph, chipArt, glyphClass } = faces[key];
+    assert.deepEqual([chip.box.width, chip.box.height], [38, 38], `${key}: the chip is 38px`);
+    assert.ok(
+      !chipArt,
+      `${key}: a broken link draws no image, so it cannot look like a working one`
+    );
+    assert.match(glyphClass, /\bfa-triangle-exclamation\b/u, `${key}: the alert glyph`);
+    assert.doesNotMatch(glyphClass, /\bfa-link\b/u, `${key}: not the caller's glyph`);
+    assert.equal(chipGlyph.style.color, tokens['danger-text'], `${key}: in danger ink`);
+  }
+});
+
+it('keeps the empty, the compact and a compact missing face`s glyph bare, with no chip', () => {
+  for (const key of ['empty', 'compact', 'compact-missing']) {
+    assert.ok(Boolean(faces[key].icon), `${key}: the bare glyph span renders`);
+    assert.ok(!faces[key].chip, `${key}: and no chip`);
+    assert.ok(!faces[key].chipArt, `${key}: and no art`);
+  }
+});
+
+it('sets the uuid at 10px, flush with the name, with Foundry`s `code` box cleared', () => {
+  for (const key of ['linked', 'missing', 'linked-art']) {
+    const { name, uuid, hint } = faces[key];
+    assert.equal(uuid.style['font-size'], '10px', `${key}: the uuid is 10px`);
+    assert.equal(uuid.style['padding-left'], '0px', `${key}: Foundry's inline padding is cleared`);
+    assert.equal(uuid.style['padding-top'], '0px', `${key}: and its block padding`);
+    assert.deepEqual(
+      [uuid.style['margin-top'], uuid.style['margin-bottom']],
+      ['0px', '0px'],
+      `${key}: and its -1px block margins, so the box keeps its line's height`
+    );
+    const offset = uuid.box.left - name.box.left;
+    assert.ok(Math.abs(offset) <= 0.5, `${key}: the uuid starts ${offset}px right of the name`);
+    const { uuidLine } = faces[key];
+    assert.ok(uuidLine > 0, `${key}: the uuid's text has a line box to compare with`);
+    assert.ok(
+      Math.abs(uuid.box.height - uuidLine) <= 0.5,
+      `${key}: the uuid's box is ${uuid.box.height}px around a ${uuidLine}px line`
+    );
+    for (const [label, gap] of [
+      ['above', uuid.box.top - name.box.bottom],
+      ['below', hint.box.top - uuid.box.bottom],
+    ]) {
+      assert.ok(Math.abs(gap - 4) <= 0.5, `${key}: the uuid sits ${gap}px from its ${label} line`);
+    }
+  }
 });
 
 it('lets a drag take the border, ground and ring of a linked, a missing and a compact zone', async () => {

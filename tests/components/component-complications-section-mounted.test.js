@@ -101,6 +101,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     // The trigger clause and the dice-condition comparator render `Select.svelte` (issue 1510); an

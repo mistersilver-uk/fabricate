@@ -86,6 +86,7 @@ const dropZoneHarness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/IconButton.svelte',
   ],
 });
@@ -2418,7 +2419,7 @@ describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the c
       `an unasked zone is the LINKED face; it read "${zone.className}"`
     );
     assert.equal(
-      zone.querySelector('.manager-item-drop-zone-icon img')?.getAttribute('src'),
+      zone.querySelector('.fab-medallion img')?.getAttribute('src'),
       LINKED_ITEM.img,
       'the art is the resolved document’s, not the empty glyph'
     );
@@ -2446,7 +2447,7 @@ describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the c
     });
     const zone = target.querySelector('[data-item-drop-zone="component-source"]');
     assert.ok(zone.classList.contains('is-compact') && !zone.classList.contains('is-linked'));
-    assert.ok(!zone.querySelector('.manager-item-drop-zone-icon img'), 'the art is a glyph again');
+    assert.ok(!zone.querySelector('img'), 'the art is a glyph again');
     assert.equal(
       zone.querySelector('.manager-item-drop-zone-copy strong').textContent.trim(),
       'Drop an item',

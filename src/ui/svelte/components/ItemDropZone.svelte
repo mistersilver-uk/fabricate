@@ -31,11 +31,14 @@
     `openspec/specs/design-system/spec.md`; one measured residue follows from the same spread, in
     that an element carrying one has its scope hash stamped defensively, so the hint `<small>`
     renders a `class` the compiled CSS never names.
+  - A MISSING CHIP DRAWS THE ALERT GLYPH, never the document's art or the caller's glyph, because a
+    broken link must not look like a working one.
 -->
 <script>
   import { dragDrop } from '../actions/dragDrop.js';
   import { resolveDropUuid } from '../util/dropUtils.js';
   import IconButton from './IconButton.svelte';
+  import Medallion from './Medallion.svelte';
 
   let {
     item = null,
@@ -82,9 +85,18 @@
   {...hooksFor('root')}
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
-  <span class="manager-item-drop-zone-icon" aria-hidden="true">
-    {#if item?.img && !compact}<img src={item.img} alt="" />{:else}<i class={emptyIcon}></i>{/if}
-  </span>
+  {#if item && !compact}
+    <Medallion
+      size={38}
+      variant="glyph-chip"
+      alt=""
+      art={isMissing ? '' : item.img || ''}
+      icon={isMissing ? 'fas fa-triangle-exclamation' : emptyIcon}
+      ink={isMissing ? 'danger' : ''}
+    />
+  {:else}
+    <span class="manager-item-drop-zone-icon" aria-hidden="true"><i class={emptyIcon}></i></span>
+  {/if}
   <span class="manager-item-drop-zone-copy">
     <strong>{compact ? title : item?.name || title}</strong>
     {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
@@ -130,9 +142,11 @@
   .manager-item-drop-zone-uuid {
     display: block;
     font-family: var(--fab-font-mono);
-    font-size: 0.68rem;
+    font-size: 10px;
     color: var(--fab-text-muted);
-    /* Foundry's `code` keeps one unbroken line, which ran the uuid beneath the actions. */
+    /* Foundry's `code` pads, offsets and keeps one unbroken line, which ran the uuid beneath the actions. */
+    padding: 0;
+    margin: 0;
     white-space: normal;
     word-break: normal;
     overflow-wrap: anywhere;
