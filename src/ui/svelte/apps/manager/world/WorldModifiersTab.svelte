@@ -13,7 +13,7 @@
   import { tick } from 'svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';

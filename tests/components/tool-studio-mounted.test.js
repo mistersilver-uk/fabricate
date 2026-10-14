@@ -110,7 +110,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
     // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373).
     'src/ui/svelte/components/ArmedDangerButton.svelte',

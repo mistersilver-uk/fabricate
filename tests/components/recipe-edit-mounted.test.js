@@ -194,7 +194,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   ...CHOICE_GROUP_COMPILED_MODULES,
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',

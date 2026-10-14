@@ -25,7 +25,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
   ],

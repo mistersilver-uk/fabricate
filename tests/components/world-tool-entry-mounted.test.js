@@ -88,7 +88,7 @@ const harness = createMountedComponentHarness({
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.

@@ -35,7 +35,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import { shownAmount } from './pickerRowKinds.js';
 
   amountSeq += 1;
@@ -176,7 +176,8 @@
         'FABRICATE.Admin.Manager.Recipe.RolledAmountHint',
         'A dice expression such as 1d4+1, rolled when the result is awarded. A missing character value counts as 0.'
       )}
-      {...invalidAttrs}
+      aria-invalid={invalid ? 'true' : undefined}
+      aria-describedby={invalid ? errorId : undefined}
       onChange={writeFormula}
     />
   {:else}

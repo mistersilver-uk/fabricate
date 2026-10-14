@@ -3,6 +3,7 @@
  * (issue 1116).
  */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -163,6 +164,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/RangeBarMarker.svelte',
   // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
   'src/ui/svelte/components/RequirementChooser.svelte',
+  // Issue 2465: the expression field, on the seventeen frames that draw it.
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
@@ -871,6 +874,45 @@ test('the importer scan is measuring a populated tree, not silently matching not
   );
 });
 
+/** The expression field (issue 2465), and the cases its override names: the ones that draw it. */
+const EXPRESSION_FIELD = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
+const EXPRESSION_FIELD_CASES = [
+  'manager-system-edit-lists',
+  'manager-checks-stacked-floor',
+  'manager-checks-formula-card',
+  'manager-checks-character-value-unresolved',
+  'manager-checks-parity-under-attribute',
+  'manager-checks-v3-count-over-narrow',
+  'manager-checks-v3-count-additional-dice-path',
+  'manager-recipe-edit-results-rolled',
+  'manager-recipe-edit-results-rolled-narrow',
+  'manager-component-edit-salvage-rolled-narrow',
+  'manager-recipe-edit-results-group-player-anyone',
+  'manager-recipe-edit-results-group-rolled-anyone',
+  'manager-recipe-edit-results-group-rolled-upto-repeats',
+  'manager-recipe-edit-results-group-rolled-upto-repeats-narrow',
+  'manager-recipe-edit-results-group-rolled-overlap',
+  'manager-recipe-edit-results-group-rolled-overlap-narrow',
+  'manager-recipe-edit-results-group-failure-role',
+];
+
+test("the expression field's override names the cases that draw it, each claiming an importer", () => {
+  assert.deepEqual(BROAD_SIGNAL_CASE_OVERRIDES[EXPRESSION_FIELD], EXPRESSION_FIELD_CASES);
+  const selected = new Set(
+    mapChangedFilesToCases([EXPRESSION_FIELD]).map((viewCase) => viewCase.id)
+  );
+  const importers = IMPORTERS.importersOf(EXPRESSION_FIELD);
+  assert.ok(importers.length > 0, 'the field has no measured importer, so no case can claim one');
+  for (const id of EXPRESSION_FIELD_CASES) {
+    assert.ok(selected.has(id), `a change to the field does not select ${id}`);
+    const patterns = VIEW_LAB_CASES.find((viewCase) => viewCase.id === id).sourceMatches ?? [];
+    assert.ok(
+      importers.some((file) => patterns.some((pattern) => pattern.test(file))),
+      `${id} claims no importer of the field by sourceMatches, so nothing says it draws one`
+    );
+  }
+});
+
 test('(d) every recorded non-member names exactly the callers it has', () => {
   // THE CLAUSE THE REGISTER WAS MISSING, AND THE THREE SHAPES IT CATCHES.
   //
@@ -1269,5 +1311,26 @@ test('(f) no file under components/ imports from the application tree', () => {
       'depends on, so an edge in this direction makes one primitive unusable without the manager ' +
       'and reverses the dependency the `design-system` capability specifies. Move the imported ' +
       'file into the primitive directory, or take the dependency out of the primitive.'
+  );
+});
+
+test('(g) no tracked file under scripts, src, openspec, tests or docs names the field by its old path', () => {
+  // The needle is built from parts so this clause's own file does not hold it.
+  const needle = ['apps/manager', 'RollDataExpressionInput'].join('/');
+  const tracked = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', 'scripts', 'src', 'openspec', 'tests', 'docs'],
+    { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+  )
+    .split('\0')
+    .filter(Boolean);
+  assert.ok(tracked.length > 1000, `only ${tracked.length} tracked files walked`);
+
+  const stale = tracked.filter((file) => readFileSync(path.join(REPO_ROOT, file)).includes(needle));
+  assert.deepEqual(
+    stale,
+    [],
+    `${needle} is where the field stood before issue 2465 moved it into ${PRIMITIVE_DIRECTORY}; ` +
+      'point these at the new path, including any prose that names it'
   );
 });

@@ -43,9 +43,9 @@
     `tests/components/expr-input-mounted.test.js`.
 -->
 <script>
-  import Button from '../../components/Button.svelte';
-  import Chip from '../../components/Chip.svelte';
-  import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
+  import Button from './Button.svelte';
+  import Chip from './Chip.svelte';
+  import { announceAfterFocusMove } from '../util/announceAfterFocus.js';
 
   /** How long typing must rest before the reading is spoken. */
   const TYPING_SETTLE_MS = 500;

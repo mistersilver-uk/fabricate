@@ -30,7 +30,7 @@
 -->
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import { interpolate } from './checksCopy.js';
   import { resolveCharacterValue, targetValueStatus } from './checkTargetStatus.js';
 
@@ -92,6 +92,7 @@
 
 <div class="manager-checks-value-field">
   {#if documentPath}
+    <!-- ratchet-exempt(design-system): the spread is `hooks.expression`, the one `data-*` name its caller spells, or nothing -->
     <RollDataExpressionInput
       class={resolution
         ? `manager-checks-value-path is-${resolution.tone}`
@@ -108,6 +109,7 @@
       {onChange}
     />
   {:else}
+    <!-- ratchet-exempt(design-system): the spread is `hooks.expression`, the one `data-*` name its caller spells, or nothing -->
     <RollDataExpressionInput
       {...attr(hooks.expression)}
       data-validation-target={validationTarget || undefined}

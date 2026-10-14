@@ -323,8 +323,6 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
-      // The expression field this screen is now the only caller of (issue 1373).
-      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269).
       /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
       /^src\/ui\/svelte\/util\/foundryIconCatalogue\.json$/,

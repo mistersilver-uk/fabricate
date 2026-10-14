@@ -30,7 +30,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Select from '../../../components/Select.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import PickerRowAmount from './PickerRowAmount.svelte';
   import {
     MIN_AWARD_COUNT,

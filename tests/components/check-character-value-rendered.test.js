@@ -14,7 +14,7 @@ import { colourOf, staticComponentPage } from '../helpers/staticComponentPage.js
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const RDE = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const RDE = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
 const CHIP = 'src/ui/svelte/components/Chip.svelte';
 const CCVF = 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte';
 

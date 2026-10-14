@@ -164,7 +164,7 @@ const FIELD_FIXTURE = `
   </section>
 </div>`;
 
-const EXPRESSION_FIELD = 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte';
+const EXPRESSION_FIELD = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
 const PREREQUISITES_CARD = 'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
 const ELEMENT_TYPES = Object.freeze(['RegularElement', 'SvelteElement', 'Component']);
 const classTokens = (node) =>
