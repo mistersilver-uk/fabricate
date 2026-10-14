@@ -75,7 +75,7 @@
     if (warnings > 0) {
       return { tone: 'warning', label: String(warnings), name: issueCountLabel(warnings) };
     }
-    // NEUTRAL, not green, and carrying no `is-valid`: a green tick claims a RESULT where the
+    // NEUTRAL, not green: a green tick claims a RESULT where the
     // reference states an absence of findings. `WorldEssenceEntryPage` states the same pair, so
     // the two essence editors cannot disagree about what "clear" looks like. It is ONE pill in
     // two states — a numeral or a tick in the same box — never a second shape.

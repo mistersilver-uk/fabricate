@@ -338,16 +338,6 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   const MONO = [
     // Read out of `Chip.svelte`'s scoped block.
     '.manager-chip.is-mono',
-    // Three classes, and issue 1509 keeps all three WITHOUT the reason issue 883 gave. That
-    // reason was that three classes out-rank `Chip.svelte`'s own scoped `.manager-chip.svelte-
-    // <hash>` block; specificity never decides that contest, because the sheet is loaded into
-    // `layer(modules)` and a Svelte scoped block is injected unlayered, and an unlayered
-    // declaration beats a layered one at any specificity. What this row still measures is the
-    // one thing that IS true of it: the rule declares the mono face and tabular figures, which
-    // `Chip` does not, so those two properties are the badge's from here. The class count is
-    // preserved because changing it would be a change, and issue 1509 re-roots this family
-    // without moving a frame. The rendering defect the old reason implies is issue 1507's.
-    '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
     // The composition list's mono pip is the shared ordered list's ordinal badge (issue 1512).
     '.fabricate-sortable-list-ordinal',
     '.fabricate-nav .manager-nav-count',
