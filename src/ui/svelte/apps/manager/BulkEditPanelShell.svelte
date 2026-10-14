@@ -17,13 +17,11 @@
   Snippets:
   - `children` — the staged axes, rendered between hero and dock. They are flex items of this panel,
     so a caller emits siblings rather than wrapping them; the panel's `gap` is the rhythm.
-  - `dockFoot` — a caller's control inside the dock, under Apply.
+  - `dockFoot` — a caller's control inside the dock, under Apply; a set delete renders here.
 
   Invariants:
-  - Apply's border box stays wholly inside the scrollport at every scroll offset, and that holds
-    only while a sibling delete card is shorter than the scrollport — pinned by
-    `tests/components/bulk-edit-dock-pinning.test.js`.
-  - With no sibling, the dock sits on the rail's foot even when the axes are short; same test.
+  - The panel is its rail's last child and fills it, so the dock sits on the rail's foot whether
+    or not the axes overflow — pinned by `tests/components/bulk-edit-dock-pinning.test.js`.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -197,14 +195,10 @@
   .fab-bulk-edit-panel {
     display: flex;
     flex-direction: column;
+    /* Fills the rail, so the dock's `margin-top: auto` seats it on the foot of a short panel. */
+    flex: 1 0 auto;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  /* With no sibling after it the panel fills its rail, so the dock's `margin-top: auto` seats it
-     on the rail's foot when the axes are shorter than the rail; a sibling card keeps it as it was. */
-  .fab-bulk-edit-panel:last-child {
-    flex: 1 0 auto;
   }
 
   .fab-bulk-edit-header {
@@ -322,10 +316,9 @@
      clamp, which applies to the sticky box's MARGIN box at maximum scroll. Both are written as
      `.manager-inspector`'s own padding token so the two cannot drift, and
      `tests/components/bulk-edit-dock-pinning.test.js` samples the top of the scroll range as well
-     as the bottom, because a dock that never sticks looks pinned at maximum scroll. Two
-     configurations do not pin and neither is a regression: a SIBLING delete card un-pins it, and
-     below the supported minimum the sheet's container query makes `.manager-body` the scrollport —
-     do not reach into that block from here. No `z-index`, deliberately, and no shadow: the dock
+     as the bottom, because a dock that never sticks looks pinned at maximum scroll. Below the
+     supported minimum the sheet's container query makes `.manager-body` the scrollport and the
+     dock does not pin, which is not a regression — do not reach into that block from here. No `z-index`, deliberately, and no shadow: the dock
      sits at its scroll area's edge rather than floating over content, so it reads by its top
      border and its fill, and a downward elevation token would be clipped at that edge. */
   .fab-bulk-edit-dock {

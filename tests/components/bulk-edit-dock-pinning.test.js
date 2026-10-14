@@ -199,66 +199,36 @@ function measureDock() {
   };
 }
 
-/**
- * The same rail, with a real `BulkDeleteCard` rendered AFTER the shell.
- * Measures a DIFFERENT invariant from `measureDock`, because the sibling breaks that one BY
- * DESIGN: it shortens `.fab-bulk-edit-panel`, which is the dock's containing block, so at
- * maximum scroll the dock clamps to the PANEL's box rather than the rail's. What survives is
- * reachability, so this reads Apply against the SCROLLPORT rather than the dock against the
- * rail.
- */
-function measureSiblingCard() {
+/** The dock, Apply and the delete card inside it, against the rail's padding box at three offsets. */
+function measureDockedDelete() {
   const inspector = document.querySelector('[data-probe-inspector]');
-  const panel = inspector.querySelector('.fab-bulk-edit-panel');
   const dock = inspector.querySelector('.fab-bulk-edit-dock');
   const apply = dock?.querySelector('[data-component-bulk-apply]');
-  const sibling = inspector.querySelector('.fab-bulk-delete-card');
-  if (!panel || !dock || !apply || !sibling) {
-    return {
-      panelRendered: Boolean(panel),
-      dockRendered: Boolean(dock),
-      applyRendered: Boolean(apply),
-      siblingRendered: Boolean(sibling),
-    };
-  }
-
-  const inspectorStyle = getComputedStyle(inspector);
-  const border = {
-    top: parseFloat(inspectorStyle.borderTopWidth),
-    bottom: parseFloat(inspectorStyle.borderBottomWidth),
-  };
-  // The dock's own negative bottom margin. Read rather than hard-coded.
-  const dockMarginBottom = parseFloat(getComputedStyle(dock).marginBottom);
+  const deleteCard = dock?.querySelector('.fab-bulk-delete-card');
+  if (!apply || !deleteCard) return { rendered: false };
 
   const sampleAt = (label, scrollTop) => {
     inspector.scrollTop = scrollTop;
     const rail = inspector.getBoundingClientRect();
-    const dockBox = dock.getBoundingClientRect();
     const applyBox = apply.getBoundingClientRect();
+    const cardBox = deleteCard.getBoundingClientRect();
     return {
       label,
       scrollTop: inspector.scrollTop,
-      // The scrollport is the rail's PADDING box — the region Apply has to stay inside.
-      railPadTop: rail.top + border.top,
-      railPadBottom: rail.bottom - border.bottom,
-      panelBottom: panel.getBoundingClientRect().bottom,
-      // The MARGIN-box bottom, which is the edge the containing-block clamp acts on.
-      dockMarginBoxBottom: dockBox.bottom + dockMarginBottom,
-      dockBottom: dockBox.bottom,
+      railTop: rail.top + inspector.clientTop,
+      railBottom: rail.top + inspector.clientTop + inspector.clientHeight,
+      dockBottom: dock.getBoundingClientRect().bottom,
       applyTop: applyBox.top,
       applyBottom: applyBox.bottom,
+      cardTop: cardBox.top,
+      cardBottom: cardBox.bottom,
     };
   };
 
   const overflow = inspector.scrollHeight - inspector.clientHeight;
   return {
-    panelRendered: true,
-    dockRendered: true,
-    applyRendered: true,
-    siblingRendered: true,
+    rendered: true,
     overflow,
-    scrollportHeight: inspector.clientHeight,
-    siblingHeight: sibling.getBoundingClientRect().height,
     samples: [
       sampleAt('scroll top', 0),
       sampleAt('mid scroll', Math.floor(overflow / 2)),
@@ -504,34 +474,17 @@ describe('the bulk edit dock sits on the rail`s foot when the panel is shorter t
 });
 
 /*
- * ── THE ACCEPTED NON-PIN: A SIBLING CARD AFTER THE SHELL (issue 1132) ────────────────
- * WHY THE INVARIANT IS A DIFFERENT ONE, AND NOT A WEAKENED ONE. `.fab-bulk-edit-dock` is
- * `position: sticky` inside `.fab-bulk-edit-panel`, so the PANEL is its containing block, and a
- * sticky box may not escape its containing block. A sibling rendered after the shell shortens
- * that panel without shortening the rail, so at maximum scroll the clamp binds and Apply is
- * lifted off the rail's bottom edge — measured at −142px on a staged recipe panel and −154px on
- * a component panel. Asserting (a) from the suite above here would therefore be asserting that
- * the shipped layout is a bug.
+ * ── THE SET DELETE RIDES THE DOCK (maintainer ruling, 2026-10-14) ───────────────────────
+ * The Essences and Recipes panels drew `BulkDeleteCard` AFTER the shell, which shortened the dock's
+ * containing block and lifted Apply off the rail's foot. Both now pass the card as `dockFoot`, so
+ * Apply and the delete sit in the dock at the foot, short panel or tall.
  */
-describe('the bulk edit dock with a sibling card after the shell', () => {
-  const rendered = { shell: '', card: '' };
-  let measured = null;
+describe('the bulk edit dock carrying the set delete', () => {
+  const measured = { short: null, tall: null };
 
   before(async () => {
-    await shell.setup();
-    try {
-      const target = await shell.mount({
-        heading: '3 components selected',
-        applyLabel: 'Apply to 3 components',
-        canApply: true,
-        children: stagedAxes,
-      });
-      rendered.shell = target.innerHTML;
-    } finally {
-      shell.teardown();
-    }
-
     await card.setup();
+    let cardMarkup;
     try {
       // The Component Studio's shipped call, at the impact its own View Lab frame photographs.
       const target = await card.mount({
@@ -540,97 +493,68 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
         rows: [
           { key: 'components', text: '3 components will be deleted.' },
           { key: 'recipes', text: '2 recipes will be rewritten.', count: 2 },
-          {
-            key: 'disabled',
-            text: '1 of those recipes is enabled today and will be disabled.',
-            count: 1,
-          },
         ],
         idleLabel: 'Delete 3 components',
         armedLabel: 'Confirm delete',
         idleAriaLabel: 'Delete 3 components',
         armedAriaLabel: 'Confirm delete — 3 component(s), 2 recipe(s)',
         cardAttr: 'data-component-bulk-delete-card',
-        impactAttr: 'data-component-bulk-impact',
-        rowAttr: 'data-component-bulk-impact-row',
       });
-      rendered.card = target.innerHTML;
+      cardMarkup = target.innerHTML;
     } finally {
       card.teardown();
+    }
+    const dockFoot = createRawSnippet(() => ({
+      render: () => `<div class="probe-foot">${cardMarkup}</div>`,
+    }));
+
+    const markup = {};
+    await shell.setup();
+    try {
+      for (const [name, children] of [['short', shortAxis], ['tall', stagedAxes]]) {
+        const props = { heading: '3 components selected', canApply: true, children, dockFoot };
+        const target = await shell.mount(props);
+        markup[name] = target.innerHTML;
+      }
+    } finally {
+      shell.teardown();
     }
 
     const browser = await borrowBrowser();
     try {
-      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.setContent(inspectorPage(`${rendered.shell}${rendered.card}`), {
-        waitUntil: 'load',
-      });
-      measured = await page.evaluate(measureSiblingCard);
+      for (const name of ['short', 'tall']) {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        await page.setContent(inspectorPage(markup[name]), { waitUntil: 'load' });
+        measured[name] = await page.evaluate(measureDockedDelete);
+      }
     } finally {
       await browser.close();
     }
   });
 
-  it('renders both the shell and a real delete card in the rail', () => {
-    assert.ok(measured.panelRendered, 'the bulk edit panel is absent from the rendered rail');
-    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
-    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
-    assert.ok(
-      measured.siblingRendered,
-      `${CARD_PATH} rendered no .fab-bulk-delete-card — the sibling this case exists to measure is not in the rail, so every assertion below would be about the shell alone`
-    );
-  });
-
-  it('measures a sibling SHORTER than the scrollport, which is where the guarantee holds', () => {
-    // The bound, asserted before anything it bounds. A taller sibling pushes Apply off the TOP
-    // of the scrollport at maximum scroll: that is a reachability failure, it is not one of the
-    // accepted non-pinning configurations, and this gate must not be read as evidence for it.
-    assert.ok(
-      measured.siblingHeight > 0,
-      'the sibling card has no height, so it displaces nothing'
-    );
-    assert.ok(
-      measured.siblingHeight < measured.scrollportHeight,
-      `the delete card is ${measured.siblingHeight}px against a ${measured.scrollportHeight}px scrollport — at or above that height Apply is scrolled off the TOP at maximum scroll, which this case does NOT accept and does not measure`
-    );
-    assert.ok(
-      measured.overflow >= MIN_OVERFLOW_PX,
-      `the rail must genuinely overflow for a scroll assertion to say anything (overflow ${measured.overflow}px, need at least ${MIN_OVERFLOW_PX}px)`
-    );
-    const offsets = measured.samples.map((sample) => sample.scrollTop);
-    assert.ok(
-      offsets[0] < offsets[1] && offsets[1] < offsets[2],
-      `the three samples must be at DIFFERENT scroll offsets or they are one sample three times (measured ${offsets.join(', ')})`
-    );
-  });
-
-  it('clamps the dock to the panel box rather than the rail at maximum scroll', () => {
-    // The ACCEPTED behaviour, pinned so it cannot silently become something else. A sticky box
-    // may not escape its containing block, and that clamp acts on its MARGIN box — which is why
-    // this reads `dockMarginBoxBottom` and not the border-box bottom the shell-alone suite uses.
-    const max = measured.samples.at(-1);
-    assert.ok(
-      Math.abs(max.dockMarginBoxBottom - max.panelBottom) <= EPSILON_PX,
-      `at max scroll the dock's margin-box bottom is ${max.dockMarginBoxBottom}px but the panel's bottom is ${max.panelBottom}px — the dock is no longer clamped to its containing block, so it is neither pinned nor accepted-un-pinned but something new`
-    );
-    // And it is genuinely OFF the rail's bottom edge.
-    assert.ok(
-      max.railPadBottom - max.dockBottom > EPSILON_PX,
-      `at max scroll the dock's bottom is ${max.dockBottom}px against a rail padding-box bottom of ${max.railPadBottom}px — the dock is still pinned to the rail, so the sibling is not shortening the panel and this case is measuring nothing`
-    );
-  });
-
-  it('keeps Apply wholly inside the scrollport at every scroll offset', () => {
-    // THE INVARIANT THAT SURVIVES. Issue 1015's symptom was Apply being unreachable.
-    for (const sample of measured.samples) {
+  for (const name of ['short', 'tall']) {
+    it(`holds Apply and the delete in the dock on the rail's foot (${name} panel)`, () => {
+      const { rendered, overflow, samples } = measured[name];
+      assert.ok(rendered, 'the dock carries no Apply or no delete card');
       assert.ok(
-        sample.applyTop >= sample.railPadTop - EPSILON_PX,
-        `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's top edge is ${sample.applyTop}px, above the scrollport's top at ${sample.railPadTop}px — the primary action has scrolled off the TOP, which is issue 1015's original symptom and is not an accepted configuration`
+        name === 'short' ? overflow === 0 : overflow >= MIN_OVERFLOW_PX,
+        `NON-VACUITY: the ${name} panel overflows the rail by ${overflow}px`
       );
-      assert.ok(
-        sample.applyBottom <= sample.railPadBottom + EPSILON_PX,
-        `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's bottom edge is ${sample.applyBottom}px, below the scrollport's bottom at ${sample.railPadBottom}px — the primary action is clipped by the rail`
-      );
-    }
-  });
+      for (const sample of samples) {
+        const at = `at ${sample.label} (scrollTop ${sample.scrollTop})`;
+        assert.ok(
+          Math.abs(sample.dockBottom - sample.railBottom) <= EPSILON_PX,
+          `${at} the dock's bottom is ${sample.dockBottom}px against the rail's foot at ${sample.railBottom}px`
+        );
+        assert.ok(
+          sample.applyTop >= sample.railTop - EPSILON_PX && sample.applyBottom <= sample.cardTop,
+          `${at} Apply (${sample.applyTop}–${sample.applyBottom}px) is not above the delete card at ${sample.cardTop}px inside the rail`
+        );
+        assert.ok(
+          sample.cardBottom <= sample.railBottom + EPSILON_PX,
+          `${at} the delete card ends at ${sample.cardBottom}px, past the rail's foot at ${sample.railBottom}px`
+        );
+      }
+    });
+  }
 });

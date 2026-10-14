@@ -409,6 +409,21 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     );
     harness.remount();
   });
+
+  it('rides the shell`s dock under Apply (maintainer ruling 2026-10-14)', async () => {
+    const root = await harness.mount(props(SELECTION));
+    const dock = root.querySelector(':scope [data-essence-bulk-panel] .fab-bulk-edit-dock');
+    assert.ok(Boolean(dock), 'the shell renders no dock');
+    const [first, second] = dock.querySelectorAll(
+      '[data-essence-bulk-apply], [data-essence-bulk-delete-card]'
+    );
+    assert.ok(Boolean(first?.matches('[data-essence-bulk-apply]')), 'Apply leads the dock');
+    assert.ok(
+      Boolean(second?.matches('[data-essence-bulk-delete-card]')),
+      'and the delete card follows it inside the dock'
+    );
+    harness.remount();
+  });
 });
 
 describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
