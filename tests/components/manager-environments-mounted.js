@@ -3261,14 +3261,10 @@ export function registerEnvironmentsCases() {
     flushSync();
 
     const taskBadges = Array.from(
-      target.querySelectorAll(
-        '[data-environment-tab-button="tasks"] .manager-environment-tab-badge'
-      )
+      target.querySelectorAll('[data-environment-tab-button="tasks"] .manager-editor-tab-count')
     );
     const eventBadges = Array.from(
-      target.querySelectorAll(
-        '[data-environment-tab-button="events"] .manager-environment-tab-badge'
-      )
+      target.querySelectorAll('[data-environment-tab-button="events"] .manager-editor-tab-count')
     );
     const validationBadges = Array.from(
       target.querySelectorAll(
@@ -4121,9 +4117,9 @@ export function registerEnvironmentsCases() {
     });
 
     assert.deepEqual(
-      Array.from(target.querySelectorAll('.manager-environment-tab-badge')).map((node) =>
-        node.textContent.trim()
-      ),
+      Array.from(
+        target.querySelectorAll('.manager-environment-tab-badge, .manager-editor-tab-count')
+      ).map((node) => node.textContent.trim()),
       [],
       'no tab draws a badge when its count is zero'
     );

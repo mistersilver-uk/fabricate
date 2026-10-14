@@ -276,7 +276,7 @@
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
 
-  // Tab count badges (issue 643 §F1). Multi-step recipes sum each tab's count across every step;
+  // Tab record counts (issue 643 §F1). Multi-step recipes sum each tab's count across every step;
   // single-step recipes read the recipe-scope arrays.
   function countIngredients(scope) {
     const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
@@ -313,9 +313,9 @@
   // carries the ledger row.
   const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
-    ingredients: ingredientsCount > 0 ? [{ label: String(ingredientsCount), tone: 'neutral' }] : [],
-    results: resultsCount > 0 ? [{ label: String(resultsCount), tone: 'neutral' }] : [],
-    tools: toolsCount > 0 ? [{ label: String(toolsCount), tone: 'neutral' }] : [],
+    ingredients: { vehicle: 'count', label: ingredientsCount },
+    results: { vehicle: 'count', label: resultsCount },
+    tools: { vehicle: 'count', label: toolsCount },
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
       ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),

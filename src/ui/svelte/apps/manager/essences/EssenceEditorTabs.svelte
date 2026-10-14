@@ -15,8 +15,8 @@
   Lab's source-coverage scan cannot credit ids produced that way. They are also literals in
   `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS`, which is where the scan reads them.
 
-  THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
-  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders NO badge, which is
+  THE ON-CRAFT COUNT COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
+  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders no count, which is
   the primitive's own rule, and the rules set has no `oncraft` tab for the entry to match.
 -->
 <script>
@@ -75,7 +75,7 @@
     if (warnings > 0) {
       return { tone: 'warning', label: String(warnings), name: issueCountLabel(warnings) };
     }
-    // NEUTRAL, not green, and carrying no `is-valid`: a green tick claims a RESULT where the
+    // NEUTRAL, not green: a green tick claims a RESULT where the
     // reference states an absence of findings. `WorldEssenceEntryPage` states the same pair, so
     // the two essence editors cannot disagree about what "clear" looks like. It is ONE pill in
     // two states — a numeral or a tick in the same box — never a second shape.
@@ -87,7 +87,7 @@
   }
 
   const badges = $derived({
-    oncraft: onCraftCount,
+    oncraft: { vehicle: 'count', label: onCraftCount },
     validation: validationBadgeFor(blockingCount, warningCount),
   });
 </script>

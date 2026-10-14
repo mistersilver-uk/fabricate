@@ -447,23 +447,23 @@ describe('the sheet draws the description, and the danger tint stays scoped', ()
     );
   });
 
-  it('colours the current tab`s padlock in the accent', () => {
-    assert.deepEqual(
-      declared(
-        '.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-lock',
-        'color'
-      ),
-      ['var(--fab-accent)']
-    );
+  it('colours the current tab`s padlock in the accent, under both button vocabularies', () => {
+    for (const button of ['manager-editor-tab-button', 'manager-environment-tab-button']) {
+      assert.deepEqual(
+        declared(`.fabricate-tabs .${button}.is-active .manager-editor-tab-lock`, 'color'),
+        ['var(--fab-accent)'],
+        button
+      );
+    }
   });
 
-  it('emits both danger rules with the primitive`s scoping class', () => {
+  it('emits both danger rules with the primitive`s scoping class, naming both vocabularies', () => {
     const { css, hashClass } = scopedComponentCss(resolve(repoRoot, PRIMITIVE));
-    for (const selector of [
-      `.manager-editor-tab-button.is-danger.${hashClass}`,
-      `.manager-editor-tab-button.is-danger.is-active.${hashClass}`,
-    ]) {
-      assert.ok(css.includes(`${selector} {`), `the compiled block carries ${selector}`);
+    for (const state of ['is-danger', 'is-danger.is-active']) {
+      const list =
+        `.manager-editor-tab-button.${state}.${hashClass},\n` +
+        `  .manager-environment-tab-button.${state}.${hashClass} {`;
+      assert.ok(css.includes(list), `the compiled block carries ${list}`);
     }
   });
 });

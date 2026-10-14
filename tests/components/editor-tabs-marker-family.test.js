@@ -343,6 +343,18 @@ describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
     }
   });
 
+  it('ignores a `class` on an issue mark, so no caller can add to its drawing', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: { outcomes: { label: 2, tone: 'warning', class: 'is-x' } },
+    });
+    assert.equal(
+      authoredClasses(buttonFor(root, 'outcomes').querySelector('.manager-chip')),
+      'manager-chip is-warning is-mono is-inspector manager-editor-tab-badge'
+    );
+  });
+
   it('still suppresses a chip that carries no label', async () => {
     const root = await harness.mount({
       tabs: TABS,

@@ -276,15 +276,15 @@
     },
   ]);
 
-  // THE VALIDATION TAB WEARS ITS OWN COUNT, so a GM need not open it to learn whether anything
-  // is wrong. A clean record shows a tick, because a zero reads as a quantity of something.
+  // The Validation tab wears its own count, and a clean record shows a tick rather than a zero.
+  const ALL_VALID = 'FABRICATE.Admin.Manager.Tools.Editor.AllValid';
   const tabBadges = $derived({
     validation:
       validationCounts.blocking > 0
         ? { label: String(validationCounts.blocking), tone: 'danger' }
         : validationCounts.warnings > 0
           ? { label: String(validationCounts.warnings), tone: 'warning' }
-          : { label: '✓', tone: 'success' },
+          : { label: '✓', tone: 'neutral', name: text(ALL_VALID, 'All checks pass') },
   });
 
   /** The inherit count a section states before an edit lands; `null` for a SEEDED section. */

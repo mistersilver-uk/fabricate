@@ -847,6 +847,26 @@ describe('Tool Studio editor (mounted)', () => {
     assert.deepEqual(enabled, [false]);
   });
 
+  it('draws the Requirements count as a bare record count, and none at zero', async () => {
+    const root = await harness.mount(props());
+    const requirements = root.querySelector('#tool-tab-requirements');
+    assert.equal(requirements.querySelector('.manager-editor-tab-count')?.textContent, '2');
+    assert.ok(!requirements.querySelector('.manager-chip'), 'a record count is never a chip');
+    harness.remount();
+    const empty = await harness.mount(
+      props({
+        tool: tool({
+          prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+          bonus: { enabled: false, expression: '' },
+        }),
+      })
+    );
+    assert.ok(
+      !empty.querySelector('#tool-tab-requirements').querySelector('.manager-editor-tab-count'),
+      'a zero Requirements count draws no count'
+    );
+  });
+
   it('routes all three tab controls without moving actions into a footer', async () => {
     const tabs = [];
     const root = await harness.mount(props({ onTabChange: (id) => tabs.push(id) }));

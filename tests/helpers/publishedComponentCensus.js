@@ -54,7 +54,6 @@ export const BARE_BUTTON_ANCESTORS = new Set([
   'fabricate-tabs',
   'manager-breadcrumbs',
   'manager-travel-inspector-actions',
-  'manager-tool-editor-tabs',
   'fabricate-interactables-manager',
   'form-footer',
   'dialog-buttons',
