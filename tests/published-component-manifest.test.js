@@ -22,8 +22,8 @@
  * Limit: on an element a control-landing rest is spread on, a spread is followed only into an
  * object literal a top-level `const` holds, so `$derived.by`, an alias, a computed key, a call and
  * a local written to after its declaration fail closed, as an action, an `{@attach}`, a transition
- * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, is
- * not seen.
+ * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, or
+ * by an event-handler attribute on `event.currentTarget`, is not seen.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -1676,6 +1676,12 @@ describe('each entry matches its component declaration', () => {
       'control',
       ['data-open is written before a control-landing rest and is not reserved'],
     ],
+    [
+      'a data attribute in mixed case written before a control-landing spread',
+      pressed(' DATA-State {...rest}'),
+      'control',
+      ['data-state is written before a control-landing rest and is not reserved'],
+    ],
   ]) {
     it(`names ${claim} as a restOn fault`, () => {
       assert.deepEqual(restFaultsOf(template, restOn), faults);
@@ -1785,12 +1791,26 @@ describe('each entry matches its component declaration', () => {
     ],
     ['a local another object holds', `${LITERAL} const held = { attrs };`],
     ['a local a function reads', `${LITERAL} const widen = () => { attrs.role = role; };`],
+    [
+      'a local an alias is then written through',
+      `${LITERAL} const alias = attrs; alias["aria-expanded"] = open;`,
+    ],
+    ['a local the script exports', `export ${LITERAL}`],
     ['an undeclared name', ''],
   ]) {
     it(`fails closed on a spread of ${claim}, which it cannot follow`, () => {
       assert.deepEqual(spreadsOf(body), followed(null));
     });
   }
+
+  it('follows a spread of a local a module script holds, and fails closed where that script writes to it or exports it', () => {
+    const under = (module) =>
+      `<script module>${module}</script>${pressed(' {...attrs} {...rest}')}`;
+    assert.deepEqual(spreadsOf('', under(LITERAL)), followed(['type']));
+    const written = `${LITERAL} attrs["aria-expanded"] = true;`;
+    assert.deepEqual(spreadsOf('', under(written)), followed(null), 'written to');
+    assert.deepEqual(spreadsOf('', under(`export ${LITERAL}`)), followed(null), 'exported');
+  });
 
   it('fails closed on a spread of a name a template block binds, and of anything that is no name', () => {
     for (const [open, close] of [
@@ -1991,25 +2011,34 @@ describe('each entry matches its component declaration', () => {
   }
 
   const WRITTEN = 'aria-expanded is written by the component and published as an aria key';
-  /** The `restOn` faults of a control-landing entry publishing `keys` as `aria` keys, over a button that states `attributes`. */
-  const writtenFaultsOf = (attributes, keys) => {
+  /**
+   * The `restOn` faults of a control-landing entry publishing `keys` as `aria` keys, over a button
+   * that states `attributes` and a local `attrs` whose one key is `spelled`.
+   */
+  const writtenFaultsOf = (attributes, keys, spelled = 'aria-expanded') => {
     const props = Object.fromEntries(keys.map((key) => [key, aria]));
     const entry = { path: 'src/E.svelte', ...LANDING, props };
-    const script = `${SPREAD}const attrs = { "aria-expanded": open };</script>`;
+    const script = `${SPREAD}const attrs = { "${spelled}": open };</script>`;
     return restOnFaults(entry, templateOf(entry.path, script + pressed(attributes)).ast);
   };
 
-  for (const [claim, attributes] of [
+  for (const [claim, attributes, spelled] of [
     ['ahead of the rest', ' aria-expanded={open} {...rest}'],
     ['behind the rest', ' {...rest} aria-expanded={open}'],
+    ['behind the rest in upper case', ' {...rest} ARIA-EXPANDED={open}'],
     ['as static text', ' aria-expanded="false" {...rest}'],
     ['through a followed spread ahead of the rest', ' {...attrs} {...rest}'],
     ['through a followed spread behind the rest', ' {...rest} {...attrs}'],
+    [
+      'through a followed spread that spells it in mixed case',
+      ' {...rest} {...attrs}',
+      'ARIA-Expanded',
+    ],
   ]) {
     it(`names an aria key the component writes ${claim} as a fault, and none where the entry does not publish it`, () => {
-      assert.deepEqual(writtenFaultsOf(attributes, ['aria-expanded']), [WRITTEN]);
-      assert.deepEqual(writtenFaultsOf(attributes, ['aria-describedby']), []);
-      assert.deepEqual(writtenFaultsOf(attributes, []), []);
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-expanded'], spelled), [WRITTEN]);
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-describedby'], spelled), []);
+      assert.deepEqual(writtenFaultsOf(attributes, [], spelled), []);
     });
   }
 
@@ -2425,20 +2454,48 @@ describe('the module sheet and every component style against the published Butto
     }
   });
 
+  /**
+   * Holds what `attributeSelectors` reads of `aria-expanded` in one sheet of `rules` to each rule's
+   * stated `above`, `null` marking a rule it must not read.
+   */
+  const assertAbove = (rules) => {
+    const written = rules.map(([rule]) => rule);
+    const { css } = templateOf('sheet.css', `<style>${written.join(', ')} { gap: 0 }</style>`).ast;
+    assert.deepEqual(
+      attributeSelectors([['sheet.css', css]], 'aria-expanded'),
+      rules
+        .filter(([, above]) => above !== null)
+        .map(([rule, above]) => ({ written: `sheet.css: ${rule}`, above }))
+    );
+  };
+
   it('reads an attribute selector wherever a selector holds it, beside the classes above it', () => {
-    const rules = [
-      ".fabricate [aria-expanded='true']",
-      '.fab-im-toolbar.is-open > :global(.fabricate-button[aria-expanded]) i',
-      '.a:not([aria-expanded]) .b',
-      '[aria-expanded]',
-      '.c[aria-describedby]',
-    ];
-    const { css } = templateOf('sheet.css', `<style>${rules.join(', ')} { gap: 0 }</style>`).ast;
-    assert.deepEqual(attributeSelectors([['sheet.css', css]], 'aria-expanded'), [
-      { written: `sheet.css: ${rules[0]}`, above: ['fabricate'] },
-      { written: `sheet.css: ${rules[1]}`, above: ['fab-im-toolbar', 'is-open'] },
-      { written: `sheet.css: ${rules[2]}`, above: [] },
-      { written: `sheet.css: ${rules[3]}`, above: [] },
+    assertAbove([
+      [".fabricate [aria-expanded='true']", ['fabricate']],
+      [
+        '.fab-im-toolbar.is-open > :global(.fabricate-button[aria-expanded]) i',
+        ['fab-im-toolbar', 'is-open'],
+      ],
+      ['.a:not([aria-expanded]) .b', []],
+      ['[aria-expanded]', []],
+      ['.c[aria-describedby]', null],
+    ]);
+  });
+
+  it('reads an attribute name in any case and through a CSS escape, as HTML matches it', () => {
+    assertAbove([
+      [".d [ARIA-EXPANDED='true']", ['d']],
+      [String.raw`.e [aria\-expanded]`, ['e']],
+      [String.raw`.f [\41 ria-expanded]`, ['f']],
+    ]);
+  });
+
+  it('counts as above only a class an ancestor of the attribute’s element must carry', () => {
+    assertAbove([
+      [':not(.fab-im-toolbar) .x[aria-expanded]', []],
+      ['.g + .h ~ .i > .j .k[aria-expanded]', ['i', 'j']],
+      [':is(.l, .m) :has(.n) :where(.o) :global(.p.q) .r[aria-expanded]', ['p', 'q']],
+      [':global(.s .t) .u[aria-expanded]', []],
     ]);
   });
 

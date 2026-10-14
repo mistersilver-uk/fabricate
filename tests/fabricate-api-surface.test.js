@@ -516,15 +516,19 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
 
   it('spells the shipped prop kinds alike in the kinds table, the spec and the docs', () => {
     const kinds = Object.keys(SHIPPED_KINDS);
-    const shapes = [...SPECIFIED.matchAll(/\{ kind: ([^,]+), required/gu)];
+    const shapes = [...SPECIFIED.matchAll(/\{ kind: ('[a-z]+'(?: \| '[a-z]+')+), required/gu)];
     assert.deepEqual(
       shapes.map(([, union]) => spelledBetween(union, "'")),
       [kinds, kinds],
       'the described shape and the manifest shape, in the spec'
     );
-    const [, refused] = /`kind` outside the shipped set, (.+?), with an `Error`/u.exec(SPECIFIED);
+    const refusing = /`kind` outside the shipped set, (.+?), with an `Error`/u.exec(SPECIFIED);
+    assert.ok(refusing, 'the spec sentence that refuses a `kind` outside the shipped set');
+    const [, refused] = refusing;
     assert.deepEqual(spelledBetween(refused, "`'", "'`"), kinds, 'what registration admits');
-    const [, sentence] = /^A prop's `kind` is (.+)\.$/mu.exec(DOCUMENTED);
+    const listing = /^A prop's `kind` is (.+)\.$/mu.exec(DOCUMENTED);
+    assert.ok(listing, 'the docs sentence that opens "A prop’s `kind` is"');
+    const [, sentence] = listing;
     assert.deepEqual(spelledBetween(sentence, '`'), kinds, 'the docs’ kinds sentence');
   });
 

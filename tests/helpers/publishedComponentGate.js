@@ -419,13 +419,16 @@ const SPREAD_OPERANDS = Object.freeze({
   LogicalExpression: ({ operator, left, right }) => (operator === '&&' ? [right] : [left, right]),
 });
 
-/** The keys of every object literal an initialiser can answer, or `null` where one is not read. */
+/**
+ * The keys of every object literal an initialiser can answer, in lower case as a spread writes
+ * them on an HTML element, or `null` where one is not read.
+ */
 function objectKeys(expression) {
   if (isCallTo(expression, '$derived')) return objectKeys(expression.arguments[0]);
   if (expression?.type === 'ObjectExpression') {
     const { properties } = expression;
     const plain = properties.every(({ type, computed }) => type === 'Property' && !computed);
-    return plain ? properties.map(({ key }) => String(key.name ?? key.value)) : null;
+    return plain ? properties.map(({ key }) => String(key.name ?? key.value).toLowerCase()) : null;
   }
   const operands = SPREAD_OPERANDS[expression?.type]?.(expression);
   if (!operands) return null;
@@ -433,17 +436,30 @@ function objectKeys(expression) {
   return keys.includes(null) ? null : keys.flat();
 }
 
+/** Every name a script of one component exports by declaration, which another module can then write to. */
+function exportedLocals(ast) {
+  const exported = [ast.module, ast.instance]
+    .flatMap((script) => script?.content?.body ?? [])
+    .flatMap(({ type, declaration }) =>
+      type === 'ExportNamedDeclaration' ? (declaration?.declarations ?? []) : []
+    );
+  return new Set(exported.flatMap(({ id }) => [...identifierNames(id)]));
+}
+
 /**
  * The keys a spread attribute's expression can write, or `null` where the gate cannot follow it.
- * It follows a name no template block binds, declared by a top-level plain `const` and read
- * nowhere but in spread attributes, into an object literal with no spread and no computed key,
- * under `$derived(…)` or not, and through a conditional, `||`, `??` and the right of `&&`.
+ * It follows a name no template block binds, declared by a top-level plain `const` no script
+ * exports and read nowhere but in spread attributes, into an object literal with no spread and no
+ * computed key, under `$derived(…)` or not, and through a conditional, `||`, `??` and the right
+ * of `&&`.
  */
 export function spreadKeys(ast, expression) {
   if (expression?.type !== 'Identifier') return null;
   const { name } = expression;
-  if (templateBindings(ast).has(name) || !readOnlyInSpreads(ast, name)) return null;
-  return objectKeys(scriptDeclarations(ast).get(name));
+  const followable = !templateBindings(ast).has(name) && !exportedLocals(ast).has(name);
+  return followable && readOnlyInSpreads(ast, name)
+    ? objectKeys(scriptDeclarations(ast).get(name))
+    : null;
 }
 
 /** What hands an element to code of the component's own, which can write any attribute on it. */
@@ -459,8 +475,8 @@ const ELEMENT_HANDLERS = Object.freeze({
  * as `{ node, before, written, spreads, handed }`: each `data-*` attribute written ahead of the
  * spread, static or not; every attribute the element states, wherever it sits; every other spread
  * as `{ local, before, keys }`, `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it
- * carries. A rest that reaches an element any other way (an alias, a `$derived` copy, a child
- * component) answers none.
+ * carries. An attribute's name is read in lower case, as HTML reads it. A rest that reaches an
+ * element any other way (an alias, a `$derived` copy, a child component) answers none.
  */
 export function restElements(ast) {
   const rest = restLocal(ast);
@@ -471,13 +487,11 @@ export function restElements(ast) {
     .flatMap((node) => {
       const at = node.attributes.findIndex((attribute) => isRest(attribute));
       if (at === -1) return [];
-      const written = node.attributes.flatMap(({ type, name }) =>
-        type === 'Attribute' ? [name] : []
+      const stated = node.attributes.map(({ type, name }) =>
+        type === 'Attribute' ? name.toLowerCase() : null
       );
-      const before = node.attributes
-        .slice(0, at)
-        .filter(({ type, name }) => type === 'Attribute' && name.startsWith('data-'))
-        .map(({ name }) => name);
+      const written = stated.filter((name) => name !== null);
+      const before = stated.slice(0, at).filter((name) => name?.startsWith('data-'));
       const spreads = node.attributes.flatMap((attribute, index) => {
         if (attribute.type !== 'SpreadAttribute' || isRest(attribute)) return [];
         const local = attribute.expression.name ?? 'an expression';
@@ -611,22 +625,41 @@ export const selectorsNaming = (css, root) =>
 export const writtenSelector = (css, complex) =>
   css.content.styles.slice(complex.start - css.content.start, complex.end - css.content.start);
 
+/** The name an attribute selector matches in HTML: a character escape resolved, in lower case. */
+const matchedAttribute = (part) => part.name.replaceAll(/\\(.)/gsu, '$1').toLowerCase();
+
+/**
+ * The classes one compound requires of the element it matches: its own, and those of a `:global()`
+ * that wraps one compound. A class under any other pseudo-class (`:not()`, `:is()`, `:where()`,
+ * `:has()`) is one the element need not carry.
+ */
+function requiredClasses(relative) {
+  return relative.selectors.flatMap((part) => {
+    if (part.type === 'ClassSelector') return [part.name];
+    if (part.type !== 'PseudoClassSelector' || part.name !== 'global') return [];
+    const [wrapped, ...others] = (part.args?.children ?? []).flatMap((complex) => complex.children);
+    return wrapped && others.length === 0 ? requiredClasses(wrapped) : [];
+  });
+}
+
+const ANCESTOR_COMBINATORS = new Set([' ', '>']);
+
 /**
  * Every selector of `sheets`, each `[file, css]`, with an attribute selector named `name` wherever
- * in the selector, as `{ written, above }`: as its sheet writes it, and each class named above the
- * compound that holds the attribute.
+ * in the selector, as `{ written, above }`: as its sheet writes it, and each of the
+ * `requiredClasses` of a compound a descendant or child combinator follows ahead of the compound
+ * that holds the attribute, which is an ancestor of that compound's element. `name` is lower case.
  */
 export function attributeSelectors(sheets, name) {
-  const holds = (part) => part.type === 'AttributeSelector' && part.name === name;
+  const holds = (part) => part.type === 'AttributeSelector' && matchedAttribute(part) === name;
   const holdsIn = (relative) => [...walkNodes(relative)].some((part) => holds(part));
   return sheets.flatMap(([file, css]) =>
     selectorsHolding(css, holds).map((complex) => {
       const at = complex.children.findIndex((relative) => holdsIn(relative));
       const above = complex.children
         .slice(0, at)
-        .flatMap((relative) => [...walkNodes(relative)])
-        .filter((part) => part.type === 'ClassSelector')
-        .map((part) => part.name);
+        .filter((_, index) => ANCESTOR_COMBINATORS.has(complex.children[index + 1].combinator.name))
+        .flatMap((relative) => requiredClasses(relative));
       return { written: `${file}: ${writtenSelector(css, complex)}`, above };
     })
   );

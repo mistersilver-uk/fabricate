@@ -537,6 +537,47 @@ describe('an aria key on the published Button', () => {
     handle.destroy();
   });
 
+  it('restores a removed aria-describedby on the same focused button when a timeout separates the update that omits it from the one that passes it', async () => {
+    const props = base({ 'aria-describedby': HINT_ID });
+    const { handle, button } = mountButton(props);
+    await settle();
+    const node = button();
+    node.focus();
+    node.removeAttribute('aria-describedby');
+    assert.equal(handle.update(base()), true);
+    await new Promise((done) => setTimeout(done, 0));
+    assert.ok(!node.hasAttribute('aria-describedby'), 'still absent before the second update');
+    assert.equal(handle.update({ ...props }), true);
+    await settle();
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID);
+    assert.ok(button() === node && document.activeElement === node, 'that node, still focused');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('restores it when onclick omits the key and passes it again after an awaited promise', async () => {
+    const described = { 'aria-describedby': HINT_ID };
+    const props = (aria = {}) => ({
+      children: LABEL,
+      ...aria,
+      onclick: async () => {
+        held.handle.update(props());
+        await Promise.resolve();
+        held.handle.update(props(described));
+      },
+    });
+    const held = mountButton(props(described));
+    await settle();
+    const node = held.button();
+    node.removeAttribute('aria-describedby');
+    node.click();
+    await settle();
+    assert.ok(held.button() === node, 'the same node');
+    assert.equal(node.getAttribute('aria-describedby'), HINT_ID);
+    held.handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
   for (const key of [
     'aria-label',
     'aria-labelledby',
