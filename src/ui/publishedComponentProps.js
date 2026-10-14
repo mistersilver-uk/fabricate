@@ -8,6 +8,17 @@ export const PREFIX = 'Fabricate | published components: ';
 const DATA_ATTRIBUTE = /^data-[a-z0-9-]+$/;
 const ATTRIBUTE_TYPES = new Set(['string', 'number', 'boolean']);
 
+/**
+ * The rest names an entry whose `restOn` is `'control'` refuses, because each would replace the
+ * control's own keyboard mark (`data-keyboard-focus`), or be read off the control by Foundry: a
+ * window action on a press (`data-action`), a cursor at the next pointer release (`data-cursor`),
+ * a tooltip on pointer entry (`data-tooltip` and every name that starts `data-tooltip-`); or
+ * because Fabricate's own stylesheet reads it off its own buttons (`data-validation-focused`,
+ * which draws the keyboard ring under a Fabricate root, and `data-essence-sort-direction`).
+ */
+export const RESERVED_ON_A_CONTROL =
+  /^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/;
+
 export const refuse = (message) => new TypeError(PREFIX + message);
 
 /** M10: a function anywhere but as the whole value of a `callback` key, named by its top-level key. */
@@ -74,6 +85,16 @@ export const SHIPPED_KINDS = Object.freeze({
   callback: copyCallback,
 });
 
+/** M13: a rest key is a data attribute holding a scalar, and no name the entry reserves. */
+function assertRestKey(entry, key, value) {
+  if (!(DATA_ATTRIBUTE.test(key) && ATTRIBUTE_TYPES.has(typeof value))) {
+    throw refuse(`"${key}" is not a data attribute`);
+  }
+  if (entry.restOn === 'control' && RESERVED_ON_A_CONTROL.test(key)) {
+    throw refuse(`"${key}" is reserved on ${entry.name}`);
+  }
+}
+
 /**
  * The validated copy one mount or update renders: M7, M8, M10-M15 and M17, then M9. Each key is
  * configurable, so the seam can drop an absent callback key from it.
@@ -85,9 +106,7 @@ export function copyProps(entry, props) {
     const published = Object.hasOwn(entry.props, key);
     if (!published && !entry.rest) throw refuse(`"${key}" is not a prop of ${entry.name}`);
     const value = SHIPPED_KINDS[published ? entry.props[key].kind : 'data'](raw, key);
-    if (!published && !(DATA_ATTRIBUTE.test(key) && ATTRIBUTE_TYPES.has(typeof value))) {
-      throw refuse(`"${key}" is not a data attribute`);
-    }
+    if (!published) assertRestKey(entry, key, value);
     const own = { value, enumerable: true, writable: true, configurable: true };
     Object.defineProperty(copy, key, own);
   }

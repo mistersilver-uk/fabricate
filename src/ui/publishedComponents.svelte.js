@@ -8,6 +8,7 @@ import { mount, unmount, untrack } from 'svelte';
 import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
+import Button from './svelte/components/Button.svelte';
 import Chip from './svelte/components/Chip.svelte';
 import EmptyState from './svelte/components/EmptyState.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
@@ -38,6 +39,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/InspectorCard.svelte': InspectorCard,
   'src/ui/svelte/components/EmptyState.svelte': EmptyState,
   'src/ui/svelte/components/Notice.svelte': Notice,
+  'src/ui/svelte/components/Button.svelte': Button,
 });
 
 export const publishedComponentRuntime = Object.freeze({

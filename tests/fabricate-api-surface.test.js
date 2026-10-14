@@ -20,6 +20,7 @@ import { managerExtensions } from '../src/ui/managerExtensions.js';
 import { playerExtensions } from '../src/ui/playerExtensions.js';
 import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { publishedComponentSeam } from '../src/ui/publishedComponentSeam.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { defineStructureContract } from './helpers/structureContract.js';
@@ -188,11 +189,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448 and issue 2451 headings,
- * by name and in the order the spec states them.
+ * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
+ * headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -205,6 +206,16 @@ function specifiedComponentGroups() {
   });
   return new Map(groups);
 }
+
+/** One token for each family of rest name M13 reserves where an entry's rest lands on a control. */
+const RESERVED_REST_FAMILIES = Object.freeze([
+  '`data-keyboard-focus`',
+  '`data-action`',
+  '`data-cursor`',
+  '`data-tooltip`',
+  '`data-validation-focused`',
+  '`data-essence-sort-direction`',
+]);
 
 /** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
 function linesOpenedBy(text, key) {
@@ -255,6 +266,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'InspectorCard',
       'EmptyState',
       'Notice',
+      'Button',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -385,6 +397,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: true,
         root: 'any',
       },
+      Button: {
+        version: 1,
+        props: {
+          role: optional,
+          fullWidth: optional,
+          disabled: optional,
+          children: requiredText,
+          onclick: { kind: 'callback', required: true },
+        },
+        rest: true,
+        root: 'fabricate',
+      },
     });
     assert.deepEqual(
       Object.keys(ui),
@@ -477,6 +501,47 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       !documented.includes('non-interactive'),
       'the docs no longer say a published component is non-interactive'
     );
+  });
+
+  it('states the reserved rest names and their refusal in the spec’s M13 row and the docs’ mounting section', () => {
+    const row = SPECIFIED.split('\n').filter((line) => line.startsWith('| M13 |'));
+    assert.equal(row.length, 1, 'one M13 row');
+    const from = DOCUMENTED.indexOf('\n### Mounting, updating and destroying\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mounting section, then another heading');
+    const stated = ['is reserved on <name>', ...RESERVED_REST_FAMILIES, '`data-tooltip-`'];
+    for (const [where, prose] of [
+      ['the spec’s M13 row', row[0]],
+      ['### Mounting, updating and destroying', DOCUMENTED.slice(from, to)],
+    ]) {
+      assert.deepEqual(
+        stated.filter((token) => !prose.includes(token)),
+        [],
+        `${where} states each reserved name and the tail that refuses it`
+      );
+    }
+  });
+
+  it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
+    const names = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control').map(
+      (entry) => entry.name
+    );
+    assert.ok(names.length > 0, 'an entry states restOn');
+    const groups = specifiedComponentGroups();
+    const sections = documentedComponentSections();
+    for (const name of names) {
+      const section = sections.find((candidate) => candidate.startsWith(`${name}\n`));
+      for (const [where, prose] of [
+        [`the ${name} group`, groups.get(name) ?? ''],
+        [`### ${name}`, section ?? ''],
+      ]) {
+        assert.deepEqual(
+          RESERVED_REST_FAMILIES.filter((token) => !prose.includes(token)),
+          [],
+          `${where} is where a companion learns the names it reserves`
+        );
+      }
+    }
   });
 
   it('publishes the canonical realm classes and the deprecated alias as the same class', () => {

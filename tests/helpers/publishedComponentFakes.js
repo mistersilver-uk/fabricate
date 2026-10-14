@@ -48,6 +48,22 @@ export const TITLED = Object.freeze({
 });
 export const TABLE = Object.freeze([ZETA, ALPHA, TITLED]);
 
+/** Every rest name a control-landing rest reserves, each with a value a data attribute may hold. */
+export const RESERVED_REST_NAMES = Object.freeze([
+  ['data-keyboard-focus', 'false'],
+  ['data-keyboard-focus', false],
+  ['data-keyboard-focus', 'true'],
+  ['data-action', 'close'],
+  ['data-cursor', 'wait'],
+  ['data-validation-focused', ''],
+  ['data-essence-sort-direction', 'asc'],
+  ['data-tooltip', 'Why'],
+  ['data-tooltip-', 'x'],
+  ['data-tooltip-text', 'Why'],
+  ['data-tooltip-html', '<b>Why</b>'],
+  ['data-tooltip-direction', 'UP'],
+]);
+
 const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 export const exactly = (message) => new RegExp(`^${escape(message)}$`);
 

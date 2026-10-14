@@ -809,6 +809,8 @@ const runKicker = (selector) => ({
 });
 const RUN_HEADING = '[data-journal-detail] .fab-run-progress-heading';
 const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
+/** One published button of the controls fixture, by its section's key. */
+const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button`;
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -972,7 +974,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
   // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
-  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451).
+  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451); then each
+  // panel's nested button in its visual role's ink and fill (issue 2452).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -1025,6 +1028,14 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
     { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
     { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    {
+      selector: '.manager-empty:not(.is-filtered) .fabricate-button',
+      styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
+    },
+    {
+      selector: '.manager-empty.is-filtered .fabricate-button',
+      styles: 'color: var(--fab-text); background-color: var(--fab-surface-soft)',
+    },
     { selector: '.fab-notice', styles: 'display: flex; background-color: var(--fab-warning-soft)' },
     { selector: '.fab-notice-title', styles: 'color: var(--fab-warning-text)' },
     { selector: '.fab-notice-detail', styles: 'color: var(--fab-text-muted)' },
@@ -1051,6 +1062,38 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
       styles: 'color: var(--fab-danger-text)',
     },
+    // The published buttons at rest (issue 2452): each visual role in the sheet's own values, a
+    // full-width button at its cell's width and at the two-cell span's, the disabled look at two
+    // roles, and the 34px box a four-line label spills past without growing it.
+    ...[
+      [
+        'clear',
+        'min-height: 34px; border-radius: 9px; color: var(--fab-text); background-color: var(--fab-surface-soft)',
+      ],
+      ['create', 'color: var(--fab-on-success); background-color: var(--fab-success)'],
+      [
+        'back',
+        'color: var(--fab-text-muted); background-color: rgba(0, 0, 0, 0); border-color: var(--fab-border)',
+      ],
+      ['delete', 'color: var(--fab-danger-text); border-color: var(--fab-danger-border)'],
+      ['review', 'color: var(--fab-warning-text); background-color: var(--fab-warning-soft)'],
+      ['add', 'border-top-style: dashed; color: var(--fab-text-muted)'],
+      ['add-wide', 'width: 568px'],
+      ['wide', 'width: 280px'],
+      ['off', 'opacity: 0.62; cursor: default; color: var(--fab-text-muted)'],
+      ['off-primary', 'opacity: 0.62; color: var(--fab-text-muted)'],
+      ['long', 'height: 34px'],
+    ].map(([key, styles]) => ({ selector: labButton(key), styles })),
+  ],
+  // The same fixture after its two presses (issue 2452): the focused primary's drawn ring in the
+  // accent, and the pressed neutral on the raised tile under the pointer.
+  'manager-published-buttons-specimen': [
+    {
+      selector: `${labButton('create')}:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
+    { selector: labButton('clear'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5585,7 +5628,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the three specimens it mounts', () => {
+test('every published component seam module, and the host, selects the four specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5599,6 +5642,7 @@ test('every published component seam module, and the host, selects the three spe
       'manager-published-tier-track-specimen',
       'manager-published-leaves-specimen',
       'manager-published-controls-specimen',
+      'manager-published-buttons-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
@@ -5670,13 +5714,14 @@ test('the leaves specimen mounts every published component but TierTrack and che
       ['Rail', 'InfoStrip', '.fab-rail'],
       ['InspectorCard', 'Kicker', '.fabricate-card'],
       ['InspectorCard', 'StatBox', '.fabricate-card'],
-      ['EmptyState', 'Chip', '.manager-empty:not(.is-filtered)'],
-      ['EmptyState', 'Chip', '.manager-empty.is-filtered'],
+      ['EmptyState', 'Button', '.manager-empty:not(.is-filtered)'],
+      ['EmptyState', 'Button', '.manager-empty.is-filtered'],
     ],
     'the mounts the fixture makes inside a content slot, in fixture order, each with its host root'
   );
+  const drawn = [...mounted, ...nested.map(([, name]) => name)];
   assert.deepEqual(
-    [...new Set(mounted)].sort(byCodePoint),
+    [...new Set(drawn)].sort(byCodePoint),
     PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
       .filter((name) => name !== 'TierTrack')
       .sort(byCodePoint),
@@ -5713,13 +5758,15 @@ test('the leaves specimen mounts every published component but TierTrack and che
   );
 });
 
+/** Whether `node`, or anything under it, passes `test`. */
+const holds = (node, test) =>
+  node !== null &&
+  typeof node === 'object' &&
+  (test(node) || Object.values(node).some((child) => holds(child, test)));
+
 test('the controls specimen mounts through the seam and presses what it mounts: a click, Enter and Tab', () => {
   const FIXTURE = 'tests/view-lab/fixtures/PublishedControls.svelte';
   const { instance, fragment } = componentAstOf(FIXTURE);
-  const holds = (node, test) =>
-    node !== null &&
-    typeof node === 'object' &&
-    (test(node) || Object.values(node).some((child) => holds(child, test)));
   assert.ok(
     holds(
       instance,
@@ -5768,8 +5815,57 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
   );
   assert.equal(
     expectContained.length,
-    6,
-    'five notices in the ground, and the ground in the window'
+    19,
+    'five notices and thirteen buttons in the ground, and the ground in the window'
+  );
+});
+
+test('the buttons specimen presses two published buttons of the controls fixture: a click, then Space', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedControls.svelte');
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Button'
+    ),
+    'the fixture mounts Button through the seam’s mount'
+  );
+  for (const hook of ['data-lab-buttons', 'data-lab-button']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit, expectContained, query } = getCaseById(
+    'manager-published-buttons-specimen'
+  );
+  assert.deepEqual(query, getCaseById('manager-published-controls-specimen').query);
+  assert.deepEqual(
+    steps.map((step) => step.press ?? 'click'),
+    ['click', 'Space'],
+    'a pointer press, then a keyboard press'
+  );
+  assert.deepEqual(
+    steps.map((step) => /\[data-lab-button="([a-z-]+)"\] button$/.exec(step.selector)?.[1]),
+    ['clear', 'create'],
+    'each step acts on a button the fixture mounted'
+  );
+  const focused = '[data-lab-button="create"] button';
+  assert.ok(
+    expectSelector.endsWith(`${focused}:focus-visible`) && expectCenterHit.endsWith(focused),
+    'the frame is taken with keyboard focus on the button whose centre is hit-tested'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-button="clear"] button[data-lab-presses="1"]') &&
+      expectSelector.includes('[data-lab-button="create"] button[data-lab-presses="1"]'),
+    'the frame is taken only after the click and the Space press each changed what is drawn'
+  );
+  assert.deepEqual(
+    expectContained,
+    getCaseById('manager-published-controls-specimen').expectContained,
+    'the same nineteen containments as the fixture’s other case'
   );
 });
 

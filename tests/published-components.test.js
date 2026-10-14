@@ -22,6 +22,7 @@ import {
   drained,
   exactly,
   fakeRuntime,
+  RESERVED_REST_NAMES,
   refusal,
   seamWith,
   zetaProps,
@@ -292,6 +293,150 @@ describe('mount refuses before it can draw', () => {
     const props = zetaProps({ 'data-rank': 2, 'data-open': true, 'data-tag-name': 'x' });
     ui.mount('Zeta', { target: new FakeTarget(), props });
     assert.deepEqual(mounts[0].props.initial, props);
+  });
+});
+
+// A required label and a required callback, as a control-rooted entry publishes them.
+const PRESS_SHAPE = Object.freeze({
+  path: 'src/ui/svelte/components/Pressed.svelte',
+  version: 1,
+  props: {
+    children: { kind: 'text', required: true },
+    onclick: { kind: 'callback', required: true },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Pressed' }),
+});
+// One entry whose rest lands on the control, and one whose rest lands on a root that is none.
+const PRESSED = Object.freeze({ ...PRESS_SHAPE, name: 'Pressed', restOn: 'control' });
+const ROOTED = Object.freeze({ ...PRESS_SHAPE, name: 'Rooted' });
+
+const UNRESERVED_NAMES = [
+  'data-tooltips',
+  'data-tooltipx',
+  'data-actions',
+  'data-cursors',
+  'data-keyboard-focused',
+  'data-validation-focus',
+  'data-validation-focused-x',
+  'data-essence-sort',
+  'data-essence-sort-directions',
+  'data-acme-id',
+];
+
+describe('a rest key on an entry whose rest lands on a control', () => {
+  const pressedProps = (overrides = {}) => ({ children: 'Clear', onclick() {}, ...overrides });
+  const pressed = () => seamWith({ table: [PRESSED, ROOTED] });
+  const mountOf = (ui, name, props) => ui.mount(name, { target: new FakeTarget(), props });
+
+  it('describes the entry without restOn, which only its group states', () => {
+    const { ui } = pressed();
+    assert.deepEqual(Object.keys(ui.describe('Pressed')), ['version', 'props', 'rest', 'root']);
+    assert.deepEqual(ui.describe('Pressed'), { ...ui.describe('Rooted') });
+  });
+
+  for (const [key, value] of RESERVED_REST_NAMES) {
+    it(`M13: refuses ${key} holding ${JSON.stringify(value)} as reserved, and accepts it where rest lands on no control`, () => {
+      const { ui, mounts } = pressed();
+      assert.throws(
+        () => mountOf(ui, 'Pressed', pressedProps({ [key]: value })),
+        refusal(`"${key}" is reserved on Pressed`)
+      );
+      assert.equal(mounts.length, 0);
+      mountOf(ui, 'Rooted', pressedProps({ [key]: value }));
+      assert.equal(mounts[0].props.initial[key], value, 'passed through, as before');
+    });
+  }
+
+  it('accepts a name that only starts like a reserved one, and passes it through', () => {
+    const { ui, mounts } = pressed();
+    const rest = Object.fromEntries(UNRESERVED_NAMES.map((key) => [key, 'x']));
+    mountOf(ui, 'Pressed', pressedProps(rest));
+    assert.deepEqual(
+      UNRESERVED_NAMES.map((key) => mounts[0].props.initial[key]),
+      UNRESERVED_NAMES.map(() => 'x')
+    );
+  });
+
+  it('keeps the first tail for a key that is no data attribute, and for a reserved name that holds no scalar', () => {
+    const { ui } = pressed();
+    for (const [key, value] of [
+      ['title', 'Why'],
+      ['aria-label', 'Why'],
+      ['data-action', undefined],
+      ['data-action', null],
+      ['data-action', {}],
+    ]) {
+      assert.throws(
+        () => mountOf(ui, 'Pressed', pressedProps({ [key]: value })),
+        refusal(`"${key}" is not a data attribute`),
+        `${key}: ${JSON.stringify(value)}`
+      );
+    }
+    assert.throws(
+      () => mountOf(ui, 'Pressed', pressedProps({ 'data-action': () => {} })),
+      refusal('"data-action" must not hold a function')
+    );
+  });
+
+  it('refuses a reserved name on update atomically: the earlier props and the earlier callback stay', () => {
+    const { ui, mounts } = pressed();
+    const calls = [];
+    const noting = (call) => () => {
+      calls.push(call);
+    };
+    const handle = mountOf(ui, 'Pressed', pressedProps({ onclick: noting('first') }));
+    const next = pressedProps({ children: 'Next', onclick: noting('next') });
+    for (const [key, value] of RESERVED_REST_NAMES) {
+      assert.throws(
+        () => handle.update({ ...next, [key]: value }),
+        refusal(`"${key}" is reserved on Pressed`)
+      );
+    }
+    const [{ instance }] = mounts;
+    assert.deepEqual(instance.updates, [], 'nothing was rendered');
+    instance.callbacks.onclick.deliver([]);
+    assert.deepEqual(calls, ['first'], 'the earlier function still answers');
+    assert.equal(handle.update(next), true);
+    instance.callbacks.onclick.deliver([]);
+    assert.deepEqual(calls, ['first', 'next']);
+  });
+
+  it('a required callback key: absence and undefined are M9, any other value that is no function M17', () => {
+    const { ui, mounts } = pressed();
+    for (const props of [{ children: 'Clear' }, { children: 'Clear', onclick: undefined }]) {
+      assert.throws(
+        () => mountOf(ui, 'Pressed', props),
+        refusal('Pressed requires a non-empty "onclick"')
+      );
+    }
+    for (const onclick of ['', null, 'x']) {
+      assert.throws(
+        () => mountOf(ui, 'Pressed', { children: 'Clear', onclick }),
+        refusal('"onclick" must be a function'),
+        JSON.stringify(onclick)
+      );
+    }
+    assert.equal(mounts.length, 0);
+    const handle = mountOf(ui, 'Pressed', pressedProps());
+    assert.throws(
+      () => handle.update({ children: 'Clear' }),
+      refusal('Pressed requires a non-empty "onclick"'),
+      'an update that omits it'
+    );
+    assert.deepEqual(mounts[0].instance.updates, []);
+  });
+
+  it('refuses in the companion’s key order, a reserved name (M13) before a missing key (M9)', () => {
+    const { ui } = pressed();
+    const reserved = refusal('"data-action" is reserved on Pressed');
+    const notAFunction = refusal('"onclick" must be a function');
+    const action = { 'data-action': 'x' };
+    assert.throws(() => mountOf(ui, 'Pressed', { children: 'Clear', ...action }), reserved);
+    assert.throws(() => mountOf(ui, 'Pressed', action), reserved, 'before a missing children too');
+    assert.throws(() => mountOf(ui, 'Pressed', { onclick: null, ...action }), notAFunction);
+    assert.throws(() => mountOf(ui, 'Pressed', { ...action, onclick: null }), reserved);
   });
 });
 

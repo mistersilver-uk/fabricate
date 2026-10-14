@@ -1,8 +1,9 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2448). It mounts the seven data-only leaves,
-  then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` (issue 2451), through
-  the page-session seam `game.fabricate.api.ui` binds, as a companion does: one mount per section,
-  each into an element it owns. A mount's third member lists the mounts made inside its `children`
+  then `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` (issue 2451), and a
+  `Button` in each empty panel (issue 2452), through the page-session seam
+  `game.fabricate.api.ui` binds, as a companion does: one mount per section, each into an element
+  it owns. A mount's third member lists the mounts made inside its `children`
   content slot, each into a `div` the fixture appends there. The effect's teardown destroys the
   outer handles only, so the seam ends the nested ones. Every word is a companion's final text, so
   none is localized, and the art is the lab world's own, so
@@ -15,8 +16,9 @@
   It sets the danger ink, so an ink a leaf fails to state shows in the frame, and the card's, the
   panels' and the notice's cells take the downtime target's `--fab-bg-1` ground, so a card that
   drew no fill shows too. The case's `expectContained` addresses each section by its position in
-  `MOUNTS`, and each nested mount by its host and its `data-nested` name. The chips stand in for the
-  way-out control, because a published button is issue 2452.
+  `MOUNTS`, and each nested mount by its host and its `data-nested` name. Each empty panel's
+  content slot holds its way out, a published button that hugs its label in a `display: flex`
+  target.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -27,8 +29,11 @@
 
   const INLINE = new Set(['Avatar', 'Medallion', 'Chip']);
   const ONE_TRACK = new Set([...INLINE, 'StatBox']);
-  // A `Kicker` is an inline mark only when it is drawn as `span`.
-  const isInline = (name, props) => INLINE.has(name) || props.as === 'span';
+  // A `Kicker` is an inline mark only when it is drawn as `span`, and a `Button`'s target is laid
+  // out as one though it takes a whole cell.
+  const isInline = (name, props) => INLINE.has(name) || name === 'Button' || props.as === 'span';
+
+  function ignore() {}
 
   const MOUNTS = Object.freeze([
     ['Avatar', { art: smithing.img, name: 'Karrun Forge', alt: '' }],
@@ -102,7 +107,7 @@
         hint: 'Projects the party starts in downtime are listed here.',
         children: true,
       },
-      [['Chip', { tone: 'positive', density: 'list', children: 'Up to three at a time' }]],
+      [['Button', { role: 'primary', children: 'New project', onclick: ignore }]],
     ],
     [
       'Notice',
@@ -115,7 +120,7 @@
     [
       'EmptyState',
       { filtered: true, hint: 'No projects match these filters.', children: true },
-      [['Chip', { tone: 'info', density: 'list', children: 'Two filters on' }]],
+      [['Button', { children: 'Clear filters', onclick: ignore }]],
     ],
   ]);
 
