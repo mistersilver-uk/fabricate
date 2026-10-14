@@ -164,12 +164,11 @@
   const criticalCount = $derived(checks.filter((check) => !check.ok).length);
   const effectiveValidation = $derived({ checks, criticalCount });
 
+  const ALL_CLEAR = 'FABRICATE.Admin.Manager.Validation.SummaryAllClear';
+  const PASS_MARK = { label: '✓', tone: 'neutral', name: text(ALL_CLEAR, 'All clear') };
   const badges = $derived({
     contents: { vehicle: 'count', label: recipeCount },
-    validation:
-      criticalCount > 0
-        ? [{ label: String(criticalCount), tone: 'danger' }]
-        : [{ label: '✓', tone: 'success' }],
+    validation: criticalCount > 0 ? { label: String(criticalCount), tone: 'danger' } : PASS_MARK,
   });
 
   // ---- Right rail: preview + effective rules --------------------------------

@@ -2088,9 +2088,11 @@ describe('world Component entry editor (issue 1371)', () => {
         target.querySelector('[data-scoped-entry-tab="definition"]').textContent.trim(),
         'Catalogue entry'
       );
-      assert.equal(
-        target.querySelector('[data-scoped-entry-tab-badge="validation"]').textContent.trim(),
-        '✓'
+      const badge = target.querySelector('[data-scoped-entry-tab-badge="validation"]');
+      assert.deepEqual(
+        [badge.textContent.trim(), badge.getAttribute('data-badge-tone')],
+        ['✓', 'neutral'],
+        'a passing tick asks for no attention'
       );
     });
 

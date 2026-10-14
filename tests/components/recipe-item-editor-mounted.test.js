@@ -257,7 +257,7 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.deepEqual(calls, ['contents']);
   });
 
-  it('derives the contents count badge and a passing validation badge', async () => {
+  it('derives the contents count and a neutral, named passing validation badge', async () => {
     const root = await harness.mount({
       recipeItem: draft(),
       linkedItem: LINKED_ITEM,
@@ -271,7 +271,8 @@ describe('RecipeItemEditor (mounted)', () => {
     );
     const validation = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.equal(validation.textContent.trim(), '✓');
-    assert.ok(validation.classList.contains('is-active'));
+    assert.ok(validation.classList.contains('is-neutral'), 'a pass asks for no attention');
+    assert.equal(validation.getAttribute('aria-label'), 'All clear');
   });
 
   it('turns the validation badge danger when the linked item is missing', async () => {

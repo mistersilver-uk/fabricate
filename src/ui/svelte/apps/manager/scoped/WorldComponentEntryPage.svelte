@@ -468,7 +468,7 @@
     }
     return {
       label: '✓',
-      tone: 'success',
+      tone: 'neutral',
       name: text(
         'FABRICATE.Admin.Manager.Scoped.Component.Entry.ValidationClear',
         'Validation: no problems'

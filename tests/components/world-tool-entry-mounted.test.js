@@ -950,9 +950,12 @@ describe('the world Tool entry (issue 1373)', () => {
         ['identity', 'breakage', 'requirements', 'validation']
       );
       // THE VALIDATION BADGE STILL HOLDS. The strip grew a tab.
-      assert.ok(
-        Boolean(target.querySelector('[data-world-tool-entry-tab-badge="validation"]')),
-        'the Validation tab keeps its own count badge'
+      const badge = target.querySelector('[data-world-tool-entry-tab-badge="validation"]');
+      assert.ok(Boolean(badge), 'the Validation tab keeps its own count badge');
+      assert.deepEqual(
+        [badge.textContent.trim(), badge.dataset.badgeTone, badge.getAttribute('aria-label')],
+        ['✓', 'neutral', 'All checks pass'],
+        'a passing tick is neutral and named'
       );
     });
 

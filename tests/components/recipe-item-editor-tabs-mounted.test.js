@@ -76,12 +76,12 @@ describe('RecipeItemEditorTabs (mounted)', () => {
     }
   });
 
-  it('renders a success check badge when validation passes', async () => {
-    const root = await harness.mount({ activeTab: 'overview', badges: { validation: [{ label: '✓', tone: 'success' }] } });
+  it('renders a neutral check badge when validation passes', async () => {
+    const root = await harness.mount({ activeTab: 'overview', badges: { validation: [{ label: '✓', tone: 'neutral' }] } });
     const badge = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.ok(badge);
     assert.equal(badge.textContent.trim(), '✓');
-    assert.ok(badge.classList.contains('is-active'), 'success badge reuses the is-active chip tone');
+    assert.ok(badge.classList.contains('is-neutral'), 'a pass asks for no attention');
     const button = root.querySelector('[data-recipe-item-tab-button="validation"]');
     assert.ok(!button.classList.contains('is-danger'));
   });

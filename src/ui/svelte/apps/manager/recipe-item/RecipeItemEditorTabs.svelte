@@ -11,7 +11,7 @@
   Validation tab's button turns danger when its badge is a failing count.
 
   The Contents tab carries the linked-recipe count as a record count. The Validation tab always
-  carries a badge: a success `✓` chip when valid, or a danger count chip when there are failing
+  carries a badge: a neutral `✓` chip when valid, or a danger count chip when there are failing
   checks.
 
   Props:
