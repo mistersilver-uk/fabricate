@@ -12,8 +12,8 @@ import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopePr
 import {
   ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
   ESSENCE_CATALOGUE_BULK_RAW_MODULES,
-  ESSENCE_WORLD_SCOPE_RAW_MODULES as SCOPED_RAW_MODULES,
-  ESSENCE_WORLD_SHELL_MODULES as SHELL_MODULES,
+  ESSENCE_WORLD_SCOPE_RAW_MODULES,
+  ESSENCE_WORLD_SHELL_MODULES,
 } from '../helpers/essenceWorldScopeModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 
@@ -22,9 +22,9 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const pageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-catalogue-',
-  rawModules: [...SCOPED_RAW_MODULES, ...ESSENCE_CATALOGUE_BULK_RAW_MODULES],
+  rawModules: [...ESSENCE_WORLD_SCOPE_RAW_MODULES, ...ESSENCE_CATALOGUE_BULK_RAW_MODULES],
   compiledModules: [
-    ...SHELL_MODULES,
+    ...ESSENCE_WORLD_SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
     ...ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
@@ -37,7 +37,7 @@ const entryHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-entry-',
   rawModules: [
-    ...SCOPED_RAW_MODULES,
+    ...ESSENCE_WORLD_SCOPE_RAW_MODULES,
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     'src/ui/svelte/util/essenceIcons.js',
@@ -61,7 +61,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/model/essenceValidation.js',
   ],
   compiledModules: [
-    ...SHELL_MODULES,
+    ...ESSENCE_WORLD_SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -83,8 +83,8 @@ const entryHarness = createMountedComponentHarness({
 const shellHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-control-',
-  rawModules: SCOPED_RAW_MODULES,
-  compiledModules: [...SHELL_MODULES, ...SELECT_COMPILED_MODULES],
+  rawModules: ESSENCE_WORLD_SCOPE_RAW_MODULES,
+  compiledModules: [...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 });
 
@@ -104,8 +104,20 @@ function essenceScope() {
     entityType: 'essence',
     corpus: {
       entities: [
-        { id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember', description: 'Cinders' },
-        { id: 'brine', name: 'Brine', icon: 'fas fa-water', colorToken: 'tide', description: 'Salt' },
+        {
+          id: 'ash',
+          name: 'Ash',
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          description: 'Cinders',
+        },
+        {
+          id: 'brine',
+          name: 'Brine',
+          icon: 'fas fa-water',
+          colorToken: 'tide',
+          description: 'Salt',
+        },
       ],
       defaults: [{ id: 'ash', effectSource: 'Item.ember' }],
       membership: [
@@ -457,7 +469,10 @@ describe('the world essence entry editor buffers its edit until Save', () => {
   it('pairs the projected carrier name and artwork in the preview', async () => {
     const { root } = await mountEntry();
     const component = root.querySelector('[data-essence-preview-component]');
-    assert.equal(component.querySelector('.inventory-card-name').textContent.trim(), 'Ashen Thread');
+    assert.equal(
+      component.querySelector('.inventory-card-name').textContent.trim(),
+      'Ashen Thread'
+    );
     assert.equal(
       component.querySelector('.inventory-card-art img').getAttribute('src'),
       'icons/commodities/materials/thread-plain-grey.webp'
@@ -470,9 +485,7 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     await entryHarness.setProps({});
 
     assert.equal(await reported.handle.save(), true);
-    assert.deepEqual(actions.calls, [
-      ['updateWorldDefaultSection', 'ash', 'effectSource', null],
-    ]);
+    assert.deepEqual(actions.calls, [['updateWorldDefaultSection', 'ash', 'effectSource', null]]);
     assert.equal(
       reported.handle.isDirty(),
       false,
@@ -538,7 +551,10 @@ describe('the world essence entry editor buffers its edit until Save', () => {
         onDraftChange: (handle) => (reported.handle = handle),
         onDirtyChange: () => {},
       });
-      assert.ok(reported.handle, 'the editor reported no draft handle, so nothing below is measured');
+      assert.ok(
+        reported.handle,
+        'the editor reported no draft handle, so nothing below is measured'
+      );
 
       // The IDENTITY patch lands first and the sections after it.
       const name = root.querySelector('[data-scoped-entry-name]');
@@ -596,7 +612,10 @@ describe('the essence entry row states what an essence removal actually does', (
     assert.ok(Boolean(remove), 'the member row rendered its armed Remove');
     const note = remove.getAttribute('aria-label');
     assert.match(note, /Remove Ash from Mythwright Forge/, 'the sentence names this pair');
-    assert.match(note, /Its overrides go with it; the world record and every other system are untouched\./);
+    assert.match(
+      note,
+      /Its overrides go with it; the world record and every other system are untouched\./
+    );
     assert.equal(
       /recipe/.test(note),
       false,
@@ -617,15 +636,23 @@ describe('the essence entry row states what an essence removal actually does', (
       onOpenSystemRules: (...args) => calls.push(['rules', ...args]),
     });
 
-    assert.match(root.querySelector('[data-scoped-entry-systems-card]').textContent, /Systems using this essence/);
+    assert.match(
+      root.querySelector('[data-scoped-entry-systems-card]').textContent,
+      /Systems using this essence/
+    );
     root.querySelector('[data-scoped-entry-system-filter="with"] input').click();
     await entryHarness.setProps({});
     assert.deepEqual(
-      [...root.querySelectorAll('[data-scoped-entry-system]')].map((row) => row.dataset.scopedEntrySystem),
+      [...root.querySelectorAll('[data-scoped-entry-system]')].map(
+        (row) => row.dataset.scopedEntrySystem
+      ),
       ['sys-a', 'sys-b'],
       'disabled rules remain in With rules because membership is independent of enabled state'
     );
-    assert.match(root.querySelector('[data-scoped-entry-system="sys-b"]').textContent, /Disabled here/);
+    assert.match(
+      root.querySelector('[data-scoped-entry-system="sys-b"]').textContent,
+      /Disabled here/
+    );
 
     root.querySelector('[data-scoped-entry-system-rules="sys-b"]').click();
     assert.deepEqual(calls, [['rules', 'ash', 'sys-b']]);
