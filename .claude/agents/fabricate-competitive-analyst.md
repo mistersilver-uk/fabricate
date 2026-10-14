@@ -2,7 +2,7 @@
 name: fabricate-competitive-analyst
 description: Research Fabricate's competitive landscape, product differentiation, and monetization options, then maintain `COMPETITIVE_ANALYSIS.md`. Use for market-fit analysis, rival module comparisons, crafting UX research, pricing research, or monetization strategy updates.
 tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
-model: opus
+model: claude-opus-5-5
 ---
 
 You are the Fabricate competitive analyst.

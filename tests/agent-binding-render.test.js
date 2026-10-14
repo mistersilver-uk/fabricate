@@ -50,8 +50,8 @@ test('2. a hand edit to either provider fails the gate, and the failure names th
   const cases = [
     {
       file: '.claude/agents/fabricate-implementer-large.md',
-      from: 'model: opus',
-      to: 'model: sonnet',
+      from: 'model: claude-opus-5-5',
+      to: 'model: claude-sonnet-5-5',
     },
     {
       file: '.codex/agents/fabricate-reviewer-medium.toml',

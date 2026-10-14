@@ -2,7 +2,7 @@
 name: fabricate-implementer-small
 description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with brief-approved focused checks. Use when the issue's OpenSpec delta defines the task and code, canonical spec, or test files need to change under `src/`, `openspec/specs/`, `tests/`, or related runtime files. Use for a small, self-contained change confined to a single function, object, or segment of one file. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: haiku
+model: claude-haiku-5-5
 ---
 
 You are the Fabricate implementer.

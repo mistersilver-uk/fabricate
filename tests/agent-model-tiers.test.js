@@ -124,17 +124,17 @@ function bindingPair(tier, overrides = {}) {
 
 test('1. each model tier declares its Claude model, Codex model, and Codex reasoning effort', () => {
   assert.deepEqual(TIER_MODELS.small, {
-    claude: 'haiku',
+    claude: 'claude-haiku-5-5',
     codexModel: 'gpt-5.6-luna',
     codexReasoningEffort: 'low',
   });
   assert.deepEqual(TIER_MODELS.medium, {
-    claude: 'sonnet',
+    claude: 'claude-sonnet-5-5',
     codexModel: 'gpt-5.6-terra',
     codexReasoningEffort: 'medium',
   });
   assert.deepEqual(TIER_MODELS.large, {
-    claude: 'opus',
+    claude: 'claude-opus-5-5',
     codexModel: 'gpt-5.6-sol',
     codexReasoningEffort: 'high',
   });
@@ -570,7 +570,7 @@ test('12. a description naming all three model tiers is rejected for every model
     claudePath: '.claude/agents/fabricate-orchestrator.md',
     claudeText: claudeBinding({
       token: 'fabricate_orchestrator',
-      model: 'opus',
+      model: 'claude-opus-5-5',
       description: 'Owns routing and the iteration loops.',
     }),
     codexPath: '.codex/agents/fabricate-orchestrator.toml',
@@ -786,7 +786,7 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
   const cases = [
     {
       name: 'modelPinErrors for a skill-backed role',
-      expected: /pins model: opus, model tier small requires haiku/,
+      expected: /pins model: opus, model tier small requires claude-haiku-5-5/,
       damage: ({ write }) =>
         write(
           '.claude/agents/fabricate-implementer-small.md',
@@ -822,7 +822,7 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
             'name: fabricate-implementer-small',
             `description: ${fixtureDescription('small')}`,
             'tools: Read, Grep, Glob',
-            'model: haiku',
+            'model: claude-haiku-5-5',
             '---',
             '',
             'Read `.agents/skills/fabricate-implementer/SKILL.md`.',
@@ -918,7 +918,7 @@ test('16. a hyphenated model-tier token cell is reported as skipped, never parse
 test('17. a superstring Claude pin and a missing tiered description both error', () => {
   const superstring = modelPinErrors(bindingPair('small', { claudeModel: 'haiku-preview' }));
   assert.equal(superstring.length, 1);
-  assert.match(superstring[0], /pins model: haiku-preview, model tier small requires haiku/);
+  assert.match(superstring[0], /pins model: haiku-preview, model tier small requires claude-haiku-5-5/);
 
   const noDescription = modelPinErrors({
     token: 'fabricate_implementer_small',
@@ -928,7 +928,7 @@ test('17. a superstring Claude pin and a missing tiered description both error',
       '---',
       'name: fabricate-implementer-small',
       'tools: Read, Grep, Glob, Edit, Write, Bash',
-      'model: haiku',
+      'model: claude-haiku-5-5',
       '---',
       '',
       'body',

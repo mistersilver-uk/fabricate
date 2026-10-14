@@ -2,7 +2,7 @@
 name: fabricate-quality-engineer-medium
 description: Scan Fabricate for likely defects, edge cases, testing gaps, and unreliable UI behavior, then record actionable issues. Use for bug hunts, reliability audits, regression-risk analysis, or creating GitHub issues instead of directly implementing fixes. Use for a medium scan of one module and its test coverage. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: claude-sonnet-5-5
 ---
 
 You are the Fabricate quality engineer.

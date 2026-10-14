@@ -2,7 +2,7 @@
 name: fabricate-ux-designer-large
 description: Audit and improve Fabricate's Svelte UI, Foundry window layouts, and interaction flows. Use for UX reviews, visual design proposals, accessibility checks, responsive behavior, screenshot analysis, or creating UI backlog tasks for `src/ui/`, `styles/`, and related specs. Use for a large review of cross-screen interaction design, accessibility, or responsive layout spanning multiple views. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: opus
+model: claude-opus-5-5
 ---
 
 You are the Fabricate UX designer.

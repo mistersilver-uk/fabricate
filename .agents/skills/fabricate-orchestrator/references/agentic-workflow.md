@@ -82,11 +82,11 @@ A model tier changes the model pin and nothing else: all three bindings of a fam
 "Model tier" is written in full on first use in a section.
 A bare "tier" belongs to the crafting domain's existing success/outcome vocabulary and never to these three.
 
-| Model tier | Claude `model:` | Codex `model`   | Codex `model_reasoning_effort` |
-|------------|-----------------|-----------------|--------------------------------|
-| `small`    | `haiku`         | `gpt-5.6-luna`  | `low`                          |
-| `medium`   | `sonnet`        | `gpt-5.6-terra` | `medium`                       |
-| `large`    | `opus`          | `gpt-5.6-sol`   | `high`                         |
+| Model tier | Claude `model:`     | Codex `model`   | Codex `model_reasoning_effort` |
+|------------|---------------------|-----------------|--------------------------------|
+| `small`    | `claude-haiku-5-5`  | `gpt-5.6-luna`  | `low`                          |
+| `medium`   | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`                       |
+| `large`    | `claude-opus-5-5`   | `gpt-5.6-sol`   | `high`                         |
 
 These pins are declared once in `scripts/lib/agentModelTiers.js` and mirrored by this table; `npm run validate:agents` fails any binding that drifts from them.
 The model tier is an **underscore** suffix in token space (`fabricate_implementer_small`) and a **hyphen** suffix in file space (`.codex/agents/fabricate-implementer-small.toml`), because the two namespaces already differ that way.
