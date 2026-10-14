@@ -2388,7 +2388,7 @@ The label is the same in both states, because the attribute says which holds.
 Draw the region directly after the button in reading order, so the person who hears "expanded" reaches it with the next move.
 Focus stays on the button when the region opens or closes, and before you hide a region that holds focus, move focus to the button, because that focus otherwise falls to the page and the next Escape runs Foundry's dismiss, which closes the window.
 Foundry reads the attribute nowhere and gives the region no key.
-While the button holds focus Escape reaches no Foundry keybinding, though a dialog still closes on it, as [Ownership and theme](#ownership-and-theme) states; with focus in the region on an element of yours that Foundry does not count as taking keys (a link, a button outside a form, a `tabindex` container) Escape runs Foundry's dismiss, which, when no drag, menu, context menu or Tour is open, closes every Foundry window.
+While the button holds focus Escape reaches no Foundry keybinding, though a dialog still closes on it, as [Ownership and theme](#ownership-and-theme) states; with focus in the region on an element of yours that Foundry does not count as taking keys (a link, a button outside a form, a `tabindex` container) Escape runs Foundry's dismiss, which, when no drag, menu, context menu or Tour is open, asks every Foundry window to close.
 The button draws no chevron and opens nothing itself.
 `aria-describedby` is an `aria` prop: Fabricate writes it on the button.
 It is the id of one element of your own, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
@@ -2683,7 +2683,7 @@ A published component draws a control only where its section says so, and each c
   In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything you appended to `body` stays behind.
 - Foundry's tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
   A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it.
-  Restore the prop once the tooltip has closed, which you can see when `game.tooltip.element` is no longer your control or after calling `game.tooltip.deactivate()` yourself: call `update` without the prop, `await` anything once that call has returned (`await Promise.resolve()` is enough), and call `update` with it again.
+  Restore the prop once the tooltip has closed, which you can see when `game.tooltip.element` is no longer your control or after calling `game.tooltip.deactivate()` yourself: call `update` without the prop, `await` anything once that `update` has returned (`await Promise.resolve()` is enough), and call `update` with it again.
   Without the `await` between them the two are drawn as the second alone, which writes nothing, and a restore you make while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
   Where a component's rest lands on the control itself, `data-cursor` is refused: at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.

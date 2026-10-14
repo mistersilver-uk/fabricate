@@ -516,7 +516,7 @@ Fabricate resolves and checks nothing: an id that is absent, or that two element
 In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything the companion appended to `body` stays behind.
 - Foundry's tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
 A tooltip on an ancestor leaves the control alone, so this reaches a published control only when the companion shows one on it itself, with `game.tooltip.activate` or a Tour step that selects it.
-The companion restores the key once the tooltip has closed, which it can see when `game.tooltip.element` is no longer the control or after calling `game.tooltip.deactivate()` itself: an `update` that omits the key, an `await` of anything once that call has returned (`await Promise.resolve()` is enough), and an `update` that passes it again.
+The companion restores the key once the tooltip has closed, which it can see when `game.tooltip.element` is no longer the control or after calling `game.tooltip.deactivate()` itself: an `update` that omits the key, an `await` of anything once that `update` has returned (`await Promise.resolve()` is enough), and an `update` that passes it again.
 Without the `await` between them the two are drawn as the second alone, which writes nothing, and a restore made while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
 Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
@@ -756,7 +756,7 @@ Each group states the accepted values of every key that entry publishes.
     The region follows the button directly in reading order, so a user who hears "expanded" reaches it with the next move.
     Focus stays on the button when the region opens or closes, and a companion that hides a region holding focus moves focus to the button first, because that focus otherwise falls to the page and the next Escape runs Foundry's dismiss, which closes the window.
     Foundry reads the attribute nowhere and gives the region no key.
-    While the button holds focus Escape reaches no Foundry keybinding, though a dialog still closes on it as stated above; with focus in the region on an element Foundry does not count as taking keys (a link, a button outside a form, a `tabindex` container) Escape runs Foundry's dismiss, which, when no drag, menu, context menu or Tour is open, closes every Foundry window.
+    While the button holds focus Escape reaches no Foundry keybinding, though a dialog still closes on it as stated above; with focus in the region on an element Foundry does not count as taking keys (a link, a button outside a form, a `tabindex` container) Escape runs Foundry's dismiss, which, when no drag, menu, context menu or Tour is open, asks every Foundry window to close.
     The button draws no chevron and opens nothing itself.
   - `aria-describedby` is an `aria` key: Fabricate writes it on the button.
     It is the id of one element of the companion's, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
