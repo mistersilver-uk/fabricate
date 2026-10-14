@@ -60,6 +60,26 @@ const PRE_1936 = {
 };
 
 /**
+ * Three pre-#1936 table rows deliberately superseded in issue #2494 by explicit Claude 5.5
+ * model IDs. Unlike a generic structural-row exemption, each old row is paired with exactly
+ * one current row; the regression check below verifies both sides.
+ */
+const SUPERSEDED_MODEL_ROWS = [
+  {
+    before: '`small` | `haiku` | `gpt-5.6-luna` | `low`',
+    after: '`small` | `claude-haiku-5-5` | `gpt-5.6-luna` | `low`',
+  },
+  {
+    before: '`medium` | `sonnet` | `gpt-5.6-terra` | `medium`',
+    after: '`medium` | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`',
+  },
+  {
+    before: '`large` | `opus` | `gpt-5.6-sol` | `high`',
+    after: '`large` | `claude-opus-5-5` | `gpt-5.6-sol` | `high`',
+  },
+];
+
+/**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
  * nothing has moved yet.
  */
@@ -1015,7 +1035,9 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
     // A verified rename or superseded policy excuses its sentence here too; each is checked below.
-    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
+    const excused = new Set(
+      [...RENAMED, ...SUPERSEDED_POLICY, ...SUPERSEDED_MODEL_ROWS].map(({ before: was }) => was)
+    );
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
       ({ sentence }) => !excused.has(sentence)
     );
@@ -1023,6 +1045,30 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
       [],
       `these ${kind} predate issue #1936 in AGENTS.md and are in no DESTINATIONS file`
+    );
+  }
+});
+
+test('each retired model-alias row is replaced by its exact pinned-model row', () => {
+  assert.equal(SUPERSEDED_MODEL_ROWS.length, 3, 'only the #2494 model alias transition is exempt');
+
+  const frozen = multiset(
+    structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8'))
+  );
+  const current = survivingLines(structuralLinesOf);
+  for (const { before, after } of SUPERSEDED_MODEL_ROWS) {
+    assert.equal(frozen.get(before), 1, `retired model row was not in the fixture: ${before}`);
+    assert.equal(current.get(before) ?? 0, 0, `retired model row still survives: ${before}`);
+    assert.equal(current.get(after), 1, `pinned replacement row is absent or duplicated: ${after}`);
+
+    // This transition may change the Claude model only, not the tier, Codex model, or effort.
+    const previous = before.split(' | ');
+    const replacement = after.split(' | ');
+    assert.equal(previous.length, 4);
+    assert.equal(replacement.length, 4);
+    assert.deepEqual(
+      [replacement[0], ...replacement.slice(2)],
+      [previous[0], ...previous.slice(2)]
     );
   }
 });
