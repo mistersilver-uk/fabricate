@@ -456,6 +456,53 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 });
 
+/** One staged axis: far shorter than the rail, so only the panel's own fill can seat the dock. */
+const shortAxis = createRawSnippet(() => ({
+  render: () => '<p class="probe-row">One staged axis</p>',
+}));
+
+// The reported defect: a short panel drew its dock under the axes with the rail empty below it.
+describe('the bulk edit dock sits on the rail`s foot when the panel is shorter than the rail', () => {
+  let measured = null;
+
+  before(async () => {
+    await shell.setup();
+    let markup;
+    try {
+      const target = await shell.mount({ heading: '1 component selected', children: shortAxis });
+      markup = target.innerHTML;
+    } finally {
+      shell.teardown();
+    }
+    const browser = await borrowBrowser();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      await page.setContent(inspectorPage(markup), { waitUntil: 'load' });
+      measured = await page.evaluate(measureDock);
+      measured.innerWidth = await page.evaluate(
+        () => document.querySelector('[data-probe-inspector]').clientWidth
+      );
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('seats the dock on the rail`s padding-box bottom at the rail`s full inner width', () => {
+    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
+    assert.equal(measured.overflow, 0, 'NON-VACUITY: the panel must be shorter than the rail');
+    const [sample] = measured.samples;
+    assert.ok(
+      Math.abs(sample.dockBottom - sample.padBottom) <= EPSILON_PX,
+      `the dock's bottom is ${sample.dockBottom}px against the rail's foot at ${sample.padBottom}px — a short panel no longer fills its rail`
+    );
+    assert.ok(
+      Math.abs(sample.dockRight - sample.dockLeft - measured.innerWidth) <= EPSILON_PX &&
+        Math.abs(sample.dockLeft - sample.padLeft) <= EPSILON_PX,
+      `the dock spans ${sample.dockLeft}–${sample.dockRight}px against the rail's ${measured.innerWidth}px inner width from ${sample.padLeft}px`
+    );
+  });
+});
+
 /*
  * ── THE ACCEPTED NON-PIN: A SIBLING CARD AFTER THE SHELL (issue 1132) ────────────────
  * WHY THE INVARIANT IS A DIFFERENT ONE, AND NOT A WEAKENED ONE. `.fab-bulk-edit-dock` is
