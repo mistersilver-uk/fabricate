@@ -144,18 +144,43 @@ const PRESSED_BUTTONS = [
   `:has(> ${BUTTON_SECTION('create')} button[data-lab-presses="1"])`,
 ].join('');
 
-/** Each notice and each button inside the ground, and the ground inside the window. */
+/** The same fixture's band of published switches, and one of them by its section's key. */
+const TOGGLES_GROUND = '[data-lab-toggles]';
+const TOGGLE_SECTION = (key) => `[data-lab-toggle="${key}"]`;
+const LAB_TOGGLE = (key) => `${TOGGLES_GROUND} ${TOGGLE_SECTION(key)} button`;
+const TOGGLE_TRACK = (key) => `${LAB_TOGGLE(key)} > .manager-status-toggle-track`;
+
+/** Each switch that fixture mounts, by its section's key. */
+const TOGGLE_KEYS = Object.freeze([
+  'group',
+  'hide',
+  'press',
+  'key',
+  'long',
+  'dangling',
+  'card-on',
+  'card-off',
+]);
+
+/** The band once both of the toggles case's steps have acted: the clicked switch on, its count at one. */
+const PRESSED_TOGGLES = [
+  TOGGLES_GROUND,
+  `:has(> ${TOGGLE_SECTION('press')} button[data-lab-presses="1"][aria-pressed="true"])`,
+].join('');
+
+/** Each notice, each button and each switch inside the ground, and the ground inside the window. */
 const CONTROLS_CONTAINMENT = Object.freeze([
   ...CONTROL_KEYS.map((key) => ({
     container: CONTROLS_GROUND,
     target: `${CONTROL(key)} > div > .fab-notice`,
   })),
   ...BUTTON_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_BUTTON(key) })),
+  ...TOGGLE_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_TOGGLE(key) })),
   { container: '.window-content', target: CONTROLS_GROUND },
 ]);
 
-/** Sized to the fixture's 592px ground and the height of its notices and buttons. */
-const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 640 });
+/** Sized to the fixture's 592px ground and the height of its notices, buttons and switches. */
+const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 830 });
 
 export const CASES = Object.freeze([
   managerCase({
@@ -287,7 +312,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-controls-specimen',
     label:
-      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. Beneath those, eight published switches at rest beside their labels: Group by category off and Hidden tasks on; Sort by name and Essences in the list off, the second over its hint; a long label wrapping beside a switch that is on; Group by tag off; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -338,7 +363,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-buttons-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn and the five notices above are unpressed. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn, the five notices above are unpressed and the eight switches beneath are at rest. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -368,6 +393,45 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `Notice.svelte` and `Button.svelte` are broad signals, each routed here by its
     // `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-toggles-specimen',
+    label:
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window without Foundry’s own sheet, so the button stands 24px tall here and taller in a Foundry window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: LAB_TOGGLE('press') }, { selector: LAB_TOGGLE('key'), press: 'Space' }],
+    // Both pressed states, neither of which exists before its step, and keyboard focus on the
+    // switch the Space press turned on.
+    expectSelector: `${PRESSED_TOGGLES} > ${TOGGLE_SECTION('key')} button[aria-pressed="true"]:focus-visible`,
+    expectCenterHit: LAB_TOGGLE('key'),
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The sheet's declared track, and its quiet and accent grounds; no host height, which
+        // Foundry's own sheet sets in a window and the lab does not load.
+        {
+          selector: TOGGLE_TRACK('group'),
+          styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+        },
+        { selector: TOGGLE_TRACK('hide'), styles: 'background-color: var(--fab-accent)' },
+        // A label that wraps beside the switch leaves it its own width.
+        { selector: LAB_TOGGLE('long'), styles: 'width: 34px' },
+        // `:focus-visible` alone says focus, not a ring; its colour fades in under Foundry's
+        // own transition, so only its shape is read.
+        {
+          selector: `${LAB_TOGGLE('key')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES`
+    // entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

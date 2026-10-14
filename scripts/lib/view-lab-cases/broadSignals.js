@@ -237,11 +237,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-component-entry-essences',
     'manager-published-leaves-specimen',
   ]),
-  // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per state.
+  // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per
+  // state. Then the three specimens that mount it through the published seam (issue 2452).
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
     'coverage-mode-routed-check-checks',
     'manager-tool-parity-04-requirements-1280x720',
+    'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
+    'manager-published-toggles-specimen',
   ]),
   // The range bar's marker (issue 2431), drawn only by the time-of-day bar: its clock line and dot.
   'src/ui/svelte/components/RangeBarMarker.svelte': Object.freeze([
