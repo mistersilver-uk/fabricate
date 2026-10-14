@@ -7708,6 +7708,7 @@
             "TabRequirements": "Requirements",
             "TabValidation": "Validation",
             "SourceEmptyDropHint": "Drop an Item from the Items directory or a compendium to link this Tool.",
+            "SourceMissingDropHint": "This Item no longer resolves. Drop another Item here to replace it.",
             "BackToTools": "Back to tools",
             "Delete": "Delete",
             "DeleteConfirm": "Delete for good?",

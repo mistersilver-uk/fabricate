@@ -2456,6 +2456,18 @@ export const CASES = Object.freeze([
       ':has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))' +
       ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
   }),
+  // The same two wells near the 220px floor their grid gives them.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-narrow',
+    label: 'paid by macros, the spend macro not yet linked, at 580x720',
+    frame: '07, macros',
+    position: { width: 580, height: 720 },
+    steps: [{ selector: '[data-check-additional-dice-source-option="macro"]' }],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
+    expectNoHorizontalOverflow: '[data-check-additional-dice-macros]',
+  }),
   // Both macros linked: the Preview never runs the read macro, so the maximum bounds it.
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-macro-pair',
@@ -2473,6 +2485,21 @@ export const CASES = Object.freeze([
     // The linked uuid wraps under its Copy button rather than running beneath it.
     expectNoHorizontalOverflow:
       '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-pair-narrow',
+    label: 'paid by a linked read and spend macro, at 580x720',
+    frame: '07, macros',
+    state: 'dice-pool-faults-macro',
+    position: { width: 580, height: 720 },
+    steps: [],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Announce Momentum")',
+    expectNoHorizontalOverflow: [
+      '[data-check-additional-dice-macros]',
+      '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+    ],
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-no-actor',

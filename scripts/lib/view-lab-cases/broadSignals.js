@@ -371,12 +371,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
   ]),
-  // Both parties pickers: between them they are the primitive's two modes, and neither renders the other's chrome.
+  // The link field (issue 2466): the world Tool screens, then one frame of each other host that draws it.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
     'world-tool-entry-unlinked',
     'world-tool-entry-source-missing',
+    'world-component-entry-definition',
+    'world-component-catalogue',
+    'world-essence-entry',
+    'manager-environment-edit-scene-linked',
+    'manager-environment-edit-scene-unlinked-narrow',
+    'manager-recipe-item-overview',
+    'manager-essence-edit-on-craft',
+    'manager-checks-crafting-dynamic-dc',
+    'manager-checks-v3-count-additional-dice-macro',
+    'manager-checks-v3-count-additional-dice-macro-narrow',
+    'manager-checks-v3-count-additional-dice-macro-pair',
+    'manager-checks-v3-count-additional-dice-macro-pair-narrow',
   ]),
   // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
