@@ -1,7 +1,7 @@
 /**
  * The published component seam's prop kinds (issue 2451): each shipped kind's copier, the
- * `callback` kind's among them (issue 2452), and the validated copy of the props one mount or
- * update renders. Plain JS with no import, so the seam and its tests read it without Svelte.
+ * `callback` and `aria` kinds' among them (issue 2452), and the validated copy of the props one
+ * mount or update renders. Plain JS with no import, so the seam and its tests read it without Svelte.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 export const PREFIX = 'Fabricate | published components: ';
@@ -77,12 +77,28 @@ function copyCallback(value, key) {
   return value;
 }
 
+/**
+ * One `aria` value. It accepts a string, number or boolean as passed, and `undefined` as absent,
+ * which writes no attribute. It refuses a function with M10 and any other type (an object, an
+ * array, `null`, a symbol or a bigint) with M13, `"<key>" must be a string, number or boolean`.
+ * No value is coerced here, because the host writes it as the attribute's value, so `false` is
+ * written as `"false"`.
+ */
+function copyAria(value, key) {
+  if (typeof value === 'function') throw refuseFunction(key);
+  if (value !== undefined && !ATTRIBUTE_TYPES.has(typeof value)) {
+    throw refuse(`"${key}" must be a string, number or boolean`);
+  }
+  return value;
+}
+
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */
 export const SHIPPED_KINDS = Object.freeze({
   data: (value, key) => copyData(value, key, new Set()),
   text: copyText,
   slot: copySlot,
   callback: copyCallback,
+  aria: copyAria,
 });
 
 /** M13: a rest key is a data attribute holding a scalar, and no name the entry reserves. */

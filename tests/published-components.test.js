@@ -440,6 +440,128 @@ describe('a rest key on an entry whose rest lands on a control', () => {
   });
 });
 
+// An entry whose rest lands on a control, with one `aria` key beside its label and callback.
+const EXPANDING = Object.freeze({
+  ...PRESSED,
+  name: 'Expanding',
+  props: { ...PRESS_SHAPE.props, 'aria-expanded': { kind: 'aria' } },
+});
+const NO_SCALAR = '"aria-expanded" must be a string, number or boolean';
+
+describe('an aria key', () => {
+  const expandingProps = (overrides = {}) => ({ children: 'Details', onclick() {}, ...overrides });
+  const expanding = () => seamWith({ table: [EXPANDING, ROOTED] });
+  const mountOf = (ui, name, props) => ui.mount(name, { target: new FakeTarget(), props });
+  const passed = (mounts) => mounts.map(({ props }) => props.initial['aria-expanded']);
+
+  it('describes the key by its kind, never required, and leaves it out of the kinds the host draws', () => {
+    const { ui, mounts } = expanding();
+    assert.deepEqual(ui.describe('Expanding').props['aria-expanded'], {
+      kind: 'aria',
+      required: false,
+    });
+    mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': false }));
+    assert.deepEqual(mounts[0].props.kinds, { children: 'text', onclick: 'callback' });
+  });
+
+  it('passes a string, a number or a boolean to the component as it was passed', () => {
+    const { ui, mounts } = expanding();
+    const values = [true, false, 'true', 'false', 0, 1, '', NaN];
+    for (const value of values) {
+      mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': value }));
+    }
+    assert.deepEqual(passed(mounts), values);
+  });
+
+  it('reads undefined and absence as no value', () => {
+    const { ui, mounts } = expanding();
+    mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': undefined }));
+    mountOf(ui, 'Expanding', expandingProps());
+    assert.deepEqual(passed(mounts), [undefined, undefined]);
+  });
+
+  it('M13: refuses a value that is no string, number or boolean, and M10: a function', () => {
+    const { ui, mounts } = expanding();
+    for (const value of [null, {}, [], Symbol('open'), 1n]) {
+      assert.throws(
+        () => mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': value })),
+        refusal(NO_SCALAR),
+        String(value)
+      );
+    }
+    assert.throws(
+      () => mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': () => true })),
+      refusal('"aria-expanded" must not hold a function')
+    );
+    assert.equal(mounts.length, 0);
+  });
+
+  it('keeps the first tail for an aria-* name the entry does not publish, and for its own key on an entry that publishes none', () => {
+    const { ui } = expanding();
+    for (const key of [
+      'aria-pressed',
+      'aria-label',
+      'aria-labelledby',
+      'aria-hidden',
+      'aria-controls',
+      'aria-haspopup',
+      'ARIA-EXPANDED',
+    ]) {
+      assert.throws(
+        () => mountOf(ui, 'Expanding', expandingProps({ [key]: 'true' })),
+        refusal(`"${key}" is not a data attribute`)
+      );
+    }
+    assert.throws(
+      () => mountOf(ui, 'Rooted', expandingProps({ 'aria-expanded': false })),
+      refusal('"aria-expanded" is not a data attribute')
+    );
+  });
+
+  it('refuses in key order: a bad value before a reserved name behind it, after one ahead of it, and before a missing key (M9)', () => {
+    const { ui } = expanding();
+    const bad = { 'aria-expanded': null };
+    const reserved = { 'data-action': 'x' };
+    assert.throws(
+      () => mountOf(ui, 'Expanding', expandingProps({ ...bad, ...reserved })),
+      refusal(NO_SCALAR)
+    );
+    assert.throws(
+      () => mountOf(ui, 'Expanding', expandingProps({ ...reserved, ...bad })),
+      refusal('"data-action" is reserved on Expanding')
+    );
+    assert.throws(() => mountOf(ui, 'Expanding', bad), refusal(NO_SCALAR), 'with no children');
+  });
+
+  it('refuses a bad value on update atomically, and passes none once an update omits the key', () => {
+    const { ui, mounts } = expanding();
+    const handle = mountOf(ui, 'Expanding', expandingProps({ 'aria-expanded': false }));
+    assert.throws(
+      () => handle.update(expandingProps({ 'aria-expanded': null })),
+      refusal(NO_SCALAR)
+    );
+    assert.throws(
+      () => handle.update(expandingProps({ 'aria-pressed': true })),
+      refusal('"aria-pressed" is not a data attribute')
+    );
+    const [{ instance }] = mounts;
+    assert.deepEqual(instance.updates, [], 'the earlier props stay rendered');
+    assert.equal(handle.update(expandingProps({ 'aria-expanded': true })), true);
+    assert.equal(handle.update(expandingProps()), true);
+    assert.deepEqual(
+      instance.updates.map((props) => [
+        Object.hasOwn(props, 'aria-expanded'),
+        props['aria-expanded'],
+      ]),
+      [
+        [true, true],
+        [false, undefined],
+      ],
+      'the value, then no key at all'
+    );
+  });
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();
