@@ -1222,7 +1222,7 @@ An inspector rail's verbs render through the button primitive at full width, eac
 The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
 A count has two faces and neither licenses a third: at the end of a labelled row it is that bare mono numeral, and on an item whose only visible content is a glyph it is a filled pip on the icon well's outer corner with a 2px ground-coloured ring.
 The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
-On the RAIL the shared chip primitive draws the unsaved mark and none of the family's four vehicles: measured, the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
+On the RAIL none of the family's four vehicles is drawn by the shared chip primitive: measured, the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
 The vehicles are cited by SELECTOR and never by line number, because a line into that sheet is not verifiable by a reader of this document and the four this sentence carried before had all gone stale.
 Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact on the rail; a tab strip is governed by the rule below.
 The family reaches a TAB STRIP as well as the rail, because a tab's mark states a fact about what is behind that tab exactly as a rail entry's does, and the tab-strip primitive MUST own the drawing of every vehicle it offers so that a call site names which one its mark uses and never how it looks.
@@ -1301,7 +1301,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 
 #### Scenario: A tab strip draws its issue summary
 
-- **WHEN** a tab strip draws an issue mark under any caller's badge class
+- **WHEN** a tab strip draws an issue summary under any caller's badge class
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box

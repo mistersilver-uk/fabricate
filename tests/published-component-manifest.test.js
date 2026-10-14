@@ -649,7 +649,7 @@ function sheetReach({ path, root }, sheet, reader = SHIPPED) {
 const SHEET_REACH_PINS = Object.freeze([
   // On the remove control, which no published key draws.
   'src/ui/svelte/components/Chip.svelte: fab-hit-area',
-  // The chip's root class, which the 18-selector census below holds.
+  // The chip's root class, which the 16-selector census below holds.
   'src/ui/svelte/components/Chip.svelte: manager-chip',
   // The panel's root class, which its 3-selector census below holds.
   'src/ui/svelte/components/EmptyState.svelte: manager-empty',

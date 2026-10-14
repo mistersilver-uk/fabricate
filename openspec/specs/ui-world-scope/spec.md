@@ -708,6 +708,7 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     A tab may carry more than one mark, because a section can be both authored and unready at once.
     The dot renders only with a text accessible name naming its unit, and a nameless one is dropped rather than drawn, because a mark separated from its siblings by colour alone is not a signal.
     A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
+    A caller states its answer through the mark's `suppressZero` (default true); the five record counts moved at issue 2464 take that default.
 13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
     It is a mode of the one primitive, never a reason for a second implementation.
 14. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**
