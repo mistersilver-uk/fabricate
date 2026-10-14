@@ -1170,7 +1170,7 @@ const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
   'text-align',
 ]);
 
-/** The 44px art tile. */
+/** The linked face's 44px art tile. */
 const LINK_FIELD_ICON_COMPARED = Object.freeze([
   'display',
   'align-items',
@@ -1201,14 +1201,14 @@ const LINK_FIELD_COMPACT_COPY_COMPARED = Object.freeze([
   'text-align',
 ]);
 
-/** The linked name, which the family types and truncates. */
+/** The linked name, which the family types and caps at two lines. */
 const LINK_FIELD_NAME_COMPARED = Object.freeze([
   'font-family',
   'font-size',
   'font-weight',
   'line-height',
   'overflow-x',
-  'text-overflow',
+  '-webkit-line-clamp',
 ]);
 
 /** The compact face's name line, which the family also types down. */
@@ -1225,7 +1225,7 @@ const LINK_FIELD_HINT_COMPARED = Object.freeze([
   'font-size',
   'line-height',
   'overflow-x',
-  'text-overflow',
+  '-webkit-line-clamp',
 ]);
 
 /** The compact face's note. */
@@ -2904,15 +2904,15 @@ test('the link field family declares no font floor and no focus pair', async () 
     // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY.
     assert.equal(
       endingInBareElement(family).length,
-      8,
-      'the link field no longer ends eight rules in a bare element, so `floorShaped`s zero above ' +
+      9,
+      'the link field no longer ends nine rules in a bare element, so `floorShaped`s zero above ' +
         'has stopped discriminating and the docblock`s contrast with the status card is stale: ' +
         endingInBareElement(family)
           .map((rule) => rule.selectorText)
           .join(', ')
     );
 
-    // Of those eight, the four that TYPE it. Asserted separately because the zero above cannot be
+    // Of those nine, the five that TYPE it. Asserted separately because the zero above cannot be
     // mistaken for "this family types nothing" — the predicate is shape, not absence, and a
     // reader reconciling the two needs the second number.
     const typedBareElement = endingInBareElement(family).filter((rule) =>
@@ -2920,10 +2920,10 @@ test('the link field family declares no font floor and no focus pair', async () 
     );
     assert.equal(
       typedBareElement.length,
-      4,
-      'expected exactly the four name-and-note rules to type a bare element under this root — ' +
-        'the family`s `small`, the linked face`s `strong`, and the compact face`s `strong` and ' +
-        '`small` — found ' +
+      5,
+      'expected exactly the five name-and-note rules to type a bare element under this root — ' +
+        'the family`s `small`, the empty and the linked face`s `strong`, and the compact face`s ' +
+        '`strong` and `small` — found ' +
         `${typedBareElement.length}: ` +
         typedBareElement.map((rule) => rule.selectorText).join(', ')
     );

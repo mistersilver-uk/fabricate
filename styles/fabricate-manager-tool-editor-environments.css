@@ -719,10 +719,11 @@
 
 /* ROOTED AT `fabricate-link-field`, the class `ItemDropZone` writes at the head of its root element's class attribute (issues 1509, 1507). */
 .fabricate-link-field.manager-item-drop-zone {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) max-content;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--fab-space-3);
+  justify-content: center;
+  gap: var(--fab-space-1);
   width: 100%;
   min-height: 104px;
   padding: var(--fab-space-3);
@@ -730,11 +731,17 @@
   border-radius: 11px;
   box-sizing: border-box;
   background: var(--fab-surface-soft);
+  text-align: center;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-linked {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) max-content;
+  justify-content: normal;
+  gap: var(--fab-space-3);
   border-style: solid;
   background: var(--fab-bg-1);
+  text-align: start;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing {
@@ -798,12 +805,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--fab-text-subtle);
+  font-size: 18px;
+}
+
+.fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-icon {
   width: 44px;
   height: 44px;
   border-radius: 11px;
   overflow: hidden;
   background: var(--fab-surface-soft);
   color: var(--fab-accent);
+  font-size: inherit;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing .manager-item-drop-zone-icon {
@@ -824,14 +837,24 @@
 
 .fabricate-link-field .manager-item-drop-zone-copy strong,
 .fabricate-link-field .manager-item-drop-zone-copy small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .fabricate-link-field .manager-item-drop-zone-copy small {
   color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.35;
+}
+
+.fabricate-link-field.manager-item-drop-zone:not(.is-linked):not(.is-compact) .manager-item-drop-zone-copy strong {
+  color: var(--fab-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong {

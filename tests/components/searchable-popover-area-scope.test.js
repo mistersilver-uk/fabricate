@@ -566,7 +566,7 @@ const PRIMITIVES = Object.freeze([
       // WRITTEN BUT UNRULED IN THIS SHEET.
       'manager-item-drop-zone-uuid',
     ]),
-    // Measured at this commit: 5 written, 22 family selectors, 21 owned.
+    // Measured at this commit: 5 written, 24 family selectors, 23 owned.
     writtenFloor: 4,
     familyFloor: 14,
     ownedFloor: 13,
