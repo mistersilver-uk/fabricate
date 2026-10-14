@@ -19,9 +19,10 @@
  * Limit: a handler declared in `<script>` and named by an attribute fails closed, as does a
  * callback handed to a child component.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
- * local followed through its value operands, and not from a child element or `aria-labelledby`.
- * Limit: whether a control draws text of its own follows the snippets its file defines, and holds
- * off only an `{#if}` on an unpublished prop at a falsy default.
+ * local followed through its value operands, and not from a child element or `aria-labelledby`;
+ * whether a name is drawn in every state is the mounted suite's.
+ * Limit: whether a control draws text of its own follows the snippets its file defines, counts a
+ * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -1077,11 +1078,40 @@ describe('the aria-labelledby admission clause', () => {
     ['a control whose snippet draws text', '{@render worded()}', NAMED],
     ['a static text node', 'On', NAMED],
     ['a name key that is not required', '', NAMED, { label: { kind: 'data' }, ...LABELLED }],
+    ['a child component, which may draw text', '<Label text={label} />', NAMED],
+    ['a render of a snippet its file does not define', '{@render children?.()}', NAMED],
+    ['text under an {#if} on a published key', '{#if label}<span>{label}</span>{/if}', NAMED],
   ]) {
     it(`names ${claim} as a fault`, () => {
       assert.ok(admitted(content, open, props).includes(REFUSED));
     });
   }
+
+  /** The faults of an entry publishing it beside a required `label`, over `markup`, under `pins`. */
+  const labelledFaults = (markup, pins) => {
+    const entry = { name: 'E', path: E, root: 'any', props: { label: required, ...LABELLED } };
+    return controlFaults(entry, pins, syntheticReader({ [E]: markup }));
+  };
+
+  it('names an entry one of whose two reached controls draws text as a fault', () => {
+    const markup = [
+      '<script>let { label, ...rest } = $props(); const accessibleName = $derived(label || undefined);</script>',
+      button('', NAMED),
+      button('<span>{label}</span>', NAMED).replace('data-press', 'data-other'),
+      styled(PAIR),
+    ].join('');
+    const pins = { [PRESS]: 'always', [`${E}: button[data-other]`]: 'always' };
+    assert.ok(labelledFaults(markup, pins).includes(REFUSED));
+  });
+
+  it('names an entry that reaches no control as a fault', () => {
+    assert.ok(
+      labelledFaults(
+        '<script>let { label, ...rest } = $props();</script><span {...rest}>{label}</span>',
+        {}
+      ).includes(REFUSED)
+    );
+  });
 });
 
 describe('the called-from-an-event clause', () => {

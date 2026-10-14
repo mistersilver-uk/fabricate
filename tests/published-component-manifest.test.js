@@ -26,10 +26,11 @@
  * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, or
  * by an event-handler attribute on `event.currentTarget`, is not seen.
  * Limit: the twin rule reads a branch's landings wherever they sit in it, so one under a nested
- * `{#if}` with no `{:else}` counts as drawn, and judges no `{#await}`'s branches; which landing a
- * pinned entry's defaults draw is its `heldBy` clause's, not the gate's.
- * Limit: the DOM-read census sees a string passed to the call itself, not one held in a local nor
- * an ARIA reflection property, and the aria-key clause does not see which element a read is of.
+ * `{#if}` with no `{:else}` counts as drawn, judges no `{#await}`'s branches, and does not see a
+ * landing inside a snippet rendered in one branch; which landing a pinned entry's defaults draw is
+ * its `heldBy` clause's, not the gate's.
+ * Limit: the DOM-read census sees only the read forms `attributeReads` names, and the aria-key
+ * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -550,6 +551,13 @@ const ARIA_KEY_SELECTORS = Object.freeze([
     'fab-bulk-inset-row',
   ],
 ]);
+
+/**
+ * Whether `kept` keeps one `attributeSelectors` reading off a published control: as a `pinned`
+ * ancestor above the attribute, or as a class its own element requires that `spelled` lacks.
+ */
+const keptOff = ({ above, bearers }, kept, pinned, spelled) =>
+  (pinned.has(kept) && above.includes(kept)) || (bearers.includes(kept) && !spelled.has(kept));
 
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
 const CARD_FAMILY_RULES = Object.freeze([
@@ -1735,6 +1743,11 @@ describe('each entry matches its component declaration', () => {
       'a landing under a nested {#if} with no {:else}, which the rule does not see',
       '{#if label}{#if label.length}<p {...rest}></p>{/if}{:else}<i {...rest}></i>{/if}',
     ],
+    ['an {#each} with no {:else}', '{#each [label] as item}<p {...rest}>{item}</p>{/each}'],
+    [
+      'an {#each} whose {:else} holds it too',
+      '{#each [label] as item}<p {...rest}>{item}</p>{:else}<i {...rest}></i>{/each}',
+    ],
   ]) {
     it(`passes ${claim} under the twin rule`, () => {
       assert.deepEqual(twinsOf(template), []);
@@ -1750,6 +1763,10 @@ describe('each entry matches its component declaration', () => {
     [
       'the last branch of an {:else if} chain',
       '{#if label}<p {...rest}></p>{:else if label.length}<i {...rest}></i>{:else}<b>x</b>{/if}',
+    ],
+    [
+      'the {:else} of an {#each}',
+      '{#each [label] as item}<p {...rest}>{item}</p>{:else}<b>x</b>{/each}',
     ],
   ]) {
     it(`names rest that misses ${claim} as one twin fault`, () => {
@@ -2480,11 +2497,33 @@ describe('the module sheet and every component style against the published Butto
     ]);
     const spelled = publishedTokens();
     for (const [index, [written, kept]] of ARIA_KEY_SELECTORS.entries()) {
-      const { above, bearers } = reading[index];
-      const under = pinned.has(kept) && above.includes(kept);
-      const held = bearers.includes(kept) && !spelled.has(kept);
-      assert.ok(under || held, `${written} is kept off by ${kept}`);
+      assert.ok(
+        keptOff(reading[index], kept, pinned, spelled),
+        `${written} is kept off by ${kept}`
+      );
     }
+  });
+
+  /** One `aria-pressed` reading of `rule`, as the ARIA census takes it. */
+  const pressedReading = (rule) => {
+    const { css } = templateOf('sheet.css', `<style>${rule} { gap: 0 }</style>`).ast;
+    return attributeSelectors([['sheet.css', css]], 'aria-pressed')[0];
+  };
+
+  it('names as a bearer only a compound whose own element holds the attribute, not a :has() subject', () => {
+    assert.deepEqual(pressedReading('.x:has([aria-pressed])').bearers, []);
+    assert.deepEqual(pressedReading('.x:has(> .y[aria-pressed])').bearers, ['y']);
+    assert.deepEqual(pressedReading('.x:not([aria-pressed])').bearers, ['x']);
+  });
+
+  it('keeps a row off by its bearer only when no published closure spells that class', () => {
+    const spelled = publishedTokens();
+    assert.ok(spelled.has('fabricate-toggle'), 'the switch spells its root class');
+    const none = new Set();
+    const reading = pressedReading('.fabricate-toggle[aria-pressed]');
+    assert.ok(!keptOff(reading, 'fabricate-toggle', none, spelled), 'a spelled bearer is refused');
+    const unspelled = pressedReading('.acme-row[aria-pressed]');
+    assert.ok(keptOff(unspelled, 'acme-row', none, spelled), 'an unspelled bearer holds');
   });
 
   /**
@@ -2893,5 +2932,19 @@ describe('the DOM reads of a published ARIA attribute', () => {
       ].join('\n')
     );
     assert.deepEqual(attributesReadInClauses(ast), ['aria-controls', 'aria-labelledby']);
+  });
+
+  it('reads no getAttribute call in a clause that it or a describe around it skips', () => {
+    const { ast } = parseModule(
+      [
+        "describe.skip('x', () => { it('a', () => node.getAttribute('aria-busy')); });",
+        "describe('y', { skip: true }, () => { it('b', () => node.getAttribute('aria-owns')); });",
+        "it.skip('c', () => node.getAttribute('aria-live'));",
+        "it('d', { skip: 'later' }, () => node.getAttribute('aria-atomic'));",
+        "test('e', { todo: true }, () => node.getAttribute('aria-details'));",
+        "it('f', { skip: false }, () => node.getAttribute('aria-controls'));",
+      ].join('\n')
+    );
+    assert.deepEqual(attributesReadInClauses(ast), ['aria-controls']);
   });
 });

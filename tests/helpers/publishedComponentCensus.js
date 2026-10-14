@@ -375,7 +375,9 @@ function readsAttribute(method, text, name) {
  * Every DOM read in `files`, each `[file, ast]`, that names one of `names`, as
  * `<file>: <method>(<string>)`: a `READ_METHODS` call on a member, `?.` included, in a module, a
  * component script or a template expression, whose string argument names it. A string held in a
- * local and an ARIA reflection property are not seen.
+ * local, an ARIA reflection property, a computed member (`el['querySelector']`), a `.call(el, …)`,
+ * `getAttributeNode`, `attributes.getNamedItem`, a template literal with an expression and jQuery's
+ * `.attr` are not seen.
  */
 export function attributeReads(files, names) {
   return files.flatMap(([file, ast]) =>

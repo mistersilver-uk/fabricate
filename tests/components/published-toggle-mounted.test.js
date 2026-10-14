@@ -162,6 +162,20 @@ describe('the default draws the button host alone', () => {
     await settle();
     assert.deepEqual(authoredClasses(button()), ['fabricate-toggle', 'is-on']);
     assert.equal(button().getAttribute('aria-pressed'), 'true');
+    assert.equal(button().getAttribute('aria-label'), NAME, 'named while on');
+    handle.destroy();
+  });
+
+  it('renames the same focused button when an update changes only ariaLabel', async () => {
+    const { handle, button } = mountToggle();
+    await settle();
+    const node = button();
+    node.focus();
+    assert.equal(handle.update(base({ ariaLabel: 'Hidden tasks' })), true);
+    await settle();
+    assert.ok(button() === node, 'the same node');
+    assert.ok(document.activeElement === node, 'focus stays on it');
+    assert.equal(node.getAttribute('aria-label'), 'Hidden tasks');
     handle.destroy();
   });
 

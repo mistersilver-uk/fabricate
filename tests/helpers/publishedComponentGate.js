@@ -370,11 +370,15 @@ const CHILD_FRAGMENTS = Object.freeze({
   SnippetBlock: () => [],
 });
 
+/** A child component may draw text whatever its slot holds, so `drawsOwnText` fails closed on it. */
+const TEXT_COMPONENTS = new Set(['Component', 'SvelteComponent', 'SvelteSelf']);
+
 /**
- * Whether a control draws text of its own: a non-blank text node, an expression, an `{@html}`, or a
- * render tag of anything but a snippet its file defines, which is followed into. An `{#if}` whose
- * test is a prop local the entry does not publish (`published`, by local) held at a falsy default
- * draws only its alternate. Anything else that holds children is read through them.
+ * Whether a control draws text of its own: a non-blank text node, an expression, an `{@html}`, a
+ * child component, or a render tag of anything but a snippet its file defines, which is followed
+ * into. An `{#if}` whose test is a prop local the entry does not publish (`published`, by local)
+ * held at a falsy default draws only its alternate. Anything else that holds children is read
+ * through them.
  */
 export function drawsOwnText(ast, node, published) {
   const snippets = new Map(
@@ -394,6 +398,7 @@ export function drawsOwnText(ast, node, published) {
   const drawsText = (child) => {
     if (child.type === 'Text') return child.data.trim() !== '';
     if (child.type === 'Comment' || child.type === 'ConstTag') return false;
+    if (TEXT_COMPONENTS.has(child.type)) return true;
     if (child.type === 'IfBlock') {
       return inFragments([heldOff(child) ? null : child.consequent, child.alternate]);
     }
@@ -678,26 +683,30 @@ function chainBranches(block) {
 }
 
 export const BRANCH_TWIN =
-  'rest lands in one branch of an {#if} and another branch draws without it';
+  'rest lands in one branch of an {#if} or {#each} and another branch draws without it';
+
+/** The branches one block chooses between, or none for a block that chooses nothing. */
+function blockBranches(node) {
+  if (node.type === 'IfBlock' && !node.elseif) return chainBranches(node);
+  return node.type === 'EachBlock' && node.fallback ? [node.body, node.fallback] : [];
+}
 
 /**
- * The twin rule over one component: an `{#if}` chain one of whose branches that draws anything
- * holds a rest landing and another holds none is `BRANCH_TWIN`, once per chain; a branch that
- * draws nothing is not judged.
+ * The twin rule over one component: an `{#if}` chain, or an `{#each}` with its `{:else}`, one of
+ * whose branches that draws anything holds a rest landing and another holds none is `BRANCH_TWIN`,
+ * once per block; a branch that draws nothing is not judged.
  */
 export function branchTwinFaults(ast) {
   const landings = new Set(restElements(ast).map(({ node }) => node));
   if (landings.size === 0) return [];
   const holds = (fragment) => [...walkNodes(fragment)].some((node) => landings.has(node));
-  return [...walkNodes(ast.fragment)]
-    .filter((node) => node.type === 'IfBlock' && !node.elseif)
-    .flatMap((block) => {
-      const drawn = chainBranches(block).filter((fragment) =>
-        fragment.nodes.some((node) => !isBlank(node))
-      );
-      const holding = drawn.filter((fragment) => holds(fragment));
-      return holding.length > 0 && holding.length < drawn.length ? [BRANCH_TWIN] : [];
-    });
+  return [...walkNodes(ast.fragment)].flatMap((block) => {
+    const drawn = blockBranches(block).filter((fragment) =>
+      fragment.nodes.some((node) => !isBlank(node))
+    );
+    const holding = drawn.filter((fragment) => holds(fragment));
+    return holding.length > 0 && holding.length < drawn.length ? [BRANCH_TWIN] : [];
+  });
 }
 
 /**
@@ -847,12 +856,21 @@ const ANCESTOR_COMBINATORS = new Set([' ', '>']);
  * in the selector, as `{ written, above, bearers }`: as its sheet writes it; each of the
  * `requiredClasses` of a compound a descendant or child combinator follows ahead of the compound
  * that holds the attribute, which is an ancestor of that compound's element; and the
- * `requiredClasses` of every compound, inside a pseudo-class or not, that holds the attribute.
+ * `requiredClasses` of every compound, inside a pseudo-class or not, that holds the attribute
+ * outside a `:has()`, whose arguments match other elements and are read as compounds of their own.
  * `name` is lower case.
  */
 export function attributeSelectors(sheets, name) {
   const holds = (part) => part.type === 'AttributeSelector' && matchedAttribute(part) === name;
   const holdsIn = (relative) => [...walkNodes(relative)].some((part) => holds(part));
+  const holdsOn = (relative) => {
+    const related = new Set(
+      [...walkNodes(relative)].flatMap((part) =>
+        part.type === 'PseudoClassSelector' && part.name === 'has' ? [...walkNodes(part.args)] : []
+      )
+    );
+    return [...walkNodes(relative)].some((part) => holds(part) && !related.has(part));
+  };
   return sheets.flatMap(([file, css]) =>
     selectorsHolding(css, holds).map((complex) => {
       const at = complex.children.findIndex((relative) => holdsIn(relative));
@@ -861,7 +879,7 @@ export function attributeSelectors(sheets, name) {
         .filter((_, index) => ANCESTOR_COMBINATORS.has(complex.children[index + 1].combinator.name))
         .flatMap((relative) => requiredClasses(relative));
       const bearers = [...walkNodes(complex)]
-        .filter((node) => node.type === 'RelativeSelector' && holdsIn(node))
+        .filter((node) => node.type === 'RelativeSelector' && holdsOn(node))
         .flatMap((relative) => requiredClasses(relative));
       const written = `${file}: ${writtenSelector(css, complex)}`;
       return { written, above, bearers: [...new Set(bearers)] };
@@ -960,17 +978,38 @@ const readsByName = (node) =>
 const isFunctionNode = (node) =>
   node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 
+const SKIPPABLE_CALLS = new Set(['describe', 'it', 'test']);
+const SKIP_MARKS = new Set(['skip', 'todo']);
+
+/** Whether a node is a skipped `describe`, `it` or `test`: `.skip`, `.todo`, or a set `skip` or `todo` option. */
+function isSkippedCall(node) {
+  if (node.type !== 'CallExpression') return false;
+  const { callee } = node;
+  if (callee?.type === 'MemberExpression' && SKIPPABLE_CALLS.has(callee.object?.name)) {
+    return SKIP_MARKS.has(callee.property?.name);
+  }
+  if (!SKIPPABLE_CALLS.has(callee?.name)) return false;
+  return node.arguments.some(
+    (argument) =>
+      argument.type === 'ObjectExpression' &&
+      argument.properties.some(
+        ({ key, value }) => SKIP_MARKS.has(key?.name) && !(value.type === 'Literal' && !value.value)
+      )
+  );
+}
+
 /**
  * Every attribute name a suite reads with `.getAttribute('<name>')` inside the body of an `it` or
- * `test` call, from a parsed module. Which element the read is made of is not seen.
+ * `test` call that neither it nor a `describe` around it skips, from a parsed module. Which element
+ * the read is made of is not seen, nor whether an inner function that holds it is ever called.
  */
 export function attributesReadInClauses(ast) {
-  const clauses = [...walkNodes(ast)].filter(
-    (node) => node.type === 'CallExpression' && CLAUSE_CALLS.has(node.callee?.name)
-  );
-  const bodies = clauses.flatMap((clause) =>
-    clause.arguments.filter((argument) => isFunctionNode(argument))
-  );
+  const bodies = [];
+  walkWithAncestors(ast, (node, ancestors) => {
+    const clause = node.type === 'CallExpression' && CLAUSE_CALLS.has(node.callee?.name);
+    if (!clause || [node, ...ancestors].some((above) => isSkippedCall(above))) return;
+    bodies.push(...node.arguments.filter((argument) => isFunctionNode(argument)));
+  });
   const reads = bodies.flatMap((body) => [...walkNodes(body)].filter((node) => readsByName(node)));
   return [...new Set(reads.map((call) => call.arguments[0].value))].sort(byName);
 }
