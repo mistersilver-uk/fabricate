@@ -236,13 +236,13 @@ function templateBindings(ast) {
 }
 
 /**
- * What a `svelte:element`'s `this` expression reads, to a fixed point, as `{ keys, props, faults }`:
- * the published keys, and every prop by its key. A `const` is followed into its initialiser,
- * `$derived` and `$derived.by` included, and a function into its body. `published` is the entry's
- * keys by local name. A name declared any other way, or bound by a template block anywhere in the
- * file, is the fault `tag reads <name>, which the gate cannot follow`; any other is a global.
+ * What `names` read, to a fixed point, as `{ keys, props, faults }`: the published keys, and every
+ * prop by its key. A `const` is followed into its initialiser, `$derived` and `$derived.by`
+ * included, and a function into its body. `published` is the entry's keys by local name. A name
+ * declared any other way, or bound by a template block anywhere in the file, is the fault
+ * `reads <name>, which the gate cannot follow`; any other is a global.
  */
-export function tagKeys(ast, node, published) {
+export function followedProps(ast, names, published) {
   const locals = new Map(propLocals(ast).map(({ key, local }) => [local, key]));
   const declared = scriptDeclarations(ast);
   const bound = templateBindings(ast);
@@ -250,13 +250,13 @@ export function tagKeys(ast, node, published) {
   const props = new Set();
   const faults = [];
   const seen = new Set();
-  const queue = [...referencedNames(node.tag)];
+  const queue = [...names];
   while (queue.length > 0) {
     const name = queue.pop();
     if (seen.has(name)) continue;
     seen.add(name);
     if (bound.has(name) || declared.get(name) === null) {
-      faults.push(`tag reads ${name}, which the gate cannot follow`);
+      faults.push(`reads ${name}, which the gate cannot follow`);
     } else if (locals.has(name)) {
       props.add(locals.get(name));
       if (published.has(name)) keys.add(published.get(name));
@@ -266,6 +266,154 @@ export function tagKeys(ast, node, published) {
   }
   return { keys: [...keys].sort(byName), props: [...props].sort(byName), faults };
 }
+
+/** What a `svelte:element`'s `this` expression reads, as `followedProps` answers it for the tag. */
+export function tagKeys(ast, node, published) {
+  const { keys, props, faults } = followedProps(ast, referencedNames(node.tag), published);
+  return { keys, props, faults: faults.map((fault) => `tag ${fault}`) };
+}
+
+/** The local a member chain starts from, or `null` where it starts anywhere else. */
+function chainRoot(expression) {
+  let node = expression;
+  while (node.type === 'ChainExpression' || node.type === 'MemberExpression') {
+    node = node.type === 'ChainExpression' ? node.expression : node.object;
+  }
+  return node.type === 'Identifier' ? node.name : null;
+}
+
+/**
+ * Where a name expression's value can come from, as `{ locals, literal, unfollowed }`: the prop
+ * locals it reaches, whether a string or template literal reaches it, and whether a value comes
+ * from anything else. It walks value operands only (`SPREAD_OPERANDS`), a `const` into its
+ * initialiser, `$derived(…)` into its argument, and a member chain to its root; `undefined` and
+ * `null` add nothing. A `let`, `$state`, import, function, call or template binding is unfollowed.
+ */
+export function nameSources(ast, expression) {
+  const props = new Set(propLocals(ast).map(({ local }) => local));
+  const declared = scriptDeclarations(ast);
+  const bound = templateBindings(ast);
+  const found = { locals: new Set(), literal: false, unfollowed: false };
+  const seen = new Set();
+  const readName = (name) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const init = declared.get(name);
+    if (bound.has(name) || init === null || init?.type === 'FunctionDeclaration') {
+      found.unfollowed = true;
+    } else if (props.has(name)) found.locals.add(name);
+    else if (init) visit(init);
+    else if (name !== 'undefined') found.unfollowed = true;
+  };
+  const readRoot = (node) => {
+    const root = chainRoot(node);
+    if (root && props.has(root) && !bound.has(root)) found.locals.add(root);
+    else found.unfollowed = true;
+  };
+  const visit = (node) => {
+    const operands = SPREAD_OPERANDS[node.type]?.(node);
+    if (operands) {
+      for (const operand of operands) visit(operand);
+      return;
+    }
+    switch (node.type) {
+      case 'Literal': {
+        found.literal ||= node.value !== null;
+        break;
+      }
+      case 'TemplateLiteral': {
+        found.literal = true;
+        break;
+      }
+      case 'Identifier': {
+        readName(node.name);
+        break;
+      }
+      case 'MemberExpression':
+      case 'ChainExpression': {
+        readRoot(node);
+        break;
+      }
+      default: {
+        if (isCallTo(node, '$derived')) visit(node.arguments[0]);
+        else found.unfollowed = true;
+      }
+    }
+  };
+  visit(expression);
+  return {
+    locals: [...found.locals].sort(byName),
+    literal: found.literal,
+    unfollowed: found.unfollowed,
+  };
+}
+
+/** Whether a `$props()` local's default is absent or a falsy literal, so an `{#if}` on it alone is false. */
+function falsyDefault(ast, local) {
+  const declarator = [...walkNodes(ast.instance)].find(
+    (node) => node.type === 'VariableDeclarator' && isCallTo(node.init, '$props')
+  );
+  const property = declarator?.id.properties?.find(({ value }) =>
+    value?.type === 'AssignmentPattern' ? value.left.name === local : value?.name === local
+  );
+  if (!property) return false;
+  const fallback = property.value.type === 'AssignmentPattern' ? property.value.right : null;
+  if (!fallback) return true;
+  if (fallback.type === 'Identifier') return fallback.name === 'undefined';
+  return fallback.type === 'Literal' && !fallback.value;
+}
+
+/** The fragments a template node draws its children in; a snippet definition draws none where it sits. */
+const CHILD_FRAGMENTS = Object.freeze({
+  EachBlock: ({ body, fallback }) => [body, fallback],
+  AwaitBlock: ({ pending, then, catch: caught }) => [pending, then, caught],
+  SnippetBlock: () => [],
+});
+
+/**
+ * Whether a control draws text of its own: a non-blank text node, an expression, an `{@html}`, or a
+ * render tag of anything but a snippet its file defines, which is followed into. An `{#if}` whose
+ * test is a prop local the entry does not publish (`published`, by local) held at a falsy default
+ * draws only its alternate. Anything else that holds children is read through them.
+ */
+export function drawsOwnText(ast, node, published) {
+  const snippets = new Map(
+    [...walkNodes(ast.fragment)]
+      .filter((block) => block.type === 'SnippetBlock')
+      .map((block) => [block.expression.name, block])
+  );
+  const props = new Set(propLocals(ast).map(({ local }) => local));
+  const heldOff = ({ test }) =>
+    test.type === 'Identifier' &&
+    props.has(test.name) &&
+    !published.has(test.name) &&
+    falsyDefault(ast, test.name);
+  const followed = new Set();
+  const inFragments = (fragments) =>
+    fragments.some((fragment) => fragment?.nodes.some((child) => drawsText(child)));
+  const drawsText = (child) => {
+    if (child.type === 'Text') return child.data.trim() !== '';
+    if (child.type === 'Comment' || child.type === 'ConstTag') return false;
+    if (child.type === 'IfBlock') {
+      return inFragments([heldOff(child) ? null : child.consequent, child.alternate]);
+    }
+    if (child.type === 'RenderTag') {
+      const snippet = snippets.get(chainRoot(renderCallee(child)));
+      if (!snippet) return true;
+      if (followed.has(snippet)) return false;
+      followed.add(snippet);
+      return inFragments([snippet.body]);
+    }
+    const fragments = CHILD_FRAGMENTS[child.type]?.(child) ?? [child.fragment];
+    const held = fragments.some((fragment) => fragment !== undefined && fragment !== null);
+    return held ? inFragments(fragments) : !CHILD_FRAGMENTS[child.type];
+  };
+  return inFragments([node.fragment]);
+}
+
+/** The callee of a render tag's call, `?.()` or not. */
+const renderCallee = (tag) =>
+  (tag.expression.type === 'ChainExpression' ? tag.expression.expression : tag.expression).callee;
 
 /** What one pin breaks against the element it names, in a file that spells `spelled`. */
 function pinFaults(id, pin, read, spelled) {
@@ -472,33 +620,83 @@ const ELEMENT_HANDLERS = Object.freeze({
 
 /**
  * Every element one component spreads its `$props()` rest local on, a `svelte:element` included,
- * as `{ node, before, written, spreads, handed }`: each `data-*` attribute written ahead of the
- * spread, static or not; every attribute the element states, wherever it sits; every other spread
- * as `{ local, before, keys }`, `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it
- * carries. An attribute's name is read in lower case, as HTML reads it. A rest that reaches an
- * element any other way (an alias, a `$derived` copy, a child component) answers none.
+ * as `{ node, guards, before, written, spreads, handed }`: the names its `{#if}` and `{#each}`
+ * ancestors read; each `data-*` attribute written ahead of the spread, static or not; every
+ * attribute the element states, wherever it sits; every other spread as `{ local, before, keys }`,
+ * `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it carries. An attribute's name is
+ * read in lower case, as HTML reads it. A rest that reaches an element any other way (an alias, a
+ * `$derived` copy, a child component) answers none.
  */
 export function restElements(ast) {
   const rest = restLocal(ast);
   if (!rest) return [];
   const isRest = ({ type, expression }) => type === 'SpreadAttribute' && expression?.name === rest;
+  const elements = [];
+  walkWithAncestors(ast.fragment, (node, ancestors) => {
+    if (node.type === 'RegularElement' || node.type === 'SvelteElement') {
+      elements.push({ node, guards: guardNames(ancestors) });
+    }
+  });
+  return elements.flatMap(({ node, guards }) => {
+    const at = node.attributes.findIndex((attribute) => isRest(attribute));
+    if (at === -1) return [];
+    const stated = node.attributes.map(({ type, name }) =>
+      type === 'Attribute' ? name.toLowerCase() : null
+    );
+    const written = stated.filter((name) => name !== null);
+    const before = stated.slice(0, at).filter((name) => name?.startsWith('data-'));
+    const spreads = node.attributes.flatMap((attribute, index) => {
+      if (attribute.type !== 'SpreadAttribute' || isRest(attribute)) return [];
+      const local = attribute.expression.name ?? 'an expression';
+      return [{ local, before: index < at, keys: spreadKeys(ast, attribute.expression) }];
+    });
+    const handed = node.attributes.flatMap(({ type }) => ELEMENT_HANDLERS[type] ?? []);
+    return [{ node, guards, before, written, spreads, handed }];
+  });
+}
+
+const isBlank = (node) =>
+  (node.type === 'Text' && node.data.trim() === '') ||
+  node.type === 'Comment' ||
+  node.type === 'ConstTag';
+
+/** The branches of one `{#if}` chain, `{:else if}` flattened, an absent `{:else}` left out. */
+function chainBranches(block) {
+  const branches = [block.consequent];
+  let alternate = block.alternate;
+  while (alternate) {
+    const [only, ...others] = alternate.nodes.filter((node) => !isBlank(node));
+    if (only?.type === 'IfBlock' && only.elseif && others.length === 0) {
+      branches.push(only.consequent);
+      alternate = only.alternate;
+    } else {
+      branches.push(alternate);
+      alternate = null;
+    }
+  }
+  return branches;
+}
+
+export const BRANCH_TWIN =
+  'rest lands in one branch of an {#if} and another branch draws without it';
+
+/**
+ * The twin rule over one component: an `{#if}` chain one of whose branches that draws anything
+ * holds a rest landing and another holds none is `BRANCH_TWIN`, once per chain; a branch that
+ * draws nothing is not judged.
+ */
+export function branchTwinFaults(ast) {
+  const landings = new Set(restElements(ast).map(({ node }) => node));
+  if (landings.size === 0) return [];
+  const holds = (fragment) => [...walkNodes(fragment)].some((node) => landings.has(node));
   return [...walkNodes(ast.fragment)]
-    .filter((node) => node.type === 'RegularElement' || node.type === 'SvelteElement')
-    .flatMap((node) => {
-      const at = node.attributes.findIndex((attribute) => isRest(attribute));
-      if (at === -1) return [];
-      const stated = node.attributes.map(({ type, name }) =>
-        type === 'Attribute' ? name.toLowerCase() : null
+    .filter((node) => node.type === 'IfBlock' && !node.elseif)
+    .flatMap((block) => {
+      const drawn = chainBranches(block).filter((fragment) =>
+        fragment.nodes.some((node) => !isBlank(node))
       );
-      const written = stated.filter((name) => name !== null);
-      const before = stated.slice(0, at).filter((name) => name?.startsWith('data-'));
-      const spreads = node.attributes.flatMap((attribute, index) => {
-        if (attribute.type !== 'SpreadAttribute' || isRest(attribute)) return [];
-        const local = attribute.expression.name ?? 'an expression';
-        return [{ local, before: index < at, keys: spreadKeys(ast, attribute.expression) }];
-      });
-      const handed = node.attributes.flatMap(({ type }) => ELEMENT_HANDLERS[type] ?? []);
-      return [{ node, before, written, spreads, handed }];
+      const holding = drawn.filter((fragment) => holds(fragment));
+      return holding.length > 0 && holding.length < drawn.length ? [BRANCH_TWIN] : [];
     });
 }
 
@@ -742,4 +940,31 @@ export function everyStylesheet() {
   assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
   stylesheets = [...sheets, ...blocks];
   return stylesheets;
+}
+
+const CLAUSE_CALLS = new Set(['it', 'test']);
+
+/** Whether a node is a `.getAttribute(<string>)` call. */
+const readsByName = (node) =>
+  node.type === 'CallExpression' &&
+  node.callee?.type === 'MemberExpression' &&
+  node.callee.property?.name === 'getAttribute' &&
+  typeof node.arguments[0]?.value === 'string';
+
+const isFunctionNode = (node) =>
+  node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
+
+/**
+ * Every attribute name a suite reads with `.getAttribute('<name>')` inside the body of an `it` or
+ * `test` call, from a parsed module. Which element the read is made of is not seen.
+ */
+export function attributesReadInClauses(ast) {
+  const clauses = [...walkNodes(ast)].filter(
+    (node) => node.type === 'CallExpression' && CLAUSE_CALLS.has(node.callee?.name)
+  );
+  const bodies = clauses.flatMap((clause) =>
+    clause.arguments.filter((argument) => isFunctionNode(argument))
+  );
+  const reads = bodies.flatMap((body) => [...walkNodes(body)].filter((node) => readsByName(node)));
+  return [...new Set(reads.map((call) => call.arguments[0].value))].sort(byName);
 }

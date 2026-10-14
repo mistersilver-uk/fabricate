@@ -68,11 +68,12 @@ export function compoundsOf(complex) {
  * say `disables`, or an earlier compound is a pinned ancestor, or a later one needs a descendant
  * the mount cannot hold. `drawsChildren` is `false` for a root whose published keys draw no
  * classed descendant, as `Chip` and `Button` are; any other root holds no descendant classed
- * `manager-*` unless a published closure spells that class. An attribute selector never makes a
- * selector safe, and anything else fails closed, a root named only inside `:has()` included.
+ * `manager-*` unless a published closure spells that class, nor one of `undrawn`, the classes a
+ * closure spells that no published key draws. An attribute selector never makes a selector safe,
+ * and anything else fails closed, a root named only inside `:has()` included.
  */
 export function cannotMatchPublished(complex, shape, spelled = new Set()) {
-  const { root, writable, ancestors, drawsChildren, disables = false } = shape;
+  const { root, writable, ancestors, drawsChildren, disables = false, undrawn = new Set() } = shape;
   const compounds = compoundsOf(complex);
   const at = compounds.findLastIndex((compound) => classesOf(compound).includes(root));
   if (at === -1) return false;
@@ -82,7 +83,7 @@ export function cannotMatchPublished(complex, shape, spelled = new Set()) {
     !disables &&
     own.selectors.some((part) => part.type === 'PseudoClassSelector' && part.name === 'disabled');
   const unheld = drawsChildren
-    ? (name) => name.startsWith('manager-') && !spelled.has(name)
+    ? (name) => (name.startsWith('manager-') && !spelled.has(name)) || undrawn.has(name)
     : () => true;
   const classedChild = compounds.slice(at + 1).some((compound) => classesOf(compound).some(unheld));
   const pinnedAncestor = compounds
@@ -184,17 +185,15 @@ export function placementFaults(reaching, shape, hooks) {
 
 /**
  * Clauses 2 and 3 of the reaching set: exactly one selector carries `:focus-visible` and declares
- * exactly the module ring, exactly one carries `:focus` and is the strip, and no other declares
- * `all`, `box-shadow` or a property whose name starts `outline`.
+ * exactly the module ring and `shape.ringExtras`, each `[property, value]`, exactly one carries
+ * `:focus` and is the strip, and no other declares `all`, `box-shadow` or a property whose name
+ * starts `outline`.
  */
-export function ringFaults(reaching, ring = moduleRing()) {
+export function ringFaults(reaching, { ringExtras = [] } = {}, ring = moduleRing()) {
   const marks = reaching.filter(({ complex }) => carries(complex, 'focus-visible'));
   const strips = reaching.filter(({ complex }) => carries(complex, 'focus'));
   const others = reaching.filter((row) => !marks.includes(row) && !strips.includes(row));
-  const drawn = [
-    ['outline', ring.outline],
-    ['outline-offset', ring.offset],
-  ];
+  const drawn = [['outline', ring.outline], ['outline-offset', ring.offset], ...ringExtras];
   return [
     ...(marks.length === 1 ? [] : [`${marks.length} reaching selectors carry :focus-visible`]),
     ...(strips.length === 1 ? [] : [`${strips.length} reaching selectors carry :focus`]),
@@ -312,4 +311,50 @@ export const ownFilesOf = (name) => importClosure(entryNamed(name).path, SHIPPED
 export function shippedCensus(shape, name, sheets = everyStylesheet()) {
   const options = { spelled: publishedManagerClasses(), own: ownFilesOf(name) };
   return sheets.flatMap(([file, css]) => censusSelectors(file, css, shape, options));
+}
+
+/** The DOM reads a module can make of an attribute by name, or of a selector that holds one. */
+const READ_METHODS = new Set([
+  'closest',
+  'querySelector',
+  'querySelectorAll',
+  'matches',
+  'getAttribute',
+  'hasAttribute',
+]);
+const ATTRIBUTE_READS = new Set(['getAttribute', 'hasAttribute']);
+
+/** A call's string argument, from a literal or a template literal with no expression. */
+function stringArgument(node) {
+  const [first] = node.arguments;
+  if (first?.type === 'Literal' && typeof first.value === 'string') return first.value;
+  if (first?.type === 'TemplateLiteral' && first.expressions.length === 0) {
+    return first.quasis[0].value.cooked;
+  }
+  return undefined;
+}
+
+/** Whether `text`, passed to `method`, reads the attribute `name`: as itself, or in an attribute selector. */
+function readsAttribute(method, text, name) {
+  if (ATTRIBUTE_READS.has(method)) return text.toLowerCase() === name;
+  return new RegExp(String.raw`\[\s*${name}\s*(?:[~|^$*]?=|\])`, 'iu').test(text);
+}
+
+/**
+ * Every DOM read in `files`, each `[file, ast]`, that names one of `names`, as
+ * `<file>: <method>(<string>)`: a `READ_METHODS` call on a member, `?.` included, in a module, a
+ * component script or a template expression, whose string argument names it. A string held in a
+ * local and an ARIA reflection property are not seen.
+ */
+export function attributeReads(files, names) {
+  return files.flatMap(([file, ast]) =>
+    [...walkNodes(ast)].flatMap((node) => {
+      const { callee } = node.type === 'CallExpression' ? node : {};
+      const method =
+        callee?.type === 'MemberExpression' && !callee.computed && callee.property.name;
+      const text = READ_METHODS.has(method) ? stringArgument(node) : undefined;
+      const reads = text !== undefined && names.some((name) => readsAttribute(method, text, name));
+      return reads ? [`${file}: ${method}(${text})`] : [];
+    })
+  );
 }

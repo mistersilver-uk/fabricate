@@ -1,13 +1,16 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over each entry's import
  * closure: every `callback` key is called from a click handler; every focusable element is pinned
- * to the published key that draws it, to `'always'`, or to `null`; a reached one draws its own
- * mark for keyboard focus and is named by the companion; a closure that takes a window's ring
- * states no focus rule of its own, and its reached control no inline style; and no rule outside
- * the published `Notice` styles its action button. The test-only probe runs beside the shipped entries. A key's kind and `args` are
+ * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
+ * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
+ * companion; an entry that publishes `aria-labelledby` names each reached control by a required
+ * key; a closure that takes a window's ring states no focus rule of its own, and its reached
+ * control no inline style; and no rule outside the published `Notice` styles its action button.
+ * The test-only probe runs beside the shipped entries. A key's kind and `args` are
  * `published-component-manifest.test.js`'s.
- * Limit: reach reads the entry's own file and does not follow a derived guard, so the chip's
- * `null` pin rests on that gate's pin of its published keys.
+ * Limit: reach follows a guard through a plain `const` and `$derived` to the props it reads; a
+ * guard it cannot follow faults a defaults pin only, so a `null` or key pin under a `$state` guard
+ * is judged by the names it can follow.
  * Limit: the focus mark reads declarations; the computed half is `notice-mounted.test.js`'s. A mark
  * that is not an outline is refused.
  * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file and to
@@ -15,8 +18,10 @@
  * `components/published-button-mounted.test.js`'s.
  * Limit: a handler declared in `<script>` and named by an attribute fails closed, as does a
  * callback handed to a child component.
- * Limit: a name is read from the element's own `aria-label` or content, not from a child element
- * or `aria-labelledby`.
+ * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
+ * local followed through its value operands, and not from a child element or `aria-labelledby`.
+ * Limit: whether a control draws text of its own follows the snippets its file defines, and holds
+ * off only an `{#if}` on an unpublished prop at a falsy default.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -32,13 +37,16 @@ import {
   attributeOf,
   byName,
   declarationsOf,
+  drawsOwnText,
   everyStylesheet,
   focusableElements,
+  followedProps,
   importClosure,
   isComponent,
   isControlTag,
   isStrip,
   moduleRing,
+  nameSources,
   propLocals,
   publishedLocals,
   selectorsNaming,
@@ -53,8 +61,9 @@ const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
 
 /**
  * Each focusable element the shipped closures draw, by file and static hook: the published key
- * whose guard draws it, `'always'` for one no guard hides, or `null` for one no published key
- * reaches.
+ * whose guard draws it, `'always'` for one no guard hides, `{ defaults, heldBy }` for one drawn
+ * while each prop of `defaults`, which the entry does not publish, keeps its default, `heldBy`
+ * naming the mounted clause that holds it, or `null` for one no published key reaches.
  */
 const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
@@ -64,6 +73,11 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
 });
+
+/** The one control drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
+const OPTIONAL_NAME_PINS = Object.freeze([
+  'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]',
+]);
 
 const OUTSIDE_AN_EVENT = 'is a callback key referenced outside an event handler';
 const NOTHING_CALLS = 'is a callback key nothing calls';
@@ -153,25 +167,53 @@ function controlsOf(entry, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS) {
   });
 }
 
-/** What one control's pin breaks. */
-function reachFaults({ id, guards, published, entry }, pins) {
+/**
+ * What a defaults pin breaks: a default the entry publishes or the component does not declare, a
+ * guard the gate cannot follow, guards that follow any prop but `defaults`, and no `heldBy`.
+ */
+function defaultsPinFaults({ id, entry, ast }, { defaults, heldBy }, followed) {
+  const declared = new Set(propLocals(ast).map(({ key }) => key));
+  const pinned = [...defaults].sort(byName);
+  return [
+    ...pinned
+      .filter((key) => Object.hasOwn(entry.props, key))
+      .map((key) => `${id} is pinned to the default of ${key}, which ${entry.name} publishes`),
+    ...pinned
+      .filter((key) => !declared.has(key))
+      .map(
+        (key) => `${id} is pinned to the default of ${key}, which the component does not declare`
+      ),
+    ...followed.faults.map((fault) => `${id} guard ${fault}`),
+    ...(followed.props.join(',') === pinned.join(',')
+      ? []
+      : [`${id} is pinned to the defaults [${pinned}] and its guards follow [${followed.props}]`]),
+    ...(heldBy ? [] : [`${id} is pinned to defaults and names no mounted clause in heldBy`]),
+  ];
+}
+
+/** What one control's pin breaks, its guards followed to the props they read. */
+function reachFaults(control, pins) {
+  const { id, guards, published, entry, ast } = control;
   if (!Object.hasOwn(pins, id)) return [`${id} has no reach pin`];
   const pin = pins[id];
   if (pin === 'always') return guards.size > 0 ? [`${id} is pinned always under a guard`] : [];
+  const followed = followedProps(ast, guards, published);
+  if (pin?.defaults) return defaultsPinFaults(control, pin, followed);
   if (pin !== null) {
     if (!Object.hasOwn(entry.props, pin)) {
       return [`${id} is pinned to ${pin}, which ${entry.name} does not publish`];
     }
-    const named = [...guards].some((name) => published.get(name) === pin);
-    return named ? [] : [`${id} is pinned to ${pin}, which no guard above it names`];
+    return followed.keys.includes(pin)
+      ? []
+      : [`${id} is pinned to ${pin}, which no guard above it names`];
   }
   if (guards.size === 0) return [`${id} is pinned null under no guard`];
-  return [...guards]
-    .filter((name) => published.has(name))
-    .map((name) => `${id} is pinned null under a guard that names ${published.get(name)}`);
+  return followed.keys.map((key) => `${id} is pinned null under a guard that names ${key}`);
 }
 
 const isReached = ({ id }, pins) => pins[id] !== null && pins[id] !== undefined;
+/** Whether a control is drawn whatever the companion passes: pinned `'always'` or to defaults. */
+const isAlwaysDrawn = ({ id }, pins) => pins[id] === 'always' || Boolean(pins[id]?.defaults);
 
 /**
  * The pseudo-class a rule states on one subject made only of classes in `classes`, with how many
@@ -263,49 +305,87 @@ function focusMarkFaults({ id, node, tags, ast, entry }, moduleRule = moduleRing
   return marks[0] ? [...faults, ...markFaults(id, marks[0].rule, moduleRule)] : faults;
 }
 
-/** The local an expression is rooted at: itself, or the object its member chain starts from. */
-function rootLocal(expression) {
-  let node = expression;
-  while (node.type === 'ChainExpression' || node.type === 'MemberExpression') {
-    node = node.type === 'ChainExpression' ? node.expression : node.object;
-  }
-  return node.type === 'Identifier' ? node.name : null;
-}
-
 const LITERAL = 'is named by a literal';
 const UNPUBLISHED_NAME = "is not named by a published data key or a text key's render tag";
 const OPTIONAL_NAME = 'is named by a text key that is not required';
+const OPTIONAL_DATA_NAME = 'is named by a data key that is not required';
 
-/** What one part of a name breaks: text, an expression, or a render tag. */
-function namePartFault(part, { published, entry }) {
+/**
+ * The published keys an expression's value reaches, by `nameSources`, or the fault it is: a
+ * literal reached, or a value from anything but a published `data` key.
+ */
+function dataNameOf(expression, { ast, published, entry }) {
+  const { locals, literal, unfollowed } = nameSources(ast, expression);
+  if (literal) return { fault: LITERAL };
+  const keys = locals.map((local) => published.get(local));
+  const data = keys.every((key) => entry.props[key]?.kind === 'data');
+  return unfollowed || keys.length === 0 || !data ? { fault: UNPUBLISHED_NAME } : { keys };
+}
+
+/**
+ * What one part of a name breaks: text, an expression, or a render tag. A control drawn whatever
+ * the companion passes (`strict`) is named only by required keys.
+ */
+function namePartFault(part, control, strict) {
+  const { published, entry } = control;
   const specOf = (local) => entry.props[published.get(local)];
-  const kindOf = (local) => specOf(local)?.kind;
   if (part.type === 'Text') return LITERAL;
   if (part.type === 'RenderTag') {
     const { callee } =
       part.expression.type === 'ChainExpression' ? part.expression.expression : part.expression;
-    if (kindOf(callee?.name) !== 'text') return UNPUBLISHED_NAME;
+    if (specOf(callee?.name)?.kind !== 'text') return UNPUBLISHED_NAME;
     return specOf(callee.name).required === true ? null : OPTIONAL_NAME;
   }
   if (part.type !== 'ExpressionTag') return UNPUBLISHED_NAME;
-  const { expression } = part;
-  if (expression.type === 'Literal' || expression.type === 'TemplateLiteral') return LITERAL;
-  return kindOf(rootLocal(expression)) === 'data' ? null : UNPUBLISHED_NAME;
+  const { fault, keys } = dataNameOf(part.expression, control);
+  if (fault) return fault;
+  const required = keys.every((key) => entry.props[key].required === true);
+  return strict && !required ? OPTIONAL_DATA_NAME : null;
+}
+
+/** A control's name parts: its `aria-label`'s, or else its content's. */
+function nameParts(node) {
+  const label = attributeOf(node, 'aria-label');
+  if (label) return [label.value === true ? { type: 'Text' } : label.value].flat();
+  return node.fragment.nodes.filter((child) => child.type !== 'Text' || child.data.trim() !== '');
 }
 
 /**
  * What a reached control's name breaks: its `aria-label`, or else its content, is an expression
- * rooted at a published `data` key's local, or a required `text` key's render tag.
+ * whose value reaches published `data` keys and no literal, or a required `text` key's render tag;
+ * on a control drawn whatever the companion passes, outside `OPTIONAL_NAME_PINS`, each of those
+ * `data` keys is required.
  */
-function nameFaults(control) {
+function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS) {
   const { id, node } = control;
-  const label = attributeOf(node, 'aria-label');
-  const parts = label
-    ? [label.value === true ? { type: 'Text' } : label.value].flat()
-    : node.fragment.nodes.filter((child) => child.type !== 'Text' || child.data.trim() !== '');
+  const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
-  const faults = parts.map((part) => namePartFault(part, control)).filter(Boolean);
+  const strict = isAlwaysDrawn(control, pins) && !optional.includes(id);
+  const faults = parts.map((part) => namePartFault(part, control, strict)).filter(Boolean);
   return [...new Set(faults)].map((fault) => `${id} ${fault}`);
+}
+
+const LABELLED_BY = 'aria-labelledby';
+
+/**
+ * Whether a reached control may sit beside `aria-labelledby`: it draws no text of its own, and an
+ * `aria-label` of one expression names it by required `data` keys alone.
+ */
+function namedByRequiredLabel(control) {
+  const { ast, node, published, entry } = control;
+  if (drawsOwnText(ast, node, published)) return false;
+  const [part, ...others] = [attributeOf(node, 'aria-label')?.value ?? []].flat();
+  if (part?.type !== 'ExpressionTag' || others.length > 0) return false;
+  const { keys } = dataNameOf(part.expression, control);
+  return Boolean(keys) && keys.every((key) => entry.props[key].required === true);
+}
+
+/** What an entry that publishes `aria-labelledby` breaks: a reached control it may not sit beside, or none. */
+function labelledByFaults(entry, controls, pins) {
+  if (entry.props[LABELLED_BY]?.kind !== 'aria') return [];
+  const reached = controls.filter((control) => isReached(control, pins));
+  const admitted = reached.length > 0 && reached.every((control) => namedByRequiredLabel(control));
+  return admitted ? [] : [`${entry.name} publishes aria-labelledby beside no required name`];
 }
 
 const FOCUS_PSEUDO_CLASSES = new Set(['focus', 'focus-visible', 'focus-within']);
@@ -348,9 +428,15 @@ function controlFaults(entry, pins, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS
   const controls = controlsOf(entry, reader, dynamic);
   const faults = controls.flatMap((control) => [
     ...reachFaults(control, pins),
-    ...(isReached(control, pins) ? [...focusMarkFaults(control), ...nameFaults(control)] : []),
+    ...(isReached(control, pins)
+      ? [...focusMarkFaults(control), ...nameFaults(control, pins)]
+      : []),
   ]);
-  return [...faults, ...focusRuleFaults(entry, controls, pins, reader)];
+  return [
+    ...faults,
+    ...labelledByFaults(entry, controls, pins),
+    ...focusRuleFaults(entry, controls, pins, reader),
+  ];
 }
 
 /** The notice's action button, by the class and the hook it writes, and the file that may style it. */
@@ -385,6 +471,11 @@ describe('each published entry that draws a control', () => {
       assert.deepEqual(controlFaults(entry, FOCUSABLE_REACH), []);
     });
   }
+
+  it('exempts from the required-name rule only a control pinned always', () => {
+    assert.ok(OPTIONAL_NAME_PINS.length > 0, 'the probe is exempt');
+    for (const id of OPTIONAL_NAME_PINS) assert.equal(FOCUSABLE_REACH[id], 'always', id);
+  });
 
   it('pins every focusable element the shipped closures draw, and no other', () => {
     const drawn = ENTRIES.flatMap((entry) => controlsOf(entry).map(({ id }) => id));
@@ -421,7 +512,10 @@ const button = (content = LABEL, open = '') =>
   `<button type="button" class="press" data-keyboard-focus="true" data-press${open}>${content}</button>`;
 
 /** The control faults of a synthetic entry over `markup`, publishing `props` at `root`, with its one button pinned `pin`. */
-function syntheticFaults(markup, { props = { label: { kind: 'data' } }, pin, root = 'any' }) {
+function syntheticFaults(
+  markup,
+  { props = { label: { kind: 'data', required: true } }, pin, root = 'any' }
+) {
   const entry = { name: 'E', path: E, root, props };
   const pins = pin === undefined ? {} : { [PRESS]: pin };
   const faults = controlFaults(entry, pins, syntheticReader({ [E]: markup }));
@@ -438,7 +532,7 @@ const dynamicPress = (content) =>
   ].join('');
 
 /** The control faults of a `fabricate` entry whose one control is a `svelte:element` pinned to `tags`. */
-function dynamicFaults(tags, content = LABEL, props = { label: { kind: 'data' } }) {
+function dynamicFaults(tags, content = LABEL, props = { label: { kind: 'data', required: true } }) {
   const entry = { name: 'E', path: E, root: 'fabricate', props };
   const markup = script('label, caption, note, tag') + dynamicPress(content);
   const dynamic = { [DYNAMIC_PRESS]: { tags, keys: [] } };
@@ -519,6 +613,87 @@ describe('the reach clause', () => {
     const bare = [script('label, hidden'), '{#if hidden}', button('Close'), '{/if}'].join('');
     assert.deepEqual(syntheticFaults(bare, { pin: null }), []);
   });
+
+  const derived = (guard) =>
+    `<script>let { label, hidden } = $props(); const shown = $derived(${guard});</script>`;
+  it('follows a guard through $derived to the published key it reads, for a key pin and a null pin', () => {
+    const markup = [derived('label && !hidden'), '{#if shown}', button(), '{/if}', styled(PAIR)];
+    assert.deepEqual(syntheticFaults(markup.join(''), { pin: 'label' }), []);
+    assert.deepEqual(syntheticFaults(markup.join(''), { pin: null }), [
+      'is pinned null under a guard that names label',
+    ]);
+  });
+
+  it('judges a null pin and a key pin under a guard it cannot follow by the names it can', () => {
+    const held = `<script>let { label } = $props(); let dismissed = $state(false);</script>`;
+    const under = (guard) => [held, `{#if ${guard}}`, button(), '{/if}', styled(PAIR)].join('');
+    assert.deepEqual(syntheticFaults(under('!dismissed'), { pin: null }), []);
+    assert.deepEqual(syntheticFaults(under('label && !dismissed'), { pin: 'label' }), []);
+  });
+});
+
+describe('the defaults pin', () => {
+  const HOSTED = "let { as = 'button', label, other = '' } = $props(); let box = $state(false);";
+  /** A button drawn under `guard`, which reads the unpublished `as` through `isBox`. */
+  const hosted = (guard = '!isBox') =>
+    [
+      `<script>${HOSTED} const isBox = $derived(as === 'box');</script>`,
+      `{#if ${guard}}`,
+      button(),
+      '{/if}',
+      styled(PAIR),
+    ].join('');
+  const PINNED = { defaults: ['as'], heldBy: 'a mounted clause' };
+  const required = { kind: 'data', required: true };
+
+  it('passes a control drawn at the default of an unpublished prop, judged for its mark and name', () => {
+    assert.deepEqual(syntheticFaults(hosted(), { pin: PINNED }), []);
+    assert.deepEqual(
+      syntheticFaults(hosted(), { pin: PINNED, props: { label: { kind: 'data' } } }),
+      [OPTIONAL_DATA_NAME]
+    );
+  });
+
+  for (const [claim, options, faults] of [
+    [
+      'a default the entry publishes',
+      { pin: PINNED, props: { label: required, as: { kind: 'data' } } },
+      ['is pinned to the default of as, which E publishes'],
+    ],
+    [
+      'a default the component does not declare',
+      { pin: { ...PINNED, defaults: ['size'] } },
+      [
+        'is pinned to the default of size, which the component does not declare',
+        'is pinned to the defaults [size] and its guards follow [as]',
+      ],
+    ],
+    [
+      'guards that follow another prop',
+      { pin: PINNED, guard: '!isBox && !other' },
+      ['is pinned to the defaults [as] and its guards follow [as,other]'],
+    ],
+    [
+      'no heldBy',
+      { pin: { defaults: ['as'] } },
+      ['is pinned to defaults and names no mounted clause in heldBy'],
+    ],
+    [
+      'a guard read the gate cannot follow',
+      { pin: PINNED, guard: '!isBox && !box' },
+      ['guard reads box, which the gate cannot follow'],
+    ],
+    [
+      'a guard that reads no prop',
+      { pin: PINNED, guard: 'true' },
+      ['is pinned to the defaults [as] and its guards follow []'],
+    ],
+  ]) {
+    it(`names ${claim} as a fault`, () => {
+      const { guard, ...rest } = options;
+      assert.deepEqual(syntheticFaults(hosted(guard), rest), faults);
+    });
+  }
 });
 
 describe('the focus mark clause', () => {
@@ -595,7 +770,12 @@ describe('the focus mark clause', () => {
 
   it('names a <select> at fabricate as a fault, because the module ring does not name its tag', () => {
     const select = script('label') + '<select data-press aria-label={label}></select>';
-    const entry = { name: 'E', path: E, root: 'fabricate', props: { label: { kind: 'data' } } };
+    const entry = {
+      name: 'E',
+      path: E,
+      root: 'fabricate',
+      props: { label: { kind: 'data', required: true } },
+    };
     const pins = { [`${E}: select[data-press]`]: 'always' };
     assert.deepEqual(controlFaults(entry, pins, syntheticReader({ [E]: select })), [
       `${E}: select[data-press] is a <select>, which the module ring does not name`,
@@ -683,7 +863,12 @@ describe('the focus rule clause', () => {
   });
 
   it('names a focus rule in another file of the closure, by that file', () => {
-    const entry = { name: 'E', path: E, root: 'fabricate', props: { label: { kind: 'data' } } };
+    const entry = {
+      name: 'E',
+      path: E,
+      root: 'fabricate',
+      props: { label: { kind: 'data', required: true } },
+    };
     const reader = syntheticReader({
       [E]: `<script>import Leaf from './Leaf.svelte'; let { label } = $props();</script>${button()}<Leaf />`,
       'src/Leaf.svelte': '<p class="leaf">x</p><style>.leaf:focus-within { color: red; }</style>',
@@ -734,7 +919,7 @@ describe('the parts clause', () => {
 
 describe('the name clause', () => {
   const props = {
-    label: { kind: 'data' },
+    label: { kind: 'data', required: true },
     caption: { kind: 'text', required: true },
     note: { kind: 'text' },
     onPress: { kind: 'callback' },
@@ -761,9 +946,11 @@ describe('the name clause', () => {
     ['a literal', 'Close', '', LITERAL],
     ['a literal aria-label', '', ' aria-label="Close"', LITERAL],
     ['a literal expression', "{'Close'}", '', LITERAL],
-    ['a literal fallback', "{label ?? 'Close'}", '', UNPUBLISHED_NAME],
+    ['a literal fallback', "{label ?? 'Close'}", '', LITERAL],
+    ['a template literal', '{`Close`}', '', LITERAL],
     ['a name rooted at a callback key', '{onPress.name}', '', UNPUBLISHED_NAME],
     ['a name rooted at an unpublished prop', '{other}', '', UNPUBLISHED_NAME],
+    ['a call', '{label.trim()}', '', UNPUBLISHED_NAME],
     ['a render tag of a key that is no text key', '{@render label?.()}', '', UNPUBLISHED_NAME],
     ['the render tag of a text key that is not required', '{@render note?.()}', '', OPTIONAL_NAME],
     ['a literal beside a published key', `Close ${LABEL}`, '', LITERAL],
@@ -776,6 +963,109 @@ describe('the name clause', () => {
   it('names a control with no content and no aria-label as a fault', () => {
     assert.deepEqual(named(''), ['has no name']);
   });
+
+  /** The name faults of a button pinned `pin` whose `aria-label` reads `accessibleName`, declared by `body`. */
+  const derivedName = (body, { pin = 'always', label = props.label } = {}) =>
+    syntheticFaults(
+      [
+        "<script>let { label, as = 'p', other, ...rest } = $props(); const NAME = 'Toggle';",
+        ` const HOSTS = ['p']; ${body}</script>`,
+        '{#if label}',
+        button('<i></i>', ' aria-label={accessibleName}'),
+        '{/if}',
+        styled(PAIR),
+      ].join(''),
+      { props: { label, other: { kind: 'text' } }, pin }
+    );
+
+  for (const [claim, body] of [
+    ['$derived(label || undefined)', 'const accessibleName = $derived(label || undefined);'],
+    ['a plain const', 'const accessibleName = label;'],
+    [
+      'a conditional whose test reads an unpublished prop',
+      'const accessibleName = $derived(HOSTS.includes(as) ? label : undefined);',
+    ],
+    ['the right of &&', 'const accessibleName = $derived(as && label);'],
+  ]) {
+    it(`follows a name through ${claim} to the published key behind it`, () => {
+      assert.deepEqual(derivedName(body, { pin: 'label' }), []);
+    });
+  }
+
+  for (const [claim, body, fault] of [
+    ["$derived(label || 'Toggle')", "const accessibleName = $derived(label || 'Toggle');", LITERAL],
+    ['a literal held in a const', 'const accessibleName = $derived(label || NAME);', LITERAL],
+    ['a template literal', 'const accessibleName = $derived(label || `Toggle`);', LITERAL],
+    ['an unpublished prop', 'const accessibleName = $derived(as);', UNPUBLISHED_NAME],
+    ['a text key', 'const accessibleName = $derived(other);', UNPUBLISHED_NAME],
+    ['a $state', 'const accessibleName = $state(label);', UNPUBLISHED_NAME],
+    ['a let', 'let accessibleName = label;', UNPUBLISHED_NAME],
+    ['$derived.by', 'const accessibleName = $derived.by(() => label);', UNPUBLISHED_NAME],
+    ['a function', 'function accessibleName() { return label; }', UNPUBLISHED_NAME],
+  ]) {
+    it(`names a name followed to ${claim} as a fault`, () => {
+      assert.deepEqual(derivedName(body, { pin: 'label' }), [fault]);
+    });
+  }
+
+  it('requires the name key of a control drawn whatever the companion passes, and of no other', () => {
+    const body = 'const accessibleName = $derived(label || undefined);';
+    const optional = { kind: 'data' };
+    assert.deepEqual(derivedName(body, { pin: 'label', label: optional }), []);
+    const always = [script('label'), button(), styled(PAIR)].join('');
+    assert.deepEqual(syntheticFaults(always, { pin: 'always', props: { label: optional } }), [
+      OPTIONAL_DATA_NAME,
+    ]);
+  });
+
+  it('exempts only the control OPTIONAL_NAME_PINS names, the probe button, which mounts unlabelled', () => {
+    const always = { [PRESS]: 'always' };
+    const entry = { name: 'E', path: E, root: 'any', props: { label: { kind: 'data' } } };
+    const [control] = controlsOf(entry, syntheticReader({ [E]: script('label') + button() }));
+    assert.deepEqual(nameFaults(control, always), [`${PRESS} ${OPTIONAL_DATA_NAME}`]);
+    assert.deepEqual(nameFaults(control, always, [PRESS]), []);
+  });
+});
+
+describe('the aria-labelledby admission clause', () => {
+  const required = { kind: 'data', required: true };
+  const LABELLED = { 'aria-labelledby': { kind: 'aria' } };
+  const NAMED = ' aria-label={accessibleName}';
+  /** The faults of an entry publishing `props`, its one button holding `content` and `open`. */
+  const admitted = (content, open = NAMED, props = { label: required, ...LABELLED }) =>
+    syntheticFaults(
+      [
+        "<script>let { label, note = '', ...rest } = $props();",
+        ' const accessibleName = $derived(label || undefined);</script>',
+        '{#snippet face()}<span aria-hidden="true"><span></span></span>{#if note}<span>{note}</span>{/if}{/snippet}',
+        '{#snippet worded()}<span>{label}</span>{/snippet}',
+        button(content, open),
+        styled(PAIR),
+      ].join(''),
+      { props, pin: 'always' }
+    );
+  const REFUSED = 'E publishes aria-labelledby beside no required name';
+
+  it('admits it beside a control that draws no text and is named by a required key through aria-label', () => {
+    assert.deepEqual(admitted('<span aria-hidden="true"></span>'), []);
+    assert.deepEqual(admitted('{@render face()}'), [], 'a snippet held off at a falsy default');
+  });
+
+  it('judges no entry that does not publish it', () => {
+    assert.deepEqual(admitted(LABEL, '', { label: required }), []);
+  });
+
+  for (const [claim, content, open, props] of [
+    ['a control named by its own text, as Button is', LABEL, ''],
+    ['a control that draws text beside its aria-label', '<span>{label}</span>', NAMED],
+    ['a control whose snippet draws text', '{@render worded()}', NAMED],
+    ['a static text node', 'On', NAMED],
+    ['a name key that is not required', '', NAMED, { label: { kind: 'data' }, ...LABELLED }],
+  ]) {
+    it(`names ${claim} as a fault`, () => {
+      assert.ok(admitted(content, open, props).includes(REFUSED));
+    });
+  }
 });
 
 describe('the called-from-an-event clause', () => {
