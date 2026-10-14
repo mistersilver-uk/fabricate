@@ -540,6 +540,7 @@ A companion's tab badge (issue 1302) renders through the ISSUE-SUMMARY vehicle, 
 The `Soon` word on a disabled planned-view row is NOT a member of this family at all and no longer borrows one: it is neither a record count, nor an issue summary, nor an unsaved marker, nor a tier gate, so it draws through `.manager-nav-planned` and claims no membership.
 The premium padlock drawn by `.manager-editor-tab-lock` after a label on the shared editor tab strip is NOT a member either: it is a tier gate on a tab, not a rail mark, and it draws through the tab strip's own vehicle.
 The Downtime rail parent's rollup renders through that same vehicle, and for the reason every issue-summary mark is amber: **the mark is amber because it asks for attention, not because it reports a fault** — the rollup states how many tabs have something to say, not that anything is wrong.
+A tab strip's issue summary follows the same rule: its tone states how much attention the tab asks for, so a PASS mark is neutral (issue 1373).
 
 Canonical mapping: `.manager-nav-count`; `.manager-nav-issue-badge`; `.manager-nav-dirty-marker`; `.manager-nav-premium` (the `PREMIUM` chip, its own vehicle since issue 1515); NOT a member: `.manager-nav-planned`; `.manager-editor-tab-lock` (the tab-strip premium padlock); `src/ui/svelte/apps/manager/checks/checksNav.js`; `styles/fabricate.css`
 
