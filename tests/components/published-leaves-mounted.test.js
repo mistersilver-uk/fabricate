@@ -5,7 +5,8 @@
  * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
- * button with its `onAction` callback (issue 2452).
+ * button with its `onAction` callback (issue 2452). The published `Button` mounts here as a leaf;
+ * what it draws and refuses is `published-button-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -195,6 +196,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('.fab-notice-title').textContent,
     drawn: ['Over the limit', 'Back under the limit'],
   },
+  {
+    name: 'Button',
+    under: 'fabricate',
+    root: '.fabricate-button',
+    props: { children: 'Clear filters', onclick() {} },
+    next: { children: 'Filters cleared', onclick() {} },
+    read: (root) => root.textContent,
+    drawn: ['Clear filters', 'Filters cleared'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -203,9 +213,18 @@ const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
 const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
 const FOCUSABLE = 'button, a, input, [tabindex]';
 
+const publishedProps = (name) =>
+  PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name).props;
+
 function requiredKeysOf(name) {
-  const { props } = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
+  const props = publishedProps(name);
   return Object.keys(props).filter((key) => props[key].required);
+}
+
+/** What a required key refuses `value` with: M9, or M17 for `''` on a `callback` key. */
+function requiredRefusal(name, key, value) {
+  const notAFunction = value === '' && publishedProps(name)[key].kind === 'callback';
+  return notAFunction ? `"${key}" must be a function` : `${name} requires a non-empty "${key}"`;
 }
 
 describe('each published leaf through the seam', () => {
@@ -260,6 +279,10 @@ describe('a key a leaf does not publish', () => {
     ['Notice', 'dismissLabel', 'is not a data attribute'],
     ['Notice', 'blocking', 'is not a data attribute'],
     ['Notice', 'evidence', 'is not a data attribute'],
+    ['Button', 'size', 'is not a data attribute'],
+    ['Button', 'tag', 'is not a data attribute'],
+    ['Button', 'type', 'is not a data attribute'],
+    ['Button', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -284,7 +307,7 @@ describe('a required prop', () => {
           const target = targetFor(name);
           assert.throws(() => ui().mount(name, { target, props: given }), {
             name: 'TypeError',
-            message: `${REFUSAL}${name} requires a non-empty "${key}"`,
+            message: REFUSAL + requiredRefusal(name, key, value),
           });
           assert.equal(target.childNodes.length, 0);
         });
@@ -964,6 +987,19 @@ describe("Kicker's host element", () => {
     assert.equal(heading.textContent, 'Still live');
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
+    assert.deepEqual(reports, []);
+  });
+
+  // The clause `DYNAMIC_ELEMENTS` names for the kicker's pinned tags.
+  it('draws a <p> for an as outside its three hosts, every control tag included, so as draws no control', async () => {
+    for (const as of ['button', 'a', 'input', 'select', 'textarea', 'h1']) {
+      const { target, handle } = mountLeaf('Kicker', { as, children: 'Standing' });
+      await settle();
+      assert.equal(target.children.length, 1, 'one root');
+      assert.equal(target.children[0].localName, 'p', `as: '${as}'`);
+      assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
+      handle.destroy();
+    }
     assert.deepEqual(reports, []);
   });
 

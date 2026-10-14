@@ -1,12 +1,14 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
- * frozen `{ name, path, version, props, rest, root }`, appended and never interleaved, and a
+ * frozen `{ name, path, version, props, rest, root, restOn? }`, appended and never interleaved, and a
  * breaking change to one bumps its own `version` (issue 2426). A prop is
  * `{ kind: 'data' | 'text' | 'slot' | 'callback', required?, element?, args? }`: a `text` key
  * takes a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element`
  * says `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or `'manager'`
  * (issue 2451). A `callback` key takes a function, called with its first `args` arguments, none
- * when unstated (issue 2452).
+ * when unstated (issue 2452). An entry whose rest keys land on a control it draws also states
+ * `restOn: 'control'`, which makes M13 refuse `RESERVED_ON_A_CONTROL` among its rest keys; the
+ * `describe` result leaves `restOn` out.
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({
@@ -197,5 +199,20 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     }),
     rest: true,
     root: 'any',
+  }),
+  Object.freeze({
+    name: 'Button',
+    path: 'src/ui/svelte/components/Button.svelte',
+    version: 1,
+    props: Object.freeze({
+      role: Object.freeze({ kind: 'data' }),
+      fullWidth: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'text', required: true }),
+      onclick: Object.freeze({ kind: 'callback', required: true }),
+    }),
+    rest: true,
+    root: 'fabricate',
+    restOn: 'control',
   }),
 ]);

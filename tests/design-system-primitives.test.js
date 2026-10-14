@@ -593,6 +593,11 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'fabricate-journal-lifecycle-ready-single',
         'fabricate-journal-lifecycle-cancel-confirmation',
       ],
+      [
+        'manager-published-leaves-specimen',
+        'manager-published-controls-specimen',
+        'manager-published-buttons-specimen',
+      ],
     ],
     ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
   ];
@@ -700,6 +705,7 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
     'InspectorCard',
     'EmptyState',
     'Notice',
+    'Button',
   ]) {
     const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
       (viewCase) => viewCase.id
@@ -711,12 +717,13 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
   }
 });
 
-test('(a) a Notice change publishes both specimens that mount it, after the frame that draws it', () => {
+test('(a) a Notice change publishes the three specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
   ];
   assert.deepEqual(
     [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],

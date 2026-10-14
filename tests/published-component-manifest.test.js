@@ -5,13 +5,19 @@
  * global, no class the module sheet names under an `any` root, and focusable elements marked as
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
- * and every component `<style>` (issue 2451). The test-only probe runs beside the shipped entries;
+ * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
+ * that names a bare `button` (issue 2452). The test-only probe runs beside the shipped entries;
  * the adapter's bindings are the mounted suite's, and what a published control must also do is
  * `published-component-controls.test.js`'s (issue 2452).
  * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
  * adds a mounted clause on each argument's type.
  * Limit: it reads scoped `<style>` declarations, not inline `style=` values.
- * Limit: rule 9 does not see a `svelte:element` tag, or an attribute a spread writes.
+ * Limit: rule 9 judges a `svelte:element` by its pinned tags, and does not see an attribute a
+ * spread writes, so the `type` of a dynamic button is
+ * `components/published-button-mounted.test.js`'s. A tag that reads a name a template block binds
+ * fails closed, as does a closure file that passes a child a prop its pinned tags rest on the
+ * default of; a child drawn through an alias, `svelte:component` or a re-exporting module is not
+ * followed.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -28,28 +34,48 @@
  * census takes on trust that no extension target sits under one of its pinned ancestor classes.
  * Limit: a companion that writes one of the card's two pinned `data-*` attributes through `rest`
  * takes Fabricate's private rule.
+ * Limit: the button censuses read no universal or attribute-only compound, so a `data-*` hook on
+ * one is not among the names M13 reserves: the spec's rule that a companion passes only names that
+ * carry its own module id is what keeps a rest key off it. Their pinned ancestors
+ * `fabricate-tabs`, `fabricate-pagination` and `fabricate-filter-bar` reopen when one is published
+ * with a content slot, as `FilterBar` already renders `children`.
+ * Limit: `components/re-rooted-controls-host-independence.test.js` measures the neutral button
+ * alone, so the reaching set's first clause is what holds each visual role under either window.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
 import { walkNodes } from './helpers/moduleAst.js';
 import { componentAstOf } from './helpers/parsedSource.js';
 import {
+  DYNAMIC_ELEMENTS,
   SHIPPED,
   byName,
+  declarationsOf,
+  dynamicElementFaults,
+  dynamicElements,
   everyStylesheet,
   focusableElements,
   importClosure,
   isComponent,
+  isStrip,
+  moduleRing,
   propLocals,
+  publishedLocals,
+  restElements,
+  restReads,
+  sameDeclarations,
   selectorsNaming,
+  selectorsWithRules,
   selectorsOnAttribute,
   syntheticReader,
+  tagKeys,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
 import { readsGlobal } from './helpers/svelteStructureContract.js';
@@ -294,8 +320,76 @@ const NOTICE = Object.freeze({
   drawsChildren: true,
 });
 
+/**
+ * The published `Button`: the classes `role` and `fullWidth` write beside its root, which
+ * `Button.svelte` is held to, and the classes under which a sheet rule redraws a button, no
+ * extension target sitting in one. `disables` says a published key writes `disabled`, so
+ * `:disabled` keeps no selector off the button.
+ */
+const BUTTON = Object.freeze({
+  root: 'fabricate-button',
+  writable: new Set([
+    'fab-manager-button',
+    'is-primary',
+    'is-ghost',
+    'is-danger',
+    'is-dashed',
+    'is-warning-action',
+    'is-full-width',
+  ]),
+  ancestors: new Set([
+    'manager-tool-inspector-foot',
+    'manager-knowledge-reset-actions',
+    'manager-knowledge-row-actions',
+    'manager-component-entry-row-actions',
+    'manager-component-entry-danger-body',
+    'manager-drop-inspector-stack',
+    'fab-bulk-edit-dock',
+    'manager-tool-edit-actions',
+    'manager-environment-drop-adjustment-row',
+    'manager-header-actions',
+    'manager-checks-tier-add',
+    'manager-salvage-stage-add',
+    'fabricate-filter-bar',
+    'manager-vocabulary-confirm',
+    'manager-vocabulary-form-fields',
+    'manager-checks-trigger-presets',
+    'manager-task-drop-controls',
+    'manager-drop-editor-actions',
+    'manager-setup-links',
+    'fab-ic-actions',
+    'fab-ic-identity-head',
+    'fab-bulk-delete-card',
+    'fab-im-toolbar',
+    'fab-im-promote-actions',
+    'manager-import-mapping-row',
+    'manager-scoped-copy-head',
+    'manager-scoped-shared-head',
+    'manager-scoped-roster-system',
+  ]),
+  drawsChildren: false,
+  disables: true,
+});
+
+/** The classes `Button.svelte` spells that no published key writes. */
+const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-38']);
+/** The classes under which a sheet rule redraws a bare `button`; no extension target sits in one. */
+const BARE_BUTTON_ANCESTORS = new Set([
+  'fabricate-tabs',
+  'manager-breadcrumbs',
+  'manager-travel-inspector-actions',
+  'manager-tool-editor-tabs',
+  'fabricate-interactables-manager',
+  'form-footer',
+  'dialog-buttons',
+  'manager-selected-tag-pill',
+  'fabricate-pagination',
+]);
+
 const classesOf = (compound) =>
   compound.selectors.filter((part) => part.type === 'ClassSelector').map((part) => part.name);
+const typesOf = (compound) =>
+  compound.selectors.filter((part) => part.type === 'TypeSelector').map((part) => part.name);
 
 /** A complex selector's compounds in order, each `:global(…)` replaced by the compounds it wraps. */
 function compoundsOf(complex) {
@@ -320,23 +414,23 @@ function compoundsOf(complex) {
 
 /**
  * Whether no element a published component draws at `shape.root` can match `complex`: its root
- * compound takes a class the published keys cannot write or `:disabled`, or an earlier compound is
- * a pinned ancestor, or a later one needs a descendant the mount cannot hold. `drawsChildren` is
- * `false` for a root whose published keys draw no classed descendant, which only `Chip` is; any
- * other root holds no descendant classed `manager-*` unless a published closure spells that class.
- * An attribute selector never makes a selector safe, and anything else fails closed, a root named
- * only inside `:has()` included.
+ * compound takes a class the published keys cannot write, or `:disabled` where the shape does not
+ * say `disables`, or an earlier compound is a pinned ancestor, or a later one needs a descendant
+ * the mount cannot hold. `drawsChildren` is `false` for a root whose published keys draw no
+ * classed descendant, as `Chip` and `Button` are; any other root holds no descendant classed
+ * `manager-*` unless a published closure spells that class. An attribute selector never makes a
+ * selector safe, and anything else fails closed, a root named only inside `:has()` included.
  */
 function cannotMatchPublished(complex, shape, spelled = new Set()) {
-  const { root, writable, ancestors, drawsChildren } = shape;
+  const { root, writable, ancestors, drawsChildren, disables = false } = shape;
   const compounds = compoundsOf(complex);
   const at = compounds.findLastIndex((compound) => classesOf(compound).includes(root));
   if (at === -1) return false;
   const own = compounds[at];
   const unwritable = classesOf(own).some((name) => name !== root && !writable.has(name));
-  const disabled = own.selectors.some(
-    (part) => part.type === 'PseudoClassSelector' && part.name === 'disabled'
-  );
+  const disabled =
+    !disables &&
+    own.selectors.some((part) => part.type === 'PseudoClassSelector' && part.name === 'disabled');
   const unheld = drawsChildren
     ? (name) => name.startsWith('manager-') && !spelled.has(name)
     : () => true;
@@ -397,17 +491,176 @@ function reachedByGlobal(css, complex) {
 
 /**
  * Every selector of one parsed stylesheet that names `shape.root`, as `{ selector, written, safe }`:
- * spelled flat, and as its sheet writes it. A selector in a file of `own`, the entry's closure, is
- * scoped to that component's own elements, so it is skipped unless `:global` reaches it.
+ * spelled flat, and as its sheet writes it, beside its `complex`, its `rule` and what that rule
+ * sits `within`. A selector in a file of `own`, the entry's closure, is scoped to that component's
+ * own elements, so it is skipped unless `:global` reaches it.
  */
 function censusSelectors(file, css, shape, { spelled, own = new Set() } = {}) {
-  return selectorsNaming(css, shape.root)
-    .filter((complex) => !own.has(file) || reachedByGlobal(css, complex))
-    .map((complex) => ({
+  const names = (part) => part.type === 'ClassSelector' && part.name === shape.root;
+  return selectorsWithRules(css, names)
+    .filter(({ complex }) => !own.has(file) || reachedByGlobal(css, complex))
+    .map(({ complex, rule, within }) => ({
       selector: `${file}: ${flatSelector(complex)}`,
       written: `${file}: ${writtenSelector(css, complex)}`,
       safe: cannotMatchPublished(complex, shape, spelled),
+      complex,
+      rule,
+      within,
     }));
+}
+
+/** The pinned ancestors of `shape` that keep none of `census` off a published mount, so are stale. */
+function staleAncestors(shape, census, spelled) {
+  const without = (name) => new Set([...shape.ancestors].filter((other) => other !== name));
+  return [...shape.ancestors].filter((name) => {
+    const narrowed = { ...shape, ancestors: without(name) };
+    return census.every(
+      ({ complex, safe }) => !safe || cannotMatchPublished(complex, narrowed, spelled)
+    );
+  });
+}
+
+/** The 26 sheet rules that draw a published button, each one compound with nothing above it. */
+const BUTTON_FAMILY_RULES = Object.freeze([
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-primary',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled)',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled)',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-full-width',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled)',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled):hover',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled)',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled):hover',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button:focus',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button:focus-visible',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled)',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled)',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled)',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled):hover',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled):hover',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+]);
+/** The two rules no published button can match, an anchor's and a glyph child's, which fail closed. */
+const BUTTON_UNMATCHED_RULES = Object.freeze([
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:is(a)',
+  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button i',
+]);
+/** The sheet rule a button matches only through a `data-*` hook Fabricate writes. */
+const BUTTON_DATA_HOOK_RULES = Object.freeze([
+  'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
+]);
+
+const carries = (complex, pseudo) =>
+  [...walkNodes(complex)].some(
+    (part) => part.type === 'PseudoClassSelector' && part.name === pseudo
+  );
+const drawsOrStripsARing = (property) =>
+  property === 'all' || property === 'box-shadow' || property.startsWith('outline');
+
+/**
+ * Clause 1 of the reaching set: a selector has no compound above the root's own, and its rule sits
+ * inside no other style rule and no at-rule but `@media` and `@supports`, so it draws alike under
+ * any ancestor. A pinned data-hook rule is not judged.
+ */
+function placementFaults(reaching, shape, hooks) {
+  return reaching
+    .filter(({ written }) => !hooks.includes(written))
+    .flatMap(({ written, complex, within }) => {
+      const compounds = compoundsOf(complex);
+      const at = compounds.findLastIndex((compound) => classesOf(compound).includes(shape.root));
+      const holders = within.filter((holder) => holder !== '@media' && holder !== '@supports');
+      return [
+        ...(at > 0 ? [`${written} has a compound above the root's own`] : []),
+        ...holders.map((holder) => `${written} sits inside ${holder}`),
+      ];
+    });
+}
+
+/**
+ * Clauses 2 and 3 of the reaching set: exactly one selector carries `:focus-visible` and declares
+ * exactly the module ring, exactly one carries `:focus` and is the strip, and no other declares
+ * `all`, `box-shadow` or a property whose name starts `outline`.
+ */
+function ringFaults(reaching, ring = moduleRing()) {
+  const marks = reaching.filter(({ complex }) => carries(complex, 'focus-visible'));
+  const strips = reaching.filter(({ complex }) => carries(complex, 'focus'));
+  const others = reaching.filter((row) => !marks.includes(row) && !strips.includes(row));
+  const drawn = [
+    ['outline', ring.outline],
+    ['outline-offset', ring.offset],
+  ];
+  return [
+    ...(marks.length === 1 ? [] : [`${marks.length} reaching selectors carry :focus-visible`]),
+    ...(strips.length === 1 ? [] : [`${strips.length} reaching selectors carry :focus`]),
+    ...marks
+      .filter(({ rule }) => !sameDeclarations(rule, drawn))
+      .map(({ written }) => `${written} does not declare exactly the module ring`),
+    ...strips
+      .filter(({ rule }) => !isStrip(rule))
+      .map(({ written }) => `${written} is not the strip`),
+    ...others.flatMap(({ written, rule }) =>
+      declarationsOf(rule)
+        .filter(([property]) => drawsOrStripsARing(property))
+        .map(([property]) => `${written} declares ${property}`)
+    ),
+  ];
+}
+
+/** The four module rules a bare `button` compound reaches a published button through, as written. */
+const BARE_BUTTON_RULES = Object.freeze([
+  'styles/fabricate-base.css: .fabricate button:focus',
+  'styles/fabricate-base.css: .fabricate button:focus-visible',
+  'styles/fabricate-base.css: .fabricate button[data-validation-focused]',
+  'styles/fabricate-manager-shell.css: .fabricate-manager button',
+]);
+/** What `.fabricate-manager button` declares, which the family's floor rule also declares. */
+const MANAGER_BUTTON_FLOOR = Object.freeze([['font', 'inherit']]);
+
+/** Whether a compound is a `button` that names no class a published button lacks. */
+const isBareButton = (compound, shape) =>
+  typesOf(compound).includes('button') &&
+  classesOf(compound).every((name) => shape.writable.has(name));
+
+/**
+ * Every selector of one parsed stylesheet with a bare `button` compound, as
+ * `{ written, safe, under, rule, complex }`: safe under a class of `ancestors` above that compound. A
+ * component's selector is read only where `:global` reaches it, and one that names `button` in no
+ * compound of its own, so only inside a pseudo-class, fails closed.
+ */
+function bareButtonSelectors(file, css, shape, ancestors) {
+  const names = (part) => part.type === 'TypeSelector' && part.name === 'button';
+  return selectorsWithRules(css, names)
+    .filter(({ complex }) => !isComponent(file) || reachedByGlobal(css, complex))
+    .flatMap(({ complex, rule }) => {
+      const compounds = compoundsOf(complex);
+      const written = `${file}: ${writtenSelector(css, complex)}`;
+      const types = compounds.flatMap((compound) => typesOf(compound));
+      if (!types.includes('button')) return [{ written, safe: false, under: [], rule, complex }];
+      const at = compounds.findLastIndex((compound) => isBareButton(compound, shape));
+      if (at === -1) return [];
+      const above = compounds.slice(0, at).flatMap((compound) => classesOf(compound));
+      const under = above.filter((name) => ancestors.has(name));
+      return [{ written, safe: under.length > 0, under, rule, complex }];
+    });
+}
+
+/** Every `data-*` attribute name the selectors of `census` hold, wherever in the selector. */
+function dataHooksOf(census) {
+  const names = census.flatMap(({ complex }) =>
+    [...walkNodes(complex)]
+      .filter((part) => part.type === 'AttributeSelector' && part.name.startsWith('data-'))
+      .map((part) => part.name)
+  );
+  return [...new Set(names)].sort(byName);
 }
 
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
@@ -544,17 +797,74 @@ function publishedManagerClasses() {
 }
 
 /** Rule 9 over an entry's whole closure: every element judged, and every fault. */
-function closureFocusables(path, reader = SHIPPED) {
+function closureFocusables(path, reader = SHIPPED, dynamic = undefined) {
   const scans = [...importClosure(path, reader)]
     .filter(isComponent)
-    .map((file) => focusableElements(file, reader.component(file)));
+    .map((file) => focusableElements(file, reader.component(file), dynamic));
   return {
     judged: scans.flatMap((scan) => scan.judged),
     faults: scans.flatMap((scan) => scan.faults),
   };
 }
 
+const NO_REST_ELEMENT = 'rest lands on no element the gate can see';
+const MIXED_REST = 'rest lands on a control and on an element that is none';
+const UNSTATED_REST = "rest lands on a control and restOn is not 'control'";
+const OVERSTATED_REST = 'restOn is stated and rest lands on no control';
+const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
+
+/**
+ * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
+ * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
+ * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
+ * Where rest lands on a control, every `data-*` attribute written ahead of the spread is a name M13
+ * refuses there.
+ */
+function restOnFaults(entry, ast, dynamic = undefined) {
+  if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
+  const landed = restElements(ast);
+  if (landed.length === 0) return [NO_REST_ELEMENT];
+  const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
+  const controls = landed.filter(({ node }) => judged.includes(node));
+  if (controls.length > 0 && controls.length < landed.length) return [MIXED_REST];
+  const lands = controls.length > 0;
+  const stated = entry.restOn === 'control';
+  const overridable = controls
+    .flatMap(({ before }) => before)
+    .filter((name) => !RESERVED_ON_A_CONTROL.test(name));
+  return [
+    ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
+    ...(lands && !stated ? [UNSTATED_REST] : []),
+    ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
+    ...overridable.map(
+      (name) => `${name} is written before a control-landing rest and is not reserved`
+    ),
+  ];
+}
+
+/**
+ * Every component file of `entries`' closures, once, as `{ file, ast, published }`: `published`
+ * is the keys of the entry whose own file it is, by local name, and empty for any other file.
+ */
+function closureComponents(entries, reader = SHIPPED) {
+  const files = new Set(entries.flatMap((entry) => [...importClosure(entry.path, reader)]));
+  const components = [...files].filter((file) => isComponent(file));
+  return components.map((file) => {
+    const ast = reader.component(file);
+    const entry = entries.find(({ path }) => path === file);
+    return { file, ast, published: entry ? publishedLocals(entry, ast) : new Map() };
+  });
+}
+
 describe('the manifest', () => {
+  it('pins the names a control-landing rest reserves, which are fixed for an entry’s version', () => {
+    assert.equal(
+      String(RESERVED_ON_A_CONTROL),
+      '/^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/',
+      'reserving another name narrows every restOn entry and bumps its version'
+    );
+  });
+
   it('is a frozen list of frozen entries with unique names', () => {
     assert.ok(Object.isFrozen(PUBLISHED_COMPONENT_MANIFEST));
     const names = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name);
@@ -569,19 +879,21 @@ describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      assert.deepEqual(Object.keys(entry).sort(byName), [
-        'name',
-        'path',
-        'props',
-        'rest',
-        'root',
-        'version',
-      ]);
+      const keys = Object.keys(entry).filter((key) => key !== 'restOn');
+      assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
+      assert.ok(
+        !Object.hasOwn(entry, 'restOn') || entry.restOn === 'control',
+        "restOn is 'control' or absent"
+      );
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);
       assert.equal(entry.rest, declaration.rest !== null, 'rest matches the rest declaration');
       assert.deepEqual(declarationFaults(entry, declaration.ast), []);
+    });
+
+    it(`${entry.name} states restOn exactly when its rest keys land on a control it draws`, () => {
+      assert.deepEqual(restOnFaults(entry, componentAstOf(entry.path)), []);
     });
 
     it(`${entry.name} needs no ancestor above its root and reads no Foundry global, closure included`, () => {
@@ -593,7 +905,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges four focusable elements across the shipped closures, each file read once: the Chip remove button, the Notice action and dismiss buttons, and the probe button', () => {
+  it('judges five focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, and the probe button', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -603,11 +915,27 @@ describe('each entry matches its component declaration', () => {
       .filter(isComponent)
       .flatMap((file) => focusableElements(file, componentAstOf(file)).judged);
     assert.deepEqual(judged.sort(byName), [
+      'src/ui/svelte/components/Button.svelte: svelte:element',
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
+  });
+
+  it('pins every svelte:element the shipped closures and the probe draw, by the tags and the published keys its file states', () => {
+    const files = closureComponents([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
+    assert.ok(files.length >= 15, 'every shipped closure and the probe were read');
+    assert.deepEqual(dynamicElementFaults(files), []);
+    const held = Object.values(DYNAMIC_ELEMENTS).flatMap(({ heldBy }) => (heldBy ? [heldBy] : []));
+    assert.ok(held.length > 0, 'a pin names a mounted clause');
+    for (const heldBy of held) {
+      const [file, title] = heldBy.split(': ');
+      const described = [...walkNodes(SHIPPED.module(file).ast)]
+        .filter((node) => node.type === 'CallExpression' && node.callee.name === 'describe')
+        .map((node) => node.arguments[0]?.value);
+      assert.ok(described.includes(title), `${heldBy} names a describe block of that file`);
+    }
   });
 
   it('pins every shipped callback key with how many arguments it forwards', () => {
@@ -618,7 +946,7 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0'],
+      ['Notice.onAction: 0', 'Button.onclick: 0'],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -1031,6 +1359,321 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
+  const DYNAMIC = 'src/E.svelte: svelte:element';
+  const MARKED = ' data-keyboard-focus="true"';
+  const UNMARKED = `${DYNAMIC} does not state data-keyboard-focus="true"`;
+  /** Rule 9 over one `svelte:element` that states `attributes`, pinned to `tags` or unpinned. */
+  const dynamicFocusOf = (attributes, tags) =>
+    closureFocusables(
+      'src/E.svelte',
+      syntheticReader({
+        'src/E.svelte': ['<svelte:element this={tag}', attributes, '>x</svelte:element>'].join(''),
+      }),
+      tags ? { [DYNAMIC]: { tags, keys: [] } } : {}
+    );
+
+  for (const [claim, attributes, tags, judged, faults] of [
+    ['a marked svelte:element pinned to button', MARKED, ['button'], [DYNAMIC], []],
+    ['an unmarked one pinned to button', '', ['button'], [DYNAMIC], [UNMARKED]],
+    [
+      'one pinned to button whose data-keyboard-focus is not static',
+      ' data-keyboard-focus={on}',
+      ['button'],
+      [DYNAMIC],
+      [UNMARKED],
+    ],
+    ['one pinned to tags that draw no control', '', ['p', 'span'], [], []],
+    [
+      'a marked one pinned to p that states tabindex',
+      `${MARKED} tabindex="0"`,
+      ['p'],
+      [DYNAMIC],
+      [],
+    ],
+    ['one with no pin', MARKED, null, [], [`${DYNAMIC} has no pinned tags`]],
+    [
+      'a named one pinned to button',
+      `${MARKED} name="q"`,
+      ['button'],
+      [DYNAMIC],
+      [`${DYNAMIC} states name`],
+    ],
+    [
+      'one pinned to a link and a span, judged once as their union',
+      '',
+      ['a', 'span'],
+      [DYNAMIC],
+      [UNMARKED],
+    ],
+  ]) {
+    it(`judges ${claim} by its pinned tags`, () => {
+      assert.deepEqual(dynamicFocusOf(attributes, tags), { judged, faults });
+    });
+  }
+
+  const HOSTED = [
+    "let { as = 'p', ...rest } = $props();",
+    "const HOSTS = new Set(['p', 'span']);",
+    "const host = $derived(HOSTS.has(as) ? as : 'p');",
+  ].join(' ');
+  /** The pin faults of one file whose script is `body` and whose template is `template`, publishing `as`. */
+  const pinFaultsOf = (pins, { body = HOSTED, template, file = 'src/E.svelte' } = {}) => {
+    const drawn = template ?? '<svelte:element this={host}></svelte:element>';
+    const { ast } = templateOf(file, `<script>${body}</script>${drawn}`);
+    return dynamicElementFaults([{ file, ast, published: new Map([['as', 'as']]) }], pins);
+  };
+  const HELD = { tags: ['p', 'span'], keys: ['as'], heldBy: 'a mounted clause' };
+
+  it('passes a pin whose tags its file spells and whose keys its tag follows', () => {
+    assert.deepEqual(pinFaultsOf({ [DYNAMIC]: HELD }), []);
+  });
+
+  for (const [claim, pins, options, faults] of [
+    [
+      'a pinned id no file draws',
+      { [DYNAMIC]: HELD, 'src/Gone.svelte: svelte:element': HELD },
+      {},
+      ['src/Gone.svelte: svelte:element is pinned and no file draws it'],
+    ],
+    ['a drawn element with no pin', {}, {}, [`${DYNAMIC} has no pin`]],
+    [
+      'a pinned tag the file does not spell',
+      { [DYNAMIC]: { ...HELD, tags: ['h3', 'p'] } },
+      {},
+      [`${DYNAMIC} pins <h3>, which its file does not spell`],
+    ],
+    [
+      'two hookless elements in one file',
+      { [DYNAMIC]: HELD },
+      { template: '<svelte:element this={host} /><svelte:element this={host} />' },
+      [`${DYNAMIC} is drawn twice, so one pin would name two elements`],
+    ],
+    [
+      'an open pin on a shipped file',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: ['as'], open: true } },
+      {},
+      [`${DYNAMIC} is open in a shipped file`],
+    ],
+    [
+      'a keyed pin that names no mounted clause',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: ['as'] } },
+      {},
+      [`${DYNAMIC} follows a published key and names no mounted clause in heldBy`],
+    ],
+    [
+      'a pin whose keys differ from what its tag follows',
+      { [DYNAMIC]: { tags: ['p', 'span'], keys: [] } },
+      {},
+      [`${DYNAMIC} pins the keys [], and its tag follows [as]`],
+    ],
+  ]) {
+    it(`names ${claim} as a pin fault`, () => {
+      assert.deepEqual(pinFaultsOf(pins, options), faults);
+    });
+  }
+
+  it('admits an open pin on a test fixture, which no shipped closure reaches', () => {
+    const file = 'tests/fixtures/Probe.svelte';
+    const id = `${file}: svelte:element`;
+    const pins = { [id]: { tags: ['p', 'span'], keys: ['as'], open: true } };
+    assert.deepEqual(pinFaultsOf(pins, { file }), []);
+  });
+
+  /**
+   * The keys and faults `tagKeys` reads of `<svelte:element this={<tag>}>` under a script `body`,
+   * publishing `as`, the element drawn between `open` and `close`.
+   */
+  const keysOf = (body, tag, [open, close] = ['', '']) => {
+    const drawn = `${open}<svelte:element this={${tag}}></svelte:element>${close}`;
+    const { ast } = templateOf('src/E.svelte', `<script>${body}</script>${drawn}`);
+    const [{ node }] = dynamicElements('src/E.svelte', ast);
+    const { keys, faults } = tagKeys(ast, node, new Map([['as', 'as']]));
+    return { keys, faults };
+  };
+  const PROPS = "let { as = 'p', other = 'p', ...rest } = $props();";
+  const CANNOT_FOLLOW = (name) => `tag reads ${name}, which the gate cannot follow`;
+
+  for (const [claim, body, tag, keys] of [
+    ['the published prop itself', PROPS, 'as', ['as']],
+    ['one $derived', `${PROPS} const host = $derived(as);`, 'host', ['as']],
+    [
+      'two levels of $derived',
+      `${PROPS} const first = $derived(as); const host = $derived(first ?? 'p');`,
+      'host',
+      ['as'],
+    ],
+    ['$derived.by', `${PROPS} const host = $derived.by(() => as);`, 'host', ['as']],
+    ['a function the tag calls', `${PROPS} function tagFor() { return as; }`, 'tagFor()', ['as']],
+    ['an unpublished prop', PROPS, 'other', []],
+    ['a constant that reads no prop', `${PROPS} const host = 'p';`, 'host', []],
+    ['a literal', PROPS, "'p'", []],
+  ]) {
+    it(`follows a tag that reads ${claim} to the published keys behind it`, () => {
+      assert.deepEqual(keysOf(body, tag), { keys, faults: [] });
+    });
+  }
+
+  for (const [claim, body, tag, name] of [
+    ['a let', `${PROPS} let host = as;`, 'host', 'host'],
+    ['a $state', `${PROPS} const host = $state(as);`, 'host', 'host'],
+    ['an import', `import { host } from './host.js'; ${PROPS}`, 'host', 'host'],
+    ['the rest local', PROPS, "rest['data-tag']", 'rest'],
+    ['a destructured name', `${PROPS} const { host } = pick(as);`, 'host', 'host'],
+  ]) {
+    it(`fails closed on a tag that reads ${claim}, which it cannot follow`, () => {
+      assert.deepEqual(keysOf(body, tag), { keys: [], faults: [CANNOT_FOLLOW(name)] });
+    });
+  }
+
+  for (const [claim, open, close] of [
+    ['an {#each} item', '{#each [as] as host (host)}', '{/each}'],
+    ['an {#each} index', '{#each [as] as item, host (item)}', '{/each}'],
+    ['a {@const}', '{#if as}{@const host = as}', '{/if}'],
+    ['a snippet parameter', '{#snippet row(host)}', '{/snippet}'],
+    ['an {#await} value', '{#await as then host}', '{/await}'],
+  ]) {
+    it(`fails closed on a tag that reads ${claim}, which a template block binds`, () => {
+      assert.deepEqual(keysOf(PROPS, 'host', [open, close]), {
+        keys: [],
+        faults: [CANNOT_FOLLOW('host')],
+      });
+    });
+  }
+
+  it('fails closed on a tag that reads a prop a template block shadows', () => {
+    const shadowed = keysOf(PROPS, 'as', ['{#each [other] as as (as)}', '{/each}']);
+    assert.deepEqual(shadowed, { keys: [], faults: [CANNOT_FOLLOW('as')] });
+  });
+
+  const CHILD = 'src/E.svelte';
+  const UNKEYED = { [DYNAMIC]: { tags: ['span'], keys: [] } };
+  /** The pin faults of a child whose tag reads its prop `tagProp`, beside a parent that draws it as `drawn`. */
+  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag') => {
+    const sources = {
+      [CHILD]: `<script>let { ${tagProp} = 'span', ...rest } = $props();</script><svelte:element this={${tagProp}}></svelte:element>`,
+      'src/Parent.svelte': `<script>import Child from './E.svelte';</script>${drawn}`,
+    };
+    const published = { [CHILD]: new Map([['as', 'as']]) };
+    const files = Object.entries(sources).map(([file, source]) => ({
+      file,
+      ast: templateOf(file, source).ast,
+      published: published[file] ?? new Map(),
+    }));
+    return dynamicElementFaults(files, pins);
+  };
+  const PASSED = (name) =>
+    `src/Parent.svelte passes ${name} to ${CHILD}, whose pinned tags rest on its default`;
+
+  it('passes a parent that states no prop the child’s tag reads, and one that states a key the pin follows', () => {
+    assert.deepEqual(passedFaultsOf('<Child tone="x" />'), []);
+    const keyed = { [DYNAMIC]: { tags: ['span'], keys: ['as'], heldBy: 'a mounted clause' } };
+    assert.deepEqual(passedFaultsOf('<Child as="p" {...more} />', keyed, 'as'), []);
+  });
+
+  for (const [claim, drawn, faults] of [
+    ['the prop by name', '<Child tag="button" />', [PASSED('tag')]],
+    ['the prop from an expression', '<Child tag={kind} />', [PASSED('tag')]],
+    ['the prop by a binding', '<Child bind:tag={kind} />', [PASSED('tag')]],
+    ['a spread', '<Child {...more} />', [PASSED('a spread')]],
+  ]) {
+    it(`names a closure parent that passes a child ${claim} as a pin fault`, () => {
+      assert.deepEqual(passedFaultsOf(drawn), faults);
+    });
+  }
+
+  const REST = '<script>let { label, ...rest } = $props();</script>';
+  /** One marked button that states `attributes` after its mark. */
+  const pressed = (attributes) =>
+    ['<button type="button" data-keyboard-focus="true"', attributes, '>x</button>'].join('');
+  /** What `restOn` breaks for an entry over `template`, stating `restOn` when one is given. */
+  const restFaultsOf = (template, restOn = null, script = REST) => {
+    const entry = { path: 'src/E.svelte', rest: true };
+    if (restOn) entry.restOn = restOn;
+    return restOnFaults(entry, templateOf(entry.path, script + template).ast);
+  };
+
+  it('passes rest on a control with restOn stated, and rest on elements that are none with it absent', () => {
+    assert.deepEqual(restFaultsOf(pressed(' {...rest}'), 'control'), []);
+    assert.deepEqual(restFaultsOf('<input {...rest} />', 'control'), [], 'a form control');
+    assert.deepEqual(restFaultsOf('<div {...rest}></div>'), []);
+    assert.deepEqual(
+      restFaultsOf('{#if label}<div {...rest}></div>{:else}<p {...rest}></p>{/if}'),
+      [],
+      'two roots, neither a control'
+    );
+  });
+
+  for (const [claim, template, restOn, faults] of [
+    ['rest on a button with restOn absent', pressed(' {...rest}'), null, [UNSTATED_REST]],
+    ['rest on a div with restOn stated', '<div {...rest}></div>', 'control', [OVERSTATED_REST]],
+    ['rest forwarded to a component', '<Child {...rest} />', null, [NO_REST_ELEMENT]],
+    ['rest spread on no element at all', '<div></div>', 'control', [NO_REST_ELEMENT]],
+    [
+      'rest on two elements, one a button',
+      ['<div {...rest}>', pressed(' {...rest}'), '</div>'].join(''),
+      'control',
+      [MIXED_REST],
+    ],
+    [
+      'a static data attribute written before a control-landing spread',
+      pressed(' data-open {...rest}'),
+      'control',
+      ['data-open is written before a control-landing rest and is not reserved'],
+    ],
+    [
+      'a dynamic data attribute written before a control-landing spread',
+      pressed(' data-open={label} {...rest}'),
+      'control',
+      ['data-open is written before a control-landing rest and is not reserved'],
+    ],
+  ]) {
+    it(`names ${claim} as a restOn fault`, () => {
+      assert.deepEqual(restFaultsOf(template, restOn), faults);
+    });
+  }
+
+  it('fails closed on rest that reaches a control through a $derived copy, and admits a data attribute written after the spread', () => {
+    const copied =
+      '<script>let { label, ...rest } = $props(); const attrs = $derived({ ...rest });</script>';
+    assert.deepEqual(restFaultsOf(pressed(' {...attrs}'), 'control', copied), [NO_REST_ELEMENT]);
+    assert.deepEqual(restFaultsOf(pressed(' {...rest} data-open'), 'control'), []);
+  });
+
+  for (const [claim, template, script] of [
+    [
+      'a $derived copy spread beside it',
+      ['<div {...rest}>', pressed(' {...attrs}'), '</div>'].join(''),
+      '<script>let { label, ...rest } = $props(); const attrs = $derived({ ...rest });</script>',
+    ],
+    ['a child component it is also spread on', '<div {...rest}><Child {...rest} /></div>', REST],
+    [
+      'a member read written on a control',
+      ['<div {...rest}>', pressed(" data-x={rest['data-x']}"), '</div>'].join(''),
+      REST,
+    ],
+    ['a second spread on the same element', '<div {...rest} {...rest}></div>', REST],
+  ]) {
+    it(`fails closed on rest that lands on a root and also reaches ${claim}`, () => {
+      assert.deepEqual(restFaultsOf(template, null, script), [UNFOLLOWED_REST]);
+    });
+  }
+
+  it('judges a svelte:element the rest is spread on by its pinned tags', () => {
+    const entry = { path: 'src/E.svelte', rest: true };
+    const markup = `${REST}<svelte:element this="button" data-keyboard-focus="true" {...rest} />`;
+    const { ast } = templateOf(entry.path, markup);
+    const pinned = (tags) => ({ 'src/E.svelte: svelte:element': { tags, keys: [] } });
+    assert.deepEqual(restOnFaults(entry, ast, pinned(['button'])), [UNSTATED_REST]);
+    assert.deepEqual(restOnFaults({ ...entry, restOn: 'control' }, ast, pinned(['button'])), []);
+    assert.deepEqual(restOnFaults(entry, ast, pinned(['span'])), []);
+  });
+
+  it('refuses restOn on an entry that takes no rest', () => {
+    const entry = { path: 'src/E.svelte', rest: false, restOn: 'control' };
+    const { ast } = templateOf(entry.path, '<script>let { label } = $props();</script><p>x</p>');
+    assert.deepEqual(restOnFaults(entry, ast), [OVERSTATED_REST]);
+  });
+
   const faceRule = (value) =>
     ancestorDependencies(
       templateOf('Face.svelte', `<style>.a { font-family: ${value}; }</style>`).ast
@@ -1189,7 +1832,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard'],
+      ['InspectorCard', 'Button'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(
@@ -1359,9 +2002,14 @@ describe('the module sheet and every component style against the published Notic
   }
 
   it('fails closed on a root named only inside :has(), which only its written form spells', () => {
-    assert.deepEqual(syntheticCensus(NOTICE, '.a:has(.fab-notice) { padding: 0 }'), [
-      { selector: 'sheet.css: .a:has', written: 'sheet.css: .a:has(.fab-notice)', safe: false },
-    ]);
+    const [{ selector, written, safe }, ...others] = syntheticCensus(
+      NOTICE,
+      '.a:has(.fab-notice) { padding: 0 }'
+    );
+    assert.deepEqual(
+      [selector, written, safe, others.length],
+      ['sheet.css: .a:has', 'sheet.css: .a:has(.fab-notice)', false, 0]
+    );
   });
 
   it('names a selector that holds a data-notice-tone attribute, and no other', () => {
@@ -1371,6 +2019,298 @@ describe('the module sheet and every component style against the published Notic
     ).ast;
     assert.deepEqual(selectorsOnAttribute('sheet.css', css, 'data-notice-tone'), [
       'sheet.css: .a[data-notice-tone="warning"] .b',
+    ]);
+  });
+});
+
+/** Every selector with a bare `button` compound, over every stylesheet. */
+const shippedBareButtons = () =>
+  everyStylesheet().flatMap(([file, css]) =>
+    bareButtonSelectors(file, css, BUTTON, BARE_BUTTON_ANCESTORS)
+  );
+const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
+const reachingOf = (census) => census.filter(({ safe }) => !safe);
+
+describe('the module sheet and every component style against the published Button', () => {
+  it('reaches a published button through 29 selectors: 26 that draw it, two it cannot match and one data-hook rule', () => {
+    const census = shippedCensus(BUTTON, 'Button');
+    assert.deepEqual(
+      writtenOf(reachingOf(census)),
+      [...BUTTON_FAMILY_RULES, ...BUTTON_UNMATCHED_RULES, ...BUTTON_DATA_HOOK_RULES].sort(byName)
+    );
+    const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
+    assert.ok(inPartials >= 100, `the partials were read: ${inPartials} selectors`);
+    assert.ok(
+      census.length - inPartials >= 15,
+      `every component style was read: ${census.length - inPartials} selectors`
+    );
+    assert.deepEqual(
+      staleAncestors(BUTTON, census, publishedManagerClasses()),
+      [],
+      'each pinned ancestor keeps at least one selector off a published button'
+    );
+    assert.deepEqual(
+      publishedShapeOf('Button'),
+      [['role', 'fullWidth', 'disabled', 'children', 'onclick'], 'fabricate'],
+      'a published size, class or tag reopens the census'
+    );
+  });
+
+  it('draws a published button alike under any ancestor, with the module ring and no other', () => {
+    const reaching = reachingOf(shippedCensus(BUTTON, 'Button'));
+    assert.deepEqual(placementFaults(reaching, BUTTON, BUTTON_DATA_HOOK_RULES), []);
+    assert.deepEqual(ringFaults(reaching), []);
+  });
+
+  it('holds the classes the census calls writable to the classes Button.svelte spells and a sheet rule names on the button', () => {
+    const tokens = spelledStrings(entryNamed('Button').path, SHIPPED).flatMap((spelled) =>
+      spelled.split(/\s+/)
+    );
+    const onRoot = new Set(
+      shippedCensus(BUTTON, 'Button').flatMap(({ complex }) =>
+        compoundsOf(complex)
+          .map((compound) => classesOf(compound))
+          .filter((classes) => classes.includes(BUTTON.root))
+          .flat()
+      )
+    );
+    assert.deepEqual(
+      [...new Set(tokens)].filter((token) => onRoot.has(token)).sort(byName),
+      [BUTTON.root, ...BUTTON.writable, ...UNPUBLISHED_BUTTON_CLASSES].sort(byName),
+      'a class the file spells that a rule names on the button is writable, or pinned unpublished'
+    );
+  });
+
+  it('reaches a published button through four bare button rules, and no other', () => {
+    const census = shippedBareButtons();
+    assert.deepEqual(writtenOf(reachingOf(census)), [...BARE_BUTTON_RULES].sort(byName));
+    assert.ok(census.length >= 18, `the sheets were read: ${census.length} bare button selectors`);
+    const live = new Set(census.flatMap(({ under }) => under));
+    assert.deepEqual(
+      [...BARE_BUTTON_ANCESTORS].filter((name) => !live.has(name)),
+      [],
+      'each pinned ancestor keeps at least one selector off a published button'
+    );
+  });
+
+  it('reserves every data-* name a rule that reaches a published button reads, by its class or as a bare button', () => {
+    const hooks = dataHooksOf([
+      ...reachingOf(shippedCensus(BUTTON, 'Button')),
+      ...reachingOf(shippedBareButtons()),
+    ]);
+    assert.deepEqual(
+      hooks,
+      ['data-essence-sort-direction', 'data-validation-focused'],
+      'the hooks both censuses read at this head'
+    );
+    assert.deepEqual(
+      hooks.filter((name) => !RESERVED_ON_A_CONTROL.test(name)),
+      [],
+      'a rest key of that name would take a rule of Fabricate’s, so M13 refuses it on a control'
+    );
+  });
+
+  it('declares only the family floor in the Manager’s bare button rule, so both windows draw alike', () => {
+    const floorOf = (census, written) =>
+      census.filter((row) => row.written === written).map(({ rule }) => declarationsOf(rule));
+    assert.deepEqual(floorOf(shippedBareButtons(), BARE_BUTTON_RULES.at(-1)), [
+      [...MANAGER_BUTTON_FLOOR],
+    ]);
+    const family = 'styles/fabricate-manager-rail-gathering.css: .fabricate-button';
+    assert.deepEqual(floorOf(shippedCensus(BUTTON, 'Button'), family), [[...MANAGER_BUTTON_FLOOR]]);
+  });
+
+  const SPELLED = new Set();
+  const buttonCensus = (css) => syntheticCensus(BUTTON, css, { spelled: SPELLED });
+  const reachingIn = (css) => writtenOf(reachingOf(buttonCensus(css)));
+
+  for (const [claim, selector] of [
+    ['a class no published key writes', '.fabricate-button.is-size-38'],
+    ['the armed state, which no published key writes', '.fabricate-button.is-danger.is-armed'],
+    ['a per-site class', '.fabricate-button.fab-manager-button.manager-recipe-sort-direction'],
+    ['a pinned ancestor', '.fabricate-manager .manager-header-actions .fabricate-button'],
+    ['a classed child', '.fabricate-button .fa-plus'],
+  ]) {
+    it(`admits a selector that needs ${claim}`, () => {
+      assert.equal(buttonCensus(`${selector} { gap: 0 }`).length, 1);
+      assert.deepEqual(reachingIn(`${selector} { gap: 0 }`), []);
+    });
+  }
+
+  for (const selector of [
+    '.fabricate-button',
+    '.fabricate-button.is-primary:not(:disabled):hover',
+    '.fabricate-button:disabled',
+    '.fabricate-manager .fabricate-button',
+    '.fabricate-button > span',
+    '.fabricate-button[data-x]',
+    '.manager-tools-authority-heading .fabricate-button',
+  ]) {
+    it(`refuses ${selector}, which nothing keeps off a published button`, () => {
+      assert.deepEqual(reachingIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);
+    });
+  }
+
+  it('reads :disabled as safe for a root no published key disables, and as reaching for the button', () => {
+    const disabled = (shape) =>
+      reachingOf(syntheticCensus(shape, `.${shape.root}:disabled { gap: 0 }`)).length;
+    assert.equal(disabled(CHIP), 0);
+    assert.equal(disabled(BUTTON), 1);
+  });
+
+  it('reaches through a class once a published key writes it', () => {
+    const sized = { ...BUTTON, writable: new Set([...BUTTON.writable, 'is-size-38']) };
+    const census = syntheticCensus(sized, '.fabricate-button.is-size-38 { gap: 0 }');
+    assert.deepEqual(writtenOf(reachingOf(census)), ['sheet.css: .fabricate-button.is-size-38']);
+  });
+
+  it('names a pinned ancestor that keeps no selector off the button as stale', () => {
+    const census = buttonCensus('.manager-header-actions .fabricate-button { gap: 0 }');
+    const stale = staleAncestors(BUTTON, census, SPELLED);
+    assert.equal(stale.includes('manager-header-actions'), false, 'the one the selector names');
+    assert.equal(stale.length, BUTTON.ancestors.size - 1, 'every other is stale');
+  });
+
+  const MODULE_RING = `outline: ${moduleRing().outline}; outline-offset: ${moduleRing().offset};`;
+  const FAMILY = [
+    '.fabricate-button { font: inherit }',
+    '.fabricate-button:focus { outline: none; box-shadow: none }',
+    `.fabricate-button:focus-visible { ${MODULE_RING} }`,
+  ].join(' ');
+  const HOOK = 'sheet.css: .fabricate-manager .fabricate-button[data-hook]';
+  /** The faults of the three clauses over the reaching set of `family` and `css`. */
+  const clauseFaults = (css, family = FAMILY) => {
+    const reaching = reachingOf(buttonCensus(`${family} ${css}`));
+    return [...placementFaults(reaching, BUTTON, [HOOK]), ...ringFaults(reaching)];
+  };
+
+  it('passes a family of one-compound rules with one strip and one module ring', () => {
+    assert.deepEqual(clauseFaults(''), []);
+    assert.deepEqual(clauseFaults('@media (width > 1px) { .fabricate-button { gap: 0 } }'), []);
+    assert.deepEqual(clauseFaults('@supports (gap: 0) { .fabricate-button { gap: 0 } }'), []);
+    assert.deepEqual(
+      clauseFaults('.fabricate-manager .fabricate-button[data-hook] { gap: 0 }'),
+      [],
+      'a pinned data-hook rule is not placed'
+    );
+  });
+
+  for (const [claim, css, faults, family] of [
+    [
+      'a rule under an ancestor',
+      '.fabricate-manager .fabricate-button { gap: 0 }',
+      ["sheet.css: .fabricate-manager .fabricate-button has a compound above the root's own"],
+    ],
+    [
+      'a rule inside @container',
+      '@container fabricate-manager (width > 1px) { .fabricate-button.fabricate-button { gap: 0 } }',
+      ['sheet.css: .fabricate-button.fabricate-button sits inside @container'],
+    ],
+    [
+      'a rule inside @scope',
+      '@scope (.fabricate-manager) { .fabricate-button.is-primary { gap: 0 } }',
+      ['sheet.css: .fabricate-button.is-primary sits inside @scope'],
+    ],
+    [
+      'a rule inside @layer',
+      '@layer late { .fabricate-button.is-ghost { gap: 0 } }',
+      ['sheet.css: .fabricate-button.is-ghost sits inside @layer'],
+    ],
+    [
+      'a rule nested in another style rule',
+      '.wrap { .fabricate-button.is-ghost { gap: 0 } }',
+      ['sheet.css: .fabricate-button.is-ghost sits inside rule'],
+    ],
+    [
+      'a :focus-visible rule that strips the ring',
+      '',
+      ['sheet.css: .fabricate-button:focus-visible does not declare exactly the module ring'],
+      FAMILY.replace(MODULE_RING, 'outline: none'),
+    ],
+    [
+      'a second :focus-visible rule',
+      `.fabricate-button.is-ghost:focus-visible { ${MODULE_RING} }`,
+      ['2 reaching selectors carry :focus-visible'],
+    ],
+    [
+      'no :focus-visible rule',
+      '',
+      ['0 reaching selectors carry :focus-visible'],
+      FAMILY.replace(`.fabricate-button:focus-visible { ${MODULE_RING} }`, ''),
+    ],
+    [
+      'a :focus rule that is not the strip',
+      '',
+      ['sheet.css: .fabricate-button:focus is not the strip'],
+      FAMILY.replace('box-shadow: none', 'color: red'),
+    ],
+    [
+      'a role rule that draws a shadow',
+      '.fabricate-button.is-primary { box-shadow: 0 0 2px red }',
+      ['sheet.css: .fabricate-button.is-primary declares box-shadow'],
+    ],
+    [
+      'a role rule that states an outline longhand',
+      '.fabricate-button.is-ghost:not(:disabled) { outline-width: 0 }',
+      ['sheet.css: .fabricate-button.is-ghost:not(:disabled) declares outline-width'],
+    ],
+    [
+      'a rule that resets all',
+      '.fabricate-button.is-dashed { all: unset }',
+      ['sheet.css: .fabricate-button.is-dashed declares all'],
+    ],
+  ]) {
+    it(`names ${claim} as a fault of the reaching set`, () => {
+      assert.deepEqual(clauseFaults(css, family), faults);
+    });
+  }
+
+  const bareIn = (css, file = 'sheet.css') =>
+    bareButtonSelectors(
+      file,
+      templateOf(file, `<style>${css}</style>`).ast.css,
+      BUTTON,
+      BARE_BUTTON_ANCESTORS
+    );
+
+  it('admits a bare button under a pinned ancestor, and reads none a class keeps off the button', () => {
+    const [tab, ...others] = bareIn(
+      '.fabricate-tabs button, .fabricate-app button.active { gap: 0 }'
+    );
+    assert.deepEqual(
+      [tab.written, tab.safe, tab.under, others.length],
+      ['sheet.css: .fabricate-tabs button', true, ['fabricate-tabs'], 0]
+    );
+    assert.deepEqual(bareIn('.a button.manager-row:hover > i { gap: 0 }'), []);
+  });
+
+  for (const selector of [
+    '.fabricate-app .window-content button',
+    'button',
+    '.companion-host button > span',
+    '.fabricate-manager button.is-primary',
+    '.fabricate :is(button, a)',
+  ]) {
+    it(`names ${selector}, which no pinned ancestor keeps off a published button`, () => {
+      assert.deepEqual(writtenOf(reachingOf(bareIn(`${selector} { gap: 0 }`))), [
+        `sheet.css: ${selector}`,
+      ]);
+    });
+  }
+
+  it('reads a data-* hook wherever a reaching selector holds it, inside :not() included', () => {
+    const classed = buttonCensus('.fabricate-button[data-x]:not([data-y="1"]) { gap: 0 }');
+    assert.deepEqual(dataHooksOf(reachingOf(classed)), ['data-x', 'data-y']);
+    const bare = bareIn('.fabricate button[data-z], .fabricate-tabs button[data-tab] { gap: 0 }');
+    assert.deepEqual(dataHooksOf(reachingOf(bare)), ['data-z'], 'a pinned ancestor keeps one off');
+    assert.equal(RESERVED_ON_A_CONTROL.test('data-x'), false, 'so a new hook reds the clause');
+  });
+
+  it('reads a component’s bare button rule only where :global reaches it', () => {
+    const file = 'src/Host.svelte';
+    assert.deepEqual(bareIn('.host button { gap: 0 }', file), []);
+    assert.deepEqual(writtenOf(reachingOf(bareIn('.host :global(button) { gap: 0 }', file))), [
+      `${file}: .host :global(button)`,
     ]);
   });
 });
