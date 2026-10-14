@@ -561,11 +561,16 @@ describe('the bulk edit dock carrying the set delete', () => {
 });
 
 /*
- * ── THE LIVE SHELL: FOCUS ABOVE THE DOCK ────────────────────────────────────────────────
+ * ── THE LIVE SHELL: FOCUS AND THE SMALLEST SUPPORTED RAIL ────────────────────────────────
  * The dock measures itself, which only a running component does, so these clauses mount the shell
  * through Vite (`tests/fixtures/bulk-edit-dock/`) in the same inspector skeleton as above.
  */
 const dockFixture = createViteFixtureServer({ styleMountPrefix: '/@bulk-edit-dock-styles/' });
+// The Manager's declared 1024x640 floor (`ui-system-studio`) at a width above the 1120 restack, where
+// the inspector is still a rail: the View Lab measured that rail 454px tall (634px at 1280x820).
+const FLOOR_RAIL_PX = 454;
+// The control ladder's tallest rung, which Apply wears: the axes keep one control's room above the dock.
+const ONE_CONTROL_PX = 38;
 
 async function openDockFixture(query) {
   const page = await dockFixture.newPage({ viewport: { width: 1280, height: 900 } });
@@ -610,6 +615,40 @@ function focusWalk() {
   return { count: controls.length, scrolls, obscured, last: under(last), dockHeight: dock.offsetHeight, published };
 }
 
+/** Apply, the delete's control and the room above the dock, against the rail at three offsets. */
+function floorReading() {
+  const inspector = document.querySelector('[data-probe-inspector]');
+  const dock = inspector.querySelector('.fab-bulk-edit-dock');
+  const apply = dock.querySelector('[data-component-bulk-apply]');
+  const confirm = dock.querySelector('[data-arm-token]');
+  const overflow = inspector.scrollHeight - inspector.clientHeight;
+  const sampleAt = (label, scrollTop) => {
+    inspector.scrollTop = scrollTop;
+    const railTop = inspector.getBoundingClientRect().top + inspector.clientTop;
+    const box = (node) => node.getBoundingClientRect();
+    return {
+      label,
+      railTop,
+      railBottom: railTop + inspector.clientHeight,
+      dockTop: box(dock).top,
+      apply: { top: box(apply).top, bottom: box(apply).bottom },
+      confirm: { top: box(confirm).top, bottom: box(confirm).bottom },
+    };
+  };
+  return {
+    rail: inspector.clientHeight,
+    overflow,
+    armed: confirm.dataset.armed,
+    rows: dock.querySelectorAll(':scope .fab-bulk-delete-impact > li').length,
+    hint: Boolean(dock.querySelector('.fab-bulk-delete-hint')),
+    samples: [
+      sampleAt('scroll top', 0),
+      sampleAt('mid scroll', Math.floor(overflow / 2)),
+      sampleAt('max scroll', inspector.scrollHeight),
+    ],
+  };
+}
+
 function assertNoneObscured(walk, face) {
   assert.ok(walk.count >= 18 && walk.scrolls > 0, `NON-VACUITY: ${face}, ${walk.count} controls, ${walk.scrolls} focus scrolls`);
   assert.deepEqual(walk.obscured, [], `${face}: a focused control sat under the ${walk.dockHeight}px dock`);
@@ -639,6 +678,31 @@ describe('the live bulk edit dock', () => {
       const grown = await page.evaluate(focusWalk);
       assert.ok(grown.dockHeight >= idle.dockHeight + 60, `NON-VACUITY: the dock grew (${idle.dockHeight} → ${grown.dockHeight}px)`);
       assertNoneObscured(grown, 'grown');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('keeps Apply, Confirm and a control of room in view on the smallest supported rail', async () => {
+    const page = await openDockFixture(`h=${FLOOR_RAIL_PX}&armed&card=recipe`);
+    try {
+      const floor = await page.evaluate(floorReading);
+      assert.ok(Math.abs(floor.rail - FLOOR_RAIL_PX) <= EPSILON_PX, `NON-VACUITY: the rail is ${floor.rail}px`);
+      assert.ok(
+        floor.armed === 'true' && floor.rows === 3 && floor.hint && floor.overflow >= MIN_OVERFLOW_PX,
+        `NON-VACUITY: the armed recipe card with all three rows and its hint, over a panel that overflows (${JSON.stringify(floor)})`
+      );
+      for (const sample of floor.samples) {
+        const at = `at ${sample.label}`;
+        for (const [name, box] of [['Apply', sample.apply], ['Confirm', sample.confirm]]) {
+          assert.ok(
+            box.top >= sample.railTop - EPSILON_PX && box.bottom <= sample.railBottom + EPSILON_PX,
+            `${at} ${name} spans ${box.top}–${box.bottom}px outside the rail ${sample.railTop}–${sample.railBottom}px`
+          );
+        }
+        const room = sample.dockTop - sample.railTop;
+        assert.ok(room >= ONE_CONTROL_PX, `${at} the axes keep ${room}px above the dock, under one ${ONE_CONTROL_PX}px control`);
+      }
     } finally {
       await page.close();
     }
