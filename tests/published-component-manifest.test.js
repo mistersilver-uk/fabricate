@@ -6,8 +6,9 @@
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
- * that names a bare `button`, and every selector that reads a shipped `aria` key off any element
- * (issue 2452). The test-only probe runs beside the shipped entries;
+ * that names a bare `button`, every selector that reads a shipped `aria` key off any element, and
+ * every script under `src/` that reads one (issue 2452). The test-only probe runs beside the
+ * shipped entries;
  * the adapter's bindings are the mounted suite's, and what a published control must also do is
  * `published-component-controls.test.js`'s (issue 2452).
  * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
@@ -24,6 +25,12 @@
  * a local written to after its declaration fail closed, as an action, an `{@attach}`, a transition
  * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, or
  * by an event-handler attribute on `event.currentTarget`, is not seen.
+ * Limit: the twin rule reads a branch's landings wherever they sit in it, so one under a nested
+ * `{#if}` with no `{:else}` counts as drawn, judges no `{#await}`'s branches, and does not see a
+ * landing inside a snippet rendered in one branch; which landing a pinned entry's defaults draw is
+ * its `heldBy` clause's, not the gate's.
+ * Limit: the DOM-read census sees only the read forms `attributeReads` names, and the aria-key
+ * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -57,13 +64,39 @@ import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
-import { walkNodes } from './helpers/moduleAst.js';
-import { componentAstOf } from './helpers/parsedSource.js';
+import { parseModule, walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import {
+  BARE_BUTTON_ANCESTORS,
+  BARE_BUTTON_RULES,
+  MANAGER_BUTTON_FLOOR,
+  attributeReads,
+  bareButtonSelectors,
+  cannotMatchPublished,
+  classNames,
+  classesOf,
+  compoundsOf,
+  dataHooksOf,
+  entryNamed,
+  ownFilesOf,
+  placementFaults,
+  publishedManagerClasses,
+  publishedTokens,
+  ringFaults,
+  shippedCensus,
+  spelledStrings,
+  staleAncestors,
+  syntheticCensus,
+  TOGGLE,
+} from './helpers/publishedComponentCensus.js';
+import {
+  BRANCH_TWIN,
   DYNAMIC_ELEMENTS,
   SHIPPED,
   ariaFaults,
   attributeSelectors,
+  attributesReadInClauses,
+  branchTwinFaults,
   byName,
   controlRestFaults,
   declarationsOf,
@@ -71,22 +104,20 @@ import {
   dynamicElements,
   everyStylesheet,
   focusableElements,
+  followedProps,
   importClosure,
   isComponent,
-  isStrip,
   moduleRing,
   propLocals,
   publishedLocals,
   restElements,
   restReads,
-  sameDeclarations,
   selectorsNaming,
-  selectorsWithRules,
   selectorsOnAttribute,
   spreadKeys,
   syntheticReader,
   tagKeys,
-  writtenSelector,
+  unheldClauses,
 } from './helpers/publishedComponentGate.js';
 import { readsGlobal } from './helpers/svelteStructureContract.js';
 
@@ -288,6 +319,25 @@ const shippedAriaKeys = () =>
     ariaKeysOf(entry).map((key) => `${entry.name}.${key}`)
   );
 
+/** The mounted suite of each entry that publishes an `aria` key, which reads each key off the control. */
+const ARIA_KEY_SUITES = Object.freeze({
+  Button: 'tests/components/published-button-mounted.test.js',
+  StatusToggle: 'tests/components/published-toggle-mounted.test.js',
+});
+
+/**
+ * Every DOM read under `src/` of a shipped `aria` key or of `aria-pressed`, which a published
+ * `data` key drives, beside why no published control is the element it reads.
+ */
+const JS_ARIA_READERS = Object.freeze({
+  'src/ui/svelte/apps/journal/RunAwardChoice.svelte: querySelector([data-award-choice-id] button[aria-pressed]:not([disabled]))':
+    'under a Fabricate hook',
+  'src/ui/svelte/apps/manager/validationAnnouncement.js: getAttribute(aria-labelledby)':
+    "on Fabricate's own validation targets",
+  'src/ui/svelte/components/Modal.svelte: closest([aria-expanded="true"])':
+    'no extension target sits in a Fabricate modal',
+});
+
 /** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
   'is-positive',
@@ -407,73 +457,6 @@ const BUTTON = Object.freeze({
 
 /** The classes `Button.svelte` spells that no published key writes. */
 const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-38']);
-/** The classes under which a sheet rule redraws a bare `button`; no extension target sits in one. */
-const BARE_BUTTON_ANCESTORS = new Set([
-  'fabricate-tabs',
-  'manager-breadcrumbs',
-  'manager-travel-inspector-actions',
-  'manager-tool-editor-tabs',
-  'fabricate-interactables-manager',
-  'form-footer',
-  'dialog-buttons',
-  'manager-selected-tag-pill',
-  'fabricate-pagination',
-]);
-
-const classesOf = (compound) =>
-  compound.selectors.filter((part) => part.type === 'ClassSelector').map((part) => part.name);
-const typesOf = (compound) =>
-  compound.selectors.filter((part) => part.type === 'TypeSelector').map((part) => part.name);
-
-/** A complex selector's compounds in order, each `:global(…)` replaced by the compounds it wraps. */
-function compoundsOf(complex) {
-  const compounds = [];
-  for (const relative of complex.children) {
-    let current = { combinator: relative.combinator?.name ?? null, selectors: [] };
-    compounds.push(current);
-    for (const part of relative.selectors) {
-      const isGlobal = part.type === 'PseudoClassSelector' && part.name === 'global';
-      if (!isGlobal || part.args?.children.length !== 1) {
-        current.selectors.push(part);
-        continue;
-      }
-      const [first, ...rest] = compoundsOf(part.args.children[0]);
-      current.selectors.push(...first.selectors);
-      compounds.push(...rest);
-      current = rest.at(-1) ?? current;
-    }
-  }
-  return compounds;
-}
-
-/**
- * Whether no element a published component draws at `shape.root` can match `complex`: its root
- * compound takes a class the published keys cannot write, or `:disabled` where the shape does not
- * say `disables`, or an earlier compound is a pinned ancestor, or a later one needs a descendant
- * the mount cannot hold. `drawsChildren` is `false` for a root whose published keys draw no
- * classed descendant, as `Chip` and `Button` are; any other root holds no descendant classed
- * `manager-*` unless a published closure spells that class. An attribute selector never makes a
- * selector safe, and anything else fails closed, a root named only inside `:has()` included.
- */
-function cannotMatchPublished(complex, shape, spelled = new Set()) {
-  const { root, writable, ancestors, drawsChildren, disables = false } = shape;
-  const compounds = compoundsOf(complex);
-  const at = compounds.findLastIndex((compound) => classesOf(compound).includes(root));
-  if (at === -1) return false;
-  const own = compounds[at];
-  const unwritable = classesOf(own).some((name) => name !== root && !writable.has(name));
-  const disabled =
-    !disables &&
-    own.selectors.some((part) => part.type === 'PseudoClassSelector' && part.name === 'disabled');
-  const unheld = drawsChildren
-    ? (name) => name.startsWith('manager-') && !spelled.has(name)
-    : () => true;
-  const classedChild = compounds.slice(at + 1).some((compound) => classesOf(compound).some(unheld));
-  const pinnedAncestor = compounds
-    .slice(0, at)
-    .some((compound) => classesOf(compound).some((name) => ancestors.has(name)));
-  return unwritable || disabled || classedChild || pinnedAncestor;
-}
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
@@ -488,71 +471,6 @@ const unsafeChipSelectors = (file, css) =>
   chipSelectors(file, css)
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
-
-const PART_TEXT = Object.freeze({
-  ClassSelector: (part) => `.${part.name}`,
-  AttributeSelector: (part) => `[${part.name}${part.matcher ?? ''}${part.value ?? ''}]`,
-  TypeSelector: (part) => part.name,
-  PseudoClassSelector: (part) => `:${part.name}`,
-  PseudoElementSelector: (part) => `::${part.name}`,
-});
-
-/** A selector spelled from its compounds, so a `:global()` rule and a sheet rule read alike. */
-function flatSelector(complex) {
-  return compoundsOf(complex)
-    .map(({ combinator, selectors }) => {
-      const lead = combinator && combinator !== ' ' ? `${combinator} ` : '';
-      return lead + selectors.map((part) => PART_TEXT[part.type]?.(part) ?? part.type).join('');
-    })
-    .join(' ');
-}
-
-const holdsGlobal = (node) =>
-  [...walkNodes(node)].some(
-    (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
-  );
-
-/** Whether `:global` reaches `complex`: in a part of its own, in a rule that nests it, or in a rule it nests. */
-function reachedByGlobal(css, complex) {
-  const within = (outer) => outer.start <= complex.start && complex.end <= outer.end;
-  return [...walkNodes(css)].some(
-    (rule) =>
-      rule.type === 'Rule' &&
-      ((within(rule.block) && holdsGlobal(rule.prelude)) ||
-        (within(rule.prelude) && holdsGlobal(rule)))
-  );
-}
-
-/**
- * Every selector of one parsed stylesheet that names `shape.root`, as `{ selector, written, safe }`:
- * spelled flat, and as its sheet writes it, beside its `complex`, its `rule` and what that rule
- * sits `within`. A selector in a file of `own`, the entry's closure, is scoped to that component's
- * own elements, so it is skipped unless `:global` reaches it.
- */
-function censusSelectors(file, css, shape, { spelled, own = new Set() } = {}) {
-  const names = (part) => part.type === 'ClassSelector' && part.name === shape.root;
-  return selectorsWithRules(css, names)
-    .filter(({ complex }) => !own.has(file) || reachedByGlobal(css, complex))
-    .map(({ complex, rule, within }) => ({
-      selector: `${file}: ${flatSelector(complex)}`,
-      written: `${file}: ${writtenSelector(css, complex)}`,
-      safe: cannotMatchPublished(complex, shape, spelled),
-      complex,
-      rule,
-      within,
-    }));
-}
-
-/** The pinned ancestors of `shape` that keep none of `census` off a published mount, so are stale. */
-function staleAncestors(shape, census, spelled) {
-  const without = (name) => new Set([...shape.ancestors].filter((other) => other !== name));
-  return [...shape.ancestors].filter((name) => {
-    const narrowed = { ...shape, ancestors: without(name) };
-    return census.every(
-      ({ complex, safe }) => !safe || cannotMatchPublished(complex, narrowed, spelled)
-    );
-  });
-}
 
 /** The 26 sheet rules that draw a published button, each one compound with nothing above it. */
 const BUTTON_FAMILY_RULES = Object.freeze([
@@ -593,120 +511,53 @@ const BUTTON_DATA_HOOK_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
 ]);
 
-const carries = (complex, pseudo) =>
-  [...walkNodes(complex)].some(
-    (part) => part.type === 'PseudoClassSelector' && part.name === pseudo
-  );
-const drawsOrStripsARing = (property) =>
-  property === 'all' || property === 'box-shadow' || property.startsWith('outline');
-
 /**
- * Clause 1 of the reaching set: a selector has no compound above the root's own, and its rule sits
- * inside no other style rule and no at-rule but `@media` and `@supports`, so it draws alike under
- * any ancestor. A pinned data-hook rule is not judged.
- */
-function placementFaults(reaching, shape, hooks) {
-  return reaching
-    .filter(({ written }) => !hooks.includes(written))
-    .flatMap(({ written, complex, within }) => {
-      const compounds = compoundsOf(complex);
-      const at = compounds.findLastIndex((compound) => classesOf(compound).includes(shape.root));
-      const holders = within.filter((holder) => holder !== '@media' && holder !== '@supports');
-      return [
-        ...(at > 0 ? [`${written} has a compound above the root's own`] : []),
-        ...holders.map((holder) => `${written} sits inside ${holder}`),
-      ];
-    });
-}
-
-/**
- * Clauses 2 and 3 of the reaching set: exactly one selector carries `:focus-visible` and declares
- * exactly the module ring, exactly one carries `:focus` and is the strip, and no other declares
- * `all`, `box-shadow` or a property whose name starts `outline`.
- */
-function ringFaults(reaching, ring = moduleRing()) {
-  const marks = reaching.filter(({ complex }) => carries(complex, 'focus-visible'));
-  const strips = reaching.filter(({ complex }) => carries(complex, 'focus'));
-  const others = reaching.filter((row) => !marks.includes(row) && !strips.includes(row));
-  const drawn = [
-    ['outline', ring.outline],
-    ['outline-offset', ring.offset],
-  ];
-  return [
-    ...(marks.length === 1 ? [] : [`${marks.length} reaching selectors carry :focus-visible`]),
-    ...(strips.length === 1 ? [] : [`${strips.length} reaching selectors carry :focus`]),
-    ...marks
-      .filter(({ rule }) => !sameDeclarations(rule, drawn))
-      .map(({ written }) => `${written} does not declare exactly the module ring`),
-    ...strips
-      .filter(({ rule }) => !isStrip(rule))
-      .map(({ written }) => `${written} is not the strip`),
-    ...others.flatMap(({ written, rule }) =>
-      declarationsOf(rule)
-        .filter(([property]) => drawsOrStripsARing(property))
-        .map(([property]) => `${written} declares ${property}`)
-    ),
-  ];
-}
-
-/** The four module rules a bare `button` compound reaches a published button through, as written. */
-const BARE_BUTTON_RULES = Object.freeze([
-  'styles/fabricate-base.css: .fabricate button:focus',
-  'styles/fabricate-base.css: .fabricate button:focus-visible',
-  'styles/fabricate-base.css: .fabricate button[data-validation-focused]',
-  'styles/fabricate-manager-shell.css: .fabricate-manager button',
-]);
-/** What `.fabricate-manager button` declares, which the family's floor rule also declares. */
-const MANAGER_BUTTON_FLOOR = Object.freeze([['font', 'inherit']]);
-
-/**
- * Every selector that reads a shipped `aria` key, as written, beside the class above it that keeps
- * it off a published control: a pinned ancestor, which no extension target sits under.
+ * Every selector that reads a shipped `aria` key, or `aria-pressed`, which a published `data` key
+ * drives, as written, beside the class that keeps it off a published control: a pinned ancestor
+ * above it, which no extension target sits under, or a class the element holding the attribute
+ * needs, which no published closure spells.
  */
 const ARIA_KEY_SELECTORS = Object.freeze([
   [
     "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte: .fab-im-toolbar :global(.fabricate-button[aria-expanded='true'])",
     'fab-im-toolbar',
   ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
+    'fabricate-list-row-open',
+  ],
+  [
+    "src/ui/svelte/apps/InteractableConfigRoot.svelte: .fab-ic-actions :global(.fabricate-button[aria-pressed='true'])",
+    'fab-ic-actions',
+  ],
+  [
+    "src/ui/svelte/apps/InteractableConfigRoot.svelte: .fab-ic-actions :global(.fabricate-button[aria-pressed='false'] .fab-ic-state-glyph)",
+    'fab-ic-actions',
+  ],
+  [
+    "src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset button.fab-bulk-inset-row:not([aria-pressed='true']):enabled:hover)",
+    'fab-bulk-inset-row',
+  ],
 ]);
 
-/** Whether a compound is a `button` that names no class a published button lacks. */
-const isBareButton = (compound, shape) =>
-  typesOf(compound).includes('button') &&
-  classesOf(compound).every((name) => shape.writable.has(name));
-
 /**
- * Every selector of one parsed stylesheet with a bare `button` compound, as
- * `{ written, safe, under, rule, complex }`: safe under a class of `ancestors` above that compound. A
- * component's selector is read only where `:global` reaches it, and one that names `button` in no
- * compound of its own, so only inside a pseudo-class, fails closed.
+ * Whether `kept` keeps one `attributeSelectors` reading off a published control: as a `pinned`
+ * ancestor above the attribute, or as a class its own element requires that `spelled` lacks.
  */
-function bareButtonSelectors(file, css, shape, ancestors) {
-  const names = (part) => part.type === 'TypeSelector' && part.name === 'button';
-  return selectorsWithRules(css, names)
-    .filter(({ complex }) => !isComponent(file) || reachedByGlobal(css, complex))
-    .flatMap(({ complex, rule }) => {
-      const compounds = compoundsOf(complex);
-      const written = `${file}: ${writtenSelector(css, complex)}`;
-      const types = compounds.flatMap((compound) => typesOf(compound));
-      if (!types.includes('button')) return [{ written, safe: false, under: [], rule, complex }];
-      const at = compounds.findLastIndex((compound) => isBareButton(compound, shape));
-      if (at === -1) return [];
-      const above = compounds.slice(0, at).flatMap((compound) => classesOf(compound));
-      const under = above.filter((name) => ancestors.has(name));
-      return [{ written, safe: under.length > 0, under, rule, complex }];
-    });
-}
-
-/** Every `data-*` attribute name the selectors of `census` hold, wherever in the selector. */
-function dataHooksOf(census) {
-  const names = census.flatMap(({ complex }) =>
-    [...walkNodes(complex)]
-      .filter((part) => part.type === 'AttributeSelector' && part.name.startsWith('data-'))
-      .map((part) => part.name)
-  );
-  return [...new Set(names)].sort(byName);
-}
+const keptOff = ({ above, bearers }, kept, pinned, spelled) =>
+  (pinned.has(kept) && above.includes(kept)) || (bearers.includes(kept) && !spelled.has(kept));
 
 /** The card's own two family rules, which draw all of it under a Fabricate window. */
 const CARD_FAMILY_RULES = Object.freeze([
@@ -766,13 +617,6 @@ function closureDependencies(path, reader = SHIPPED, root = 'any') {
   );
 }
 
-/** The static class names one template node writes, by attribute or directive. */
-function classNames(node) {
-  if (node.type === 'ClassDirective') return [node.name];
-  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
-  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
-}
-
 const SHEET_PREFIXES = ['fab-', 'fabricate-', 'manager-'];
 
 /** Every class name a module sheet selector names. */
@@ -783,25 +627,6 @@ function sheetClassNames() {
     for (const node of walkNodes(ast.css)) if (node.type === 'ClassSelector') names.add(node.name);
   }
   return names;
-}
-
-/**
- * Every string one closure file spells where a class may be written: each string literal and
- * template-literal chunk of its scripts and template expressions, its class attribute text and its
- * `class:` directive names.
- */
-function spelledStrings(file, reader) {
-  const component = isComponent(file) ? reader.component(file) : null;
-  const roots = component
-    ? [component.module, component.instance, component.fragment]
-    : [reader.module(file).ast];
-  const strings = [];
-  for (const node of roots.flatMap((root) => [...walkNodes(root)])) {
-    if (node.type === 'Literal' && typeof node.value === 'string') strings.push(node.value);
-    if (node.type === 'TemplateElement') strings.push(node.value.cooked ?? node.value.raw);
-    strings.push(...classNames(node));
-  }
-  return strings;
 }
 
 /**
@@ -832,15 +657,6 @@ const SHEET_REACH_PINS = Object.freeze([
   'src/ui/svelte/components/Notice.svelte: fab-notice',
 ]);
 
-/** Every `manager-` class token a published closure spells, the probe's included. */
-function publishedManagerClasses() {
-  const tokens = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]
-    .flatMap((entry) => [...importClosure(entry.path, SHIPPED)])
-    .flatMap((file) => spelledStrings(file, SHIPPED))
-    .flatMap((text) => text.split(/\s+/));
-  return new Set(tokens.filter((token) => token.startsWith('manager-')));
-}
-
 /** Rule 9 over an entry's whole closure: every element judged, and every fault. */
 function closureFocusables(path, reader = SHIPPED, dynamic = undefined) {
   const scans = [...importClosure(path, reader)]
@@ -859,23 +675,82 @@ const OVERSTATED_REST = 'restOn is stated and rest lands on no control';
 const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
 
 /**
+ * The entries whose rest lands on more than one element, by path, each drawn while every prop of
+ * `defaults`, which the entry does not publish, keeps its default: the tag of the landing drawn
+ * then, the tags of those it keeps undrawn, and in `heldBy` the mounted clause that holds both.
+ */
+const REST_LANDINGS = Object.freeze({
+  'src/ui/svelte/components/StatusToggle.svelte': {
+    drawn: 'button',
+    undrawn: ['input', 'span'],
+    defaults: ['as'],
+    heldBy:
+      'tests/components/published-toggle-mounted.test.js: the default draws the button host alone',
+  },
+});
+
+/**
+ * What a landing pin breaks: rest landing on other tags than it names, a default the entry
+ * publishes or the component does not declare, a landing whose guards the gate cannot follow or
+ * that follow any prop but `defaults`, and no `heldBy`.
+ */
+function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy }) {
+  const published = publishedLocals(entry, ast);
+  const declared = new Set(propLocals(ast).map(({ key }) => key));
+  const pinned = [...defaults].sort(byName);
+  const tags = landed.map(({ node }) => node.name).sort(byName);
+  const named = [drawn, ...undrawn].sort(byName);
+  return [
+    ...(tags.join(',') === named.join(',')
+      ? []
+      : [`rest is pinned to land on [${named}], and lands on [${tags}]`]),
+    ...pinned
+      .filter((key) => Object.hasOwn(entry.props, key))
+      .map((key) => `rest is pinned to the default of ${key}, which ${entry.name} publishes`),
+    ...pinned
+      .filter((key) => !declared.has(key))
+      .map(
+        (key) => `rest is pinned to the default of ${key}, which the component does not declare`
+      ),
+    ...landed.flatMap(({ node, guards }) => {
+      const { props, faults } = followedProps(ast, guards, published);
+      return [
+        ...faults.map((fault) => `rest on <${node.name}> sits under a guard that ${fault}`),
+        ...(props.join(',') === pinned.join(',')
+          ? []
+          : [
+              `rest on <${node.name}> is pinned to the defaults [${pinned}] and its guards follow [${props}]`,
+            ]),
+      ];
+    }),
+    ...(heldBy ? [] : ['rest is pinned to defaults and names no mounted clause in heldBy']),
+  ];
+}
+
+/**
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
  * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
+ * An entry `landings` pins is judged by its drawn landing alone, and every entry by the twin rule.
  * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
  * the entry's `aria` keys among it.
  */
-function restOnFaults(entry, ast, dynamic = undefined) {
+function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
-  const landed = restElements(ast);
-  if (landed.length === 0) return [NO_REST_ELEMENT];
+  const every = restElements(ast);
+  if (every.length === 0) return [NO_REST_ELEMENT];
+  const pin = landings[entry.path];
+  const pinned = pin ? landingPinFaults(entry, ast, every, pin) : [];
+  const landed = pin ? every.filter(({ node }) => node.name === pin.drawn) : every;
+  const shape = [...pinned, ...branchTwinFaults(ast)];
   const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
   const controls = landed.filter(({ node }) => judged.includes(node));
-  if (controls.length > 0 && controls.length < landed.length) return [MIXED_REST];
+  if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
   const lands = controls.length > 0;
   const stated = entry.restOn === 'control';
   return [
-    ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
+    ...shape,
+    ...(restReads(ast) > every.length ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
     ...controls.flatMap((control) =>
@@ -947,7 +822,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges five focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, and the probe button', () => {
+  it('judges seven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, and the probe button', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -961,6 +836,8 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/StatusToggle.svelte: button',
+      'src/ui/svelte/components/StatusToggle.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
   });
@@ -971,13 +848,17 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(dynamicElementFaults(files), []);
     const held = Object.values(DYNAMIC_ELEMENTS).flatMap(({ heldBy }) => (heldBy ? [heldBy] : []));
     assert.ok(held.length > 0, 'a pin names a mounted clause');
-    for (const heldBy of held) {
-      const [file, title] = heldBy.split(': ');
-      const described = [...walkNodes(SHIPPED.module(file).ast)]
-        .filter((node) => node.type === 'CallExpression' && node.callee.name === 'describe')
-        .map((node) => node.arguments[0]?.value);
-      assert.ok(described.includes(title), `${heldBy} names a describe block of that file`);
-    }
+    assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
+  });
+
+  it('pins the rest landings of each entry whose rest lands on more than one element, held by a mounted clause', () => {
+    const held = Object.values(REST_LANDINGS).map(({ heldBy }) => heldBy);
+    assert.deepEqual(
+      Object.keys(REST_LANDINGS),
+      ['src/ui/svelte/components/StatusToggle.svelte'],
+      'the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
+    );
+    assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
   });
 
   it('pins every shipped callback key with how many arguments it forwards', () => {
@@ -988,7 +869,7 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0', 'Button.onclick: 0'],
+      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0'],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -996,8 +877,41 @@ describe('each entry matches its component declaration', () => {
   it('pins every shipped aria key', () => {
     assert.deepEqual(
       shippedAriaKeys(),
-      ['Button.aria-expanded', 'Button.aria-describedby'],
+      [
+        'Button.aria-expanded',
+        'Button.aria-describedby',
+        'StatusToggle.aria-labelledby',
+        'StatusToggle.aria-describedby',
+      ],
       'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
+    );
+  });
+
+  it('reads each shipped aria key with getAttribute in a clause of its entry’s mounted suite', () => {
+    const entries = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => ariaKeysOf(entry).length > 0);
+    assert.deepEqual(
+      entries.map(({ name }) => name),
+      Object.keys(ARIA_KEY_SUITES),
+      'one mounted suite per entry with an aria key'
+    );
+    for (const entry of entries) {
+      const read = attributesReadInClauses(SHIPPED.module(ARIA_KEY_SUITES[entry.name]).ast);
+      assert.deepEqual(
+        ariaKeysOf(entry).filter((key) => !read.includes(key)),
+        [],
+        `${ARIA_KEY_SUITES[entry.name]} reads each of ${entry.name}’s aria keys in a clause`
+      );
+    }
+  });
+
+  it('pins every DOM read under src/ of a shipped aria key or aria-pressed, with why it reads no published control', () => {
+    const names = [...new Set(PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry)))];
+    const files = sourceAstEntriesUnder('src');
+    assert.ok(files.length > 900, `src/ was read: ${files.length} files`);
+    assert.deepEqual(
+      attributeReads(files, [...names, 'aria-pressed']).sort(byName),
+      Object.keys(JS_ARIA_READERS).sort(byName),
+      'a script that reads a published ARIA attribute off a control a companion mounted acts on it'
     );
   });
 
@@ -1730,6 +1644,141 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(restOnFaults(entry, ast), [OVERSTATED_REST]);
   });
 
+  const BOXED = [
+    "<script>let { as = 'button', label, ...rest } = $props(); let held = $state(false);",
+    " const isBox = $derived(as === 'box');</script>",
+  ].join('');
+  /** A box landing under `test`, else the marked button, each taking the rest. */
+  const hosted = (test = 'isBox') =>
+    `{#if ${test}}<span {...rest}></span>{:else}${pressed(' {...rest}')}{/if}`;
+  const LANDED = { drawn: 'button', undrawn: ['span'], defaults: ['as'], heldBy: 'a clause' };
+  /** The `restOn` faults of a control-landing entry over `template`, its landings pinned `pin`. */
+  const pinnedFaultsOf = (pin, { template = hosted(), props = { label: data } } = {}) => {
+    const entry = { name: 'E', path: 'src/E.svelte', rest: true, restOn: 'control', props };
+    const { ast } = templateOf(entry.path, BOXED + template);
+    return restOnFaults(entry, ast, undefined, { [entry.path]: pin });
+  };
+  const GUARDS = (tag, follow) =>
+    `rest on <${tag}> is pinned to the defaults [as] and its guards follow [${follow}]`;
+
+  it('judges a pinned entry by its drawn landing alone, which unpinned is mixed', () => {
+    assert.deepEqual(pinnedFaultsOf(LANDED), []);
+    assert.deepEqual(pinnedFaultsOf(undefined), [MIXED_REST]);
+  });
+
+  for (const [claim, pin, options, faults] of [
+    [
+      'a drawn landing that is no control',
+      { ...LANDED, drawn: 'span', undrawn: ['button'] },
+      {},
+      [OVERSTATED_REST],
+    ],
+    [
+      'an undrawn landing on another tag',
+      { ...LANDED, undrawn: ['input'] },
+      {},
+      ['rest is pinned to land on [button,input], and lands on [button,span]'],
+    ],
+    [
+      'a default the entry publishes',
+      LANDED,
+      { props: { label: data, as: data } },
+      ['rest is pinned to the default of as, which E publishes'],
+    ],
+    [
+      'a default the component does not declare',
+      { ...LANDED, defaults: ['size'] },
+      {},
+      [
+        'rest is pinned to the default of size, which the component does not declare',
+        'rest on <span> is pinned to the defaults [size] and its guards follow [as]',
+        'rest on <button> is pinned to the defaults [size] and its guards follow [as]',
+      ],
+    ],
+    [
+      'guards that follow a published key',
+      LANDED,
+      { template: hosted('isBox || label') },
+      [GUARDS('span', 'as,label'), GUARDS('button', 'as,label')],
+    ],
+    [
+      'a guard the gate cannot follow',
+      LANDED,
+      { template: hosted('isBox || held') },
+      [
+        'rest on <span> sits under a guard that reads held, which the gate cannot follow',
+        'rest on <button> sits under a guard that reads held, which the gate cannot follow',
+      ],
+    ],
+    [
+      'landings no guard holds apart',
+      LANDED,
+      { template: `<span {...rest}></span>${pressed(' {...rest}')}` },
+      [GUARDS('span', ''), GUARDS('button', '')],
+    ],
+    [
+      'no heldBy',
+      { drawn: 'button', undrawn: ['span'], defaults: ['as'] },
+      {},
+      ['rest is pinned to defaults and names no mounted clause in heldBy'],
+    ],
+  ]) {
+    it(`names ${claim} as a landing pin fault`, () => {
+      assert.deepEqual(pinnedFaultsOf(pin, options), faults);
+    });
+  }
+
+  /** The twin rule over `template`, beneath a script that takes `label` and the rest. */
+  const twinsOf = (template) => branchTwinFaults(templateOf('src/E.svelte', REST + template).ast);
+
+  for (const [claim, template] of [
+    [
+      'rest in every branch',
+      '{#if label}<button {...rest}>x</button>{:else}<span {...rest}></span>{/if}',
+    ],
+    ['an empty {:else}', '{#if label}<p {...rest}></p>{:else} {/if}'],
+    ['no {:else}', '{#if label}<p {...rest}></p>{/if}'],
+    ['rest in no branch', '{#if label}<p></p>{:else}<i></i>{/if}<div {...rest}></div>'],
+    [
+      'a landing under a nested {#if} with no {:else}, which the rule does not see',
+      '{#if label}{#if label.length}<p {...rest}></p>{/if}{:else}<i {...rest}></i>{/if}',
+    ],
+    ['an {#each} with no {:else}', '{#each [label] as item}<p {...rest}>{item}</p>{/each}'],
+    [
+      'an {#each} whose {:else} holds it too',
+      '{#each [label] as item}<p {...rest}>{item}</p>{:else}<i {...rest}></i>{/each}',
+    ],
+  ]) {
+    it(`passes ${claim} under the twin rule`, () => {
+      assert.deepEqual(twinsOf(template), []);
+    });
+  }
+
+  for (const [claim, template] of [
+    [
+      'a branch that draws an element without it',
+      '{#if label}<button {...rest}>x</button>{:else}<button>y</button>{/if}',
+    ],
+    ['a branch that draws text alone', '{#if label}<p {...rest}></p>{:else}No label{/if}'],
+    [
+      'the last branch of an {:else if} chain',
+      '{#if label}<p {...rest}></p>{:else if label.length}<i {...rest}></i>{:else}<b>x</b>{/if}',
+    ],
+    [
+      'the {:else} of an {#each}',
+      '{#each [label] as item}<p {...rest}>{item}</p>{:else}<b>x</b>{/each}',
+    ],
+  ]) {
+    it(`names rest that misses ${claim} as one twin fault`, () => {
+      assert.deepEqual(twinsOf(template), [BRANCH_TWIN]);
+    });
+  }
+
+  it('judges every entry by the twin rule, its rest landing on a control or not', () => {
+    const template = '{#if label}<div {...rest}></div>{:else}<p></p>{/if}';
+    assert.deepEqual(restFaultsOf(template), [BRANCH_TWIN]);
+  });
+
   const SPREAD = '<script>let { open, role, ...rest } = $props(); ';
   const BUILT = 'const build = () => ({ type: "button" });';
   const LITERAL = 'const attrs = { type: "button" };';
@@ -2123,24 +2172,7 @@ describe('each entry matches its component declaration', () => {
   });
 });
 
-/** One census over `css`, read as a stylesheet named `sheet.css`. */
-const syntheticCensus = (shape, css, options = {}) =>
-  censusSelectors(
-    'sheet.css',
-    templateOf('sheet.css', `<style>${css}</style>`).ast.css,
-    shape,
-    options
-  );
 const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector }) => selector);
-
-const entryNamed = (name) => PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === name);
-const ownFilesOf = (name) => importClosure(entryNamed(name).path, SHIPPED);
-
-/** The census of `shape` over every stylesheet, for the published entry `name` that draws its root. */
-function shippedCensus(shape, name, sheets = everyStylesheet()) {
-  const options = { spelled: publishedManagerClasses(), own: ownFilesOf(name) };
-  return sheets.flatMap(([file, css]) => censusSelectors(file, css, shape, options));
-}
 
 /** An entry's published keys and root, which a census of its root class pins. */
 const publishedShapeOf = (name) => [Object.keys(entryNamed(name).props), entryNamed(name).root];
@@ -2200,7 +2232,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 23, 'the census InspectorCard was published on');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button'],
+      ['InspectorCard', 'Button', 'StatusToggle'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(
@@ -2244,6 +2276,13 @@ describe('the module sheet and every component style against the published Inspe
       assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), [`sheet.css: ${flat}`]);
     });
   }
+
+  it('admits a class a published closure spells once the shape calls it undrawn', () => {
+    const css = '.fabricate-card .manager-chip { gap: 0 }';
+    const undrawn = { ...CARD, undrawn: new Set(['manager-chip']) };
+    assert.deepEqual(unsafeCardSelectors(css), ['sheet.css: .fabricate-card .manager-chip']);
+    assert.deepEqual(unsafeOf(syntheticCensus(undrawn, css, { spelled: SPELLED })), []);
+  });
 });
 
 describe('the module sheet and every component style against the published EmptyState', () => {
@@ -2435,23 +2474,56 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key in one selector of any stylesheet, which a pinned ancestor keeps off a published control', () => {
+  it('reads a shipped aria key or aria-pressed in eight selectors of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
-    assert.deepEqual(names, ['aria-expanded', 'aria-describedby'], 'the names the census reads');
-    const reading = names.flatMap((name) => attributeSelectors(everyStylesheet(), name));
+    assert.deepEqual(
+      names,
+      ['aria-expanded', 'aria-describedby', 'aria-labelledby'],
+      'the aria keys the census reads'
+    );
+    const reading = [...names, 'aria-pressed'].flatMap((name) =>
+      attributeSelectors(everyStylesheet(), name)
+    );
     assert.deepEqual(
       reading.map(({ written }) => written),
       ARIA_KEY_SELECTORS.map(([written]) => written),
       'a rule that reads an aria key off an element restyles a published control a companion sets it on'
     );
-    const pinned = new Set([...BUTTON.ancestors, ...BARE_BUTTON_ANCESTORS]);
-    for (const [index, [written, ancestor]] of ARIA_KEY_SELECTORS.entries()) {
+    const shapes = [CHIP, CARD, EMPTY, NOTICE, BUTTON, TOGGLE];
+    const pinned = new Set([
+      ...shapes.flatMap((shape) => [...shape.ancestors]),
+      ...BARE_BUTTON_ANCESTORS,
+    ]);
+    const spelled = publishedTokens();
+    for (const [index, [written, kept]] of ARIA_KEY_SELECTORS.entries()) {
       assert.ok(
-        pinned.has(ancestor) && reading[index].above.includes(ancestor),
-        `${written} sits under ${ancestor}, a pinned ancestor`
+        keptOff(reading[index], kept, pinned, spelled),
+        `${written} is kept off by ${kept}`
       );
     }
+  });
+
+  /** One `aria-pressed` reading of `rule`, as the ARIA census takes it. */
+  const pressedReading = (rule) => {
+    const { css } = templateOf('sheet.css', `<style>${rule} { gap: 0 }</style>`).ast;
+    return attributeSelectors([['sheet.css', css]], 'aria-pressed')[0];
+  };
+
+  it('names as a bearer only a compound whose own element holds the attribute, not a :has() subject', () => {
+    assert.deepEqual(pressedReading('.x:has([aria-pressed])').bearers, []);
+    assert.deepEqual(pressedReading('.x:has(> .y[aria-pressed])').bearers, ['y']);
+    assert.deepEqual(pressedReading('.x:not([aria-pressed])').bearers, ['x']);
+  });
+
+  it('keeps a row off by its bearer only when no published closure spells that class', () => {
+    const spelled = publishedTokens();
+    assert.ok(spelled.has('fabricate-toggle'), 'the switch spells its root class');
+    const none = new Set();
+    const reading = pressedReading('.fabricate-toggle[aria-pressed]');
+    assert.ok(!keptOff(reading, 'fabricate-toggle', none, spelled), 'a spelled bearer is refused');
+    const unspelled = pressedReading('.acme-row[aria-pressed]');
+    assert.ok(keptOff(unspelled, 'acme-row', none, spelled), 'an unspelled bearer holds');
   });
 
   /**
@@ -2462,7 +2534,10 @@ describe('the module sheet and every component style against the published Butto
     const written = rules.map(([rule]) => rule);
     const { css } = templateOf('sheet.css', `<style>${written.join(', ')} { gap: 0 }</style>`).ast;
     assert.deepEqual(
-      attributeSelectors([['sheet.css', css]], 'aria-expanded'),
+      attributeSelectors([['sheet.css', css]], 'aria-expanded').map(({ written, above }) => ({
+        written,
+        above,
+      })),
       rules
         .filter(([, above]) => above !== null)
         .map(([rule, above]) => ({ written: `sheet.css: ${rule}`, above }))
@@ -2502,7 +2577,7 @@ describe('the module sheet and every component style against the published Butto
   it('draws a published button alike under any ancestor, with the module ring and no other', () => {
     const reaching = reachingOf(shippedCensus(BUTTON, 'Button'));
     assert.deepEqual(placementFaults(reaching, BUTTON, BUTTON_DATA_HOOK_RULES), []);
-    assert.deepEqual(ringFaults(reaching), []);
+    assert.deepEqual(ringFaults(reaching, BUTTON), []);
   });
 
   it('holds the classes the census calls writable to the classes Button.svelte spells and a sheet rule names on the button', () => {
@@ -2624,8 +2699,25 @@ describe('the module sheet and every component style against the published Butto
   /** The faults of the three clauses over the reaching set of `family` and `css`. */
   const clauseFaults = (css, family = FAMILY) => {
     const reaching = reachingOf(buttonCensus(`${family} ${css}`));
-    return [...placementFaults(reaching, BUTTON, [HOOK]), ...ringFaults(reaching)];
+    return [...placementFaults(reaching, BUTTON, [HOOK]), ...ringFaults(reaching, BUTTON)];
   };
+
+  it('admits beside the module ring exactly the ring extras a shape names, and no other declaration', () => {
+    const extras = { ...BUTTON, ringExtras: [['box-shadow', 'none']] };
+    const markWith = (more) => FAMILY.replace(`{ ${MODULE_RING} }`, `{ ${MODULE_RING} ${more} }`);
+    const ringOf = (family, shape) => ringFaults(reachingOf(buttonCensus(family)), shape);
+    const UNRINGED =
+      'sheet.css: .fabricate-button:focus-visible does not declare exactly the module ring';
+    assert.deepEqual(ringOf(markWith('box-shadow: none;'), extras), []);
+    assert.deepEqual(
+      ringOf(markWith('box-shadow: none;'), BUTTON),
+      [UNRINGED],
+      'not for a shape without'
+    );
+    assert.deepEqual(ringOf(markWith('box-shadow: 0 0 2px red;'), extras), [UNRINGED]);
+    assert.deepEqual(ringOf(markWith('box-shadow: none; color: red;'), extras), [UNRINGED]);
+    assert.deepEqual(ringOf(FAMILY, extras), [UNRINGED], 'an extra the rule does not declare');
+  });
 
   it('passes a family of one-compound rules with one strip and one module ring', () => {
     assert.deepEqual(clauseFaults(''), []);
@@ -2755,5 +2847,104 @@ describe('the module sheet and every component style against the published Butto
     assert.deepEqual(writtenOf(reachingOf(bareIn('.host :global(button) { gap: 0 }', file))), [
       `${file}: .host :global(button)`,
     ]);
+  });
+});
+
+describe('the DOM reads of a published ARIA attribute', () => {
+  /** What `attributeReads` names of `aria-labelledby` in one file of `source`. */
+  const readsIn = (file, source) => {
+    const ast = isComponent(file) ? templateOf(file, source).ast : parseModule(source).ast;
+    return attributeReads([[file, ast]], ['aria-labelledby']);
+  };
+
+  for (const [claim, file, source, read] of [
+    [
+      'a selector a module passes closest',
+      'src/a.js',
+      "el.closest('[aria-labelledby]');",
+      'closest([aria-labelledby])',
+    ],
+    [
+      'an optional call',
+      'src/a.js',
+      "el?.closest?.('[aria-labelledby]');",
+      'closest([aria-labelledby])',
+    ],
+    [
+      'an attribute in upper case',
+      'src/a.js',
+      "el.getAttribute('ARIA-LABELLEDBY');",
+      'getAttribute(ARIA-LABELLEDBY)',
+    ],
+    [
+      'a selector with a value',
+      'src/a.js',
+      'el.matches(\'[aria-labelledby="x"]\');',
+      'matches([aria-labelledby="x"])',
+    ],
+    [
+      'a template literal',
+      'src/a.js',
+      'el.querySelectorAll(`b[aria-labelledby]`);',
+      'querySelectorAll(b[aria-labelledby])',
+    ],
+    [
+      'a template handler',
+      'src/E.svelte',
+      '<button onclick={(event) => event.currentTarget.hasAttribute("aria-labelledby")}>x</button>',
+      'hasAttribute(aria-labelledby)',
+    ],
+    [
+      'a component script',
+      'src/E.svelte',
+      "<script>const named = (el) => el.querySelector('[aria-labelledby]');</script>",
+      'querySelector([aria-labelledby])',
+    ],
+  ]) {
+    it(`names ${claim}`, () => {
+      assert.deepEqual(readsIn(file, source), [`${file}: ${read}`]);
+    });
+  }
+
+  for (const [claim, source] of [
+    ['a write', "el.setAttribute('aria-labelledby', 'x');"],
+    ['another attribute', "el.closest('[aria-label]'); el.getAttribute('aria-labelledby-x');"],
+    ['a call on no member', "closest('[aria-labelledby]');"],
+    [
+      'a selector held in a local, which it does not see',
+      "const S = '[aria-labelledby]'; el.closest(S);",
+    ],
+  ]) {
+    it(`names no read for ${claim}`, () => {
+      assert.deepEqual(readsIn('src/a.js', source), []);
+    });
+  }
+
+  it('reads a getAttribute call inside an it or test body, and none in a refusal or outside a clause', () => {
+    const { ast } = parseModule(
+      [
+        "describe('x', () => {",
+        "  const outside = node.getAttribute('aria-busy');",
+        "  it('reads', () => { assert.equal(button().getAttribute('aria-labelledby'), 'x'); });",
+        "  it('refuses', () => { assertRefused({ 'aria-describedby': null }); });",
+        "  test('reads too', async () => node?.getAttribute?.('aria-controls'));",
+        '});',
+      ].join('\n')
+    );
+    assert.deepEqual(attributesReadInClauses(ast), ['aria-controls', 'aria-labelledby']);
+  });
+
+  it('reads no getAttribute call in a clause that it or a describe around it skips', () => {
+    const { ast } = parseModule(
+      [
+        "describe.skip('x', () => { it('a', () => node.getAttribute('aria-busy')); });",
+        "describe('y', { skip: true }, () => { it('b', () => node.getAttribute('aria-owns')); });",
+        "it.skip('c', () => node.getAttribute('aria-live'));",
+        "it('d', { skip: 'later' }, () => node.getAttribute('aria-atomic'));",
+        "test('e', { todo: true }, () => node.getAttribute('aria-details'));",
+        "it('f', { skip: false }, () => node.getAttribute('aria-controls'));",
+      ].join('\n')
+    );
+    assert.deepEqual(attributesReadInClauses(ast), ['aria-controls']);
   });
 });

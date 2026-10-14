@@ -5,8 +5,9 @@
  * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
- * button with its `onAction` callback (issue 2452). The published `Button` mounts here as a leaf;
- * what it draws and refuses is `published-button-mounted.test.js`'s.
+ * button with its `onAction` callback (issue 2452). The published `Button` and `StatusToggle` mount
+ * here as leaves; what each draws and refuses is `published-button-mounted.test.js`'s and
+ * `published-toggle-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -205,6 +206,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.textContent,
     drawn: ['Clear filters', 'Filters cleared'],
   },
+  {
+    name: 'StatusToggle',
+    under: 'fabricate',
+    root: '.fabricate-toggle',
+    props: { on: false, ariaLabel: 'Group by category', onclick() {} },
+    next: { on: true, ariaLabel: 'Group by category', onclick() {} },
+    read: (root) => root.getAttribute('aria-pressed'),
+    drawn: ['false', 'true'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -283,6 +293,8 @@ describe('a key a leaf does not publish', () => {
     ['Button', 'tag', 'is not a data attribute'],
     ['Button', 'type', 'is not a data attribute'],
     ['Button', 'class', 'is not a data attribute'],
+    ['StatusToggle', 'as', 'is not a data attribute'],
+    ['StatusToggle', 'label', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

@@ -40,6 +40,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

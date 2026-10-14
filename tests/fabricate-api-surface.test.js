@@ -276,6 +276,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'EmptyState',
       'Notice',
       'Button',
+      'StatusToggle',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -415,6 +416,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           children: requiredText,
           onclick: { kind: 'callback', required: true },
           'aria-expanded': { kind: 'aria', required: false },
+          'aria-describedby': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'fabricate',
+      },
+      StatusToggle: {
+        version: 1,
+        props: {
+          on: required,
+          ariaLabel: required,
+          onclick: { kind: 'callback', required: true },
+          'aria-labelledby': { kind: 'aria', required: false },
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,

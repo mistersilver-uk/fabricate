@@ -519,6 +519,7 @@ An entry's **required ancestor root** says which Fabricate ancestor its target n
 The published `Rail` is a section primitive, not the Manager rail.
 The published `Notice` is the design system's notice, drawn in the companion's element, and is unrelated to a Foundry notification.
 The published `Button` is the design system's button; its `role` is a visual role, not an ARIA role.
+The published `StatusToggle` is the design system's switch, a button that is on or off; its `on` is the companion's own state, which a press only reports, and it is unrelated to a Crafting System's feature toggle.
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
