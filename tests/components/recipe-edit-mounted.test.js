@@ -7345,6 +7345,25 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     ],
   };
 
+  it('draws the Ingredients, Results and Tools counts as bare record counts, and none at zero', async () => {
+    const tabMarks = (target, id) => target.querySelector(`[data-recipe-tab-button="${id}"]`);
+    const target = await openValidation({ ...COMPLETE_RECIPE, toolIds: ['tool-hammer'] });
+    for (const id of ['ingredients', 'results', 'tools']) {
+      const tab = tabMarks(target, id);
+      assert.equal(tab.querySelector('.manager-editor-tab-count')?.textContent.trim(), '1', id);
+      assert.ok(!tab.querySelector('.manager-chip'), `${id}: a record count is never a chip`);
+    }
+    editHarness.remount();
+    const empty = await openValidation(RECIPE);
+    for (const id of ['ingredients', 'results', 'tools']) {
+      assert.ok(
+        !tabMarks(empty, id).querySelector('.manager-editor-tab-count'),
+        `${id}: a zero draws no count`
+      );
+    }
+    editHarness.remount();
+  });
+
   // ── THE STRIP'S BADGE AND THE TAB'S RAIL ARE ONE READING (issue 1517, docs round) ──────────
   const UNNAMED_STEP_RECIPE = {
     ...COMPLETE_RECIPE,

@@ -15,8 +15,8 @@
   Lab's source-coverage scan cannot credit ids produced that way. They are also literals in
   `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS`, which is where the scan reads them.
 
-  THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
-  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders NO badge, which is
+  THE ON-CRAFT COUNT COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
+  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders no count, which is
   the primitive's own rule, and the rules set has no `oncraft` tab for the entry to match.
 -->
 <script>
@@ -87,7 +87,7 @@
   }
 
   const badges = $derived({
-    oncraft: onCraftCount,
+    oncraft: { vehicle: 'count', label: onCraftCount },
     validation: validationBadgeFor(blockingCount, warningCount),
   });
 </script>

@@ -165,7 +165,7 @@
   const effectiveValidation = $derived({ checks, criticalCount });
 
   const badges = $derived({
-    contents: recipeCount > 0 ? recipeCount : '',
+    contents: { vehicle: 'count', label: recipeCount },
     validation:
       criticalCount > 0
         ? [{ label: String(criticalCount), tone: 'danger' }]

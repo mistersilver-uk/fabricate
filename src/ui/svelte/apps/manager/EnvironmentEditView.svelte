@@ -123,7 +123,7 @@
     });
   }
 
-  // INCLUDED, not COMPOSED — the tab badges count what the Included list SHOWS. The two sets hold
+  // INCLUDED, not COMPOSED — the tab counts read what the Included list SHOWS. The two sets hold
   // the same members today but answer different questions, and `gatheringComposition.js` exports
   // both one line apart, so the name matters (issue 1321).
   function countIncludedRecords(records = []) {
@@ -168,8 +168,8 @@
       : []),
   ]);
   const badges = $derived({
-    tasks: taskCompositionCount || 0,
-    events: eventCompositionCount || 0,
+    tasks: { vehicle: 'count', label: taskCompositionCount },
+    events: { vehicle: 'count', label: eventCompositionCount },
     validation: validationBadges,
   });
 </script>

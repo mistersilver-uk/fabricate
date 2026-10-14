@@ -81,7 +81,7 @@
   // the blocking count, so a GM scanning the strip sees a mark only where there is something to
   // do.
   const badges = $derived({
-    requirements: requirementCount,
+    requirements: { vehicle: 'count', label: requirementCount },
     validation:
       errorCount > 0
         ? { tone: 'danger', label: errorCount, name: issueCountText(errorCount) }

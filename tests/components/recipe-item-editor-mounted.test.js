@@ -266,7 +266,7 @@ describe('RecipeItemEditor (mounted)', () => {
       visibilityMode: 'item',
     });
     assert.equal(
-      root.querySelector('[data-recipe-item-tab-badge="contents"]').textContent.trim(),
+      root.querySelector('[data-recipe-item-tab-count="contents"]').textContent.trim(),
       '2'
     );
     const validation = root.querySelector('[data-recipe-item-tab-badge="validation"]');
@@ -286,6 +286,12 @@ describe('RecipeItemEditor (mounted)', () => {
     // itemLinked + recipeLinked both fail = 2 critical.
     assert.equal(validation.textContent.trim(), '2');
     assert.ok(validation.classList.contains('is-danger'));
+    assert.ok(
+      !root
+        .querySelector('[data-recipe-item-tab-button="contents"]')
+        .querySelector('.manager-editor-tab-count'),
+      'no linked recipe draws no Contents count'
+    );
   });
 
   it('recomputes the embedded item-mode preview and effective rules from caps', async () => {
