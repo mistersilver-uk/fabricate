@@ -1291,12 +1291,6 @@
   line-height: 1.45;
 }
 
-/* THE COMPACT PROMPT IS TRANSPARENT ON A DASHED HAIRLINE (`proto:856`), where the primitive's default face carries a fill. */
-.fabricate-manager .manager-component-entry-card .manager-item-drop-zone.is-compact {
-  padding: var(--fab-space-3);
-  background: transparent;
-}
-
 /* ── A4. THE SOURCE IDENTITY CARD ── `proto:845-879`. */
 .fabricate-manager .manager-component-entry-uuid-well {
   display: flex;

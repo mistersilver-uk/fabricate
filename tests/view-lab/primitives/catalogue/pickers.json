@@ -238,11 +238,10 @@
     "cap": "compact",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/ItemDropZone.svelte",
-    "note": "The shipped compact face keeps a translucent ground, 8px block padding, the subtle ink and a surface-soft tile behind its glyph until issue 2466 folds its one caller's rule into the primitive.",
     "props": {
       "compact": true,
       "title": "Drop an item to replace the source",
-      "hint": "World item, compendium entry, or pack",
+      "hint": "World item or compendium entry",
       "emptyIcon": "fas fa-link"
     }
   },

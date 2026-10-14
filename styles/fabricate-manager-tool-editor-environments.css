@@ -751,23 +751,14 @@
 
 /* THE COMPACT FORM (issue 1371, round 4): a glyph over a one-line title over a one-line note, centred, with no identity block and no action cluster. */
 .fabricate-link-field.manager-item-drop-zone.is-compact {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-1);
   width: auto;
   min-height: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
   border-radius: 9px;
-  text-align: center;
+  background: transparent;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
-  width: auto;
-  height: auto;
   font-size: 0.82rem;
-  color: var(--fab-text-subtle);
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
@@ -782,13 +773,13 @@
   font-size: 0.63rem;
   font-weight: 500;
   line-height: 1.4;
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
   font-size: 0.59rem;
   line-height: 1.45;
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-drop-active {

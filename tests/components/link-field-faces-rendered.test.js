@@ -1,8 +1,8 @@
 /**
  * The link field's faces as Chromium draws them (issue 2466): the 104px floor, the three grounds
- * and borders, the empty stack, the two-line caps and the action column. The sheet sits in
- * `@layer modules` and the component's scoped block is unlayered, as Foundry loads them, so each
- * clause measures the cascade a selector reading cannot.
+ * and borders, the empty stack, the two-line caps, the action column and the compact face. The
+ * sheet sits in `@layer modules` and the component's scoped block is unlayered, as Foundry loads
+ * them, so each clause measures the cascade a selector reading cannot.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -47,6 +47,15 @@ const CASES = Object.freeze({
       hint: 'This document no longer resolves.',
     },
   },
+  compact: {
+    width: 280,
+    props: {
+      compact: true,
+      title: 'Drop an item to replace the source',
+      hint: 'World item or compendium entry',
+      emptyIcon: 'fas fa-right-left',
+    },
+  },
   disabled: { width: 280, props: { ...PROMPT, disabled: true } },
   'long-empty': { width: 220, props: { ...PROMPT, title: LONG_TITLE, hint: LONG_NOTE } },
   'long-linked': {
@@ -81,6 +90,7 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
 ${TOKENS.map((token) => `<span data-token="${token}" style="color:var(--fab-${token})"></span>`).join('')}
 <span data-token="serif" style="font-family:var(--fab-font-serif)"></span>
+<span data-token="none" style="color:transparent"></span>
 ${Object.entries(markup)
   .map(([key, html]) => `<div data-case="${key}" style="width:${CASES[key].width}px">${html}</div>`)
   .join('\n')}
@@ -273,6 +283,23 @@ it('draws a missing zone on the danger ground, and lets a drag take it', async (
     'a drag over a missing zone takes its border'
   );
   assert.equal(dragged.backgroundColor, tokens['accent-soft'], 'and its ground');
+});
+
+it('draws the compact prompt with no ground, no floor and no tile, in muted ink', () => {
+  const { root, icon, name, hint } = faces.compact;
+  assert.equal(root.style['background-color'], tokens.none);
+  assert.equal(root.style['padding-top'], '12px');
+  assert.equal(root.style['border-top-left-radius'], '9px');
+  assert.equal(root.style['border-top-style'], 'dashed');
+  assert.equal(root.style['min-height'], '0px');
+  assert.ok(root.box.height < 104, `the compact box is ${root.box.height}px, so it kept the floor`);
+
+  assert.equal(icon.style['background-color'], tokens.none, 'no tile behind the glyph');
+  assert.equal(icon.style.color, tokens['text-subtle']);
+  assert.equal(name.style['font-size'], '10.08px');
+  assert.equal(name.style['font-weight'], '500');
+  assert.equal(name.style.color, tokens['text-muted']);
+  assert.equal(hint.style.color, tokens['text-muted']);
 });
 
 it('dims a disabled zone to 0.55', () => {

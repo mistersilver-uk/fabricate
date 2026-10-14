@@ -33,6 +33,9 @@ const PLACEMENT =
 /** What the component's own scoped block may not declare on its root: the sheet's faces own it. */
 const ROOT_PAINT = /^(?:border(?:-[\w-]+)?|background(?:-[\w-]+)?|color)$/u;
 
+/** The root every sheet selector of the family begins at. */
+const FAMILY_ROOT = '.fabricate-link-field';
+
 const isScoped = (rule) => rule.file.endsWith('.svelte');
 
 function styleRules() {
@@ -123,6 +126,26 @@ function ownRootAttributes() {
   });
   return names;
 }
+
+test('every sheet selector naming the family begins at the family root', () => {
+  const sheet = styleRules().filter((rule) => !isScoped(rule));
+  const family = sheet
+    .flatMap((rule) => splitSelectorList(rule.selector).map((selector) => ({ selector, rule })))
+    .filter(({ selector }) => FAMILY.test(selector));
+  assert.ok(
+    family.length >= 20,
+    `only ${family.length} sheet selectors name the link field's family, so the clause below holds ` +
+      'over a family the reader has stopped finding'
+  );
+  assert.deepEqual(
+    family
+      .filter(({ selector }) => !selector.startsWith(FAMILY_ROOT))
+      .map(({ selector, rule }) => `${rule.file}:${rule.line} ${selector}`),
+    [],
+    'a sheet rule reaches the link field from outside its family. A rule rooted at an application ' +
+      'or a caller`s card is a caller painting the zone: move what it declares into the family.'
+  );
+});
 
 test('a scoped rule outside the link field that names its family declares only placement', () => {
   const callers = styleRules().filter(
