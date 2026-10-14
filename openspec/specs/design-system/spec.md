@@ -1222,15 +1222,19 @@ An inspector rail's verbs render through the button primitive at full width, eac
 The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
 A count has two faces and neither licenses a third: at the end of a labelled row it is that bare mono numeral, and on an item whose only visible content is a glyph it is a filled pip on the icon well's outer corner with a 2px ground-coloured ring.
 The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
-That mark, and that mark alone, is drawn by the shared chip primitive: measured, none of the family's four vehicles is one — the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
+On the RAIL the shared chip primitive draws the unsaved mark and none of the family's four vehicles: measured, the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
 The vehicles are cited by SELECTOR and never by line number, because a line into that sheet is not verifiable by a reader of this document and the four this sentence carried before had all gone stale.
-Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact.
+Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact on the rail; a tab strip is governed by the rule below.
 The family reaches a TAB STRIP as well as the rail, because a tab's mark states a fact about what is behind that tab exactly as a rail entry's does, and the tab-strip primitive MUST own the drawing of every vehicle it offers so that a call site names which one its mark uses and never how it looks.
 A caller that cannot name the vehicle it needs is a MISSING CAPABILITY on that primitive, never a licence to hand-roll a second strip or to draw one vehicle with another: a difference recorded between two strips MUST be a functional or informational one the shared primitive absorbs, because a deliberate STYLE divergence is precisely what a shared primitive exists to remove.
 The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, because the rail's PREMIUM chip and the title-bar badge already state the tier once and loudly, and a chip on every tab of a strip whose tabs are all gated would repeat it.
 A tab whose destination is tier-gated carries the strip's premium PADLOCK instead — the premium signal the rail's Downtime sub-items already carry — drawn by the tab-strip primitive, hidden from assistive technology, its meaning stated in words by the tab's description.
 The padlock is a state of the tab and not a mark of the family, so it does not enter the four-mark set and no call site names its glyph; it is not `<Locked>`, because a padlocked tab stays selectable; and like every premium signal it is drawn in the manager only, so no player-window caller marks a tab with it.
 A mark carries a LABEL and a TONE and never a glyph: a PASS mark is the issue vehicle carrying a tick character, not a fourth vehicle and not a caller-supplied icon, because a call site naming a Font Awesome class is a call site choosing a shape and that is the one thing the ownership rule above forbids.
+A PASS mark is toned neutral, because the issue vehicle's tone states how much attention the tab asks for, and a pass asks for none (issue 1373).
+On a tab strip the issue summary MUST be the shared chip primitive at its `inspector` density with `mono`, whatever badge class a caller passes: the mono face at weight 500, because it carries a number a GM compares and the mono face ships no weight above 500 (maintainer ruling 2026-10-14, issue 2464), and the size and box that density's, as the chip's library entry states them.
+The strip has no density of its own and borrows this one for its geometry, because a second pill is a missing density and never a new component.
+No rule in the module sheet names that badge's class, and the strip's record count and dot stay bare `span` elements the tab-strip primitive paints.
 
 A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
@@ -1294,6 +1298,13 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **THEN** the strip draws one padlock in that tab, hidden from assistive technology
 - **AND** the tab stays selectable
 - **AND** no call site supplies the glyph or its class
+
+#### Scenario: A tab strip draws its issue summary
+
+- **WHEN** a tab strip draws an issue mark under any caller's badge class
+- **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
+- **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
+- **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
 
 ### Requirement: A tab strip always keeps a tab stop, and names and describes a tab from its own entry
 

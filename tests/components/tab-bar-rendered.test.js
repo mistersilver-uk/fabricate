@@ -514,6 +514,18 @@ it('reads the tab inks at 4.5:1 or over on bg-2 and on the soft well over surfac
   assert.deepEqual(under, []);
 });
 
+it('draws the entry’s Validation badge equal to the mounted one', () => {
+  const badges = drawn.flatMap(({ tabs }) => tabs.flatMap((tabDrawn) => tabDrawn.badges));
+  assert.equal(badges.length, 1, 'the entry draws one issue badge');
+  const [{ text, ...badge }] = badges;
+  const [{ text: mountedText, ...mounted }] = strips[0].tabs.find(
+    ({ id }) => id === 'validation'
+  ).badges;
+  assert.equal(text, mountedText);
+  assert.deepEqual(badge, mounted);
+  assert.deepEqual(badge, BADGE);
+});
+
 it('draws the entry’s tabs at the mounted tab’s box, type, weight and height', () => {
   const [current, idle] = strips[0].tabs;
   const shape = ({ paint, weight, box: { height } }) => ({ ...paint, weight, height });
