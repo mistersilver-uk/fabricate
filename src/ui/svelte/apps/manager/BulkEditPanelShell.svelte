@@ -23,6 +23,7 @@
   - Apply's border box stays wholly inside the scrollport at every scroll offset, and that holds
     only while a sibling delete card is shorter than the scrollport — pinned by
     `tests/components/bulk-edit-dock-pinning.test.js`.
+  - With no sibling, the dock sits on the rail's foot even when the axes are short; same test.
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -200,6 +201,12 @@
     min-width: 0;
   }
 
+  /* With no sibling after it the panel fills its rail, so the dock's `margin-top: auto` seats it
+     on the rail's foot when the axes are shorter than the rail; a sibling card keeps it as it was. */
+  .fab-bulk-edit-panel:last-child {
+    flex: 1 0 auto;
+  }
+
   .fab-bulk-edit-header {
     display: flex;
     gap: var(--fab-space-2);
@@ -324,6 +331,7 @@
   .fab-bulk-edit-dock {
     position: sticky;
     bottom: -12px;
+    margin-top: auto;
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
     padding-top: var(--fab-space-3);

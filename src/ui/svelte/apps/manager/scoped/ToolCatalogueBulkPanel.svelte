@@ -97,6 +97,7 @@
   heading={headingLabel}
   {applyLabel}
   {canApply}
+  dockBleed="space-4"
   panelAttr="data-world-tool-bulk-panel"
   clearAttr="data-world-tool-bulk-clear"
   countAttr="data-world-tool-bulk-count"

@@ -353,6 +353,7 @@
     systemRowAction="navigate"
     membershipFilter={false}
     autoSelectFirst
+    flushBulkDock
     bind:selectedId
     onSelect={(entityId) => (selectedId = entityId)}
     {onOpenEntry}
@@ -362,10 +363,8 @@
   />
 </main>
 
-<!--
-  THE INSPECTOR'S BULK FACE (issue 1373): the frame swaps the identity panel for this the moment
-  a row is ticked and had none to swap to. `ctx.clearSelection` is the FRAME's own.
--->
+<!-- THE INSPECTOR'S BULK FACE (issue 1373): the frame swaps it in for the identity panel the moment
+     a row is ticked. `ctx.clearSelection` is the FRAME's own. -->
 {#snippet toolBulkEdit(selectedIds, ctx)}
   <ToolCatalogueBulkPanel
     count={selectedIds.length}

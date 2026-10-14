@@ -380,6 +380,7 @@ So the destination is a named region that says where the GM now is, leaves the s
 Focus is moved only when the re-render actually dropped it — when it rests on the document body, or on a node the re-render has detached.
 A GM who moved focus elsewhere while an awaited write was in flight keeps their place, and the same rule governs the delete card's own restore after a refused write.
 
+Apply's dock sits on its rail's bottom edge at the rail's full inner width whether or not the staged axes fill the rail: a panel shorter than its rail fills it, so the dock never stops under the axes with the rail empty beneath it.
 A bulk edit panel may render a sibling card after the shell.
 Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
 What is required is that Apply's border box stays wholly within the scrollport at every scroll offset; the guarantee holds while the sibling is shorter than the scrollport, and a sibling taller than it is a reachability failure rather than an accepted configuration.
