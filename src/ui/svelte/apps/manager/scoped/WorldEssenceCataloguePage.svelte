@@ -210,24 +210,52 @@
     }
   }
 
-  /** Names up to three essences that did not update; silent when every write landed. */
-  function reportIdentityFailures(failed) {
-    if (failed.length === 0) return;
-    const nameOf = (entityId) =>
-      String(scope?.entries?.find((entry) => entry.id === entityId)?.entity?.name || entityId);
-    notifyError(
-      failed.length === 1
-        ? format(
-            'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedOne',
-            '{name} could not be updated. The rest of the run finished.',
-            { name: nameOf(failed[0]) }
-          )
-        : format(
-            'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailed',
-            '{count} essences could not be updated, including {names}. The rest of the run finished.',
-            { count: failed.length, names: failed.slice(0, 3).map(nameOf).join(', ') }
-          )
+  /** The failed essences as the notice names them: three, then how many more. */
+  function failedNames(failed, names) {
+    const shown = failed.slice(0, 3).map((entityId) => names.get(entityId) ?? entityId);
+    const joined = shown.join(', ');
+    if (failed.length <= 3) return joined;
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedMore',
+      '{names}, and {more} more',
+      { names: joined, more: failed.length - 3 }
     );
+  }
+
+  /** Names the essences that did not update; silent when every write landed. */
+  function reportIdentityFailures(failed, names, total) {
+    if (failed.length === 0) return;
+    const every = failed.length === total;
+    const single = failed.length === 1;
+    let message;
+    if (every && single) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedAllOne',
+        '{name} could not be updated.',
+        {
+          name: failedNames(failed, names),
+        }
+      );
+    } else if (every) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedAll',
+        'None of the {count} selected essences could be updated: {names}.',
+        { count: total, names: failedNames(failed, names) }
+      );
+    } else if (single) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedOne',
+        '{name} could not be updated. The other selected essences were updated.',
+        { name: failedNames(failed, names) }
+      );
+    } else {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailed',
+        '{count} essences could not be updated: {names}. The other selected essences were updated.',
+        { count: failed.length, names: failedNames(failed, names) }
+      );
+    }
+    notifyError(message);
   }
 
   /** Write the staged identity to each ticked essence in turn, then drop the selection. */
@@ -238,13 +266,20 @@
     const patch = Object.hasOwn(edit, 'colorToken')
       ? { ...edit, colorToken: edit.colorToken ?? '' }
       : { ...edit };
+    // Named now: an essence removed mid-run is no longer in `scope` when the notice is written.
+    const names = new Map(
+      entityIds.map((entityId) => [
+        entityId,
+        String(scope?.entries?.find((entry) => entry.id === entityId)?.entity?.name || entityId),
+      ])
+    );
     const failed = [];
     try {
       for (const entityId of entityIds) await writeIdentity(failed, entityId, patch);
     } finally {
       bulkApplying = false;
       clearSelection();
-      reportIdentityFailures(failed);
+      reportIdentityFailures(failed, names, entityIds.length);
     }
   }
 </script>

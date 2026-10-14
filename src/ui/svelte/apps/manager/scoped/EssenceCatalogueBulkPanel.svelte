@@ -191,7 +191,7 @@
     tone="neutral"
     text={localizeOr(
       'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.PerEssenceNote',
-      "Names, descriptions, linked sources and property macros stay per-essence: open an essence to edit them. Enabling an essence happens on each crafting system's Essence Rules screen; adding one to a system happens there or on the essence's own page, and deleting one happens on its own page."
+      "Names, descriptions, linked sources and property macros stay per-essence: open an essence to edit them. Enabling an essence happens on each crafting system's Essence Rules screen; adding one to a system or removing it happens there or on the essence's own page, and deleting one happens on its own page."
     )}
     data-world-essence-bulk-per-essence-note
   />

@@ -36,7 +36,7 @@ const harness = createMountedComponentHarness({
 const SYSTEMS = [{ id: 'sys-a', name: 'Mythwright Forge' }];
 const IDS = ['ash', 'brine', 'cinder'];
 
-function essenceScope() {
+function essenceScope(extraIds = []) {
   return projectWorldScopeEntity({
     entityType: 'essence',
     corpus: {
@@ -44,9 +44,10 @@ function essenceScope() {
         { id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'peach' },
         { id: 'brine', name: 'Brine', icon: 'fas fa-water', colorToken: 'aqua' },
         { id: 'cinder', name: 'Cinder', icon: 'fas fa-fire-flame-curved' },
+        ...extraIds.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1) })),
       ],
       defaults: [],
-      membership: IDS.map((entityId) => ({
+      membership: [...IDS, ...extraIds].map((entityId) => ({
         entityId,
         systemId: 'sys-a',
         enabled: true,
@@ -58,10 +59,10 @@ function essenceScope() {
 }
 
 /** Mounts the page over a recorded `updateEntity`; `answer(id)` is what each write resolves to. */
-async function mountPage(answer = () => true) {
+async function mountPage(answer = () => true, extraIds = []) {
   const calls = [];
   const target = await harness.mount({
-    scope: essenceScope(),
+    scope: essenceScope(extraIds),
     systems: SYSTEMS,
     actions: {
       updateEntity: (entityId, patch) => {
@@ -248,7 +249,7 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
       'the run stopped at a failure'
     );
     assert.deepEqual(notified, [
-      '2 essences could not be updated, including Ash, Brine. The rest of the run finished.',
+      '2 essences could not be updated: Ash, Brine. The other selected essences were updated.',
     ]);
     assert.ok(!panelOf(target), 'the selection survived a failed run');
   });
@@ -259,7 +260,9 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
     await tickRows(first.target, IDS);
     await stageColour(first.target, 'rose');
     await apply(first.target);
-    assert.deepEqual(notified, ['Cinder could not be updated. The rest of the run finished.']);
+    assert.deepEqual(notified, [
+      'Cinder could not be updated. The other selected essences were updated.',
+    ]);
 
     notified.length = 0;
     harness.remount();
@@ -268,6 +271,66 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
     await stageColour(second.target, 'rose');
     await apply(second.target);
     assert.deepEqual(notified, [], 'a clean run notified');
+  });
+
+  it('names three failures at most, then how many more', async () => {
+    captureNotifications();
+    const ids = [...IDS, 'dross'];
+    const { target } = await mountPage(() => false, ['dross']);
+    await tickRows(target, ids);
+    await stageColour(target, 'rose');
+    await apply(target);
+    assert.deepEqual(notified, [
+      'None of the 4 selected essences could be updated: Ash, Brine, Cinder, and 1 more.',
+    ]);
+  });
+
+  it('counts a write that resolves undefined as a failure', async () => {
+    captureNotifications();
+    const { target } = await mountPage((id) => (id === 'brine' ? undefined : true));
+    await tickRows(target, IDS);
+    await stageColour(target, 'rose');
+    await apply(target);
+    assert.deepEqual(notified, [
+      'Brine could not be updated. The other selected essences were updated.',
+    ]);
+  });
+
+  it('caps the names at three when some, not all, of four writes fail', async () => {
+    captureNotifications();
+    const { target } = await mountPage((id) => id === 'cinder', ['dross', 'ember']);
+    await tickRows(target, ['ash', 'brine', 'cinder', 'dross', 'ember']);
+    await stageColour(target, 'rose');
+    await apply(target);
+    await drain(); // five sequential writes outlast one drain
+    assert.deepEqual(notified, [
+      '4 essences could not be updated: Ash, Brine, Dross, and 1 more. The other selected essences were updated.',
+    ]);
+  });
+
+  it('names an essence removed mid-run by its name, not its id', async () => {
+    captureNotifications();
+    const pending = [];
+    const { target } = await mountPage(
+      () =>
+        new Promise((resolveWrite) => {
+          pending.push(resolveWrite);
+        })
+    );
+    await tickRows(target, IDS);
+    await stageColour(target, 'rose');
+    await apply(target);
+    const scope = essenceScope();
+    scope.entries = scope.entries.filter((entry) => entry.id !== 'brine');
+    await harness.setProps({ scope });
+    for (const answer of [true, false, true]) {
+      pending.shift()?.(answer);
+      await drain();
+      if (pending.length === 0 && answer === true && notified.length === 0) await drain();
+    }
+    assert.deepEqual(notified, [
+      'Brine could not be updated. The other selected essences were updated.',
+    ]);
   });
 
   it('clears the selection from the panel without writing', async () => {
@@ -294,7 +357,7 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
     }
     assert.match(
       panel.querySelector('[data-world-essence-bulk-per-essence-note]')?.textContent ?? '',
-      /stay per-essence[\s\S]*Essence Rules screen[\s\S]*deleting one happens on its own page/
+      /stay per-essence[\s\S]*Essence Rules screen[\s\S]*adding one to a system or removing it happens there[\s\S]*deleting one happens on its own page/
     );
   });
 
