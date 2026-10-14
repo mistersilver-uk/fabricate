@@ -2178,7 +2178,7 @@ const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector 
 const publishedShapeOf = (name) => [Object.keys(entryNamed(name).props), entryNamed(name).root];
 
 describe('the module sheet against the published Chip', () => {
-  it('names the chip root in 18 selectors, none of which a published chip can match', () => {
+  it('names the chip root in 16 selectors, none of which a published chip can match', () => {
     const selectors = stylesheetSources().parts.flatMap(({ file, text }) =>
       chipSelectors(file, text)
     );
@@ -2186,7 +2186,7 @@ describe('the module sheet against the published Chip', () => {
       selectors.filter(({ safe }) => !safe).map(({ selector }) => selector),
       []
     );
-    assert.equal(selectors.length, 18, 'the census the static Chip was published on');
+    assert.equal(selectors.length, 16, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
       ['tone', 'density', 'children'],
