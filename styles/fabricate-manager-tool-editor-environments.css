@@ -836,6 +836,7 @@
 .fabricate-link-field .manager-item-drop-zone-actions {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--fab-space-1);
 }
 

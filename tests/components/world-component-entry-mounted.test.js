@@ -87,6 +87,7 @@ const dropZoneHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
   ],
 });

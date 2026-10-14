@@ -1,6 +1,7 @@
 <!--
   The manager's ONE document drop target: a dashed empty prompt that becomes a linked card once the
-  caller resolves a document, with optional copy-uuid and unlink actions.
+  caller resolves a document, with optional copy-uuid and unlink actions and, on a missing link,
+  Relink.
 
   Props:
   | prop | values | default | contract |
@@ -10,6 +11,7 @@
   | `address` / `subline` | strings | `''` | The resolved document's own address, a mono line directly UNDER the name and not a sub-line; and a SECOND sub-line under `hint`, for a card carrying both a uuid and a description. Each renders only when supplied. |
   | `compact` / `purpose` | boolean / string | `false` / `''` | A PROMPT, NEVER A SUMMARY (see the invariants); and WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone` rather than a branch selector. |
   | `hookAttrs` | bag keyed by region | `{}` | The test and styling hooks, over a CLOSED region set — `root`, `hint`, `copy`, `unlink` — each an object of attribute name to value. `{}` for an absent region, so a caller naming none renders byte-identically to one that passed no bag. A caller's bag need not be static: one shipped site's two hooks are two faces of ONE state. |
+  | `onRelink()` / `relinkLabel` | function / string | `null` / `''` | Relink, a `<Button>` drawn only in `missing` and only where a caller can re-pick the document; it stamps its own `data-item-drop-zone-relink` rather than a fifth region. |
   | `unlinkDataAttr` / `onDrop(data)` | attribute name / function | `''` / no-op | One unlink attribute rather than a set, deliberately not folded into the bag, so a caller passing both gets both; and a handler receiving the raw drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
 
   Invariants:
@@ -37,6 +39,7 @@
 <script>
   import { dragDrop } from '../actions/dragDrop.js';
   import { resolveDropUuid } from '../util/dropUtils.js';
+  import Button from './Button.svelte';
   import IconButton from './IconButton.svelte';
   import Medallion from './Medallion.svelte';
 
@@ -59,9 +62,12 @@
     onDrop = () => {},
     onCopy = null,
     onUnlink = null,
+    onRelink = null,
+    relinkLabel = '',
   } = $props();
 
   const isMissing = $derived(Boolean(item) && state === 'missing');
+  const showRelink = $derived(isMissing && !compact && Boolean(onRelink));
   const unlinkAttrs = $derived(unlinkDataAttr ? { [unlinkDataAttr]: true } : {});
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
 
@@ -105,12 +111,18 @@
     {#if hint}<small {...hooksFor('hint')}>{hint}</small>{/if}
     {#if subline}<small data-item-drop-zone-subline>{subline}</small>{/if}
   </span>
-  {#if item && !compact && (onCopy || onUnlink)}
+  {#if item && !compact && (showRelink || onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
+      {#if showRelink}
+        <Button data-item-drop-zone-relink="" {disabled} onclick={() => onRelink()}
+          >{relinkLabel}</Button
+        >
+      {/if}
       {#if onCopy}
         <IconButton
           ariaLabel={copyLabel}
           title={copyLabel}
+          {disabled}
           {...hooksFor('copy')}
           onclick={() => onCopy(item)}
         >
@@ -122,6 +134,7 @@
           class="is-danger"
           ariaLabel={unlinkLabel}
           title={unlinkLabel}
+          {disabled}
           {...hooksFor('unlink')}
           {...unlinkAttrs}
           onclick={onUnlink}

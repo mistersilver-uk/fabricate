@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(file-size): Relink's caller (issue 2466) grows it by seven lines; extracting the macro card is its own change -->
 <!--
   The Component Studio's COMPLICATIONS authoring section: what goes wrong when this component is
   produced as a stage of a progressive result.
@@ -74,6 +75,7 @@
   let openId = $state('');
   let macroWarning = $state('');
   let macroNames = $state({});
+  let macroBrowseOpen = $state({});
   let localIdCounter = 0;
 
   function text(key, fallback) {
@@ -981,7 +983,15 @@
                         'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                         'Browse macros'
                       )}
+                      {@const searchLabel = text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
+                        'Search macros...'
+                      )}
                       <SearchablePopover
+                        bind:open={
+                          () => macroBrowseOpen[complication.id] ?? false,
+                          (value) => (macroBrowseOpen[complication.id] = value)
+                        }
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
@@ -991,14 +1001,8 @@
                         triggerProps={{ 'data-complication-macro-browse': 'true' }}
                         ariaLabel={browseLabel}
                         panelLabel={browseLabel}
-                        searchPlaceholder={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
-                          'Search macros...'
-                        )}
-                        searchLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
-                          'Search macros...'
-                        )}
+                        searchPlaceholder={searchLabel}
+                        {searchLabel}
                         emptyHint={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.None',
                           'No script macros in this world'
@@ -1008,9 +1012,8 @@
                     {/snippet}
                     {@const macro = macroDisplay(complication.macroUuid)}
                     <div class="fab-complication-macro-controls">
-                      <!-- `ItemDropZone` has no click handler, only `use:dragDrop`, and
-                           `SearchablePopover` owns its own trigger. The recorded deviation from the
-                           prototype is that browse is a separate button beside the drop target. -->
+                      <!-- Browse is the head's trigger, beside the zone (a recorded prototype
+                           deviation); Relink opens that same list. -->
                       <ItemDropZone
                         item={complication.macroUuid ? { name: macro.name } : null}
                         documentType="Macro"
@@ -1038,6 +1041,11 @@
                           'Remove macro'
                         )}
                         onUnlink={() => setMacro(complication.id, '')}
+                        relinkLabel={text(
+                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Relink',
+                          'Relink'
+                        )}
+                        onRelink={() => (macroBrowseOpen[complication.id] = true)}
                         onDrop={(data) => handleMacroDrop(complication.id, data)}
                       />
                     </div>

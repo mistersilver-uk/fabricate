@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     // The shared eyebrow (issue 1505). All three field labels are `<Kicker>`s.
     'src/ui/svelte/components/Kicker.svelte',

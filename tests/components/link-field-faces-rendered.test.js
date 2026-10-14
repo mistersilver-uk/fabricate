@@ -24,6 +24,8 @@ const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 
 const noop = () => {};
 const ACTIONS = { copyLabel: 'Copy uuid', unlinkLabel: 'Unlink', onCopy: noop, onUnlink: noop };
+const RELINK = { relinkLabel: 'Relink', onRelink: noop };
+const MISSING = { item: { name: 'Untitled' }, uuid: 'Item.9pQr2sT4uV6wX8yZ', state: 'missing' };
 const PROMPT = { title: 'Drop a game-world item here', emptyIcon: 'fas fa-link' };
 const LONG_TITLE = 'Drop a game-world item here to link it to this record. '.repeat(3).trim();
 /** A compendium address standing in for a name: 44 characters with no break opportunity. */
@@ -83,7 +85,25 @@ const CASES = Object.freeze({
   },
   'compact-missing': {
     width: 280,
-    props: { item: { name: 'Untitled', img: ART }, state: 'missing', compact: true, ...PROMPT },
+    props: {
+      ...MISSING,
+      item: { name: 'Untitled', img: ART },
+      compact: true,
+      ...PROMPT,
+      ...RELINK,
+    },
+  },
+  'missing-relink': {
+    width: 280,
+    props: { ...MISSING, hint: 'This document no longer resolves.', ...RELINK, onUnlink: noop },
+  },
+  'disabled-linked': {
+    width: 280,
+    props: { item: { name: 'Blacksmith’s Compendium' }, ...ACTIONS, ...RELINK, disabled: true },
+  },
+  'disabled-missing': {
+    width: 280,
+    props: { ...MISSING, ...RELINK, unlinkLabel: 'Unlink', onUnlink: noop, disabled: true },
   },
 });
 
@@ -158,6 +178,7 @@ const readFaces = () => {
     chip: '.fab-medallion',
     chipGlyph: '.fab-medallion > i',
     chipArt: '.fab-medallion > img',
+    actions: '.manager-item-drop-zone-actions',
   };
   const part = (node) => {
     if (!node) return null;
@@ -182,6 +203,15 @@ const readFaces = () => {
     face.buttons = [...host.querySelectorAll(':scope .manager-item-drop-zone-actions button')].map(
       (button) => part(button).box
     );
+    face.actionButtons = [
+      ...host.querySelectorAll(':scope .manager-item-drop-zone-actions button'),
+    ].map((button) => ({
+      box: part(button).box,
+      disabled: button.disabled,
+      relink: button.hasAttribute('data-item-drop-zone-relink'),
+      text: button.textContent.trim(),
+      classes: [...button.classList],
+    }));
     face.glyphClass = host.querySelector('.fab-medallion > i')?.className ?? '';
     const uuidLine = doc.createRange();
     const uuidNode = host.querySelector(PARTS.uuid);
@@ -212,7 +242,12 @@ before(async () => {
       'src/ui/svelte/actions/dragDrop.js',
       'src/ui/svelte/util/dropUtils.js',
     ],
-    compiledModules: ['src/ui/svelte/components/IconButton.svelte', MEDALLION, ZONE],
+    compiledModules: [
+      'src/ui/svelte/components/Button.svelte',
+      'src/ui/svelte/components/IconButton.svelte',
+      MEDALLION,
+      ZONE,
+    ],
     componentPath: ZONE,
   });
   const markup = {};
@@ -382,6 +417,58 @@ it('sets the uuid at 10px, flush with the name, with Foundry`s `code` box cleare
       assert.ok(Math.abs(gap - 4) <= 0.5, `${key}: the uuid sits ${gap}px from its ${label} line`);
     }
   }
+});
+
+it('draws Relink over unlink in a missing zone, on one right edge, inside the box', () => {
+  const { root, actionButtons } = faces['missing-relink'];
+  const [relink, unlink] = actionButtons;
+  assert.equal(actionButtons.length, 2);
+  assert.ok(relink.relink, 'Relink leads the column');
+  assert.ok(relink.classes.includes('fabricate-button'), 'and is the shipped `<Button>`');
+  assert.equal(relink.text, 'Relink');
+  assert.ok(unlink.classes.includes('is-danger'), 'unlink sits under it');
+  const edges = relink.box.right - unlink.box.right;
+  assert.ok(Math.abs(edges) <= 0.5, `Relink's right edge is ${edges}px off unlink's`);
+  for (const [label, { box }] of [
+    ['Relink', relink],
+    ['unlink', unlink],
+  ]) {
+    assert.ok(
+      box.left >= root.box.left &&
+        box.right <= root.box.right &&
+        box.top >= root.box.top &&
+        box.bottom <= root.box.bottom,
+      `${label} is not wholly inside the zone`
+    );
+  }
+});
+
+it('draws Relink only in a missing zone with a handler, and no column when no action renders', () => {
+  assert.ok(!faces.missing.actions, 'a missing zone with no handler draws no action column');
+  for (const key of ['disabled-linked', 'compact-missing']) {
+    assert.ok(
+      faces[key].actionButtons.every((button) => !button.relink),
+      `${key}: a handler alone does not draw Relink`
+    );
+  }
+  assert.ok(!faces['compact-missing'].actions, 'a compact zone draws no actions at all');
+});
+
+it('disables every action of a disabled zone, and dims the zone to 0.55', () => {
+  for (const [key, count] of [
+    ['disabled-linked', 2],
+    ['disabled-missing', 2],
+  ]) {
+    const { root, actionButtons } = faces[key];
+    assert.equal(actionButtons.length, count, `${key}: the actions render`);
+    assert.deepEqual(
+      actionButtons.map((button) => button.disabled),
+      Array.from({ length: count }, () => true),
+      `${key}: every action is disabled`
+    );
+    assert.equal(root.style.opacity, '0.55', `${key}: the zone dims`);
+  }
+  assert.ok(faces['disabled-missing'].actionButtons[0].relink, 'Relink is among them');
 });
 
 it('lets a drag take the border, ground and ring of a linked, a missing and a compact zone', async () => {

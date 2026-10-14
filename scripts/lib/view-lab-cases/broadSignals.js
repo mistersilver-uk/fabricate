@@ -405,6 +405,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-v3-count-additional-dice-macro-pair',
     'manager-checks-v3-count-additional-dice-macro-pair-narrow',
     'manager-component-complications-macro-linked',
+    'manager-component-complications-macro-missing',
   ]),
   // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
