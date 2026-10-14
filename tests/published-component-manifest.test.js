@@ -18,6 +18,11 @@
  * fails closed, as does a closure file that passes a child a prop its pinned tags rest on the
  * default of; a child drawn through an alias, `svelte:component` or a re-exporting module is not
  * followed.
+ * Limit: on an element a control-landing rest is spread on, a spread is followed only into an
+ * object literal a top-level `const` holds, so `$derived.by`, an alias, a computed key, a call and
+ * a local written to after its declaration fail closed, as an action, an `{@attach}`, a transition
+ * and an `animate:` do. An attribute written through `bind:this`, which `Button.svelte` states, is
+ * not seen.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
  * or an unprefixed state class.
@@ -57,6 +62,7 @@ import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
   byName,
+  controlRestFaults,
   declarationsOf,
   dynamicElementFaults,
   dynamicElements,
@@ -74,6 +80,7 @@ import {
   selectorsNaming,
   selectorsWithRules,
   selectorsOnAttribute,
+  spreadKeys,
   syntheticReader,
   tagKeys,
   writtenSelector,
@@ -817,8 +824,7 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
  * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
- * Where rest lands on a control, every `data-*` attribute written ahead of the spread is a name M13
- * refuses there.
+ * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it.
  */
 function restOnFaults(entry, ast, dynamic = undefined) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
@@ -829,16 +835,11 @@ function restOnFaults(entry, ast, dynamic = undefined) {
   if (controls.length > 0 && controls.length < landed.length) return [MIXED_REST];
   const lands = controls.length > 0;
   const stated = entry.restOn === 'control';
-  const overridable = controls
-    .flatMap(({ before }) => before)
-    .filter((name) => !RESERVED_ON_A_CONTROL.test(name));
   return [
     ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
-    ...overridable.map(
-      (name) => `${name} is written before a control-landing rest and is not reserved`
-    ),
+    ...controls.flatMap((control) => controlRestFaults(control, RESERVED_ON_A_CONTROL)),
   ];
 }
 
@@ -1672,6 +1673,178 @@ describe('each entry matches its component declaration', () => {
     const entry = { path: 'src/E.svelte', rest: false, restOn: 'control' };
     const { ast } = templateOf(entry.path, '<script>let { label } = $props();</script><p>x</p>');
     assert.deepEqual(restOnFaults(entry, ast), [OVERSTATED_REST]);
+  });
+
+  const SPREAD = '<script>let { open, role, ...rest } = $props(); ';
+  const BUILT = 'const build = () => ({ type: "button" });';
+  const LITERAL = 'const attrs = { type: "button" };';
+  /** The spreads `restElements` reads beside the rest on the one element of `template`, under a script `body`. */
+  const spreadsOf = (body, template = pressed(' {...attrs} {...rest}')) =>
+    restElements(templateOf('src/E.svelte', `${SPREAD}${body}</script>${template}`).ast)[0].spreads;
+  const followed = (keys, local = 'attrs') => [{ local, before: true, keys }];
+
+  for (const [claim, body, keys] of [
+    [
+      'an object literal',
+      'const attrs = { type: "button", "data-state": role };',
+      ['type', 'data-state'],
+    ],
+    ['shorthand keys', 'const attrs = { open, role };', ['open', 'role']],
+    ['a $derived object literal', 'const attrs = $derived({ disabled: open });', ['disabled']],
+    [
+      'both branches of a conditional',
+      'const attrs = $derived(open ? { href: role } : { type: "button", disabled: open });',
+      ['href', 'type', 'disabled'],
+    ],
+    [
+      'the right of &&',
+      'const attrs = $derived(open && { "aria-expanded": true });',
+      ['aria-expanded'],
+    ],
+    ['both sides of ||', 'const attrs = { title: role } || { type: "button" };', ['title', 'type']],
+    ['both sides of ??', 'const attrs = { title: role } ?? { type: "button" };', ['title', 'type']],
+  ]) {
+    it(`follows a spread of ${claim} to its keys`, () => {
+      assert.deepEqual(spreadsOf(body), followed(keys));
+    });
+  }
+
+  for (const [claim, body] of [
+    ['an object literal that spreads another', 'const attrs = { ...role, type: "button" };'],
+    ['a computed key', 'const NAME = "aria-expanded"; const attrs = { [NAME]: open };'],
+    ['$derived.by', 'const attrs = $derived.by(() => ({ "aria-expanded": open }));'],
+    ['$state', 'const attrs = $state({ type: "button" });'],
+    ['$state.raw', 'const attrs = $state.raw({ type: "button" });'],
+    ['a let', 'let attrs = { type: "button" };'],
+    ['an import', 'import { attrs } from "./attrs.js";'],
+    ['a function', 'function attrs() {}'],
+    ['a destructured name', 'const { attrs } = role;'],
+    ['a call', `${BUILT} const attrs = build();`],
+    ['an alias', 'const base = { type: "button" }; const attrs = base;'],
+    [
+      'a conditional with a branch that is a call',
+      `${BUILT} const attrs = $derived(open ? { type: "button" } : build());`,
+    ],
+    [
+      '|| whose left is a name',
+      'const other = { type: "button" }; const attrs = $derived(other || { disabled: open });',
+    ],
+    ['a local a member write follows', `${LITERAL} attrs["aria-expanded"] = open;`],
+    [
+      'a local Object.assign writes to',
+      `${LITERAL} Object.assign(attrs, { "aria-expanded": open });`,
+    ],
+    ['a local another object holds', `${LITERAL} const held = { attrs };`],
+    ['a local a function reads', `${LITERAL} const widen = () => { attrs.role = role; };`],
+    ['an undeclared name', ''],
+  ]) {
+    it(`fails closed on a spread of ${claim}, which it cannot follow`, () => {
+      assert.deepEqual(spreadsOf(body), followed(null));
+    });
+  }
+
+  it('fails closed on a spread of a name a template block binds, and of anything that is no name', () => {
+    for (const [open, close] of [
+      ['{#each [{ "aria-expanded": true }] as attrs}', '{/each}'],
+      ['{#if open}{@const attrs = { "aria-expanded": true }}', '{/if}'],
+    ]) {
+      const bound = `${open}${pressed(' {...attrs} {...rest}')}${close}`;
+      assert.deepEqual(spreadsOf(LITERAL, bound), followed(null), open);
+    }
+    for (const spread of ['{ "aria-expanded": open }', 'role.button', 'build()']) {
+      const template = pressed(` {...${spread}} {...rest}`);
+      assert.deepEqual(spreadsOf(BUILT, template), followed(null, 'an expression'), spread);
+    }
+  });
+
+  it('reads a spread on either side of the rest, and no second spread of the rest itself', () => {
+    const template = pressed(' {...attrs} {...rest} {...rest} {...build()}');
+    assert.deepEqual(spreadsOf(`${BUILT} ${LITERAL}`, template), [
+      { local: 'attrs', before: true, keys: ['type'] },
+      { local: 'an expression', before: false, keys: null },
+    ]);
+    assert.equal(spreadKeys(templateOf('src/E.svelte', '<p></p>').ast, undefined), null);
+  });
+
+  it('follows the spread the shipped Button writes ahead of its rest', () => {
+    const [{ spreads, handed }] = restElements(componentAstOf(entryNamed('Button').path));
+    assert.deepEqual(
+      spreads,
+      followed(['href', 'target', 'rel', 'type', 'disabled'], 'attributes')
+    );
+    assert.deepEqual(handed, []);
+  });
+
+  const CANNOT_FOLLOW_SPREAD = (local) =>
+    `a spread of ${local} sits on a control-landing rest element and the gate cannot follow it`;
+  const HANDED = (what) =>
+    `${what} hands a control-landing rest element to code the gate cannot follow`;
+  const UNRESERVED = (name) =>
+    `${name} is written before a control-landing rest and is not reserved`;
+  /** The `restOn` faults of a control-landing entry whose script is `body` and whose button states `attributes`. */
+  const controlFaultsOf = (body, attributes) =>
+    restFaultsOf(pressed(attributes), 'control', `${SPREAD}${body}</script>`);
+  const AHEAD = ' {...attrs} {...rest}';
+
+  it('passes a control-landing rest behind a followed spread of no data-* name, or of a reserved one', () => {
+    assert.deepEqual(
+      controlFaultsOf('const attrs = { type: "button", disabled: open };', AHEAD),
+      []
+    );
+    assert.deepEqual(controlFaultsOf('const attrs = { "data-action": role };', AHEAD), []);
+    assert.deepEqual(
+      controlFaultsOf('const attrs = { "data-state": role };', ' {...rest} {...attrs}'),
+      [],
+      'a data-* name written after the rest is the component’s to keep'
+    );
+  });
+
+  for (const [claim, body, attributes, faults] of [
+    [
+      'a followed spread of an unreserved data-* name ahead of the rest',
+      'const attrs = $derived(open ? { type: "button" } : { "data-state": role });',
+      AHEAD,
+      [UNRESERVED('data-state')],
+    ],
+    [
+      'an attribute and a followed spread that each write one',
+      'const attrs = { "data-state": role, "data-action": role };',
+      ` data-open${AHEAD}`,
+      [UNRESERVED('data-open'), UNRESERVED('data-state')],
+    ],
+    [
+      'a spread it cannot follow ahead of the rest',
+      `${BUILT} const attrs = build();`,
+      AHEAD,
+      [CANNOT_FOLLOW_SPREAD('attrs')],
+    ],
+    [
+      'a spread it cannot follow behind the rest',
+      `${BUILT} const attrs = build();`,
+      ' {...rest} {...attrs}',
+      [CANNOT_FOLLOW_SPREAD('attrs')],
+    ],
+    [
+      'a spread of a call behind the rest',
+      BUILT,
+      ' {...rest} {...build()}',
+      [CANNOT_FOLLOW_SPREAD('an expression')],
+    ],
+    ['an action', BUILT, ' use:build {...rest}', [HANDED('a use: action')]],
+    ['an {@attach}', BUILT, ' {@attach build} {...rest}', [HANDED('an {@attach}')]],
+    ['a transition', BUILT, ' transition:build {...rest}', [HANDED('a transition')]],
+    ['an in: transition', BUILT, ' {...rest} in:build', [HANDED('a transition')]],
+    ['an animate: directive', BUILT, ' animate:build {...rest}', [HANDED('an animate: directive')]],
+  ]) {
+    it(`names ${claim} as a fault of a control-landing rest`, () => {
+      assert.deepEqual(controlFaultsOf(body, attributes), faults);
+    });
+  }
+
+  it('judges none of them on an element that is no control', () => {
+    const script = `${SPREAD}${BUILT}</script>`;
+    const template = '<div data-open use:build {...build()} {...rest}></div>';
+    assert.deepEqual(restFaultsOf(template, null, script), []);
   });
 
   const faceRule = (value) =>

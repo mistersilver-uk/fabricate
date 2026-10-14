@@ -398,28 +398,119 @@ function restLocal(ast) {
   return patterns.find((property) => property.type === 'RestElement')?.argument.name;
 }
 
+/** Whether every read of `name` in one component is the whole expression of a spread attribute. */
+function readOnlyInSpreads(ast, name) {
+  let elsewhere = false;
+  for (const root of [ast.module, ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== name) return;
+      const parent = ancestors.at(-1);
+      const declares = parent?.type === 'VariableDeclarator' && parent.id === node;
+      const spread = parent?.type === 'SpreadAttribute' && parent.expression === node;
+      if (!declares && !spread && isNameRead(node, parent)) elsewhere = true;
+    });
+  }
+  return !elsewhere;
+}
+
+/** The operands a spread expression can take its value from: `a && b` spreads `b` or nothing. */
+const SPREAD_OPERANDS = Object.freeze({
+  ConditionalExpression: ({ consequent, alternate }) => [consequent, alternate],
+  LogicalExpression: ({ operator, left, right }) => (operator === '&&' ? [right] : [left, right]),
+});
+
+/** The keys of every object literal an initialiser can answer, or `null` where one is not read. */
+function objectKeys(expression) {
+  if (isCallTo(expression, '$derived')) return objectKeys(expression.arguments[0]);
+  if (expression?.type === 'ObjectExpression') {
+    const { properties } = expression;
+    const plain = properties.every(({ type, computed }) => type === 'Property' && !computed);
+    return plain ? properties.map(({ key }) => String(key.name ?? key.value)) : null;
+  }
+  const operands = SPREAD_OPERANDS[expression?.type]?.(expression);
+  if (!operands) return null;
+  const keys = operands.map((operand) => objectKeys(operand));
+  return keys.includes(null) ? null : keys.flat();
+}
+
+/**
+ * The keys a spread attribute's expression can write, or `null` where the gate cannot follow it.
+ * It follows a name no template block binds, declared by a top-level plain `const` and read
+ * nowhere but in spread attributes, into an object literal with no spread and no computed key,
+ * under `$derived(…)` or not, and through a conditional, `||`, `??` and the right of `&&`.
+ */
+export function spreadKeys(ast, expression) {
+  if (expression?.type !== 'Identifier') return null;
+  const { name } = expression;
+  if (templateBindings(ast).has(name) || !readOnlyInSpreads(ast, name)) return null;
+  return objectKeys(scriptDeclarations(ast).get(name));
+}
+
+/** What hands an element to code of the component's own, which can write any attribute on it. */
+const ELEMENT_HANDLERS = Object.freeze({
+  UseDirective: 'a use: action',
+  AttachTag: 'an {@attach}',
+  TransitionDirective: 'a transition',
+  AnimateDirective: 'an animate: directive',
+});
+
 /**
  * Every element one component spreads its `$props()` rest local on, a `svelte:element` included,
- * as `{ node, before }`, `before` naming each `data-*` attribute written ahead of the spread,
- * static or not. A rest that reaches an element any other way (an alias, a `$derived` copy, a
- * child component) answers none.
+ * as `{ node, before, written, spreads, handed }`: each `data-*` attribute written ahead of the
+ * spread, static or not; every attribute the element states, wherever it sits; every other spread
+ * as `{ local, before, keys }`, `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it
+ * carries. A rest that reaches an element any other way (an alias, a `$derived` copy, a child
+ * component) answers none.
  */
 export function restElements(ast) {
   const rest = restLocal(ast);
   if (!rest) return [];
+  const isRest = ({ type, expression }) => type === 'SpreadAttribute' && expression?.name === rest;
   return [...walkNodes(ast.fragment)]
     .filter((node) => node.type === 'RegularElement' || node.type === 'SvelteElement')
     .flatMap((node) => {
-      const at = node.attributes.findIndex(
-        (attribute) => attribute.type === 'SpreadAttribute' && attribute.expression?.name === rest
-      );
+      const at = node.attributes.findIndex((attribute) => isRest(attribute));
       if (at === -1) return [];
+      const written = node.attributes.flatMap(({ type, name }) =>
+        type === 'Attribute' ? [name] : []
+      );
       const before = node.attributes
         .slice(0, at)
         .filter(({ type, name }) => type === 'Attribute' && name.startsWith('data-'))
         .map(({ name }) => name);
-      return [{ node, before }];
+      const spreads = node.attributes.flatMap((attribute, index) => {
+        if (attribute.type !== 'SpreadAttribute' || isRest(attribute)) return [];
+        const local = attribute.expression.name ?? 'an expression';
+        return [{ local, before: index < at, keys: spreadKeys(ast, attribute.expression) }];
+      });
+      const handed = node.attributes.flatMap(({ type }) => ELEMENT_HANDLERS[type] ?? []);
+      return [{ node, before, written, spreads, handed }];
     });
+}
+
+/**
+ * What one element a control-landing rest is spread on breaks by what the component writes on it
+ * beside that rest: a spread the gate cannot follow, wherever it sits; an `ELEMENT_HANDLERS`
+ * member; and a `data-*` name written ahead of the rest, by an attribute or a followed spread,
+ * that `reserved` does not match, so a rest key could replace it.
+ */
+export function controlRestFaults({ before, spreads, handed }, reserved) {
+  const ahead = spreads.filter((spread) => spread.before).flatMap(({ keys }) => keys ?? []);
+  const replaceable = [...before, ...ahead.filter((name) => name.startsWith('data-'))];
+  return [
+    ...spreads
+      .filter(({ keys }) => keys === null)
+      .map(
+        ({ local }) =>
+          `a spread of ${local} sits on a control-landing rest element and the gate cannot follow it`
+      ),
+    ...handed.map(
+      (what) => `${what} hands a control-landing rest element to code the gate cannot follow`
+    ),
+    ...replaceable
+      .filter((name) => !reserved.test(name))
+      .map((name) => `${name} is written before a control-landing rest and is not reserved`),
+  ];
 }
 
 /** How often one component reads its `$props()` rest local, the pattern that declares it apart. */
