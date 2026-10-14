@@ -3,6 +3,7 @@
   The world Essence Catalogue's bulk edit panel (issue 2485): the two closed fields of a world
   essence, `Icon` and `Colour`, staged over the selection, and one standing note naming what stays
   per-essence and where it is edited. It offers no delete, enable or membership control.
+  `Apply` sits in the shell's dock, flush with the inspector's foot (`dockBleed`). After a run the staged draft is reset; the parent page writes each essence and reports failures.
 
   Props:
   | prop | values | default | contract |

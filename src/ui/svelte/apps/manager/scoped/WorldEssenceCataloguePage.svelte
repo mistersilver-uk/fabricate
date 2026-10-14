@@ -3,7 +3,9 @@
   The world ESSENCE CATALOGUE (issue 1372, epic 1357): one definition per quality — name, icon,
   colour, description — and nothing about what an essence DOES, which is a per-system rule. It
   composes `EntityCatalogueShell` and supplies the row meta run, the world-default card copy, the
-  enabled roll-up card, the inspector's pinned foot action and its bulk face.
+  enabled roll-up card, the inspector's pinned foot action and its bulk face. The bulk face is
+  `EssenceCatalogueBulkPanel`; Apply writes `Icon`/`Colour` to each ticked essence in turn through
+  `actions.updateEntity`, then clears the selection and names any failures (three, then a count).
   AN ESSENCE HAS NO SOURCE ITEM, and that is structural; the shell reads it from
   `scope.sourceLinked` and `scope.hasColorToken`, never from a test of the entity type here. The
   per-system indicator has THREE states and the ROW states only their ROLL-UP. Declared props are
