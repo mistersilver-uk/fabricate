@@ -491,12 +491,14 @@ export function restElements(ast) {
 /**
  * What one element a control-landing rest is spread on breaks by what the component writes on it
  * beside that rest: a spread the gate cannot follow, wherever it sits; an `ELEMENT_HANDLERS`
- * member; and a `data-*` name written ahead of the rest, by an attribute or a followed spread,
- * that `reserved` does not match, so a rest key could replace it.
+ * member; a `data-*` name written ahead of the rest, by an attribute or a followed spread, that
+ * `reserved` does not match, so a rest key could replace it; and one of `ariaKeys`, the entry's
+ * `aria` keys, written by an attribute or a followed spread on either side of the rest.
  */
-export function controlRestFaults({ before, spreads, handed }, reserved) {
+export function controlRestFaults({ before, written, spreads, handed }, reserved, ariaKeys = []) {
   const ahead = spreads.filter((spread) => spread.before).flatMap(({ keys }) => keys ?? []);
   const replaceable = [...before, ...ahead.filter((name) => name.startsWith('data-'))];
+  const stated = [...written, ...spreads.flatMap(({ keys }) => keys ?? [])];
   return [
     ...spreads
       .filter(({ keys }) => keys === null)
@@ -510,6 +512,47 @@ export function controlRestFaults({ before, spreads, handed }, reserved) {
     ...replaceable
       .filter((name) => !reserved.test(name))
       .map((name) => `${name} is written before a control-landing rest and is not reserved`),
+    ...stated
+      .filter((name) => ariaKeys.includes(name))
+      .map((name) => `${name} is written by the component and published as an aria key`),
+  ];
+}
+
+/**
+ * The ARIA attributes the contract never publishes as an `aria` key, in the order the spec's
+ * "published only as an `aria` key" bullet spells them, which `fabricate-api-surface.test.js`
+ * holds equal. A name source and any other `aria-*` name are held at version 1, not listed.
+ */
+export const NEVER_ARIA = Object.freeze([
+  'aria-pressed',
+  'aria-checked',
+  'aria-selected',
+  'aria-current',
+  'aria-disabled',
+  'aria-hidden',
+  'aria-live',
+  'aria-atomic',
+  'aria-relevant',
+  'aria-owns',
+  'aria-activedescendant',
+  'aria-flowto',
+]);
+
+const ARIA_KEY = /^aria-[a-z]+$/;
+
+/**
+ * What an `aria` key breaks, as `<key> <rule>`: spelled `aria-<name>`, no prop the component
+ * declares (`declared`), never `required`, on an entry whose rest lands on a control, and no
+ * `NEVER_ARIA` name.
+ */
+export function ariaFaults(key, spec, entry, declared) {
+  const lands = entry.rest === true && entry.restOn === 'control';
+  return [
+    ...(ARIA_KEY.test(key) ? [] : [`${key} is an aria key not spelled aria-<name>`]),
+    ...(declared ? [`${key} is an aria key the component declares as a prop`] : []),
+    ...(spec.required === undefined ? [] : [`${key} is an aria key that states required`]),
+    ...(lands ? [] : [`${key} is an aria key on an entry whose rest lands on no control`]),
+    ...(NEVER_ARIA.includes(key) ? [`${key} is an ARIA attribute the seam never publishes`] : []),
   ];
 }
 

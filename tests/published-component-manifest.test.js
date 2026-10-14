@@ -61,6 +61,7 @@ import { componentAstOf } from './helpers/parsedSource.js';
 import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
+  ariaFaults,
   byName,
   controlRestFaults,
   declarationsOf,
@@ -172,7 +173,7 @@ function renderedLocals(ast) {
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
@@ -228,9 +229,16 @@ function argsFaults(key, spec) {
   return counts ? [] : [`${key} states args that is not a non-negative integer`];
 }
 
+/** What a key's `element` breaks: stated on a `slot` key only. */
+const elementFaults = (key, spec) =>
+  spec.kind !== 'slot' && spec.element !== undefined
+    ? [`${key} states element, which only a slot key takes`]
+    : [];
+
 /**
  * Each rule an entry's published keys break against the component's parsed declaration, as
  * `<key> <rule>`. An unpublished prop is not judged: it may be `$bindable` or rendered either way.
+ * An `aria` key is judged by `ariaFaults`, since the component declares no prop for it.
  * Where a `callback` key is called from is `published-component-controls.test.js`'s.
  */
 function declarationFaults(entry, ast) {
@@ -238,9 +246,18 @@ function declarationFaults(entry, ast) {
   const rendered = renderedLocals(ast);
   return Object.entries(entry.props).flatMap(([key, spec]) => {
     const prop = declared.get(key);
-    if (!prop) return [`${key} is not a declared prop`];
-    const faults = [];
-    if (!SHIPPED_KINDS.has(spec.kind)) faults.push(`${key} has the unshipped kind ${spec.kind}`);
+    const unshipped = SHIPPED_KINDS.has(spec.kind)
+      ? []
+      : [`${key} has the unshipped kind ${spec.kind}`];
+    if (spec.kind === 'aria') {
+      const own = ariaFaults(key, spec, entry, Boolean(prop));
+      return [...unshipped, ...own, ...elementFaults(key, spec), ...argsFaults(key, spec)];
+    }
+    const faults = key.startsWith('aria-')
+      ? [`${key} is spelled as an ARIA attribute and is not an aria key`]
+      : [];
+    if (!prop) return [...faults, `${key} is not a declared prop`];
+    faults.push(...unshipped);
     if (spec.required !== undefined && typeof spec.required !== 'boolean') {
       faults.push(`${key} is required by something other than a boolean`);
     }
@@ -248,9 +265,7 @@ function declarationFaults(entry, ast) {
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
     if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
-    if (spec.kind !== 'slot' && spec.element !== undefined) {
-      faults.push(`${key} states element, which only a slot key takes`);
-    }
+    faults.push(...elementFaults(key, spec));
     if (spec.kind === 'data' && calls.length > 0) {
       faults.push(`${key} is a data key rendered as a snippet`);
     }
@@ -260,6 +275,10 @@ function declarationFaults(entry, ast) {
     return [...faults, ...argsFaults(key, spec)];
   });
 }
+
+/** An entry's `aria` keys; an entry a synthetic row gives no props has none. */
+const ariaKeysOf = (entry) =>
+  Object.keys(entry.props ?? {}).filter((key) => entry.props[key].kind === 'aria');
 
 /** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
@@ -824,7 +843,8 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
  * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
- * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it.
+ * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
+ * the entry's `aria` keys among it.
  */
 function restOnFaults(entry, ast, dynamic = undefined) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
@@ -839,7 +859,9 @@ function restOnFaults(entry, ast, dynamic = undefined) {
     ...(restReads(ast) > landed.length ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
-    ...controls.flatMap((control) => controlRestFaults(control, RESERVED_ON_A_CONTROL)),
+    ...controls.flatMap((control) =>
+      controlRestFaults(control, RESERVED_ON_A_CONTROL, ariaKeysOf(entry))
+    ),
   ];
 }
 
@@ -1846,6 +1868,123 @@ describe('each entry matches its component declaration', () => {
     const template = '<div data-open use:build {...build()} {...rest}></div>';
     assert.deepEqual(restFaultsOf(template, null, script), []);
   });
+
+  const aria = { kind: 'aria' };
+  const CONTROL = templateOf(
+    'Control.svelte',
+    `<script>let { label, 'aria-busy': busy, ...rest } = $props();</script>${pressed(' {...rest}')}`
+  ).ast;
+  const LANDING = { rest: true, restOn: 'control' };
+  /** The declaration faults of `props` on an entry over a button, whose rest lands on it unless `landing` says otherwise. */
+  const ariaFaultsOf = (props, landing = LANDING) =>
+    declarationFaults({ props, ...landing }, CONTROL);
+  const ARIA = (key, rule) => `${key} is an aria key ${rule}`;
+  const NO_CONTROL = ARIA('aria-expanded', 'on an entry whose rest lands on no control');
+  const MISSPELLED = (key) => `${key} is spelled as an ARIA attribute and is not an aria key`;
+
+  it('passes an aria key spelled aria-<name> on an entry whose rest lands on a control, a held name included', () => {
+    const published = { label: data, 'aria-expanded': aria, 'aria-describedby': aria };
+    assert.deepEqual(ariaFaultsOf(published), []);
+    assert.deepEqual(ariaFaultsOf({ 'aria-labelledby': aria }), [], 'held, and not never');
+  });
+
+  for (const [claim, props, landing, faults] of [
+    [
+      'an aria key spelled as a prop',
+      { ariaExpanded: aria },
+      LANDING,
+      [ARIA('ariaExpanded', 'not spelled aria-<name>')],
+    ],
+    [
+      'an aria key spelled in upper case',
+      { 'aria-Expanded': aria },
+      LANDING,
+      [ARIA('aria-Expanded', 'not spelled aria-<name>')],
+    ],
+    [
+      'an aria key the component declares',
+      { 'aria-busy': aria },
+      LANDING,
+      [ARIA('aria-busy', 'the component declares as a prop')],
+    ],
+    [
+      'an aria key that states required',
+      { 'aria-expanded': { kind: 'aria', required: false } },
+      LANDING,
+      [ARIA('aria-expanded', 'that states required')],
+    ],
+    [
+      'an aria key on an entry with no restOn',
+      { 'aria-expanded': aria },
+      { rest: true },
+      [NO_CONTROL],
+    ],
+    [
+      'an aria key on an entry that takes no rest',
+      { 'aria-expanded': aria },
+      { rest: false, restOn: 'control' },
+      [NO_CONTROL],
+    ],
+    [
+      'element on an aria key',
+      { 'aria-expanded': { kind: 'aria', element: 'div' } },
+      LANDING,
+      ['aria-expanded states element, which only a slot key takes'],
+    ],
+    [
+      'args on an aria key',
+      { 'aria-expanded': { kind: 'aria', args: 0 } },
+      LANDING,
+      ['aria-expanded states args, which only a callback key takes'],
+    ],
+    [
+      'a data key spelled as an ARIA attribute',
+      { 'aria-expanded': data },
+      LANDING,
+      [MISSPELLED('aria-expanded'), 'aria-expanded is not a declared prop'],
+    ],
+    [
+      'a declared callback key spelled as one',
+      { 'aria-busy': { kind: 'callback' } },
+      LANDING,
+      [MISSPELLED('aria-busy')],
+    ],
+  ]) {
+    it(`names ${claim} as a fault`, () => {
+      assert.deepEqual(ariaFaultsOf(props, landing), faults);
+    });
+  }
+
+  for (const key of ['aria-pressed', 'aria-disabled', 'aria-hidden', 'aria-live', 'aria-owns']) {
+    it(`names ${key} as an ARIA attribute the seam never publishes`, () => {
+      assert.deepEqual(ariaFaultsOf({ [key]: aria }), [
+        `${key} is an ARIA attribute the seam never publishes`,
+      ]);
+    });
+  }
+
+  const WRITTEN = 'aria-expanded is written by the component and published as an aria key';
+  /** The `restOn` faults of a control-landing entry publishing `keys` as `aria` keys, over a button that states `attributes`. */
+  const writtenFaultsOf = (attributes, keys) => {
+    const props = Object.fromEntries(keys.map((key) => [key, aria]));
+    const entry = { path: 'src/E.svelte', ...LANDING, props };
+    const script = `${SPREAD}const attrs = { "aria-expanded": open };</script>`;
+    return restOnFaults(entry, templateOf(entry.path, script + pressed(attributes)).ast);
+  };
+
+  for (const [claim, attributes] of [
+    ['ahead of the rest', ' aria-expanded={open} {...rest}'],
+    ['behind the rest', ' {...rest} aria-expanded={open}'],
+    ['as static text', ' aria-expanded="false" {...rest}'],
+    ['through a followed spread ahead of the rest', ' {...attrs} {...rest}'],
+    ['through a followed spread behind the rest', ' {...rest} {...attrs}'],
+  ]) {
+    it(`names an aria key the component writes ${claim} as a fault, and none where the entry does not publish it`, () => {
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-expanded']), [WRITTEN]);
+      assert.deepEqual(writtenFaultsOf(attributes, ['aria-describedby']), []);
+      assert.deepEqual(writtenFaultsOf(attributes, []), []);
+    });
+  }
 
   const faceRule = (value) =>
     ancestorDependencies(
