@@ -550,17 +550,12 @@
 </InventoryDetailHeader>
 
 <style>
+  /* Fills the column, so the footer's `margin-top: auto` seats it on the foot of a short queue. */
   .bulk-body {
     display: flex;
+    flex: 1 0 auto;
     flex-direction: column;
     gap: var(--fab-space-4);
-    /* The salvage panel's recorded Chromium trap, hit identically here: the scroll
-       container (`.inventory-detail`) is a flex column with `overflow-y: auto`, and
-       Chromium DROPS such a container's own `padding-bottom` at the scroll end. The
-       footer is a scrolled-to-bottom action row, so without padding on THIS block —
-       a normal flow box, where it IS honoured — a 25-row queue ends flush against
-       the window edge. */
-    padding-bottom: var(--fab-space-6);
   }
 
   .bulk-progress {
@@ -634,11 +629,14 @@
 
   /* Sticky, so the commit stays reachable below a long queue (issue 859). Its fill is the column's
      composite, an opaque `--fab-surface` that hides scrolled rows under the `::before`'s 5% soft
-     layer (no gradient: `flat-ui-style-contract`). `.bulk-body`'s padding keeps it off the edge. */
+     layer (no gradient: `flat-ui-style-contract`). It sits on the column's foot at its full width
+     (maintainer ruling, 2026-10-14): the bleeds are `.inventory-detail`'s padding, as the manager's
+     bulk dock bleeds by its rail's, and the matching padding keeps the actions in the column. */
   .bulk-footer {
     position: sticky;
-    bottom: 0;
+    bottom: -16px;
     display: flex;
+    margin: auto calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
     /* Stacked, not a row: the actions are full-width so the commit control is the
        widest thing on the panel, matching the reference prototype. */
     flex-direction: column;
@@ -647,8 +645,7 @@
     /* A section DIVIDER, not a card. The footer must read as a continuation of the
        panel with a rule above it — never as a boxed tray. */
     border-top: 1px solid var(--fab-border);
-    padding-top: var(--fab-space-3);
-    padding-bottom: var(--fab-space-2);
+    padding: var(--fab-space-3) var(--fab-space-4) var(--fab-space-4);
     background-color: var(--fab-surface);
   }
 

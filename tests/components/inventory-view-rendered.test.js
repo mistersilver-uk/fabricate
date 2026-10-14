@@ -4,6 +4,7 @@
  * rail, the window's bottom edge and the detail rail's border with no gutter. Stacked, the pager
  * spans the window and the detail rail stands directly beneath it.
  */
+import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { near } from '../helpers/railFooterAssertions.js';
@@ -53,4 +54,66 @@ describe('inventory view, rendered: the pager is the left column footer', () => 
     near(detail.left, host.left, 'the detail rail at the left edge');
     near(detail.right, host.right, 'the detail rail at the right edge');
   });
+});
+
+/** The bulk panel's footer against the detail column's scroller, at three scroll offsets. */
+async function bulkFooterAt(rows) {
+  const page = await fixtureServer.newPage({ viewport: { width: 1240, height: 900 } });
+  try {
+    await page.goto(fixtureServer.url(`${VIEW.url}?width=1200&bulk=${rows}`));
+    await page.waitForSelector(
+      'html[data-inventory-view-ready="true"] [data-inventory-bulk-footer]'
+    );
+    return await page.evaluate(() => {
+      // The scroller is the shell's root inside the column section; both carry the hook.
+      const column = document.querySelector('.inventory-detail[data-inventory-detail]');
+      const footer = column.querySelector('[data-inventory-bulk-footer]');
+      const sampleAt = (scrollTop) => {
+        column.scrollTop = scrollTop;
+        const box = column.getBoundingClientRect();
+        const foot = footer.getBoundingClientRect();
+        return {
+          scrollTop: column.scrollTop,
+          column: { left: box.left + column.clientLeft, right: box.right, bottom: box.bottom },
+          footer: { left: foot.left, right: foot.right, bottom: foot.bottom },
+        };
+      };
+      const overflow = column.scrollHeight - column.clientHeight;
+      return {
+        overflow,
+        samples: [sampleAt(0), sampleAt(Math.floor(overflow / 2)), sampleAt(column.scrollHeight)],
+      };
+    });
+  } finally {
+    await page.close();
+  }
+}
+
+/** Two edges within a pixel: a clamped integer `scrollTop` leaves a sub-pixel residue. */
+const within = (actual, expected, label) =>
+  assert.ok(Math.abs(actual - expected) <= 1, `${label}: ${actual}, expected ${expected}`);
+
+// Maintainer ruling, 2026-10-14: pinned to the column's foot and spanning its full width.
+describe('inventory view, rendered: the bulk footer sits on the detail column`s foot', () => {
+  for (const [label, rows] of [
+    ['a short queue', 1],
+    ['a queue taller than the column', 25],
+  ]) {
+    it(`meets the column's bottom and both sides with ${label}`, async () => {
+      const { overflow, samples } = await bulkFooterAt(rows);
+      assert.ok(
+        rows === 1 ? overflow === 0 : overflow >= 48,
+        `NON-VACUITY: ${label} overflows the column by ${overflow}px`
+      );
+      for (const { scrollTop, column, footer } of samples) {
+        within(
+          footer.bottom,
+          column.bottom,
+          `its bottom edge on the column's foot at ${scrollTop}px`
+        );
+        within(footer.left, column.left, `its left edge on the column's at ${scrollTop}px`);
+        within(footer.right, column.right, `its right edge on the column's at ${scrollTop}px`);
+      }
+    });
+  }
 });
