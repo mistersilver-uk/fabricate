@@ -5,83 +5,17 @@ import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  STATUS_TONE_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  ESSENCE_WORLD_SCOPE_RAW_MODULES as SCOPED_RAW_MODULES,
+  ESSENCE_WORLD_SHELL_MODULES as SHELL_MODULES,
+} from '../helpers/essenceWorldScopeModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-
-const SCOPED_RAW_MODULES = [
-  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
-  ...STATUS_TONE_RAW_MODULES,
-  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-  ...SEARCHABLE_POPOVER_RAW_MODULES,
-  ...FOUNDRY_BRIDGE_RAW_MODULES,
-  ...LOCALIZE_OR_RAW_MODULES,
-  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-  'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
-  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
-  'src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js',
-  'src/ui/svelte/stores/worldScopeProjection.js',
-  // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
-  // per-entry references now, so its own static closure reaches the vocabulary core and the
-  // shipped counter. The harness validates this closure and names the miss, unlike the
-  // hand-rolled trees elsewhere.
-  'src/systems/worldVocabulary.js',
-  'src/ui/model/vocabularyUsage.js',
-  'src/utils/componentCategories.js',
-  // #1663: the ONE implementation behind both category shims; imports nothing.
-  'src/utils/categoryNormalization.js',
-  'src/utils/recipeCategories.js',
-  'src/systems/componentScope.js',
-  'src/systems/essenceScope.js',
-  'src/systems/toolScope.js',
-  'src/systems/scopedDefinitions.js',
-  'src/systems/scopedDefinitionStore.js',
-  'src/utils/scalars.js',
-  'src/systems/worldScopeEntityGrouping.js',
-  'src/utils/definitionIndex.js',
-  'src/utils/sourceReferenceUnion.js',
-  'src/ui/model/browserPagination.js',
-  'src/utils/bulkSelectionModel.js',
-  'src/ui/model/scopedEntityListModel.js',
-  // The frame's lifted view-state (issue 1438).
-  'src/ui/model/managerBrowserViewState.js',
-];
-
-const SHELL_MODULES = [
-  'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-  'src/ui/svelte/components/ArmedDangerButton.svelte',
-  // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
-  'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
-  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
-  // (`...SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: `Pagination` and the
-  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
-  // this shell rather than new controls on these screens.
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/SearchField.svelte',
-  'src/ui/svelte/components/FilterBar.svelte',
-  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
-  'src/ui/svelte/components/StatusToggle.svelte',
-  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
-  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
-  'src/ui/svelte/components/SegmentedControl.svelte',
-  'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
-  // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
-  // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
-  'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
-  // The world-default cards render through the fact row (issue 1521).
-  'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
-];
 
 const pageHarness = createMountedComponentHarness({
   repoRoot,
