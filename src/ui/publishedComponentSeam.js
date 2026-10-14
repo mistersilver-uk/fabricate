@@ -51,6 +51,9 @@ function assertKnownEntry(entry) {
   }
 }
 
+// The kinds the host builds something for: a snippet (`text`), a slot element (`slot`) or a
+// delivering function (`callback`). A `data` or `aria` key needs none, because its copied value
+// is already what the component takes.
 const HOST_DRAWN_KINDS = new Set(['text', 'slot', 'callback']);
 
 /**

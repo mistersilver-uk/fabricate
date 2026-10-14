@@ -78,8 +78,11 @@ function copyCallback(value, key) {
 }
 
 /**
- * One `aria` value: a string, number or boolean as passed, `undefined` as absent, a function M10,
- * else M13. It is written as an attribute, so no value is coerced here.
+ * One `aria` value. It accepts a string, number or boolean as passed, and `undefined` as absent,
+ * which writes no attribute. It refuses a function with M10 and any other type (an object, an
+ * array, `null`, a symbol or a bigint) with M13, `"<key>" must be a string, number or boolean`.
+ * No value is coerced here, because the host writes it as the attribute's value, so `false` is
+ * written as `"false"`.
  */
 function copyAria(value, key) {
   if (typeof value === 'function') throw refuseFunction(key);
