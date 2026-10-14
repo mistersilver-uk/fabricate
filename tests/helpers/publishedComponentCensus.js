@@ -1,8 +1,9 @@
 /**
  * The census of a published root class over every stylesheet (issues 2451, 2452): which selectors
  * name it, which of those a published mount can match, where they sit and what they draw, the bare
- * `button` rules beside them, and the classes the published closures spell.
- * `tests/published-component-manifest.test.js` reads it.
+ * `button` rules beside them, the classes the published closures spell, and the DOM reads of an ARIA
+ * attribute. `tests/published-component-manifest.test.js` and
+ * `tests/published-toggle-census.test.js` read it.
  */
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
@@ -22,6 +23,31 @@ import {
   selectorsWithRules,
   writtenSelector,
 } from './publishedComponentGate.js';
+
+/**
+ * The published `StatusToggle`'s root (issue 2452): the state classes `on` writes beside it, the
+ * classes under which a sheet rule redraws a switch, no extension target sitting in one, the
+ * classes its file spells that no published key draws, and what its `:focus-visible` rule
+ * declares beside the module ring. No published key writes `disabled`.
+ */
+export const TOGGLE = Object.freeze({
+  root: 'fabricate-toggle',
+  writable: new Set(['is-on', 'is-off']),
+  ancestors: new Set([
+    'manager-checks-active-card',
+    'manager-character-modifier-override-row',
+    'manager-task-core-status',
+    'manager-tool-rule-card-head',
+    'manager-recipe-filter-row',
+    'manager-component-filter-row',
+    'fabricate-interactable-config',
+    'manager-essence-inherit-slot',
+  ]),
+  drawsChildren: true,
+  disables: false,
+  undrawn: new Set(['manager-tool-setting-toggle-input', 'manager-status-toggle-label']),
+  ringExtras: Object.freeze([['box-shadow', 'none']]),
+});
 
 /** The classes under which a sheet rule redraws a bare `button`; no extension target sits in one. */
 export const BARE_BUTTON_ANCESTORS = new Set([
@@ -285,13 +311,18 @@ export function spelledStrings(file, reader) {
   return strings;
 }
 
-/** Every `manager-` class token a published closure spells, the probe's included. */
-export function publishedManagerClasses() {
+/** Every whitespace-separated token a published closure spells, the probe's included. */
+export function publishedTokens() {
   const tokens = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]
     .flatMap((entry) => [...importClosure(entry.path, SHIPPED)])
     .flatMap((file) => spelledStrings(file, SHIPPED))
     .flatMap((text) => text.split(/\s+/));
-  return new Set(tokens.filter((token) => token.startsWith('manager-')));
+  return new Set(tokens);
+}
+
+/** Every `manager-` class token a published closure spells, the probe's included. */
+export function publishedManagerClasses() {
+  return new Set([...publishedTokens()].filter((token) => token.startsWith('manager-')));
 }
 
 /** One census over `css`, read as a stylesheet named `sheet.css`. */

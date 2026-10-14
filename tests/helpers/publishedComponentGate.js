@@ -844,9 +844,11 @@ const ANCESTOR_COMBINATORS = new Set([' ', '>']);
 
 /**
  * Every selector of `sheets`, each `[file, css]`, with an attribute selector named `name` wherever
- * in the selector, as `{ written, above }`: as its sheet writes it, and each of the
+ * in the selector, as `{ written, above, bearers }`: as its sheet writes it; each of the
  * `requiredClasses` of a compound a descendant or child combinator follows ahead of the compound
- * that holds the attribute, which is an ancestor of that compound's element. `name` is lower case.
+ * that holds the attribute, which is an ancestor of that compound's element; and the
+ * `requiredClasses` of every compound, inside a pseudo-class or not, that holds the attribute.
+ * `name` is lower case.
  */
 export function attributeSelectors(sheets, name) {
   const holds = (part) => part.type === 'AttributeSelector' && matchedAttribute(part) === name;
@@ -858,7 +860,11 @@ export function attributeSelectors(sheets, name) {
         .slice(0, at)
         .filter((_, index) => ANCESTOR_COMBINATORS.has(complex.children[index + 1].combinator.name))
         .flatMap((relative) => requiredClasses(relative));
-      return { written: `${file}: ${writtenSelector(css, complex)}`, above };
+      const bearers = [...walkNodes(complex)]
+        .filter((node) => node.type === 'RelativeSelector' && holdsIn(node))
+        .flatMap((relative) => requiredClasses(relative));
+      const written = `${file}: ${writtenSelector(css, complex)}`;
+      return { written, above, bearers: [...new Set(bearers)] };
     })
   );
 }
@@ -967,4 +973,15 @@ export function attributesReadInClauses(ast) {
   );
   const reads = bodies.flatMap((body) => [...walkNodes(body)].filter((node) => readsByName(node)));
   return [...new Set(reads.map((call) => call.arguments[0].value))].sort(byName);
+}
+
+/** Each `heldBy`, `<file>: <title>`, whose file has no `describe` block of that title. */
+export function unheldClauses(heldBys) {
+  return heldBys.filter((heldBy) => {
+    const [file, title] = heldBy.split(': ');
+    const described = [...walkNodes(SHIPPED.module(file).ast)]
+      .filter((node) => node.type === 'CallExpression' && node.callee.name === 'describe')
+      .map((node) => node.arguments[0]?.value);
+    return !described.includes(title);
+  });
 }

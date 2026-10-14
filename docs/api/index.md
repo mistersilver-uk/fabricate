@@ -2044,6 +2044,7 @@ The published components, in publication order:
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback) | yes |
 | `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
+| `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2052,7 +2053,7 @@ An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
-On `Button` the rest keys land on the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
+On `Button` and `StatusToggle` the rest keys land on the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
 A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
@@ -2451,6 +2452,73 @@ const props = () => ({
 const disclosure = fabUi.mount('Button', { target, props: props() });
 ```
 
+### StatusToggle
+
+`StatusToggle` draws the design system's switch as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off and takes effect when it is pressed.
+It exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology, and it draws no text of its own.
+A choice between two named things is not a switch: draw your own control for it.
+`on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
+Fabricate coerces nothing, so only `true` and `false` are in the contract.
+The button changes nothing itself: a press reports through `onclick`, and the switch shows the new state when your `update` passes it, which may be after the press returns.
+To refuse the change, pass `on` unchanged and say why in text of your own, so the switch never shows a state you do not hold.
+`onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+`ariaLabel` is required and is the switch's name, final display text, the same in both states, because `aria-pressed` says which holds.
+`ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
+It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
+It does not change between states.
+`ariaLabel` is required whether or not you pass `aria-labelledby`.
+Draw the setting's name as visible text beside the switch, from one string that you also pass as `ariaLabel`, and pass both again in any `update` that changes the text, so the spoken name always contains the words the user sees.
+A name of white space alone leaves the switch with no name, so never pass one.
+`aria-labelledby` is an `aria` prop: Fabricate writes it on the button.
+It is the id of your element that holds the visible name and nothing else, or several such ids separated by spaces, in `target`'s tree.
+When at least one id names an element, that element's text is the switch's name and `ariaLabel` is not read.
+When none does, the switch is named by `ariaLabel`, so a mistyped id never leaves it nameless.
+`aria-describedby` is an `aria` prop: Fabricate writes it on the button.
+It is the id of one element of your own, or several ids separated by spaces, holding a sentence that is visible text beside the switch and that says what the setting does without repeating its name.
+Each id must exist in `target`'s tree while the switch is shown, and the element it names must not be `hidden`; an id that does not exist is skipped and the others are still read.
+The switch has no unavailable state at version 1.
+Keep the switch of a setting the user cannot change right now enabled.
+Answer its press with the reason, in a `Notice` or a notification of your own, and pass `on` unchanged; do not draw a setting that can never change here as a switch.
+Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
+It needs a Fabricate window ancestor, so its root is `fabricate`, and its track is drawn the same in the Manager and the player window.
+Your own window or dialog carries no Fabricate root, so the switch is refused there with `StatusToggle needs a Fabricate window ancestor`.
+Foundry sizes a button at least twice its font size, so the switch's button is 24px tall at an inherited font size of 12px or less, 2em tall above that, and taller inside a Foundry form or dialog row, and its 20px track is centred in it; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
+The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
+An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side; leave that much inside any edge of your own that clips.
+The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
+Give a switch you mount inside a `.tabs` element no `data-group`, because Foundry writes `aria-pressed` on a button inside `.tabs` whose own `data-group` names the tab group it changes.
+Its track and knob sizes, its button's width, its 78px cap, its colours beyond what this section states, and what it draws for an `on` value other than `true` or `false` are private.
+Rest `data-*` is for your own hooks; name them for your module, as `data-<module-id>-…`.
+They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on StatusToggle`.
+The switch therefore opens no tooltip and keeps its own cursor, so the pointer is shown its name only as your label beside it, and what the setting does goes in text beside it, tied to it with `aria-describedby`.
+
+A worked switch follows: a setting of your own, named by the label you draw beside it.
+
+```javascript
+// After `load(['StatusToggle'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the switch describes none: draw your own control there.
+if (fabUi?.describe?.('StatusToggle')?.props['aria-labelledby']?.kind !== 'aria') return;
+
+// Your label beside `target`, in the same Fabricate window: <span id="acme-group-label">Group by category</span>.
+const name = target.ownerDocument.getElementById('acme-group-label').textContent;
+target.style.display = 'flex';
+target.style.alignItems = 'center';
+let grouped = acmeSettings.groupByCategory;
+const props = () => ({
+  on: grouped,
+  ariaLabel: name, // The same text the label draws.
+  'aria-labelledby': 'acme-group-label',
+  onclick: () => {
+    grouped = !grouped;
+    acmeSettings.groupByCategory = grouped; // Your own state first.
+    toggle.update(props()); // Every prop again, with the new `on`.
+  },
+});
+const toggle = fabUi.mount('StatusToggle', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2478,9 +2546,10 @@ An `update` that changes the prop's value writes it on the same element, and one
 Fabricate writes the attribute only when the value differs from the one it last wrote, so it puts back nothing other code removed or replaced.
 Fabricate checks no value against the attribute's own set: the component's section states the accepted values, and any other is private.
 Detect an `aria` prop with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates it refuses the prop.
+A camel-case prop is one the component interprets, and a hyphenated `aria-*` prop is an attribute Fabricate writes under that name; a control's name is carried by the prop its section names, and by the text that an `aria-labelledby` prop its section names points at.
 An ARIA attribute is published only as an `aria` prop a component's section names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
-A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1; publishing one later is additive.
+A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless a component's section names the prop (`StatusToggle`'s section names `aria-labelledby`); publishing one later is additive.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
@@ -2656,8 +2725,9 @@ A published component draws a control only where its section says so, and each c
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
 - A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
-- A control's accessible name is text you pass through a prop its section names, and Fabricate supplies none.
-  Where a prop carries the name, `aria-label` and `aria-labelledby` are refused, so nothing replaces it.
+- A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
+  Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
+  A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
 - Fabricate moves no focus.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
@@ -2677,9 +2747,9 @@ A published component draws a control only where its section says so, and each c
   The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as props.
   `aria-expanded` is an `aria` prop because it reports a region the control does not draw, which the component shows nowhere.
 - A control takes an ARIA attribute from you only through an `aria` prop its section names; every other `aria-*` name is refused.
-- An `aria` prop that takes an id (`aria-describedby`) names an element you own, in the same tree as `target`, outside `target` or inside one of its content slots.
+- An `aria` prop that takes an id (`aria-describedby`, `aria-labelledby`) names an element you own, in the same tree as `target`, outside `target` or inside one of its content slots.
   The element it names holds text you also draw visibly; Fabricate does not check this.
-  Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, describes nothing, and keeping it unique is yours.
+  Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, names or describes nothing, and keeping it unique is yours.
   In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything you appended to `body` stays behind.
 - In Foundry 13 and 14 the tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
   A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it.
@@ -2687,8 +2757,8 @@ A published component draws a control only where its section says so, and each c
   Without the `await` between them Fabricate may draw the two as the second alone, which writes nothing, and a restore you make while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
   Where a component's rest lands on the control itself, `data-cursor` is refused: at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
-- A control's only motion is the fade of its own state change.
-  Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
+- A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
+  Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.

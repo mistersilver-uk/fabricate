@@ -389,6 +389,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `Rail` and `InspectorCard` (issue 2451), in that order.
 - The published set continues with `EmptyState` and `Notice` (issue 2451), in that order.
 - The published set continues with `Button` (issue 2452).
+- The published set continues with `StatusToggle` (issue 2452).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
@@ -396,11 +397,12 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
+- `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
-A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1; publishing one later is additive.
+A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button` too (issue 2452); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button` and `StatusToggle` too (issue 2452); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'` and `'aria'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
@@ -459,6 +461,7 @@ An `aria` key is never `required`.
 Fabricate writes the attribute only when the value differs from the one it last wrote, so it puts back nothing other code removed or replaced.
 - Fabricate checks no value against the attribute's own set: the entry's group states the accepted values, and any other is private.
 - A companion detects an `aria` key with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates the key refuses it (M13).
+- A camel-case key is a prop the component interprets, and a hyphenated `aria-*` key is an attribute Fabricate writes under that name; a control's name is carried by the key its group names, and by the text that an `aria-labelledby` key its group names points at.
 
 ### The required ancestor root
 
@@ -489,8 +492,9 @@ Tab moves focus as the browser does, and Escape still closes a DialogV2 while a 
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
-- A control's accessible name is text the companion passes through a key its group names, and Fabricate supplies none.
-Where a key carries the name, `aria-label` and `aria-labelledby` are refused (M13), so nothing replaces it.
+- A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none.
+Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
+A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
 - Fabricate moves no focus.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
 The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
@@ -510,9 +514,9 @@ A press reports through the callback, and the control shows the new state when t
 The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as keys (M13).
 `aria-expanded` is an `aria` key because it reports a region the control does not draw, which the component shows nowhere.
 - A control takes an ARIA attribute from the companion only through an `aria` key its group names; every other `aria-*` name is refused (M13).
-- An `aria` key that takes an id (`aria-describedby`) names an element the companion owns, in the same tree as `target`, outside `target` or inside one of its content slots.
+- An `aria` key that takes an id (`aria-describedby`, `aria-labelledby`) names an element the companion owns, in the same tree as `target`, outside `target` or inside one of its content slots.
 The element it names holds text the companion also draws visibly; Fabricate does not check this.
-Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, describes nothing, and keeping it unique is the companion's.
+Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, names or describes nothing, and keeping it unique is the companion's.
 In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything the companion appended to `body` stays behind.
 - In Foundry 13 and 14 the tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
 A tooltip on an ancestor leaves the control alone, so this reaches a published control only when the companion shows one on it itself, with `game.tooltip.activate` or a Tour step that selects it.
@@ -520,8 +524,8 @@ The companion restores the key once the tooltip has closed, which it can see whe
 Without the `await` between them Fabricate may draw the two as the second alone, which writes nothing, and a restore made while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
 Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
-- A control's only motion is the fade of its own state change.
-Under `prefers-reduced-motion: reduce` Fabricate removes it inside a Fabricate window; outside one the fade is the host's own.
+- A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
+Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
@@ -770,7 +774,43 @@ Each group states the accepted values of every key that entry publishes.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
     On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
   - `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: the companion passes a verb phrase.
-- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+- **`StatusToggle`.**
+  - It is the design system's switch (`<Toggle>` in the library), drawn as its button host: a native `<button>` holding a track and a knob, for a setting that is on or off and takes effect when it is pressed.
+    It exposes the state with `aria-pressed` and states no `role`, so it is a toggle button to assistive technology, and it draws no text of its own.
+    A choice between two named things is not a switch: the companion draws its own control for it.
+  - `on` is `true` or `false`, and is required: `true` draws the knob at the far end of an accent track, and `false` at the near end of a quiet one.
+    Fabricate coerces nothing, so only `true` and `false` are in the contract.
+    The button changes nothing itself: a press reports through `onclick`, and the switch shows the new state when the companion's `update` passes it, which may be after the press returns.
+    A companion that refuses the change passes `on` unchanged and says why in text of its own, so the switch never shows a state the companion does not hold.
+  - `onclick` is a required callback, called with no argument each time the switch is pressed, each repeat of a held Enter key included.
+  - `ariaLabel` is required and is the switch's name, final display text, the same in both states, because `aria-pressed` says which holds.
+  - `ariaLabel` names the setting so that "pressed" means the setting is in effect: "Group by category", "Hidden tasks".
+    It never states a position, so no "on", "off", "show" or "hide" at its start or end, and never a negation such as "Do not group" (which reads "do not group, pressed").
+    It does not change between states.
+  - `ariaLabel` is required whether or not `aria-labelledby` is passed.
+    The companion draws the setting's name as visible text beside the switch, from one string that it also passes as `ariaLabel`, and passes both again in any `update` that changes the text, so the spoken name always contains the words the user sees.
+    A name of white space alone leaves the switch with no name, so the companion never passes one.
+  - `aria-labelledby` is an `aria` key: Fabricate writes it on the button.
+    It is the id of the companion's element that holds the visible name and nothing else, or several such ids separated by spaces, in `target`'s tree.
+    When at least one id names an element, that element's text is the switch's name and `ariaLabel` is not read.
+    When none does, the switch is named by `ariaLabel`, so a mistyped id never leaves it nameless.
+  - `aria-describedby` is an `aria` key: Fabricate writes it on the button.
+    It is the id of one element of the companion's, or several ids separated by spaces, holding a sentence that is visible text beside the switch and that says what the setting does without repeating its name.
+    Each id exists in `target`'s tree while the switch is shown, and the element it names is not `hidden`; an id that does not exist is skipped and the others are still read.
+  - The switch has no unavailable state at version 1.
+    A setting the user cannot change right now keeps its switch enabled.
+    Its press answers with the reason, in a `Notice` or a notification of the companion's, and `on` is passed unchanged; a setting that can never change here is not drawn as a switch.
+    A setting that is unavailable also says so in the visible text `aria-describedby` points at, so it is heard when the switch takes focus, not only after a press.
+  - It needs a Fabricate window ancestor, and its track is drawn the same in the Manager and the player window.
+    Foundry sizes a button at least twice its font size, so the switch's button is 24px tall at an inherited font size of 12px or less, 2em tall above that, and taller inside a Foundry form or dialog row, and its 20px track is centred in it; the companion gives `target` `display: flex` and `align-items: center`, and centres its own label against the switch.
+  - The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
+    An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus the companion moves focus first.
+  - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side, and the companion leaves that much inside any edge of its own that clips.
+  - The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
+  - A switch mounted inside a `.tabs` element carries no `data-group`, because Foundry writes `aria-pressed` on a button inside `.tabs` whose own `data-group` names the tab group it changes.
+  - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
+    The switch therefore opens no tooltip and keeps its own cursor, so the pointer is shown its name only as the companion's label beside it, and what the setting does goes in text beside it, tied to it with `aria-describedby`.
+- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards.
 
 ### Mounting and its refusals
 
@@ -923,6 +963,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the button carries `aria-expanded="false"`, and after the update `aria-expanded="true"` on the same element
 - **AND** a mount that passes `aria-pressed` throws M13, and nothing is rendered
 - **AND** a mount that omits `aria-expanded` draws no such attribute
+
+#### Scenario: A published switch
+
+- **WHEN** a companion mounts `StatusToggle` with `on: false`, `ariaLabel` and `onclick` inside a Fabricate window and the user presses it
+- **THEN** Fabricate calls `onclick` once, with no argument, and the button still carries `aria-pressed="false"`
+- **AND** after an `update` that passes `on: true` the same button carries `aria-pressed="true"` and keeps focus
+- **AND** a mount that omits `ariaLabel` throws M9, and one that passes `aria-pressed` throws M13
 
 #### Scenario: A malformed request
 

@@ -53,6 +53,7 @@ import {
   selectorsOnAttribute,
   staticText,
   syntheticReader,
+  unheldClauses,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
 import { styleRules } from './helpers/svelteStructureContract.js';
@@ -71,6 +72,13 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': null,
+  'src/ui/svelte/components/StatusToggle.svelte: button': {
+    defaults: ['as'],
+    heldBy:
+      'tests/components/published-toggle-mounted.test.js: the default draws the button host alone',
+  },
+  // Drawn only when `as`, which the entry does not publish, is `'checkbox'`.
+  'src/ui/svelte/components/StatusToggle.svelte: input': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
 });
 
@@ -471,6 +479,14 @@ describe('each published entry that draws a control', () => {
       assert.deepEqual(controlFaults(entry, FOCUSABLE_REACH), []);
     });
   }
+
+  it('names a describe block of its mounted suite in each defaults pin', () => {
+    const held = Object.values(FOCUSABLE_REACH).flatMap((pin) =>
+      pin?.defaults ? [pin.heldBy] : []
+    );
+    assert.ok(held.length > 0, 'the switch is pinned to the default of as');
+    assert.deepEqual(unheldClauses(held), []);
+  });
 
   it('exempts from the required-name rule only a control pinned always', () => {
     assert.ok(OPTIONAL_NAME_PINS.length > 0, 'the probe is exempt');

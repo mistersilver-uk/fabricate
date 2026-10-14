@@ -80,11 +80,13 @@ import {
   ownFilesOf,
   placementFaults,
   publishedManagerClasses,
+  publishedTokens,
   ringFaults,
   shippedCensus,
   spelledStrings,
   staleAncestors,
   syntheticCensus,
+  TOGGLE,
 } from './helpers/publishedComponentCensus.js';
 import {
   BRANCH_TWIN,
@@ -114,6 +116,7 @@ import {
   spreadKeys,
   syntheticReader,
   tagKeys,
+  unheldClauses,
 } from './helpers/publishedComponentGate.js';
 import { readsGlobal } from './helpers/svelteStructureContract.js';
 
@@ -318,6 +321,7 @@ const shippedAriaKeys = () =>
 /** The mounted suite of each entry that publishes an `aria` key, which reads each key off the control. */
 const ARIA_KEY_SUITES = Object.freeze({
   Button: 'tests/components/published-button-mounted.test.js',
+  StatusToggle: 'tests/components/published-toggle-mounted.test.js',
 });
 
 /**
@@ -327,6 +331,8 @@ const ARIA_KEY_SUITES = Object.freeze({
 const JS_ARIA_READERS = Object.freeze({
   'src/ui/svelte/apps/journal/RunAwardChoice.svelte: querySelector([data-award-choice-id] button[aria-pressed]:not([disabled]))':
     'under a Fabricate hook',
+  'src/ui/svelte/apps/manager/validationAnnouncement.js: getAttribute(aria-labelledby)':
+    "on Fabricate's own validation targets",
   'src/ui/svelte/components/Modal.svelte: closest([aria-expanded="true"])':
     'no extension target sits in a Fabricate modal',
 });
@@ -505,13 +511,43 @@ const BUTTON_DATA_HOOK_RULES = Object.freeze([
 ]);
 
 /**
- * Every selector that reads a shipped `aria` key, as written, beside the class above it that keeps
- * it off a published control: a pinned ancestor, which no extension target sits under.
+ * Every selector that reads a shipped `aria` key, or `aria-pressed`, which a published `data` key
+ * drives, as written, beside the class that keeps it off a published control: a pinned ancestor
+ * above it, which no extension target sits under, or a class the element holding the attribute
+ * needs, which no published closure spells.
  */
 const ARIA_KEY_SELECTORS = Object.freeze([
   [
     "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte: .fab-im-toolbar :global(.fabricate-button[aria-expanded='true'])",
     'fab-im-toolbar',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])",
+    'fabricate-list-row-open',
+  ],
+  [
+    "styles/fabricate-list-primitives.css: .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true']))",
+    'fabricate-list-row-open',
+  ],
+  [
+    "src/ui/svelte/apps/InteractableConfigRoot.svelte: .fab-ic-actions :global(.fabricate-button[aria-pressed='true'])",
+    'fab-ic-actions',
+  ],
+  [
+    "src/ui/svelte/apps/InteractableConfigRoot.svelte: .fab-ic-actions :global(.fabricate-button[aria-pressed='false'] .fab-ic-state-glyph)",
+    'fab-ic-actions',
+  ],
+  [
+    "src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset button.fab-bulk-inset-row:not([aria-pressed='true']):enabled:hover)",
+    'fab-bulk-inset-row',
   ],
 ]);
 
@@ -635,7 +671,15 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * `defaults`, which the entry does not publish, keeps its default: the tag of the landing drawn
  * then, the tags of those it keeps undrawn, and in `heldBy` the mounted clause that holds both.
  */
-const REST_LANDINGS = Object.freeze({});
+const REST_LANDINGS = Object.freeze({
+  'src/ui/svelte/components/StatusToggle.svelte': {
+    drawn: 'button',
+    undrawn: ['input', 'span'],
+    defaults: ['as'],
+    heldBy:
+      'tests/components/published-toggle-mounted.test.js: the default draws the button host alone',
+  },
+});
 
 /**
  * What a landing pin breaks: rest landing on other tags than it names, a default the entry
@@ -770,7 +814,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges five focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, and the probe button', () => {
+  it('judges seven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, and the probe button', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -784,6 +828,8 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/StatusToggle.svelte: button',
+      'src/ui/svelte/components/StatusToggle.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
   });
@@ -794,13 +840,17 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(dynamicElementFaults(files), []);
     const held = Object.values(DYNAMIC_ELEMENTS).flatMap(({ heldBy }) => (heldBy ? [heldBy] : []));
     assert.ok(held.length > 0, 'a pin names a mounted clause');
-    for (const heldBy of held) {
-      const [file, title] = heldBy.split(': ');
-      const described = [...walkNodes(SHIPPED.module(file).ast)]
-        .filter((node) => node.type === 'CallExpression' && node.callee.name === 'describe')
-        .map((node) => node.arguments[0]?.value);
-      assert.ok(described.includes(title), `${heldBy} names a describe block of that file`);
-    }
+    assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
+  });
+
+  it('pins the rest landings of each entry whose rest lands on more than one element, held by a mounted clause', () => {
+    const held = Object.values(REST_LANDINGS).map(({ heldBy }) => heldBy);
+    assert.deepEqual(
+      Object.keys(REST_LANDINGS),
+      ['src/ui/svelte/components/StatusToggle.svelte'],
+      'the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
+    );
+    assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
   });
 
   it('pins every shipped callback key with how many arguments it forwards', () => {
@@ -811,7 +861,7 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0', 'Button.onclick: 0'],
+      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0'],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -819,7 +869,12 @@ describe('each entry matches its component declaration', () => {
   it('pins every shipped aria key', () => {
     assert.deepEqual(
       shippedAriaKeys(),
-      ['Button.aria-expanded', 'Button.aria-describedby'],
+      [
+        'Button.aria-expanded',
+        'Button.aria-describedby',
+        'StatusToggle.aria-labelledby',
+        'StatusToggle.aria-describedby',
+      ],
       'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
     );
   });
@@ -2160,7 +2215,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button'],
+      ['InspectorCard', 'Button', 'StatusToggle'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(
@@ -2402,22 +2457,33 @@ describe('the module sheet and every component style against the published Butto
     );
   });
 
-  it('reads a shipped aria key in one selector of any stylesheet, which a pinned ancestor keeps off a published control', () => {
+  it('reads a shipped aria key or aria-pressed in eight selectors of any stylesheet, each kept off a published control', () => {
     const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
     const names = [...new Set(keys)];
-    assert.deepEqual(names, ['aria-expanded', 'aria-describedby'], 'the names the census reads');
-    const reading = names.flatMap((name) => attributeSelectors(everyStylesheet(), name));
+    assert.deepEqual(
+      names,
+      ['aria-expanded', 'aria-describedby', 'aria-labelledby'],
+      'the aria keys the census reads'
+    );
+    const reading = [...names, 'aria-pressed'].flatMap((name) =>
+      attributeSelectors(everyStylesheet(), name)
+    );
     assert.deepEqual(
       reading.map(({ written }) => written),
       ARIA_KEY_SELECTORS.map(([written]) => written),
       'a rule that reads an aria key off an element restyles a published control a companion sets it on'
     );
-    const pinned = new Set([...BUTTON.ancestors, ...BARE_BUTTON_ANCESTORS]);
-    for (const [index, [written, ancestor]] of ARIA_KEY_SELECTORS.entries()) {
-      assert.ok(
-        pinned.has(ancestor) && reading[index].above.includes(ancestor),
-        `${written} sits under ${ancestor}, a pinned ancestor`
-      );
+    const shapes = [CHIP, CARD, EMPTY, NOTICE, BUTTON, TOGGLE];
+    const pinned = new Set([
+      ...shapes.flatMap((shape) => [...shape.ancestors]),
+      ...BARE_BUTTON_ANCESTORS,
+    ]);
+    const spelled = publishedTokens();
+    for (const [index, [written, kept]] of ARIA_KEY_SELECTORS.entries()) {
+      const { above, bearers } = reading[index];
+      const under = pinned.has(kept) && above.includes(kept);
+      const held = bearers.includes(kept) && !spelled.has(kept);
+      assert.ok(under || held, `${written} is kept off by ${kept}`);
     }
   });
 
@@ -2429,7 +2495,10 @@ describe('the module sheet and every component style against the published Butto
     const written = rules.map(([rule]) => rule);
     const { css } = templateOf('sheet.css', `<style>${written.join(', ')} { gap: 0 }</style>`).ast;
     assert.deepEqual(
-      attributeSelectors([['sheet.css', css]], 'aria-expanded'),
+      attributeSelectors([['sheet.css', css]], 'aria-expanded').map(({ written, above }) => ({
+        written,
+        above,
+      })),
       rules
         .filter(([, above]) => above !== null)
         .map(([rule, above]) => ({ written: `sheet.css: ${rule}`, above }))

@@ -219,4 +219,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'fabricate',
     restOn: 'control',
   }),
+  Object.freeze({
+    name: 'StatusToggle',
+    path: 'src/ui/svelte/components/StatusToggle.svelte',
+    version: 1,
+    props: Object.freeze({
+      on: Object.freeze({ kind: 'data', required: true }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      onclick: Object.freeze({ kind: 'callback', required: true }),
+      'aria-labelledby': Object.freeze({ kind: 'aria' }),
+      'aria-describedby': Object.freeze({ kind: 'aria' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+    restOn: 'control',
+  }),
 ]);

@@ -5657,7 +5657,10 @@ test('every published component seam module, and the host, selects the four spec
   }
 });
 
-test('the leaves specimen mounts every published component but TierTrack and checks the containment of each mount, nested ones included', () => {
+/** The published components a specimen other than the leaves one draws: the tier track's own, and the controls fixture's switch. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle']);
+
+test('the leaves specimen mounts every published component but TierTrack and StatusToggle and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -5731,9 +5734,9 @@ test('the leaves specimen mounts every published component but TierTrack and che
   assert.deepEqual(
     [...new Set(drawn)].sort(byCodePoint),
     PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name)
-      .filter((name) => name !== 'TierTrack')
+      .filter((name) => !SPECIMENED_ELSEWHERE.has(name))
       .sort(byCodePoint),
-    'every published component but TierTrack, which has its own specimen, and no other'
+    'every published component but TierTrack and StatusToggle, which other specimens draw, and no other'
   );
   const { expectContained } = getCaseById('manager-published-leaves-specimen');
   const [{ container: ground }] = expectContained;
