@@ -254,6 +254,13 @@ const COUNTING = '.fabricate-manager:has([data-check-product-option="count"].is-
 const ADDITIONAL_DICE = '[data-check-additional-dice-group]';
 const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: true });
 const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
+/** Each macro zone fills its well, so two wells side by side end level (issue 2466). */
+const MACRO_ZONES_FILL = Object.freeze({
+  controls: ['read', 'spend'].map((slot) => ({
+    selector: `[data-check-additional-dice-${slot}-macro]`,
+    styles: 'flex-grow: 1',
+  })),
+});
 const PATH_LINE = (tone, text) =>
   `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
 const PATH_READING = (kind, text) =>
@@ -2467,6 +2474,7 @@ export const CASES = Object.freeze([
       ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
       ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
     expectNoHorizontalOverflow: '[data-check-additional-dice-macros]',
+    expectLayout: MACRO_ZONES_FILL,
   }),
   // Both macros linked: the Preview never runs the read macro, so the maximum bounds it.
   additionalDiceCase({
@@ -2500,6 +2508,7 @@ export const CASES = Object.freeze([
       '[data-check-additional-dice-macros]',
       '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
     ],
+    expectLayout: MACRO_ZONES_FILL,
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-no-actor',

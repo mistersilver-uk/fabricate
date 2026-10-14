@@ -24,6 +24,8 @@ const noop = () => {};
 const ACTIONS = { copyLabel: 'Copy uuid', unlinkLabel: 'Unlink', onCopy: noop, onUnlink: noop };
 const PROMPT = { title: 'Drop a game-world item here', emptyIcon: 'fas fa-link' };
 const LONG_TITLE = 'Drop a game-world item here to link it to this record. '.repeat(3).trim();
+/** A compendium address standing in for a name: 44 characters with no break opportunity. */
+const UUID_NAME = 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB';
 const LONG_NOTE = `From the Items directory or a compendium, ${'x'.repeat(40)} and from any pack this world has unlocked for editing.`;
 
 /** Each case: the host's width and the props the zone mounts with. */
@@ -62,6 +64,7 @@ const CASES = Object.freeze({
     width: 220,
     props: { item: { name: LONG_TITLE }, hint: LONG_NOTE, subline: LONG_NOTE, ...ACTIONS },
   },
+  'uuid-name': { width: 220, props: { item: { name: UUID_NAME }, uuid: UUID_NAME, ...ACTIONS } },
 });
 
 /** The tokens the clauses compare against, each read from an element that declares it. */
@@ -112,6 +115,7 @@ const readFaces = () => {
     'font-weight',
     'font-family',
     'line-height',
+    'text-align',
   ];
   const PARTS = {
     root: '.manager-item-drop-zone',
@@ -232,7 +236,8 @@ it('draws the empty prompt as a centred stack on a dashed 104px box', () => {
   assert.equal(name.style['font-weight'], '600');
   assert.equal(name.style.color, tokens['text-secondary']);
   assert.equal(hint.style.color, tokens['text-muted']);
-  assert.ok(glyph.box.bottom <= name.box.top, 'the glyph sits above the title');
+  const glyphGap = name.box.top - glyph.box.bottom;
+  assert.ok(Math.abs(glyphGap - 4) <= 0.5, `the glyph sits ${glyphGap}px above the title, not 4px`);
   assert.ok(name.box.bottom <= hint.box.top, 'and the title above the hint');
   assert.ok(
     Math.abs((glyph.box.top + hint.box.bottom) / 2 - middle(root.box)) <= 1,
@@ -253,14 +258,20 @@ it('draws a linked zone as a solid bg-1 row on the same floor, with its actions 
   assert.equal(name.style['font-weight'], '600');
   assert.equal(name.style['font-family'], tokens.serif);
   assert.equal(px(name.style['line-height']), 18.2);
+  assert.equal(
+    name.style['text-align'],
+    'start',
+    'the name and uuid start at the tile, not centred'
+  );
   assert.equal(uuid.style.color, tokens['text-muted']);
   assert.equal(hint.style.color, tokens['text-muted']);
 
   assert.equal(buttons.length, 2);
-  assert.ok(buttons[1].top >= buttons[0].bottom, 'unlink sits under copy, not beside it');
+  const buttonGap = buttons[1].top - buttons[0].bottom;
+  assert.ok(Math.abs(buttonGap - 4) <= 0.5, `unlink sits ${buttonGap}px under copy, not 4px`);
 });
 
-it('draws a missing zone on the danger ground, and lets a drag take it', async () => {
+it('draws a missing zone on the danger ground', () => {
   const { root, icon, name, uuid, hint } = faces.missing;
   assert.equal(root.style['border-top-style'], 'solid');
   assert.equal(root.style['border-top-color'], tokens['danger-border']);
@@ -269,20 +280,30 @@ it('draws a missing zone on the danger ground, and lets a drag take it', async (
   assert.equal(icon.style.color, tokens['danger-text']);
   assert.equal(uuid.style.color, tokens['text-secondary']);
   assert.equal(hint.style.color, tokens['text-secondary']);
+});
 
-  const dragged = await tab.evaluate(() => {
-    const zone = globalThis.document.querySelector('[data-case="missing"] .manager-item-drop-zone');
-    zone.classList.add('is-drop-active');
-    const { borderTopColor, backgroundColor } = globalThis.getComputedStyle(zone);
-    zone.classList.remove('is-drop-active');
-    return { borderTopColor, backgroundColor };
-  });
-  assert.equal(
-    dragged.borderTopColor,
-    tokens.accent,
-    'a drag over a missing zone takes its border'
-  );
-  assert.equal(dragged.backgroundColor, tokens['accent-soft'], 'and its ground');
+it('lets a drag take the border, ground and ring of a linked, a missing and a compact zone', async () => {
+  for (const face of ['linked', 'missing', 'compact']) {
+    const dragged = await tab.evaluate((key) => {
+      const zone = globalThis.document.querySelector(
+        `[data-case="${key}"] .manager-item-drop-zone`
+      );
+      zone.classList.add('is-drop-active');
+      const { borderTopColor, backgroundColor, boxShadow } = globalThis.getComputedStyle(zone);
+      zone.classList.remove('is-drop-active');
+      return { borderTopColor, backgroundColor, boxShadow };
+    }, face);
+    assert.equal(
+      dragged.borderTopColor,
+      tokens.accent,
+      `a drag over a ${face} zone takes its border`
+    );
+    assert.equal(dragged.backgroundColor, tokens['accent-soft'], `and its ${face} ground`);
+    assert.ok(
+      dragged.boxShadow.includes(tokens.accent),
+      `and draws the ring: ${dragged.boxShadow}`
+    );
+  }
 });
 
 it('draws the compact prompt with no ground, no floor and no tile, in muted ink', () => {
@@ -306,14 +327,18 @@ it('dims a disabled zone to 0.55', () => {
   assert.equal(faces.disabled.root.style.opacity, '0.55');
 });
 
-it('caps a title, a name, a hint and a subline at two lines, and grows the box instead', () => {
+it('caps a title, a hint and a subline at two lines, lets a linked name wrap, and grows the box', () => {
   const empty = faces['long-empty'];
   assertCapped(empty.name, 'the empty title');
   assertCapped(empty.hint, 'the empty hint');
   assert.ok(empty.root.box.height > 104, 'two capped lines of each stand taller than the floor');
 
   const linked = faces['long-linked'];
-  assertCapped(linked.name, 'the linked name');
+  assert.ok(linked.name.scroll.height <= linked.name.scroll.clientHeight, 'the linked name is cut');
+  assert.ok(
+    linked.name.box.height > 2 * px(linked.name.style['line-height']),
+    'the linked name stops at two lines, so it is still capped'
+  );
   assertCapped(linked.hint, 'the linked hint');
   assertCapped(linked.subline, 'the subline');
 
@@ -324,4 +349,12 @@ it('caps a title, a name, a hint and a subline at two lines, and grows the box i
     assert.ok(root.scroll.width <= root.scroll.clientWidth, `${label} scrolls sideways`);
     assert.ok(root.scroll.height <= root.scroll.clientHeight, `${label} scrolls down`);
   }
+});
+
+it('wraps a uuid standing in for a linked name, never cutting it or overflowing sideways', () => {
+  const { root, name } = faces['uuid-name'];
+  assert.ok(name.scroll.width <= name.scroll.clientWidth, 'the name runs out of its column');
+  assert.ok(name.scroll.height <= name.scroll.clientHeight, 'the name is clipped');
+  assert.ok(root.scroll.width <= root.scroll.clientWidth, 'the zone scrolls sideways');
+  assert.ok(root.scroll.height <= root.scroll.clientHeight, 'the zone scrolls down');
 });

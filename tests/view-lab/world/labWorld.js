@@ -15,7 +15,7 @@ import {
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
-import { registerLabMacros } from './labMacros.js';
+import { LAB_MACRO_UUIDS, registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
@@ -697,6 +697,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
+ * @param {boolean} [options.scriptMacros] List the lab's script macro in `game.macros`, so a macro
+ *   picker offers an option (issue 2466).
  * @param {string} [options.timeOfDayBar] `'1'` or `'fallback'`: the time-of-day bar's periods,
  *   and the world clock at 14:34. See {@link seedTimeOfDayBar}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -721,6 +723,7 @@ export async function buildLabWorld({
   learnableBook = false,
   systemBlocked = false,
   depletedImage = false,
+  scriptMacros = false,
   tagStacks = false,
   timeOfDayBar = '',
 } = {}) {
@@ -762,6 +765,7 @@ export async function buildLabWorld({
     settings: seedSettings(content, actors, managedSystemId, experimentalFeatures, noParties),
     documents,
     actorList: actors,
+    macros: scriptMacros ? [documents.get(LAB_MACRO_UUIDS.readMomentum)] : [],
     scenes: [
       {
         id: 'lab-scene',

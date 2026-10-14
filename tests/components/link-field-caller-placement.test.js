@@ -31,7 +31,8 @@ const PLACEMENT =
   /^(?:flex(?:-grow|-shrink|-basis)?|(?:min-|max-)?width|align-self|justify-self|order|margin(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|grid-(?:area|column|row))$/u;
 
 /** What the component's own scoped block may not declare on its root: the sheet's faces own it. */
-const ROOT_PAINT = /^(?:border(?:-[\w-]+)?|background(?:-[\w-]+)?|color)$/u;
+const ROOT_PAINT =
+  /^(?:border(?:-[\w-]+)?|background(?:-[\w-]+)?|color|box-shadow|outline(?:-[\w-]+)?|opacity)$/u;
 
 /** The root every sheet selector of the family begins at. */
 const FAMILY_ROOT = '.fabricate-link-field';
@@ -75,6 +76,16 @@ function unwrapGlobal(selector) {
 const subjectsOf = (rule) =>
   splitSelectorList(rule.selector).map(
     (selector) => compoundsOf(unwrapGlobal(selector)).at(-1) ?? ''
+  );
+
+/** Every compound of every selector in a rule's list, so a hook on an ancestor is read too. */
+const compoundsIn = (rule) =>
+  splitSelectorList(rule.selector).flatMap((selector) => compoundsOf(unwrapGlobal(selector)));
+
+/** Whether any compound of `rule` names one of `attributes`. */
+const namesAttribute = (rule, attributes) =>
+  compoundsIn(rule).some((compound) =>
+    [...compound.matchAll(/\[\s*(data-[\w-]+)/gu)].some(([, name]) => attributes.has(name))
   );
 
 /** The properties of `rule` that `allowed` does not admit, as failure lines. */
@@ -174,11 +185,13 @@ test('a rule reaching the zone by a root attribute declares only placement', () 
   );
 
   const attributes = new Set([...hooks, ...own]);
-  const reaching = styleRules().filter((rule) =>
-    subjectsOf(rule).some((subject) =>
-      [...subject.matchAll(/\[\s*(data-[\w-]+)/gu)].some(([, name]) => attributes.has(name))
-    )
-  );
+  for (const selector of [
+    '[data-tool-create-card] strong',
+    '[data-tool-source-card] .fabricate-icon-button',
+  ]) {
+    assert.ok(namesAttribute({ selector }, attributes), `${selector} goes unread`);
+  }
+  const reaching = styleRules().filter((rule) => namesAttribute(rule, attributes));
   assert.ok(
     reaching.length > 0,
     'no rule reaches the zone by a root attribute, so the clause below holds over nothing'
@@ -190,7 +203,7 @@ test('a rule reaching the zone by a root attribute declares only placement', () 
   );
 });
 
-test('the link field`s scoped block declares no border, ground or colour on its root', () => {
+test('the link field`s scoped block declares no border, ground, colour, ring or dim on its root', () => {
   const own = styleRules().filter((rule) => rule.file === ZONE);
   assert.ok(own.length > 0, `${ZONE} contributed no scoped rule, so nothing was read`);
   const onRoot = own.filter((rule) => subjectsOf(rule).some((subject) => ROOT.test(subject)));

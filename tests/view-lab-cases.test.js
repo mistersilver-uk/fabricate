@@ -785,6 +785,11 @@ const menuCorners = (panel, item) => [
   { selector: item, styles: 'border-radius: 7px' },
 ];
 const OR_MENU = '.manager-recipe-or-menu';
+const macroZonesFill = () =>
+  ['read', 'spend'].map((slot) => ({
+    selector: `[data-check-additional-dice-${slot}-macro]`,
+    styles: 'flex-grow: 1',
+  }));
 /** An open nav group drawn as one box (issue 2257 E3). */
 const navGroupBox = (selector) => ({
   selector,
@@ -824,6 +829,9 @@ const NON_VERB_CONTROLS = Object.freeze({
     '[data-complication-roll-condition-cmp]'
   ),
   'manager-component-complications-check-trigger': toolbarSelects('[data-complication-trigger]'),
+  // Each macro zone fills its well, so the two wells end level (issue 2466).
+  'manager-checks-v3-count-additional-dice-macro-narrow': macroZonesFill(),
+  'manager-checks-v3-count-additional-dice-macro-pair-narrow': macroZonesFill(),
   'manager-component-edit-salvage': toolbarSelects('[data-salvage-dc-preset]'),
   'manager-checks-simple-two-band-strip': toolbarSelects(
     '[data-simple-band-record]',

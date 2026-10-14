@@ -512,6 +512,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the frame that draws two linked wells near the 220px floor',
     ],
     [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-component-complications-macro-linked',
+      'the frame that draws the complication macro zone linked, with its uuid as the hint',
+    ],
+    [
       'src/ui/svelte/components/EditorTabs.svelte',
       'interactables-browser-tasks',
       'the one caller whose tab entries carry no icon, so the only frame that draws the ' +

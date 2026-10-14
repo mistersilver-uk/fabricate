@@ -371,7 +371,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
   ]),
-  // The link field (issue 2466): the world Tool screens, then one frame of each other host that draws it.
+  // The link field (issue 2466): the world Tool screens, then at least one frame of each of its nine other hosts.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
@@ -389,6 +389,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-v3-count-additional-dice-macro-narrow',
     'manager-checks-v3-count-additional-dice-macro-pair',
     'manager-checks-v3-count-additional-dice-macro-pair-narrow',
+    'manager-component-complications-macro-linked',
   ]),
   // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
