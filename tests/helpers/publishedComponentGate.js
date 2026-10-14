@@ -611,11 +611,30 @@ export const selectorsNaming = (css, root) =>
 export const writtenSelector = (css, complex) =>
   css.content.styles.slice(complex.start - css.content.start, complex.end - css.content.start);
 
+/**
+ * Every selector of `sheets`, each `[file, css]`, with an attribute selector named `name` wherever
+ * in the selector, as `{ written, above }`: as its sheet writes it, and each class named above the
+ * compound that holds the attribute.
+ */
+export function attributeSelectors(sheets, name) {
+  const holds = (part) => part.type === 'AttributeSelector' && part.name === name;
+  const holdsIn = (relative) => [...walkNodes(relative)].some((part) => holds(part));
+  return sheets.flatMap(([file, css]) =>
+    selectorsHolding(css, holds).map((complex) => {
+      const at = complex.children.findIndex((relative) => holdsIn(relative));
+      const above = complex.children
+        .slice(0, at)
+        .flatMap((relative) => [...walkNodes(relative)])
+        .filter((part) => part.type === 'ClassSelector')
+        .map((part) => part.name);
+      return { written: `${file}: ${writtenSelector(css, complex)}`, above };
+    })
+  );
+}
+
 /** Every selector of one parsed stylesheet with an attribute selector named `name`, as written. */
 export const selectorsOnAttribute = (file, css, name) =>
-  selectorsHolding(css, (part) => part.type === 'AttributeSelector' && part.name === name).map(
-    (complex) => `${file}: ${writtenSelector(css, complex)}`
-  );
+  attributeSelectors([[file, css]], name).map(({ written }) => written);
 
 const isRingSelector = (complex) => {
   const [root, subject, ...deeper] = complex.children;

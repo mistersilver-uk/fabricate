@@ -2043,11 +2043,12 @@ The published components, in publication order:
 | `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback) | yes |
-| `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required) | yes |
+| `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 Each row lists the component's published props, noting a prop's kind when it is not plain data and marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -2380,11 +2381,24 @@ Mount a button on one of those four grounds, never on `--fab-bg-3` and never ins
 `neutral`, `ghost`, `dashed` and `danger` draw an edge under 3:1 against the ground in every palette, so the label alone marks the button as a control: pass a verb phrase.
 What the button draws for a `role` value outside its set is private.
 So are its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this section states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors.
+`aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
+It is for a button whose press shows and hides a region you draw: pass `false` while the region is hidden and `true` while it is shown, in the same `onclick` that shows or hides it, and omit the prop on a button that does no such thing.
+Hide the region from assistive technology too, with `hidden` and not by height alone, and never pass a value that never changes, because it says something false.
+The label is the same in both states, because the attribute says which holds.
+Focus stays on the button when the region opens or closes, and before you hide a region that holds focus, move focus to the button, because that focus otherwise falls to the page and the next Escape closes the window.
+Foundry reads the attribute nowhere and gives the region no key: Escape does nothing while the button holds focus, and with focus in the region on anything but a field or a published control it closes every Foundry window.
+The button draws no chevron and opens nothing itself.
+`aria-describedby` is an `aria` prop: Fabricate writes it on the button.
+It is the id of one element of your own, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
+The id exists in the tree while the button is shown; one that does not describes nothing.
+The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
+The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: keep the button enabled and answer the press with the reason, or state the reason in the surrounding text.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on Button`.
 That includes `data-tooltip-text`, which the sections above advise for a component whose rest lands on a root that is no control: a button opens no tooltip.
 The button keeps its own cursor too, so put a hint in the label or in text beside the button, where a keyboard user reads it as well.
+Tie a hint in text beside the button to it with `aria-describedby`.
 
 A worked way out follows: an empty panel that holds the one verb that fills it.
 The panel sits inside a Fabricate window, because the button needs that ancestor wherever it is mounted, a content slot included.
@@ -2410,12 +2424,36 @@ fabUi.mount('Button', {
 panel.destroy(); // Ends the button, then the panel.
 ```
 
+A disclosure follows: a button that shows and hides a region of your own, and says which through `aria-expanded`.
+
+```javascript
+// After `load(['Button'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the prop refuses it: draw your own control there.
+if (fabUi?.describe?.('Button')?.props['aria-expanded']?.kind !== 'aria') return;
+
+// A region you drew beside `target`, in the same Fabricate window.
+const region = target.ownerDocument.getElementById('acme-project-notes');
+region.hidden = true;
+let open = false;
+const props = () => ({
+  children: 'Project notes', // The same label in both states.
+  'aria-expanded': open,
+  onclick: () => {
+    open = !open;
+    region.hidden = !open; // Hidden from assistive technology too.
+    disclosure.update(props()); // The same props, and the new `aria-expanded`.
+  },
+});
+const disclosure = fabUi.mount('Button', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
 `describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
-A prop's `kind` is `data`, `text`, `slot` or `callback`.
+A prop's `kind` is `data`, `text`, `slot`, `callback` or `aria`.
 A `data` prop takes plain data, and the component receives a copy.
 A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
 A `text` prop that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a required one refuses `''`.
@@ -2430,6 +2468,16 @@ It runs under Fabricate's `untrack`, which covers Fabricate's runtime only, so i
 Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush.
 After `destroy`, a fault, or an `update` that omits the prop, Fabricate does not call the function again; a required prop cannot be omitted, so an `update` that omits it throws and the earlier function still answers.
 Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates it refuses the prop.
+An `aria` prop is an ARIA attribute Fabricate writes, under the prop's own name, on the control the component's section names; the component declares no prop of that name.
+It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`; `undefined` or absence writes no attribute; anything else throws `"<key>" must be a string, number or boolean`.
+An `aria` prop is never required.
+An `update` that changes the prop's value writes it on the same element, and one that omits the prop removes the attribute.
+Fabricate writes the attribute only when the value differs from the one you last passed, so it puts back nothing other code removed or replaced.
+Fabricate checks no value against the attribute's own set: the component's section states the accepted values, and any other is private.
+Detect an `aria` prop with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates it refuses the prop.
+An ARIA attribute is published only as an `aria` prop a component's section names.
+A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
+A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1; publishing one later is additive.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
@@ -2442,6 +2490,7 @@ A breaking change to one component bumps that component's `version`, keeps the o
 `mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
 It returns a frozen `{ update(props), destroy(), slot(key) }`.
+Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
   A component whose root is not `any` also needs that Fabricate ancestor above `target`: otherwise `mount` throws `<name> needs a Fabricate window ancestor` or `<name> needs a Fabricate manager ancestor`, before it claims the target.
@@ -2452,6 +2501,7 @@ It returns a frozen `{ update(props), destroy(), slot(key) }`.
   A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
   Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet reads off its buttons, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
+  An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
 - `onFault` is optional, and is described with faults below.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
 - `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
@@ -2604,6 +2654,7 @@ A published component draws a control only where its section says so, and each c
 - A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, and Fabricate supplies none.
+  Where a prop carries the name, `aria-label` and `aria-labelledby` are refused, so nothing replaces it.
 - Fabricate moves no focus.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
@@ -2620,6 +2671,16 @@ A published component draws a control only where its section says so, and each c
   In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so mount a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` prop and exposes it in the accessibility tree as well as in colour.
   A press reports through the callback, and the control shows the new state when your `update` passes it; its section says where a native control changes itself first.
+  The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as props.
+  `aria-expanded` is an `aria` prop because it reports a region the control does not draw, which the component shows nowhere.
+- A control takes an ARIA attribute from you only through an `aria` prop its section names; every other `aria-*` name is refused.
+- An `aria` prop that takes an id (`aria-describedby`) names an element you own, in the same tree as `target`, outside `target` or inside one of its content slots.
+  The element it names holds text you also draw visibly; Fabricate does not check this.
+  Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, describes nothing, and keeping it unique is yours.
+  In a Foundry 14 detached window both ends sit inside the one Foundry window's element, because Foundry moves that element whole to the other document and anything you appended to `body` stays behind.
+- Foundry's tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
+  A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it.
+  Restore the prop then with an `update` that omits it and, after Fabricate's next microtask flush, one that passes it again; made in one synchronous run the two are drawn as the second alone, which writes nothing.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
   Where a component's rest lands on the control itself, `data-cursor` is refused: at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is the fade of its own state change.

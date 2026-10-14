@@ -212,6 +212,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       disabled: Object.freeze({ kind: 'data' }),
       children: Object.freeze({ kind: 'text', required: true }),
       onclick: Object.freeze({ kind: 'callback', required: true }),
+      'aria-expanded': Object.freeze({ kind: 'aria' }),
+      'aria-describedby': Object.freeze({ kind: 'aria' }),
     }),
     rest: true,
     root: 'fabricate',

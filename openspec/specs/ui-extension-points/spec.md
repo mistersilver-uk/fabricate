@@ -366,8 +366,9 @@ Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive;
 
 - **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.**
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
-- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required: boolean } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
+- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria', required: boolean } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
 - `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key) }`.
+Fabricate draws a published component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
 - `load(names)` takes an array of published names, reads a value that is not an array as one name, and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 It resolves `undefined` once every named entry's code is loaded, which today is the next microtask, and rejects with the M3 `TypeError` for a name that is not published.
 It does not wait for `fabricate.ready`, so M2 still applies to `mount`.
@@ -378,7 +379,7 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback', required?, element?, args? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria', required?, element?, args? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
@@ -395,9 +396,12 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
+- An ARIA attribute is published only as an `aria` key an entry's group names.
+A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
+A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1; publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button` too (issue 2452); a companion calls it for each before mounting.
-- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'` and `'callback'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
+- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'` and `'aria'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
@@ -448,6 +452,13 @@ A throw, or the rejection of a Promise it returns, is reported as `console.error
 An `update` made there is drawn on Fabricate's next flush, and a refusal it throws is reported as a callback failure unless the function catches it.
 - After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again; a `required` key cannot be omitted.
 - A companion detects a callback key with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates the key refuses it.
+- An `aria` key is an ARIA attribute Fabricate writes, under the key's own name, on the control the entry's group names; the component declares no prop of that name.
+It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`; `undefined` or absence writes no attribute; anything else is M13.
+An `aria` key is never `required`.
+- An `update` that changes the key's value writes it on the same element, and one that omits the key removes the attribute.
+Fabricate writes the attribute only when the value differs from the one last passed, so it puts back nothing other code removed or replaced.
+- Fabricate checks no value against the attribute's own set: the entry's group states the accepted values, and any other is private.
+- A companion detects an `aria` key with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates the key refuses it (M13).
 
 ### The required ancestor root
 
@@ -479,6 +490,7 @@ In any other window Escape closes nothing while a control holds focus, because c
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, and Fabricate supplies none.
+Where a key carries the name, `aria-label` and `aria-labelledby` are refused (M13), so nothing replaces it.
 - Fabricate moves no focus.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
 The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
@@ -495,6 +507,16 @@ Disabling the control that holds focus drops focus to the document body, where F
 In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
+The attribute that exposes the state is the component's own, so `aria-pressed`, `aria-checked`, `aria-selected` and `aria-current` are refused as keys (M13).
+`aria-expanded` is an `aria` key because it reports a region the control does not draw, which the component shows nowhere.
+- A control takes an ARIA attribute from the companion only through an `aria` key its group names; every other `aria-*` name is refused (M13).
+- An `aria` key that takes an id (`aria-describedby`) names an element the companion owns, in the same tree as `target`, outside `target` or inside one of its content slots.
+The element it names holds text the companion also draws visibly; Fabricate does not check this.
+Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, describes nothing, and keeping it unique is the companion's.
+In a Foundry 14 detached window both ends sit inside the one Foundry window's element, because Foundry moves that element whole to the other document and anything the companion appended to `body` stays behind.
+- Foundry's tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
+A tooltip on an ancestor leaves the control alone, so this reaches a published control only when the companion shows one on it itself, with `game.tooltip.activate` or a Tour step that selects it.
+The companion then restores the key with an `update` that omits it and, after Fabricate's next microtask flush, one that passes it again; made in one synchronous run the two are drawn as the second alone, which writes nothing.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
 Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is the fade of its own state change.
@@ -726,8 +748,21 @@ Each group states the accepted values of every key that entry publishes.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side.
     The companion leaves that much inside any edge of its own that clips, a scrolling container's among them, and insets a `fullWidth` button's `target` by as much.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not against `--fab-bg-3`.
+  - `aria-expanded` is `true` or `false`, and is an `aria` key: Fabricate writes it on the button.
+    It is for a button whose press shows and hides a region the companion draws: the companion passes `false` while the region is hidden and `true` while it is shown, in the same `onclick` that shows or hides it, and omits the key on a button that does no such thing.
+    A hidden region is hidden from assistive technology too, with `hidden` and not by height alone, and a value that never changes says something false.
+    The label is the same in both states, because the attribute says which holds.
+    Focus stays on the button when the region opens or closes, and a companion that hides a region holding focus moves focus to the button first, because that focus otherwise falls to the page and the next Escape closes the window.
+    Foundry reads the attribute nowhere and gives the region no key: Escape does nothing while the button holds focus, and with focus in the region on anything but a field or a published control it closes every Foundry window.
+    The button draws no chevron and opens nothing itself.
+  - `aria-describedby` is an `aria` key: Fabricate writes it on the button.
+    It is the id of one element of the companion's, or several ids separated by spaces, holding a hint that is visible text beside the button and that adds to the label without repeating it.
+    The id exists in the tree while the button is shown; one that does not describes nothing.
+    The hint is then read to a screen-reader user who tabs to the button, and the button's name is still its label alone.
+    The reason a `disabled` button is unavailable does not go in its hint, because a keyboard user never reaches a disabled button: the companion keeps the button enabled and answers the press with the reason, or states the reason in the surrounding text.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The button therefore opens no tooltip and keeps its own cursor, so a hint goes in the label or in text beside the button, where a keyboard user reads it too.
+    A hint in text beside the button is tied to it with `aria-describedby`.
   - The label of an enabled button clears the 4.5:1 small-text floor at rest in every visual role, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and under the pointer in every visual role but `primary`, which falls short of it there in the `foundry-native` palette.
     `ghost` and `dashed` draw no fill, so their label is the muted ink on `target`'s own ground and clears that floor by the least.
     On `--fab-bg-3` every visual role but `primary` falls short of it in at least one palette, and on a tinted fill over any ground `ghost`, `dashed` and `danger` do, so the companion mounts a button on one of the four grounds and never inside a tinted panel.
@@ -755,7 +790,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
-| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction` | `"<key>" is not a data attribute`, or `"<key>" is reserved on <name>` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction`; or an `aria` key not holding a string, number or boolean (a function is M10) | `"<key>" is not a data attribute`, `"<key>" is reserved on <name>`, or `"<key>" must be a string, number or boolean` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
@@ -878,6 +913,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onclick` once, with no argument
 - **AND** after an `update` that passes `disabled: true` a press calls nothing
 - **AND** a mount that passes `data-action` through rest throws M13, and nothing is rendered
+
+#### Scenario: An ARIA attribute on a control
+
+- **WHEN** a companion mounts `Button` with `'aria-expanded': false` and then updates it with `'aria-expanded': true`
+- **THEN** the button carries `aria-expanded="false"`, and after the update `aria-expanded="true"` on the same element
+- **AND** a mount that passes `aria-pressed` throws M13, and nothing is rendered
+- **AND** a mount that omits `aria-expanded` draws no such attribute
 
 #### Scenario: A malformed request
 

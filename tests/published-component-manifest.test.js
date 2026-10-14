@@ -6,7 +6,8 @@
  * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
- * that names a bare `button` (issue 2452). The test-only probe runs beside the shipped entries;
+ * that names a bare `button`, and every selector that reads a shipped `aria` key off any element
+ * (issue 2452). The test-only probe runs beside the shipped entries;
  * the adapter's bindings are the mounted suite's, and what a published control must also do is
  * `published-component-controls.test.js`'s (issue 2452).
  * Limit: the gate does not see what a component passes a callback, so an entry that states `args`
@@ -62,6 +63,7 @@ import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
   ariaFaults,
+  attributeSelectors,
   byName,
   controlRestFaults,
   declarationsOf,
@@ -279,6 +281,12 @@ function declarationFaults(entry, ast) {
 /** An entry's `aria` keys; an entry a synthetic row gives no props has none. */
 const ariaKeysOf = (entry) =>
   Object.keys(entry.props ?? {}).filter((key) => entry.props[key].kind === 'aria');
+
+/** Every shipped `aria` key, as `<entry>.<key>`, in manifest order. */
+const shippedAriaKeys = () =>
+  PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) =>
+    ariaKeysOf(entry).map((key) => `${entry.name}.${key}`)
+  );
 
 /** The classes `tone` and `density` can write beside the root class, private values included. */
 const PUBLISHED_CHIP_CLASSES = new Set([
@@ -651,6 +659,17 @@ const BARE_BUTTON_RULES = Object.freeze([
 /** What `.fabricate-manager button` declares, which the family's floor rule also declares. */
 const MANAGER_BUTTON_FLOOR = Object.freeze([['font', 'inherit']]);
 
+/**
+ * Every selector that reads a shipped `aria` key, as written, beside the class above it that keeps
+ * it off a published control: a pinned ancestor, which no extension target sits under.
+ */
+const ARIA_KEY_SELECTORS = Object.freeze([
+  [
+    "src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte: .fab-im-toolbar :global(.fabricate-button[aria-expanded='true'])",
+    'fab-im-toolbar',
+  ],
+]);
+
 /** Whether a compound is a `button` that names no class a published button lacks. */
 const isBareButton = (compound, shape) =>
   typesOf(compound).includes('button') &&
@@ -971,6 +990,14 @@ describe('each entry matches its component declaration', () => {
       shipped,
       ['Notice.onAction: 0', 'Button.onclick: 0'],
       'a forwarded argument needs a mounted clause on its type'
+    );
+  });
+
+  it('pins every shipped aria key', () => {
+    assert.deepEqual(
+      shippedAriaKeys(),
+      ['Button.aria-expanded', 'Button.aria-describedby'],
+      'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
     );
   });
 
@@ -2363,9 +2390,56 @@ describe('the module sheet and every component style against the published Butto
     );
     assert.deepEqual(
       publishedShapeOf('Button'),
-      [['role', 'fullWidth', 'disabled', 'children', 'onclick'], 'fabricate'],
+      [
+        [
+          'role',
+          'fullWidth',
+          'disabled',
+          'children',
+          'onclick',
+          'aria-expanded',
+          'aria-describedby',
+        ],
+        'fabricate',
+      ],
       'a published size, class or tag reopens the census'
     );
+  });
+
+  it('reads a shipped aria key in one selector of any stylesheet, which a pinned ancestor keeps off a published control', () => {
+    const keys = PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => ariaKeysOf(entry));
+    const names = [...new Set(keys)];
+    assert.deepEqual(names, ['aria-expanded', 'aria-describedby'], 'the names the census reads');
+    const reading = names.flatMap((name) => attributeSelectors(everyStylesheet(), name));
+    assert.deepEqual(
+      reading.map(({ written }) => written),
+      ARIA_KEY_SELECTORS.map(([written]) => written),
+      'a rule that reads an aria key off an element restyles a published control a companion sets it on'
+    );
+    const pinned = new Set([...BUTTON.ancestors, ...BARE_BUTTON_ANCESTORS]);
+    for (const [index, [written, ancestor]] of ARIA_KEY_SELECTORS.entries()) {
+      assert.ok(
+        pinned.has(ancestor) && reading[index].above.includes(ancestor),
+        `${written} sits under ${ancestor}, a pinned ancestor`
+      );
+    }
+  });
+
+  it('reads an attribute selector wherever a selector holds it, beside the classes above it', () => {
+    const rules = [
+      ".fabricate [aria-expanded='true']",
+      '.fab-im-toolbar.is-open > :global(.fabricate-button[aria-expanded]) i',
+      '.a:not([aria-expanded]) .b',
+      '[aria-expanded]',
+      '.c[aria-describedby]',
+    ];
+    const { css } = templateOf('sheet.css', `<style>${rules.join(', ')} { gap: 0 }</style>`).ast;
+    assert.deepEqual(attributeSelectors([['sheet.css', css]], 'aria-expanded'), [
+      { written: `sheet.css: ${rules[0]}`, above: ['fabricate'] },
+      { written: `sheet.css: ${rules[1]}`, above: ['fab-im-toolbar', 'is-open'] },
+      { written: `sheet.css: ${rules[2]}`, above: [] },
+      { written: `sheet.css: ${rules[3]}`, above: [] },
+    ]);
   });
 
   it('draws a published button alike under any ancestor, with the module ring and no other', () => {

@@ -21,8 +21,10 @@ import { playerExtensions } from '../src/ui/playerExtensions.js';
 import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { SHIPPED_KINDS } from '../src/ui/publishedComponentProps.js';
 import { publishedComponentSeam } from '../src/ui/publishedComponentSeam.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
+import { NEVER_ARIA } from './helpers/publishedComponentGate.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
 const GOLDEN = JSON.parse(
@@ -217,6 +219,13 @@ const RESERVED_REST_FAMILIES = Object.freeze([
   '`data-essence-sort-direction`',
 ]);
 
+/** The kinds whose key opens a line of its entry's spec group: its arguments, or its values. */
+const KINDS_A_GROUP_STATES = new Set(['callback', 'aria']);
+
+/** The names `text` spells between `open` and `close` marks, in order. */
+const spelledBetween = (text, open, close = open) =>
+  [...(text ?? '').matchAll(new RegExp(`${open}([a-z-]+)${close}`, 'gu'))].map(([, name]) => name);
+
 /** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
 function linesOpenedBy(text, key) {
   const opening = new RegExp('^\\s*(?:- )?(?:`[^`]+` and )?`' + key + '`', 'u');
@@ -405,6 +414,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           disabled: optional,
           children: requiredText,
           onclick: { kind: 'callback', required: true },
+          'aria-expanded': { kind: 'aria', required: false },
+          'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
         root: 'fabricate',
@@ -459,10 +470,10 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       const valuesIn = (text) =>
         Object.fromEntries(keys.map((key) => [key, statedValues(text, key)]));
       for (const key of keys) {
-        if (props[key].kind !== 'callback') continue;
+        if (!KINDS_A_GROUP_STATES.has(props[key].kind)) continue;
         assert.ok(
           linesOpenedBy(group, key).length > 0,
-          `the ${name} group opens a line with \`${key}\`, where its arguments are stated`
+          `the ${name} group opens a line with \`${key}\`, where its arguments or values are stated`
         );
       }
       const specified = valuesIn(group);
@@ -503,13 +514,41 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     );
   });
 
-  it('states the reserved rest names and their refusal in the spec’s M13 row and the docs’ mounting section', () => {
+  it('spells the shipped prop kinds alike in the kinds table, the spec and the docs', () => {
+    const kinds = Object.keys(SHIPPED_KINDS);
+    const shapes = [...SPECIFIED.matchAll(/\{ kind: ([^,]+), required/gu)];
+    assert.deepEqual(
+      shapes.map(([, union]) => spelledBetween(union, "'")),
+      [kinds, kinds],
+      'the described shape and the manifest shape, in the spec'
+    );
+    const [, refused] = /`kind` outside the shipped set, (.+?), with an `Error`/u.exec(SPECIFIED);
+    assert.deepEqual(spelledBetween(refused, "`'", "'`"), kinds, 'what registration admits');
+    const [, sentence] = /^A prop's `kind` is (.+)\.$/mu.exec(DOCUMENTED);
+    assert.deepEqual(spelledBetween(sentence, '`'), kinds, 'the docs’ kinds sentence');
+  });
+
+  it('holds the gate’s never-published ARIA names to the line of the spec and of the docs that spells them', () => {
+    const stating = (text) =>
+      text.split('\n').filter((line) => line.endsWith(' are never published as one.'));
+    const lines = stating(SPECIFIED);
+    assert.equal(lines.length, 1, 'one spec line says what is never an aria key');
+    assert.deepEqual(spelledBetween(lines[0], '`'), [...NEVER_ARIA]);
+    assert.deepEqual(stating(DOCUMENTED), lines, 'and the docs spell the same line');
+  });
+
+  it('states the reserved rest names, their refusal and an aria key’s in the spec’s M13 row and the docs’ mounting section', () => {
     const row = SPECIFIED.split('\n').filter((line) => line.startsWith('| M13 |'));
     assert.equal(row.length, 1, 'one M13 row');
     const from = DOCUMENTED.indexOf('\n### Mounting, updating and destroying\n');
     const to = DOCUMENTED.indexOf('\n### ', from + 1);
     assert.ok(from !== -1 && to !== -1, 'the mounting section, then another heading');
-    const stated = ['is reserved on <name>', ...RESERVED_REST_FAMILIES, '`data-tooltip-`'];
+    const stated = [
+      'is reserved on <name>',
+      'must be a string, number or boolean',
+      ...RESERVED_REST_FAMILIES,
+      '`data-tooltip-`',
+    ];
     for (const [where, prose] of [
       ['the spec’s M13 row', row[0]],
       ['### Mounting, updating and destroying', DOCUMENTED.slice(from, to)],
