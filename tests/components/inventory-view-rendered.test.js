@@ -94,7 +94,7 @@ const within = (actual, expected, label) =>
   assert.ok(Math.abs(actual - expected) <= 1, `${label}: ${actual}, expected ${expected}`);
 
 // Maintainer ruling, 2026-10-14: pinned to the column's foot and spanning its full width.
-describe('inventory view, rendered: the bulk footer sits on the detail column`s foot', () => {
+describe("inventory view, rendered: the bulk footer sits on the detail column's foot", () => {
   for (const [label, rows] of [
     ['a short queue', 1],
     ['a queue taller than the column', 25],

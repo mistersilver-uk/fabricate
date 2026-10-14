@@ -410,7 +410,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     harness.remount();
   });
 
-  it('rides the shell`s dock under Apply (maintainer ruling 2026-10-14)', async () => {
+  it("rides the shell's dock under Apply (maintainer ruling 2026-10-14)", async () => {
     const root = await harness.mount(props(SELECTION));
     const dock = root.querySelector(':scope [data-essence-bulk-panel] .fab-bulk-edit-dock');
     assert.ok(Boolean(dock), 'the shell renders no dock');

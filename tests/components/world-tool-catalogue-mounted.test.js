@@ -596,7 +596,7 @@ describe('world Tools Catalogue (issue 1373)', () => {
     });
 
     // The maintainer's report (2026-10-14): the dock sat under the axes, inset from the column.
-    it('seats the dock on the inspector column`s foot at its full width', async () => {
+    it("seats the dock on the inspector column's foot at its full width", async () => {
       const target = await harness.mount({ scope: scopeFor({}), systems: SYSTEMS, actions: {} });
       tick(target, 'hammer');
       await harness.setProps({});

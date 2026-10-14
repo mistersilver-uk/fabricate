@@ -998,7 +998,7 @@ const FULL_IMPACT = {
 };
 
 describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
-  it('renders the card in the shell`s dock, with this studio\'s hook names', async () => {
+  it("renders the card in the shell's dock, with this studio's hook names", async () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.ok(Boolean(deleteCard(root)), 'the panel renders no delete card at all');

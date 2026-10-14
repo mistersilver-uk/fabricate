@@ -432,7 +432,7 @@ const shortAxis = createRawSnippet(() => ({
 }));
 
 // The reported defect: a short panel drew its dock under the axes with the rail empty below it.
-describe('the bulk edit dock sits on the rail`s foot when the panel is shorter than the rail', () => {
+describe("the bulk edit dock sits on the rail's foot when the panel is shorter than the rail", () => {
   let measured = null;
 
   before(async () => {
@@ -457,7 +457,7 @@ describe('the bulk edit dock sits on the rail`s foot when the panel is shorter t
     }
   });
 
-  it('seats the dock on the rail`s padding-box bottom at the rail`s full inner width', () => {
+  it("seats the dock on the rail's padding-box bottom at the rail's full inner width", () => {
     assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
     assert.equal(measured.overflow, 0, 'NON-VACUITY: the panel must be shorter than the rail');
     const [sample] = measured.samples;
