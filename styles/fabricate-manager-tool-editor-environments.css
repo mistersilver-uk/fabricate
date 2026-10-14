@@ -128,12 +128,6 @@
   grid-row: 2;
 }
 
-/* THE TOOL STRIP'S BADGE IS A SQUARE, AND THIS RULE HAD TO SAY SO OUT LOUD (issue 1373). */
-.fabricate-manager .manager-tool-editor-tabs .manager-chip.manager-editor-tab-badge {
-  min-width: 18px;
-  text-align: center;
-}
-
 .fabricate-manager .manager-tool-edit-composition {
   /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   display: contents;
@@ -340,12 +334,6 @@
 }
 
 /* The prerequisite list's own grid, its `> label` row and its `small` detail line are GONE (issue 1373, round 5). */
-
-.fabricate-manager .manager-tool-editor-tabs > button > span.is-valid {
-  border-color: var(--fab-success-border);
-  background: var(--fab-success-soft);
-  color: var(--fab-success-text);
-}
 
 .fabricate-manager .manager-tool-preview-chips {
   display: flex;
@@ -1633,20 +1621,6 @@
   outline-offset: 2px;
 }
 
-/* Editor tab badges are counts — issue counts, item counts — so they take the mono face with tabular figures like every other numeric in the product (issue 643). */
-
-/* Written at THREE classes, and issue 1509 keeps all three rather than restating the reason issue 883 gave for them, because that reason is FALSE and the correction belongs beside the rule it was written on (issue 1507). */
-.fabricate-tabs .manager-chip.manager-editor-tab-badge {
-  min-width: 1.4rem;
-  min-height: 18px;
-  padding: 0 var(--fab-space-2xs);
-  font-family: var(--fab-font-mono);
-
-  /* 0.56rem (~9px) matches the prototype's tab count badge (issue 643 audit). */
-  font-size: 0.56rem;
-  font-variant-numeric: tabular-nums;
-}
-
 /* A tab's description is a sibling of the tablist (a tablist owns only tabs), placed against the caller's nearest positioned ancestor; the strip writes its tab's start-aligned, clamped position inline, and this above-and-end-aligned box is the fallback when nothing can be measured (issue 1779). */
 .fabricate-tabs ~ .fabricate-tabs-tooltip {
   position: absolute;
@@ -1681,7 +1655,8 @@
   font-size: 7px;
 }
 
-.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-lock {
+.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-lock,
+.fabricate-tabs .manager-environment-tab-button.is-active .manager-editor-tab-lock {
   color: var(--fab-accent);
 }
 

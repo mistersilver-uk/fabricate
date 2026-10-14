@@ -257,7 +257,7 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.deepEqual(calls, ['contents']);
   });
 
-  it('derives the contents count badge and a passing validation badge', async () => {
+  it('derives the contents count and a neutral, named passing validation badge', async () => {
     const root = await harness.mount({
       recipeItem: draft(),
       linkedItem: LINKED_ITEM,
@@ -266,12 +266,13 @@ describe('RecipeItemEditor (mounted)', () => {
       visibilityMode: 'item',
     });
     assert.equal(
-      root.querySelector('[data-recipe-item-tab-badge="contents"]').textContent.trim(),
+      root.querySelector('[data-recipe-item-tab-count="contents"]').textContent.trim(),
       '2'
     );
     const validation = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.equal(validation.textContent.trim(), '✓');
-    assert.ok(validation.classList.contains('is-active'));
+    assert.ok(validation.classList.contains('is-neutral'), 'a pass asks for no attention');
+    assert.equal(validation.getAttribute('aria-label'), 'All clear');
   });
 
   it('turns the validation badge danger when the linked item is missing', async () => {
@@ -286,6 +287,12 @@ describe('RecipeItemEditor (mounted)', () => {
     // itemLinked + recipeLinked both fail = 2 critical.
     assert.equal(validation.textContent.trim(), '2');
     assert.ok(validation.classList.contains('is-danger'));
+    assert.ok(
+      !root
+        .querySelector('[data-recipe-item-tab-button="contents"]')
+        .querySelector('.manager-editor-tab-count'),
+      'no linked recipe draws no Contents count'
+    );
   });
 
   it('recomputes the embedded item-mode preview and effective rules from caps', async () => {

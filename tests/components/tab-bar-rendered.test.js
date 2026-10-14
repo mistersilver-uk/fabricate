@@ -40,6 +40,12 @@ const MARKS = Object.freeze({
   outcomes: [count, { vehicle: 'dot', name: '1 issue' }],
 });
 const BADGED = Object.freeze({ ...MARKS, validation: issue('warning') });
+const DANGER_BADGES = Object.freeze({
+  ...MARKS,
+  tiers: [count, issue('danger')],
+  validation: issue('danger'),
+});
+const TICK = Object.freeze({ label: '✓', tone: 'neutral', name: 'All checks pass' });
 
 const MANAGER = ['<div class="fabricate fabricate-manager">', '</div>'];
 const within = (open, close) => [`${MANAGER[0]}${open}`, `${close}${MANAGER[1]}`];
@@ -47,29 +53,42 @@ const ALIAS = Object.freeze({
   containerClass: 'manager-environment-tabs',
   buttonClass: 'manager-environment-tab-button',
 });
+const ALIAS_BADGE = Object.freeze({ ...ALIAS, badgeClass: 'manager-environment-tab-badge' });
 
-/** Each mount: the props a caller passes, the host it stands in, and the gaps its marks leave. */
+/**
+ * Each mount: the props a caller passes, the host it stands in, the gaps its marks leave and its
+ * current tab, `tiers` unless it names another.
+ */
 const MOUNTS = Object.freeze({
   default: {},
   checks: {
     props: { ...ALIAS, containerClass: `${ALIAS.containerClass} manager-checks-sections` },
     host: within('<div data-checks-editor>', '</div>'),
   },
-  environment: { props: { ...ALIAS, badgeClass: 'manager-environment-tab-badge' } },
+  environment: { props: ALIAS_BADGE },
   'entry-column': { host: within('<div class="manager-component-entry-column">', '</div>') },
   bare: { host: ['<div class="fabricate">', '</div>'] },
   'no-badge': { badges: MARKS, marks: { validation: 0 } },
-  danger: {
-    props: { danger: true },
-    badges: { ...MARKS, tiers: [count, issue('danger')], validation: issue('danger') },
+  danger: { props: { danger: true }, badges: DANGER_BADGES, marks: { tiers: 2 } },
+  'environment-danger': {
+    props: { ...ALIAS_BADGE, danger: true },
+    badges: DANGER_BADGES,
     marks: { tiers: 2 },
   },
+  'environment-gated': {
+    props: ALIAS_BADGE,
+    badges: { ...MARKS, validation: TICK },
+    activeTab: 'settings',
+  },
 });
+const DANGER_MOUNTS = new Set(['danger', 'environment-danger']);
+const currentOf = (key) => MOUNTS[key].activeTab ?? 'tiers';
 const MARK_COUNTS = Object.freeze({ tiers: 1, outcomes: 2, validation: 1, settings: 1 });
 const HOST_LINES = Object.freeze(['1.2', '1.6']);
 const PROBED = Object.freeze([
   '--fab-text-muted',
   '--fab-text',
+  '--fab-text-subtle',
   '--fab-accent',
   '--fab-danger-text',
   '--fab-danger-border',
@@ -90,6 +109,19 @@ const TAB = Object.freeze({
   'border-bottom-width': '2px',
 });
 const TAB_HEIGHT = 46;
+/** Chip's `inspector` density in the mono face, as every strip's issue badge computes it. */
+const BADGE = Object.freeze({
+  height: 20,
+  'min-height': '20px',
+  padding: '4px 8px 4px 8px',
+  'font-size': '10px',
+  mono: true,
+  'font-weight': '500',
+  'line-height': '10px',
+  'border-top-width': '1px',
+  'border-top-left-radius': '999px',
+  'min-width': 'auto',
+});
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 /** Narrower than four tabs need on one row (about 400px), so the strip must wrap. */
 const NARROW_WIDTH = 266;
@@ -134,18 +166,34 @@ function readStrips(entryHeading) {
       color: style.color,
     };
   };
+  const sides = (style, property) =>
+    ['Top', 'Right', 'Bottom', 'Left'].map((side) => style[`${property}${side}`]).join(' ');
+  const readBadge = (badge) => {
+    const style = getComputedStyle(badge);
+    return {
+      height: badge.getBoundingClientRect().height,
+      'min-height': style.minHeight,
+      padding: sides(style, 'padding'),
+      'font-size': style.fontSize,
+      mono: /^"?JetBrains Mono/u.test(style.fontFamily),
+      'font-weight': style.fontWeight,
+      'line-height': style.lineHeight,
+      'border-top-width': style.borderTopWidth,
+      'border-top-left-radius': style.borderTopLeftRadius,
+      'min-width': style.minWidth,
+    };
+  };
   const readTab = (button) => {
     const style = getComputedStyle(button);
     const parts = [...button.children].map(box);
+    const lock = button.querySelector('.manager-editor-tab-lock');
     return {
       id: button.id.replace(/^.*-tab-/u, ''),
       current: button.matches('.is-active'),
       danger: button.matches('.is-danger'),
       box: box(button),
       paint: {
-        padding: ['Top', 'Right', 'Bottom', 'Left']
-          .map((side) => style[`padding${side}`])
-          .join(' '),
+        padding: sides(style, 'padding'),
         'font-size': style.fontSize,
         'line-height': style.lineHeight,
         'column-gap': style.columnGap,
@@ -156,9 +204,11 @@ function readStrips(entryHeading) {
       border: style.borderBottomColor,
       gaps: parts.slice(1).map((part, index) => part.left - parts[index].right),
       count: readCount(button.querySelector('.manager-editor-tab-count')),
-      chips: [...button.querySelectorAll('.manager-chip')].map(
-        (chip) => getComputedStyle(chip).minHeight
-      ),
+      lock: lock ? getComputedStyle(lock).color : null,
+      badges: [...button.querySelectorAll('.manager-chip, .k-badge')].map((badge) => ({
+        text: badge.textContent.trim(),
+        ...readBadge(badge),
+      })),
     };
   };
   const read = (strip, mount) => ({
@@ -208,7 +258,7 @@ async function mountedMarkup() {
   const markup = {};
   try {
     for (const [key, { props, badges = BADGED }] of Object.entries(MOUNTS)) {
-      const root = await harness.mount({ tabs: TABS, activeTab: 'tiers', badges, ...props });
+      const root = await harness.mount({ tabs: TABS, activeTab: currentOf(key), badges, ...props });
       markup[key] = root.innerHTML;
       harness.remount();
     }
@@ -285,7 +335,7 @@ it('keeps a danger tab in the danger ink, current and idle, under the accent rul
     const danger = strip.tabs.filter((drawn) => drawn.danger);
     assert.deepEqual(
       danger.map(({ id, current }) => [id, current]),
-      strip.key === 'danger' ? expected : [],
+      DANGER_MOUNTS.has(strip.key) ? expected : [],
       strip.key
     );
     assert.notEqual(strip.probes['--fab-danger-text'], strip.probes['--fab-accent']);
@@ -301,17 +351,18 @@ it('takes the text ink on a hovered idle tab, and keeps the current tab’s own 
   for (const strip of strips) {
     if (strip.line !== line) continue;
     const inks = {};
-    for (const id of ['outcomes', 'tiers']) {
+    const currentId = currentOf(strip.key);
+    for (const id of ['outcomes', currentId]) {
       const hovered = tab.locator(
         `[data-host-line="${line}"] [data-mount="${strip.key}"] [role="tab"][id$="-${id}"]`
       );
       await hovered.hover();
       inks[id] = await hovered.evaluate((button) => getComputedStyle(button).color);
     }
-    const current = strip.key === 'danger' ? '--fab-danger-text' : '--fab-accent';
+    const current = DANGER_MOUNTS.has(strip.key) ? '--fab-danger-text' : '--fab-accent';
     assert.deepEqual(
       inks,
-      { outcomes: strip.probes['--fab-text'], tiers: strip.probes[current] },
+      { outcomes: strip.probes['--fab-text'], [currentId]: strip.probes[current] },
       strip.key
     );
   }
@@ -345,13 +396,26 @@ it('wraps to a further row when narrow, rather than shrinking a tab', () => {
   }
 });
 
-it('draws a tab’s issue chip at the chip’s own 20px minimum height', () => {
-  let chipped = 0;
+it('draws every issue badge as Chip’s inspector density in the mono face at 500, in every host', () => {
+  const texts = new Set();
   eachTab((strip, drawn) => {
-    chipped += drawn.chips.length;
-    for (const minHeight of drawn.chips) assert.equal(minHeight, '20px', named(strip, drawn));
+    for (const { text, ...badge } of drawn.badges) {
+      texts.add(text);
+      assert.deepEqual(badge, BADGE, `${named(strip, drawn)} badge ${text}`);
+    }
   });
-  assert.ok(chipped > 0, 'no tab drew a chip');
+  assert.deepEqual(texts, new Set(['3', '✓']), 'a numeral and the tick are both measured');
+});
+
+it('colours the current tab’s padlock in the accent and an idle one subtle, under both vocabularies', () => {
+  const current = [];
+  eachTab((strip, drawn) => {
+    if (drawn.id !== 'settings') return;
+    if (drawn.current) current.push(strip.key);
+    const ink = drawn.current ? '--fab-accent' : '--fab-text-subtle';
+    assert.equal(drawn.lock, strip.probes[ink], named(strip, drawn));
+  });
+  assert.deepEqual(current, ['environment-gated', 'environment-gated'], 'the gated tab is current');
 });
 
 it('sets each mark 6px after what precedes it', () => {
@@ -373,7 +437,7 @@ it('draws a count at 10.5px mono 500 in the muted ink, on the current tab and on
     assert.deepEqual(
       counted.map(({ id, current }) => [id, current]),
       [
-        ['tiers', true],
+        ['tiers', currentOf(strip.key) === 'tiers'],
         ['outcomes', false],
       ],
       strip.key
@@ -448,6 +512,18 @@ it('reads the tab inks at 4.5:1 or over on bg-2 and on the soft well over surfac
   }
   assert.equal(grounds.size, themes.length, 'each palette paints its own ground');
   assert.deepEqual(under, []);
+});
+
+it('draws the entry’s Validation badge equal to the mounted one', () => {
+  const badges = drawn.flatMap(({ tabs }) => tabs.flatMap((tabDrawn) => tabDrawn.badges));
+  assert.equal(badges.length, 1, 'the entry draws one issue badge');
+  const [{ text, ...badge }] = badges;
+  const [{ text: mountedText, ...mounted }] = strips[0].tabs.find(
+    ({ id }) => id === 'validation'
+  ).badges;
+  assert.equal(text, mountedText);
+  assert.deepEqual(badge, mounted);
+  assert.deepEqual(badge, BADGE);
 });
 
 it('draws the entry’s tabs at the mounted tab’s box, type, weight and height', () => {

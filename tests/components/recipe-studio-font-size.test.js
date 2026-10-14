@@ -37,7 +37,10 @@ const FIXTURE = `
         </div></header>
         <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
-            <span class="manager-chip is-neutral manager-editor-tab-badge" data-m="tab-badge">4</span>
+            <span class="manager-editor-tab-count" data-m="tab-count">4</span>
+          </button>
+          <button class="manager-editor-tab-button"><span>Validation</span>
+            <span class="manager-chip is-danger is-mono is-inspector manager-editor-tab-badge" data-m="tab-badge">2</span>
           </button>
         </div>
         <div class="fabricate-nav"><div class="manager-nav-button">
@@ -310,7 +313,8 @@ const EXPECTED = {
   subtitle: 12,
   'header-button': 11.52, // 0.72rem
   'tab-label': 12.5,
-  'tab-badge': 8.96, // 0.56rem
+  'tab-count': 10.5,
+  'tab-badge': 10, // Chip's inspector density (issue 2464)
   'nav-label': 12.48, // 0.78rem — bleed fix (was inheriting 14)
   'nav-count': 10, // 0.625rem
   // 11px, NOT the 0.7rem (11.2px) this row committed before issue 1118 — a real change, and

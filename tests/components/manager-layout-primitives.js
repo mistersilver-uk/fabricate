@@ -1362,22 +1362,6 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
       `${tone} must change colour only, never the chip's size`
     );
   }
-
-  // THE TAB BADGE IS WRITTEN AT THREE CLASSES.
-  // Issue 883's reason was that three classes out-rank `Chip.svelte`'s own scoped
-  // `.manager-chip.svelte-<hash>` block, so the badge renders at its own deliberately smaller
-  // 18px/0.56rem rather than at the chip's scale. That is not how the contest resolves.
-  assert.ok(
-    css.includes('.fabricate-tabs .manager-chip.manager-editor-tab-badge {'),
-    'the tab badge rule must stay at three classes, rooted at the class `EditorTabs` emits ' +
-      'rather than at the manager window'
-  );
-  assert.equal(
-    css.includes('.fabricate-manager .manager-editor-tab-badge {'),
-    false,
-    'the two-class, manager-rooted form is the shape this rule must never be rewritten back ' +
-      'to: it is neither three classes nor rooted at the primitive'
-  );
 });
 
 // A staged conversion needs a ratchet.

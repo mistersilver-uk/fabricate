@@ -426,7 +426,7 @@ const PRIMITIVES = Object.freeze([
       'manager-editor-tab-dot',
     ]),
     classMaps: Object.freeze(['DEFAULT_CLASSES']),
-    // Measured at this commit: 6 written, 11 family selectors, 8 owned.
+    // Measured at issue 2464: 6 written, 10 family selectors, 8 owned.
     writtenFloor: 4,
     familyFloor: 10,
     ownedFloor: 6,
@@ -2361,8 +2361,8 @@ test('each primitive’s own scoped styles name no application root either', () 
       'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
       '`TintPicker` and ' +
-      '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
-      'scoped `.manager-editor-tab-button.is-danger` rules that tint a failing validation ' +
+      '— since issue 1509 put entries on them — `EditorTabs`, whose block is the scoped ' +
+      'danger pair, naming both button vocabularies, that tints a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
       'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +

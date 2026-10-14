@@ -702,11 +702,13 @@ Each is stated here because the shape of each is decided by the `data-models/spe
     It is NOT the shared SUBJECT modifier picker, and that is a contract mismatch rather than a preference: that picker authors a MULTI pick of entry ids with a tri-state inheritance and an activity cap, while the Tool bonus writes ONE entry's expression to a string field with no inheritance of picks and no cap.
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
+    A record count moved off the issue vehicle at issue 2464 is the one admitted change of hook: a reclassification, not a promotion.
     A site whose button stem and panel stem differ — `checks-section-<id>` beside `checks-panel-<id>` — overrides either half rather than being kept out of the primitive.
-12. **The strip DRAWS the Rail Marker Family**, so a caller names which vehicle its mark uses — a record count, an issue summary, or the dot — and the primitive owns each drawing; the count and the dot take no class from the caller.
+12. **The strip DRAWS the Rail Marker Family**, so a caller names which vehicle its mark uses — a record count, an issue summary, or the dot — and the primitive owns each drawing; the count, the dot and the issue summary take no class from the caller.
     A tab may carry more than one mark, because a section can be both authored and unready at once.
     The dot renders only with a text accessible name naming its unit, and a nameless one is dropped rather than drawn, because a mark separated from its siblings by colour alone is not a signal.
     A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
+    A caller states its answer through the mark's `suppressZero` (default true); the five record counts moved at issue 2464 take that default.
 13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
     It is a mode of the one primitive, never a reason for a second implementation.
 14. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**

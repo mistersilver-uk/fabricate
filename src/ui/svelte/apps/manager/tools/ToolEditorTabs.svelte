@@ -70,7 +70,7 @@
     return value.replace('{count}', String(count));
   }
 
-  // The Requirements count is suppressed at zero by the primitive's own badge rule. The
+  // The Requirements count is suppressed at zero by the primitive's zero rule. The
   // Validation badge is always present: a danger count, or the tick, whose `name` is its only
   // readable name.
   //
@@ -81,14 +81,13 @@
   // the blocking count, so a GM scanning the strip sees a mark only where there is something to
   // do.
   const badges = $derived({
-    requirements: requirementCount,
+    requirements: { vehicle: 'count', label: requirementCount },
     validation:
       errorCount > 0
         ? { tone: 'danger', label: errorCount, name: issueCountText(errorCount) }
         : {
             tone: 'neutral',
             label: '✓',
-            class: 'is-valid',
             name: text('AllValid', 'All checks pass'),
           },
   });

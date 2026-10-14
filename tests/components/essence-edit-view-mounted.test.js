@@ -434,16 +434,27 @@ describe('1036 EssenceEditView — tab badges', () => {
   it('counts CONFIGURED behaviours on the On-craft badge, not effects', async () => {
     const root = await harness.mount(props());
     assert.equal(
-      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge').textContent.trim(),
+      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-count').textContent.trim(),
       '2',
       'a linked source and a linked macro'
     );
 
     await harness.setProps(props({ showPropertyMacroUi: false }));
     assert.equal(
-      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge').textContent.trim(),
+      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-count').textContent.trim(),
       '1',
       'a gated-off capability cannot be configured from this tab, so it does not count'
+    );
+    assert.ok(
+      !root.querySelector('[data-essence-tab="oncraft"]').querySelector('.manager-chip'),
+      'the On-craft count is a record count, never a chip'
+    );
+
+    await harness.setProps(props({ showSourceUi: false, showPropertyMacroUi: false }));
+    assert.ok(Boolean(root.querySelector('[data-essence-tab="oncraft"]')), 'the tab still renders');
+    assert.ok(
+      !root.querySelector('[data-essence-tab="oncraft"]').querySelector('.manager-editor-tab-count'),
+      'a zero On-craft count draws no count'
     );
     harness.remount();
   });

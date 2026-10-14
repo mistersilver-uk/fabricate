@@ -29,7 +29,10 @@ const COMPONENT = 'src/ui/svelte/components/EditorTabs.svelte';
 const ROOT = 'fabricate-tabs';
 const DEFAULT_CONTAINER = 'manager-editor-tabs';
 const DEFAULT_BUTTON = 'manager-editor-tab-button';
+const DEFAULT_BADGE = 'manager-editor-tab-badge';
+const ALIAS_BUTTON = 'manager-environment-tab-button';
 const COUNT = 'manager-editor-tab-count';
+const LOCK = 'manager-editor-tab-lock';
 
 const corpus = collectStyleCorpus();
 const definitions = collectCustomProperties(corpus);
@@ -43,10 +46,10 @@ const rules = Object.entries(corpus).flatMap(([file, css]) =>
   }))
 );
 
-/** The one rule in the sheet listing `selector`. */
-function familyRule(selector) {
-  const found = rules.filter((rule) => rule.file === SHEET && rule.selectors.includes(selector));
-  assert.equal(found.length, 1, `${found.length} sheet rules list ${selector}`);
+/** The one rule in `file` listing `selector`. */
+function familyRule(selector, file = SHEET) {
+  const found = rules.filter((rule) => rule.file === file && rule.selectors.includes(selector));
+  assert.equal(found.length, 1, `${found.length} ${file} rules list ${selector}`);
   return found[0];
 }
 const FAMILY = Object.freeze({
@@ -55,6 +58,14 @@ const FAMILY = Object.freeze({
   hover: familyRule(`.${ROOT} .${DEFAULT_BUTTON}:hover`),
   current: familyRule(`.${ROOT} .${DEFAULT_BUTTON}.is-active`),
 });
+/** The tab-state rules beside the family, each read at its compound carrying the state. */
+const STATE_RULES = Object.freeze({
+  lock: familyRule(`.${ROOT} .${DEFAULT_BUTTON}.is-active .${LOCK}`),
+  danger: familyRule(`.${DEFAULT_BUTTON}.is-danger`, COMPONENT),
+  'current danger': familyRule(`.${DEFAULT_BUTTON}.is-danger.is-active`, COMPONENT),
+});
+const stateCompound = (selector) =>
+  compoundsOf(selector).find((compound) => /\.is-(active|danger)(?![\w-])/u.test(compound));
 
 /** Whether a class prop is anything but one static string, which the sites below could not read. */
 const isComputed = (node, prop) => {
@@ -76,12 +87,14 @@ const allSites = sourceAstEntriesUnder('src/ui/svelte')
       computed: ['containerClass', 'buttonClass'].filter((prop) => isComputed(node, prop)),
       container: classTokens(node, 'containerClass'),
       button: classTokens(node, 'buttonClass'),
+      badge: classTokens(node, 'badgeClass'),
     }))
   );
 const callSites = allSites.filter(({ container, button }) => container.size + button.size > 0);
 const passed = (prop) => callSites.flatMap((site) => [...site[prop]]);
 const callerContainers = new Set([DEFAULT_CONTAINER, ...passed('container')]);
 const tabClasses = new Set([DEFAULT_BUTTON, ...passed('button')]);
+const badgeClasses = new Set([DEFAULT_BADGE, ...allSites.flatMap((site) => [...site.badge])]);
 
 const subjectOf = (selector) => compoundsOf(selector).at(-1);
 const subjectHolds = (selector, classes) =>
@@ -194,13 +207,17 @@ test('no <EditorTabs> call site passes a computed container or button class', ()
   );
 });
 
-test('each family selector list names a class every caller passes', () => {
+test('each family and tab-state selector list names a class every caller passes', () => {
   assert.ok(callSites.length >= 7, `only ${callSites.length} call sites pass a class`);
-  assert.ok(passed('button').length >= 3, 'the button vocabularies are read');
-  for (const [part, rule] of Object.entries(FAMILY)) {
+  assert.ok(passed('button').includes(ALIAS_BUTTON), 'the alias button vocabulary is read');
+  const lists = [
+    ...Object.entries(FAMILY).map(([part, rule]) => [part, rule, subjectOf]),
+    ...Object.entries(STATE_RULES).map(([part, rule]) => [part, rule, stateCompound]),
+  ];
+  for (const [part, rule, compoundOf] of lists) {
     const prop = part === 'strip' ? 'container' : 'button';
     const named = new Set(
-      rule.selectors.flatMap((selector) => compoundClasses(subjectOf(selector)))
+      rule.selectors.flatMap((selector) => compoundClasses(compoundOf(selector)))
     );
     for (const site of callSites) {
       if (site[prop].size === 0) continue;
@@ -210,6 +227,34 @@ test('each family selector list names a class every caller passes', () => {
       );
     }
   }
+});
+
+test('no rule draws the issue badge but the chip’s own: none names a badge class or a chip in a strip', () => {
+  assert.ok(
+    badgeClasses.has('manager-environment-tab-badge'),
+    'the callers’ badge classes are read'
+  );
+  const strips = new Set([ROOT, ...callerContainers]);
+  const inAStrip = (selector) => {
+    const compounds = compoundsOf(selector);
+    return (
+      compoundClasses(compounds.at(-1)).includes('manager-chip') &&
+      compounds
+        .slice(0, -1)
+        .some((compound) => compoundClasses(compound).some((name) => strips.has(name)))
+    );
+  };
+  const offenders = rules.flatMap((rule) =>
+    rule.selectors
+      .filter(
+        (selector) =>
+          compoundsOf(selector).some((compound) =>
+            compoundClasses(compound).some((name) => badgeClasses.has(name))
+          ) || inAStrip(selector)
+      )
+      .map((selector) => `${rule.file} ${rule.context} ${selector}`.replaceAll(/\s+/gu, ' '))
+  );
+  assert.deepEqual(offenders, []);
 });
 
 const isButton = (compound) =>
@@ -232,14 +277,15 @@ function drawsATab(selector) {
   );
 }
 
-/** The rules beside the family that may draw a tab: danger, the font floor, focus, and PR 2’s valid mark. */
+/** The rules beside the family that may draw a tab: danger, under both vocabularies, the font floor and focus. */
 const BESIDE_THE_FAMILY = Object.freeze([
   `${COMPONENT} .${DEFAULT_BUTTON}.is-danger`,
   `${COMPONENT} .${DEFAULT_BUTTON}.is-danger.is-active`,
+  `${COMPONENT} .${ALIAS_BUTTON}.is-danger`,
+  `${COMPONENT} .${ALIAS_BUTTON}.is-danger.is-active`,
   `${SHEET} .${ROOT} button`,
   `${SHEET} .${ROOT} button:focus`,
   `${SHEET} .${ROOT} button:focus-visible`,
-  `${SHEET} .fabricate-manager .manager-tool-editor-tabs > button > span.is-valid`,
 ]);
 
 test('no rule beside the family draws a tab, at any container width', () => {

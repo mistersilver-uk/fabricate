@@ -9,13 +9,13 @@
   | tab `ariaLabelKey` / `ariaLabel` | key / English fallback | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here (see Invariants). |
   | tab `tooltipKey` / `tooltip` | key / English fallback | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
-  | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, class, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `class` is one modifier class appended to `badgeClass` on the chip only; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
+  | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
   | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
   | `idStem` / `buttonIdStem` / `panelIdStem` | strings | `'editor'` / `''` / `''` | `idStem` builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`; the other two override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
   | `tooltipIdStem` / `tooltipDataAttr` | string / `data-*` name | `<idStem>-tooltip` / `''` | The description id `<stem>-<id>` and its per-tab hook. |
   | `activePanelOnly` | boolean | `false` | Emit `aria-controls` ONLY on the selected tab. Not cosmetic: a strip rendering one panel at a time otherwise points every unselected tab at an id not in the document, which assistive technology reports as a broken relationship rather than as "not currently shown". |
   | `tabDataAttr` / `badgeDataAttr` / `countDataAttr` / `dotDataAttr` | `data-*` names | see source | The per-button and per-vehicle hooks carrying the tab id; `''` renders none. One per vehicle because the shipped hooks do not share a stem. |
-  | `containerClass` / `buttonClass` / `badgeClass` / `danger` | class strings / boolean | the primitive's own family / `false` | The site's existing classes, kept so no shipped rule stops matching — the COUNT and DOT have no such prop, because their classes ARE the drawing — and whether a danger chip also tints its button. |
+  | `containerClass` / `buttonClass` / `badgeClass` / `danger` | class strings / boolean | the primitive's own family / `false` | Hooks a site's harness and its placement rule select on; none of them draws, and a mark takes no class, because the COUNT's and DOT's classes ARE the drawing. `danger` tints a tab carrying a danger issue mark. |
 
   Rest spread:
   - `{...rest}` lands on the tablist root, written after `class`, and carries the per-tablist hook.
@@ -34,8 +34,8 @@
     name, so a nameless dot is DROPPED; and the PREMIUM chip is scoped by canon to the manager rail.
     A mark naming no vehicle is the ISSUE chip, and an unrecognised name falls back to it.
   - A CALLER NAMES A VEHICLE AND THE PRIMITIVE OWNS THE DRAWING: no call site supplies markup, a
-    class or a shape, and A MARK CARRIES NO `icon`. The pass mark is the issue chip's LABEL rather
-    than a fourth vehicle, and `class` appends a token to a chip this primitive still draws.
+    class or a shape, and A MARK CARRIES NO `icon` OR `class`. The pass mark is the issue chip's
+    LABEL rather than a fourth vehicle.
   - `positive` IS `Chip`'s OWN SPELLING of the success family, passed through rather than folded
     into `success`. THE STRIP IS ROOTED AT `fabricate-tabs`, written ahead of whatever
     `containerClass` carries, per `openspec/specs/design-system/spec.md`.
@@ -179,7 +179,6 @@
         label: mark.label ?? mark.value ?? '',
         tone: mark.tone || fallbackTone,
         name: mark.name ?? '',
-        class: mark.class ?? '',
         suppressZero: mark.suppressZero !== false,
       };
     }
@@ -188,7 +187,6 @@
       label: mark,
       tone: fallbackTone,
       name: '',
-      class: '',
       suppressZero: true,
     };
   }
@@ -277,10 +275,6 @@
     return attributes;
   }
 
-  function badgeClasses(mark) {
-    return [badgeClass, mark.class].filter(Boolean).join(' ');
-  }
-
   function targetIndex(key, index) {
     if (key === 'ArrowRight') return (index + 1) % tabs.length;
     if (key === 'ArrowLeft') return (index - 1 + tabs.length) % tabs.length;
@@ -359,7 +353,9 @@
         {:else}
           <Chip
             tone={badgeTone(mark.tone)}
-            class={badgeClasses(mark)}
+            density="inspector"
+            mono
+            class={badgeClass}
             {...markAttributes(tab, mark)}>{mark.label}</Chip
           >
         {/if}
@@ -380,17 +376,13 @@
   >{/each}
 
 <style>
-  .manager-editor-tab-button.is-danger {
+  .manager-editor-tab-button.is-danger,
+  .manager-environment-tab-button.is-danger {
     color: var(--fab-danger-text);
   }
 
-  .manager-editor-tab-button.is-danger.is-active {
+  .manager-editor-tab-button.is-danger.is-active,
+  .manager-environment-tab-button.is-danger.is-active {
     border-bottom-color: var(--fab-danger-border);
-  }
-
-  /* The sheet draws this badge in the mono face, which ships 500 at most; its layered rule cannot
-     out-rank the chip's own 700, so the weight is stated here. */
-  .fabricate-tabs :global(.manager-chip.manager-editor-tab-badge) {
-    font-weight: 500;
   }
 </style>

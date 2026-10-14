@@ -4,18 +4,19 @@
 
   A thin caller of the promoted `EditorTabs` primitive (issue 1362): this file owns the tab
   list and this site's DOM contract — the `data-recipe-item-tab-button` hook, the
-  `data-recipe-item-tab-badge` badge hook with its `data-badge-tone`, the `recipe-item-tab-*`
+  `data-recipe-item-tab-badge` badge hook with its `data-badge-tone` and
+  `data-recipe-item-tab-count` on the Contents count, the `recipe-item-tab-*`
   / `recipe-item-panel-*` id stem whose one panel `RecipeItemEditor.svelte` renders, and the
   strip's own aria-label. It is the site that needs the primitive's `danger` capability: the
   Validation tab's button turns danger when its badge is a failing count.
 
-  The Contents tab carries a neutral count badge (linked recipe count). The Validation tab
-  always carries a badge: a success `✓` chip when valid, or a danger count chip when there
-  are failing checks.
+  The Contents tab carries the linked-recipe count as a record count. The Validation tab always
+  carries a badge: a neutral `✓` chip when valid, or a danger count chip when there are failing
+  checks.
 
   Props:
    - activeTab: the selected tab id.
-   - badges: `{ contents?: count|badge|badge[], validation?: badge|badge[] }` where a
+   - badges: `{ contents?: count mark, validation?: badge|badge[] }` where a
      badge is a plain value or `{ label, tone }` (`tone` ∈ neutral/success/warning/danger).
    - onSelect(tabId): called when a tab is chosen (click or arrow-key).
 -->
@@ -62,6 +63,7 @@
   idStem="recipe-item"
   tabDataAttr="data-recipe-item-tab-button"
   badgeDataAttr="data-recipe-item-tab-badge"
+  countDataAttr="data-recipe-item-tab-count"
   containerClass="manager-editor-tabs"
   buttonClass="manager-editor-tab-button"
   badgeClass="manager-editor-tab-badge"
