@@ -27,6 +27,7 @@ import {
   COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createLangBackedI18n } from '../helpers/langBackedI18n.js';
 // The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
 // so their option lists are read off a panel portaled onto the mount target.
 import {
@@ -43,6 +44,7 @@ const TRIGGER_PICKER = '[data-complication-trigger]';
 const COMPARATOR = '[data-complication-roll-condition-cmp]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const LANG = createLangBackedI18n(repoRoot);
 const sectionPath = 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte';
 const sectionSource = readFileSync(resolve(repoRoot, sectionPath), 'utf8');
 const summaryRowSource = readFileSync(
@@ -941,6 +943,38 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     await flushRender();
     const body = target.querySelector('.fab-complication-row-body');
     assert.match(body.textContent, /runs Compendium\.pack\.Macro\.xyz$/, 'the uuid stands in');
+  });
+
+  it('says in text that a linked macro no longer resolves, and says nothing for one that does', async () => {
+    const subline = (target) =>
+      target.querySelector(':scope [data-item-drop-zone="complication-macro"] [data-item-drop-zone-subline]');
+    const previous = globalThis.fromUuid;
+    Object.assign(globalThis, { fromUuid: async () => null });
+    try {
+      const { target } = await mountSection({
+        complications: [complication({ macroUuid: 'Macro.deleted' })],
+        macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+      });
+      await flushRender();
+      await openFirstRow(target);
+      const zone = target.querySelector('[data-item-drop-zone="complication-macro"]');
+      assert.equal(zone.dataset.itemDropState, 'missing');
+      assert.equal(
+        subline(target)?.textContent.trim(),
+        LANG.lookup('FABRICATE.Admin.Manager.Component.Complications.Macro.Missing'),
+        'a missing macro is carried by a sentence, not by the danger ground alone'
+      );
+    } finally {
+      Object.assign(globalThis, { fromUuid: previous });
+    }
+
+    harness.remount();
+    const { target } = await mountSection({
+      complications: [complication({ macroUuid: 'Macro.abc' })],
+      macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+    });
+    await openFirstRow(target);
+    assert.ok(!subline(target), 'a macro that resolves draws no subline');
   });
 
   it('carries NO `Math.random()` literal, which is the whole reason `random` is a prop', () => {

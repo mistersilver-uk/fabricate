@@ -9,6 +9,7 @@ import { tick } from 'svelte';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
@@ -27,6 +28,7 @@ import {
 } from '../helpers/toolMountModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const LANG = createLangBackedI18n(repoRoot);
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -859,10 +861,10 @@ describe('the world Tool entry (issue 1373)', () => {
         loaded.querySelector('[data-tool-source-card]').dataset.itemDropState,
         'missing'
       );
-      assert.match(
-        loaded.querySelector('[data-tool-source-drop-hint]').textContent,
-        /This Item no longer resolves. Drop another Item here to replace it./,
-        'a missing source says so in the hint, so the state is not carried by colour alone'
+      assert.equal(
+        loaded.querySelector('[data-tool-source-drop-hint]').textContent.trim(),
+        LANG.lookup('FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint'),
+        'a missing source says so in the hint, in the words `lang/en.json` ships'
       );
 
       const unloaded = await mountTab({ scope: scopeFor(), worldItems: [] });
@@ -874,6 +876,36 @@ describe('the world Tool entry (issue 1373)', () => {
         unloaded.querySelector('[data-tool-source-drop-hint]').textContent,
         /replace the linked source/,
         'and it keeps the healthy link`s hint'
+      );
+    });
+
+    it('never marks a COMPENDIUM source missing, since the roster holds world Items only', async () => {
+      const scope = scopeFor();
+      const entry = scope.entries.find((candidate) => candidate.id === 'pick');
+      entry.entity = {
+        ...entry.entity,
+        originItemUuid: 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB',
+        registeredItemUuid: '',
+      };
+      const target = await mountTab({ scope, worldItems: [LINKED_ITEM] });
+      const zone = target.querySelector('[data-tool-source-card]');
+      assert.ok(
+        !zone.hasAttribute('data-item-drop-state'),
+        'a compendium source draws no drop state'
+      );
+      assert.match(
+        zone.querySelector('[data-tool-source-drop-hint]').textContent,
+        /replace the linked source/
+      );
+
+      const gone = await mountTab({
+        scope: scopeFor(),
+        worldItems: [{ uuid: 'Item.something-else', name: 'Other' }],
+      });
+      assert.equal(
+        gone.querySelector('[data-tool-source-card]').dataset.itemDropState,
+        'missing',
+        'while a world address absent from a loaded roster still draws missing'
       );
     });
   });

@@ -539,11 +539,33 @@
    */
   const source = $derived(toolSourceSnapshot(entity, worldItems));
 
-  /**
-   */
+  // `worldItems` is the world's Items only, so a compendium address is never reported missing,
+  // as `componentSourceBroken` rules.
   const sourceMissing = $derived(
-    sourceLinked && worldItems.length > 0 && !worldItems.some((item) => item?.uuid === sourceUuid)
+    sourceLinked &&
+      worldItems.length > 0 &&
+      !sourceUuid.trim().startsWith('Compendium.') &&
+      !worldItems.some((item) => item?.uuid === sourceUuid)
   );
+
+  const sourceDropHint = $derived.by(() => {
+    if (sourceMissing) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint',
+        'This Item no longer resolves. Drop another Item here to replace it.'
+      );
+    }
+    if (sourceLinked) {
+      return text(
+        'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
+        'Drop another Item here to replace the linked source.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
+      'Drop an Item from the Items directory or a compendium to link this Tool.'
+    );
+  });
 
   /**
    * THE NAME THIS SCREEN SHOWS, and the ONE place the optional display label is resolved: the
@@ -819,20 +841,7 @@
               item={sourceLinked ? source : null}
               state={sourceMissing ? 'missing' : 'linked'}
               title={entryName}
-              hint={sourceMissing
-                ? text(
-                    'FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint',
-                    'This Item no longer resolves. Drop another Item here to replace it.'
-                  )
-                : sourceLinked
-                  ? text(
-                      'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
-                      'Drop another Item here to replace the linked source.'
-                    )
-                  : text(
-                      'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
-                      'Drop an Item from the Items directory or a compendium to link this Tool.'
-                    )}
+              hint={sourceDropHint}
               onDrop={onSourceDrop}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
               unlinkDataAttr="data-world-tool-entry-source-unlink"

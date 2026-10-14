@@ -826,7 +826,7 @@
   min-width: 0;
 }
 
-.fabricate-link-field .manager-item-drop-zone-copy strong,
+.fabricate-link-field.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy strong,
 .fabricate-link-field .manager-item-drop-zone-copy small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -848,11 +848,13 @@
   line-height: 1.4;
 }
 
+/* A linked name is not capped: a uuid standing in for a name would be cut (issue 2466). */
 .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong {
   font-family: var(--fab-font-serif);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing .manager-item-drop-zone-copy strong {
