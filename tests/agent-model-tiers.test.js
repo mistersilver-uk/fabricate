@@ -918,7 +918,10 @@ test('16. a hyphenated model-tier token cell is reported as skipped, never parse
 test('17. a superstring Claude pin and a missing tiered description both error', () => {
   const superstring = modelPinErrors(bindingPair('small', { claudeModel: 'haiku-preview' }));
   assert.equal(superstring.length, 1);
-  assert.match(superstring[0], /pins model: haiku-preview, model tier small requires claude-haiku-5-5/);
+  assert.match(
+    superstring[0],
+    /pins model: haiku-preview, model tier small requires claude-haiku-5-5/
+  );
 
   const noDescription = modelPinErrors({
     token: 'fabricate_implementer_small',
