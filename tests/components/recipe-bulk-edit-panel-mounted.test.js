@@ -998,7 +998,7 @@ const FULL_IMPACT = {
 };
 
 describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
-  it('renders the card under the shell, with this studio\'s hook names', async () => {
+  it("renders the card in the shell's dock, with this studio's hook names", async () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.ok(Boolean(deleteCard(root)), 'the panel renders no delete card at all');
@@ -1007,14 +1007,14 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
       'the impact list keeps the `data-recipe-bulk-*` convention every other hook in this panel uses'
     );
     assert.ok(Boolean(root.querySelector('[data-recipe-bulk-delete-announce]')));
-    // The card is a SIBLING of the shell, not a child of it.
-    const panelEl = root.querySelector('[data-recipe-bulk-panel]');
-    assert.ok(Boolean(panelEl), 'the shell is absent, so "sibling" would be unfalsifiable');
-    assert.equal(
-      panelEl.contains(deleteCard(root)),
-      false,
-      'the delete card is INSIDE the shell, where it reads as a second Apply'
+    // The card rides the dock under Apply (maintainer ruling 2026-10-14), so both sit at the foot.
+    const dock = root.querySelector(':scope [data-recipe-bulk-panel] .fab-bulk-edit-dock');
+    assert.ok(Boolean(dock), 'the shell renders no dock, so "in the dock" would be unfalsifiable');
+    const [first, second] = dock.querySelectorAll(
+      '[data-recipe-bulk-apply], [data-recipe-bulk-delete-card]'
     );
+    assert.ok(Boolean(first?.matches('[data-recipe-bulk-apply]')), 'Apply leads the dock');
+    assert.ok(second === deleteCard(root), 'and the delete card follows it inside the dock');
   });
 
   it('turns the impact prop into three sentences, keyed for the suites that query them', async () => {

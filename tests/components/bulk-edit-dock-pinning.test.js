@@ -31,7 +31,7 @@
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { before, describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
@@ -40,6 +40,7 @@ import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -199,66 +200,36 @@ function measureDock() {
   };
 }
 
-/**
- * The same rail, with a real `BulkDeleteCard` rendered AFTER the shell.
- * Measures a DIFFERENT invariant from `measureDock`, because the sibling breaks that one BY
- * DESIGN: it shortens `.fab-bulk-edit-panel`, which is the dock's containing block, so at
- * maximum scroll the dock clamps to the PANEL's box rather than the rail's. What survives is
- * reachability, so this reads Apply against the SCROLLPORT rather than the dock against the
- * rail.
- */
-function measureSiblingCard() {
+/** The dock, Apply and the delete card inside it, against the rail's padding box at three offsets. */
+function measureDockedDelete() {
   const inspector = document.querySelector('[data-probe-inspector]');
-  const panel = inspector.querySelector('.fab-bulk-edit-panel');
   const dock = inspector.querySelector('.fab-bulk-edit-dock');
   const apply = dock?.querySelector('[data-component-bulk-apply]');
-  const sibling = inspector.querySelector('.fab-bulk-delete-card');
-  if (!panel || !dock || !apply || !sibling) {
-    return {
-      panelRendered: Boolean(panel),
-      dockRendered: Boolean(dock),
-      applyRendered: Boolean(apply),
-      siblingRendered: Boolean(sibling),
-    };
-  }
-
-  const inspectorStyle = getComputedStyle(inspector);
-  const border = {
-    top: parseFloat(inspectorStyle.borderTopWidth),
-    bottom: parseFloat(inspectorStyle.borderBottomWidth),
-  };
-  // The dock's own negative bottom margin. Read rather than hard-coded.
-  const dockMarginBottom = parseFloat(getComputedStyle(dock).marginBottom);
+  const deleteCard = dock?.querySelector('.fab-bulk-delete-card');
+  if (!apply || !deleteCard) return { rendered: false };
 
   const sampleAt = (label, scrollTop) => {
     inspector.scrollTop = scrollTop;
     const rail = inspector.getBoundingClientRect();
-    const dockBox = dock.getBoundingClientRect();
     const applyBox = apply.getBoundingClientRect();
+    const cardBox = deleteCard.getBoundingClientRect();
     return {
       label,
       scrollTop: inspector.scrollTop,
-      // The scrollport is the rail's PADDING box — the region Apply has to stay inside.
-      railPadTop: rail.top + border.top,
-      railPadBottom: rail.bottom - border.bottom,
-      panelBottom: panel.getBoundingClientRect().bottom,
-      // The MARGIN-box bottom, which is the edge the containing-block clamp acts on.
-      dockMarginBoxBottom: dockBox.bottom + dockMarginBottom,
-      dockBottom: dockBox.bottom,
+      railTop: rail.top + inspector.clientTop,
+      railBottom: rail.top + inspector.clientTop + inspector.clientHeight,
+      dockBottom: dock.getBoundingClientRect().bottom,
       applyTop: applyBox.top,
       applyBottom: applyBox.bottom,
+      cardTop: cardBox.top,
+      cardBottom: cardBox.bottom,
     };
   };
 
   const overflow = inspector.scrollHeight - inspector.clientHeight;
   return {
-    panelRendered: true,
-    dockRendered: true,
-    applyRendered: true,
-    siblingRendered: true,
+    rendered: true,
     overflow,
-    scrollportHeight: inspector.clientHeight,
-    siblingHeight: sibling.getBoundingClientRect().height,
     samples: [
       sampleAt('scroll top', 0),
       sampleAt('mid scroll', Math.floor(overflow / 2)),
@@ -456,35 +427,65 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 });
 
-/*
- * ── THE ACCEPTED NON-PIN: A SIBLING CARD AFTER THE SHELL (issue 1132) ────────────────
- * WHY THE INVARIANT IS A DIFFERENT ONE, AND NOT A WEAKENED ONE. `.fab-bulk-edit-dock` is
- * `position: sticky` inside `.fab-bulk-edit-panel`, so the PANEL is its containing block, and a
- * sticky box may not escape its containing block. A sibling rendered after the shell shortens
- * that panel without shortening the rail, so at maximum scroll the clamp binds and Apply is
- * lifted off the rail's bottom edge — measured at −142px on a staged recipe panel and −154px on
- * a component panel. Asserting (a) from the suite above here would therefore be asserting that
- * the shipped layout is a bug.
- */
-describe('the bulk edit dock with a sibling card after the shell', () => {
-  const rendered = { shell: '', card: '' };
+/** One staged axis: far shorter than the rail, so only the panel's own fill can seat the dock. */
+const shortAxis = createRawSnippet(() => ({
+  render: () => '<p class="probe-row">One staged axis</p>',
+}));
+
+// The reported defect: a short panel drew its dock under the axes with the rail empty below it.
+describe("the bulk edit dock sits on the rail's foot when the panel is shorter than the rail", () => {
   let measured = null;
 
   before(async () => {
     await shell.setup();
+    let markup;
     try {
-      const target = await shell.mount({
-        heading: '3 components selected',
-        applyLabel: 'Apply to 3 components',
-        canApply: true,
-        children: stagedAxes,
-      });
-      rendered.shell = target.innerHTML;
+      const target = await shell.mount({ heading: '1 component selected', children: shortAxis });
+      markup = target.innerHTML;
     } finally {
       shell.teardown();
     }
+    const browser = await borrowBrowser();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      await page.setContent(inspectorPage(markup), { waitUntil: 'load' });
+      measured = await page.evaluate(measureDock);
+      measured.innerWidth = await page.evaluate(
+        () => document.querySelector('[data-probe-inspector]').clientWidth
+      );
+    } finally {
+      await browser.close();
+    }
+  });
 
+  it("seats the dock on the rail's padding-box bottom at the rail's full inner width", () => {
+    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
+    assert.equal(measured.overflow, 0, 'NON-VACUITY: the panel must be shorter than the rail');
+    const [sample] = measured.samples;
+    assert.ok(
+      Math.abs(sample.dockBottom - sample.padBottom) <= EPSILON_PX,
+      `the dock's bottom is ${sample.dockBottom}px against the rail's foot at ${sample.padBottom}px — a short panel no longer fills its rail`
+    );
+    assert.ok(
+      Math.abs(sample.dockRight - sample.dockLeft - measured.innerWidth) <= EPSILON_PX &&
+        Math.abs(sample.dockLeft - sample.padLeft) <= EPSILON_PX,
+      `the dock spans ${sample.dockLeft}–${sample.dockRight}px against the rail's ${measured.innerWidth}px inner width from ${sample.padLeft}px`
+    );
+  });
+});
+
+/*
+ * ── THE SET DELETE RIDES THE DOCK (maintainer ruling, 2026-10-14) ───────────────────────
+ * The Essences and Recipes panels drew `BulkDeleteCard` AFTER the shell, which shortened the dock's
+ * containing block and lifted Apply off the rail's foot. Both now pass the card as `dockFoot`, so
+ * Apply and the delete sit in the dock at the foot, short panel or tall.
+ */
+describe('the bulk edit dock carrying the set delete', () => {
+  const measured = { short: null, tall: null };
+
+  before(async () => {
     await card.setup();
+    let cardMarkup;
     try {
       // The Component Studio's shipped call, at the impact its own View Lab frame photographs.
       const target = await card.mount({
@@ -493,97 +494,217 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
         rows: [
           { key: 'components', text: '3 components will be deleted.' },
           { key: 'recipes', text: '2 recipes will be rewritten.', count: 2 },
-          {
-            key: 'disabled',
-            text: '1 of those recipes is enabled today and will be disabled.',
-            count: 1,
-          },
         ],
         idleLabel: 'Delete 3 components',
         armedLabel: 'Confirm delete',
         idleAriaLabel: 'Delete 3 components',
         armedAriaLabel: 'Confirm delete — 3 component(s), 2 recipe(s)',
         cardAttr: 'data-component-bulk-delete-card',
-        impactAttr: 'data-component-bulk-impact',
-        rowAttr: 'data-component-bulk-impact-row',
       });
-      rendered.card = target.innerHTML;
+      cardMarkup = target.innerHTML;
     } finally {
       card.teardown();
+    }
+    const dockFoot = createRawSnippet(() => ({
+      render: () => `<div class="probe-foot">${cardMarkup}</div>`,
+    }));
+
+    const markup = {};
+    await shell.setup();
+    try {
+      for (const [name, children] of [['short', shortAxis], ['tall', stagedAxes]]) {
+        const props = { heading: '3 components selected', canApply: true, children, dockFoot };
+        const target = await shell.mount(props);
+        markup[name] = target.innerHTML;
+      }
+    } finally {
+      shell.teardown();
     }
 
     const browser = await borrowBrowser();
     try {
-      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.setContent(inspectorPage(`${rendered.shell}${rendered.card}`), {
-        waitUntil: 'load',
-      });
-      measured = await page.evaluate(measureSiblingCard);
+      for (const name of ['short', 'tall']) {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        await page.setContent(inspectorPage(markup[name]), { waitUntil: 'load' });
+        measured[name] = await page.evaluate(measureDockedDelete);
+      }
     } finally {
       await browser.close();
     }
   });
 
-  it('renders both the shell and a real delete card in the rail', () => {
-    assert.ok(measured.panelRendered, 'the bulk edit panel is absent from the rendered rail');
-    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
-    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
-    assert.ok(
-      measured.siblingRendered,
-      `${CARD_PATH} rendered no .fab-bulk-delete-card — the sibling this case exists to measure is not in the rail, so every assertion below would be about the shell alone`
-    );
-  });
-
-  it('measures a sibling SHORTER than the scrollport, which is where the guarantee holds', () => {
-    // The bound, asserted before anything it bounds. A taller sibling pushes Apply off the TOP
-    // of the scrollport at maximum scroll: that is a reachability failure, it is not one of the
-    // accepted non-pinning configurations, and this gate must not be read as evidence for it.
-    assert.ok(
-      measured.siblingHeight > 0,
-      'the sibling card has no height, so it displaces nothing'
-    );
-    assert.ok(
-      measured.siblingHeight < measured.scrollportHeight,
-      `the delete card is ${measured.siblingHeight}px against a ${measured.scrollportHeight}px scrollport — at or above that height Apply is scrolled off the TOP at maximum scroll, which this case does NOT accept and does not measure`
-    );
-    assert.ok(
-      measured.overflow >= MIN_OVERFLOW_PX,
-      `the rail must genuinely overflow for a scroll assertion to say anything (overflow ${measured.overflow}px, need at least ${MIN_OVERFLOW_PX}px)`
-    );
-    const offsets = measured.samples.map((sample) => sample.scrollTop);
-    assert.ok(
-      offsets[0] < offsets[1] && offsets[1] < offsets[2],
-      `the three samples must be at DIFFERENT scroll offsets or they are one sample three times (measured ${offsets.join(', ')})`
-    );
-  });
-
-  it('clamps the dock to the panel box rather than the rail at maximum scroll', () => {
-    // The ACCEPTED behaviour, pinned so it cannot silently become something else. A sticky box
-    // may not escape its containing block, and that clamp acts on its MARGIN box — which is why
-    // this reads `dockMarginBoxBottom` and not the border-box bottom the shell-alone suite uses.
-    const max = measured.samples.at(-1);
-    assert.ok(
-      Math.abs(max.dockMarginBoxBottom - max.panelBottom) <= EPSILON_PX,
-      `at max scroll the dock's margin-box bottom is ${max.dockMarginBoxBottom}px but the panel's bottom is ${max.panelBottom}px — the dock is no longer clamped to its containing block, so it is neither pinned nor accepted-un-pinned but something new`
-    );
-    // And it is genuinely OFF the rail's bottom edge.
-    assert.ok(
-      max.railPadBottom - max.dockBottom > EPSILON_PX,
-      `at max scroll the dock's bottom is ${max.dockBottom}px against a rail padding-box bottom of ${max.railPadBottom}px — the dock is still pinned to the rail, so the sibling is not shortening the panel and this case is measuring nothing`
-    );
-  });
-
-  it('keeps Apply wholly inside the scrollport at every scroll offset', () => {
-    // THE INVARIANT THAT SURVIVES. Issue 1015's symptom was Apply being unreachable.
-    for (const sample of measured.samples) {
+  for (const name of ['short', 'tall']) {
+    it(`holds Apply and the delete in the dock on the rail's foot (${name} panel)`, () => {
+      const { rendered, overflow, samples } = measured[name];
+      assert.ok(rendered, 'the dock carries no Apply or no delete card');
       assert.ok(
-        sample.applyTop >= sample.railPadTop - EPSILON_PX,
-        `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's top edge is ${sample.applyTop}px, above the scrollport's top at ${sample.railPadTop}px — the primary action has scrolled off the TOP, which is issue 1015's original symptom and is not an accepted configuration`
+        name === 'short' ? overflow === 0 : overflow >= MIN_OVERFLOW_PX,
+        `NON-VACUITY: the ${name} panel overflows the rail by ${overflow}px`
       );
+      for (const sample of samples) {
+        const at = `at ${sample.label} (scrollTop ${sample.scrollTop})`;
+        assert.ok(
+          Math.abs(sample.dockBottom - sample.railBottom) <= EPSILON_PX,
+          `${at} the dock's bottom is ${sample.dockBottom}px against the rail's foot at ${sample.railBottom}px`
+        );
+        assert.ok(
+          sample.applyTop >= sample.railTop - EPSILON_PX && sample.applyBottom <= sample.cardTop,
+          `${at} Apply (${sample.applyTop}–${sample.applyBottom}px) is not above the delete card at ${sample.cardTop}px inside the rail`
+        );
+        assert.ok(
+          sample.cardBottom <= sample.railBottom + EPSILON_PX,
+          `${at} the delete card ends at ${sample.cardBottom}px, past the rail's foot at ${sample.railBottom}px`
+        );
+      }
+    });
+  }
+});
+
+/*
+ * ── THE LIVE SHELL: FOCUS AND THE SMALLEST SUPPORTED RAIL ────────────────────────────────
+ * The dock measures itself, which only a running component does, so these clauses mount the shell
+ * through Vite (`tests/fixtures/bulk-edit-dock/`) in the same inspector skeleton as above.
+ */
+const dockFixture = createViteFixtureServer({ styleMountPrefix: '/@bulk-edit-dock-styles/' });
+// The Manager's declared 1024x640 floor (`ui-system-studio`) at a width above the 1120 restack, where
+// the inspector is still a rail: the View Lab measured that rail 454px tall (634px at 1280x820).
+const FLOOR_RAIL_PX = 454;
+// The control ladder's tallest rung, which Apply wears: the axes keep one control's room above the dock.
+const ONE_CONTROL_PX = 38;
+
+async function openDockFixture(query) {
+  const page = await dockFixture.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.goto(dockFixture.url(`/tests/fixtures/bulk-edit-dock/index.html?${query}`));
+  await page.waitForSelector('html[data-bulk-dock-ready="true"] .fab-bulk-edit-dock');
+  await settleDock(page);
+  return page;
+}
+
+/** A ResizeObserver delivers before the next paint and Svelte writes after it, so wait two frames. */
+function settleDock(page) {
+  return page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+  );
+}
+
+/** Focus every body control from the top in tab order, then the last one from scroll top. */
+function focusWalk() {
+  const inspector = document.querySelector('[data-probe-inspector]');
+  const dock = inspector.querySelector('.fab-bulk-edit-dock');
+  const controls = [...inspector.querySelectorAll('button')].filter((node) => !dock.contains(node));
+  const under = (control) => {
+    const bottom = control.getBoundingClientRect().bottom;
+    const dockTop = dock.getBoundingClientRect().top;
+    return bottom > dockTop + 1 ? `${control.textContent.trim()} ends ${bottom}px, dock top ${dockTop}px` : '';
+  };
+  inspector.scrollTop = 0;
+  let scrolls = 0;
+  const obscured = [];
+  for (const control of controls) {
+    const before = inspector.scrollTop;
+    control.focus();
+    if (inspector.scrollTop !== before) scrolls += 1;
+    if (under(control)) obscured.push(under(control));
+  }
+  // Blurred first: focusing the element that already has focus does not scroll.
+  document.activeElement.blur();
+  inspector.scrollTop = 0;
+  const last = controls.at(-1);
+  last.focus();
+  const published = dock.parentElement.style.getPropertyValue('--fab-bulk-edit-dock-block-size');
+  return { count: controls.length, scrolls, obscured, last: under(last), dockHeight: dock.offsetHeight, published };
+}
+
+/** Apply, the delete's control and the room above the dock, against the rail at three offsets. */
+function floorReading() {
+  const inspector = document.querySelector('[data-probe-inspector]');
+  const dock = inspector.querySelector('.fab-bulk-edit-dock');
+  const apply = dock.querySelector('[data-component-bulk-apply]');
+  const confirm = dock.querySelector('[data-arm-token]');
+  const overflow = inspector.scrollHeight - inspector.clientHeight;
+  const sampleAt = (label, scrollTop) => {
+    inspector.scrollTop = scrollTop;
+    const railTop = inspector.getBoundingClientRect().top + inspector.clientTop;
+    const box = (node) => node.getBoundingClientRect();
+    return {
+      label,
+      railTop,
+      railBottom: railTop + inspector.clientHeight,
+      dockTop: box(dock).top,
+      apply: { top: box(apply).top, bottom: box(apply).bottom },
+      confirm: { top: box(confirm).top, bottom: box(confirm).bottom },
+    };
+  };
+  return {
+    rail: inspector.clientHeight,
+    overflow,
+    armed: confirm.dataset.armed,
+    rows: dock.querySelectorAll(':scope .fab-bulk-delete-impact > li').length,
+    hint: Boolean(dock.querySelector('.fab-bulk-delete-hint')),
+    samples: [
+      sampleAt('scroll top', 0),
+      sampleAt('mid scroll', Math.floor(overflow / 2)),
+      sampleAt('max scroll', inspector.scrollHeight),
+    ],
+  };
+}
+
+function assertNoneObscured(walk, face) {
+  assert.ok(walk.count >= 18 && walk.scrolls > 0, `NON-VACUITY: ${face}, ${walk.count} controls, ${walk.scrolls} focus scrolls`);
+  assert.deepEqual(walk.obscured, [], `${face}: a focused control sat under the ${walk.dockHeight}px dock`);
+  assert.equal(walk.last, '', `${face}: the last body control, focused from scroll top, sat under the dock`);
+  assert.equal(walk.published, `${walk.dockHeight}px`, `${face}: the panel publishes the dock's current height`);
+}
+
+describe('the live bulk edit dock', () => {
+  before(() => dockFixture.start());
+  after(() => dockFixture.stop());
+
+  it('stops a focus scroll above the dock, idle and after the delete arms (WCAG 2.4.11)', async () => {
+    const page = await openDockFixture('');
+    try {
+      const idle = await page.evaluate(focusWalk);
+      assertNoneObscured(idle, 'idle');
+      await page.click('[data-arm-token]');
+      await page.waitForSelector('[data-arm-token][data-armed="true"]');
+      await settleDock(page);
+      assertNoneObscured(await page.evaluate(focusWalk), 'armed');
+      // The observer follows the dock after mount: a row the card did not have grows it by 60px.
+      await page.evaluate(() => {
+        const grown = Object.assign(document.createElement('div'), { style: 'height:60px' });
+        document.querySelector('.fab-bulk-edit-dock').append(grown);
+      });
+      await settleDock(page);
+      const grown = await page.evaluate(focusWalk);
+      assert.ok(grown.dockHeight >= idle.dockHeight + 60, `NON-VACUITY: the dock grew (${idle.dockHeight} → ${grown.dockHeight}px)`);
+      assertNoneObscured(grown, 'grown');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('keeps Apply, Confirm and a control of room in view on the smallest supported rail', async () => {
+    const page = await openDockFixture(`h=${FLOOR_RAIL_PX}&armed&card=recipe`);
+    try {
+      const floor = await page.evaluate(floorReading);
+      assert.ok(Math.abs(floor.rail - FLOOR_RAIL_PX) <= EPSILON_PX, `NON-VACUITY: the rail is ${floor.rail}px`);
       assert.ok(
-        sample.applyBottom <= sample.railPadBottom + EPSILON_PX,
-        `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's bottom edge is ${sample.applyBottom}px, below the scrollport's bottom at ${sample.railPadBottom}px — the primary action is clipped by the rail`
+        floor.armed === 'true' && floor.rows === 3 && floor.hint && floor.overflow >= MIN_OVERFLOW_PX,
+        `NON-VACUITY: the armed recipe card with all three rows and its hint, over a panel that overflows (${JSON.stringify(floor)})`
       );
+      for (const sample of floor.samples) {
+        const at = `at ${sample.label}`;
+        for (const [name, box] of [['Apply', sample.apply], ['Confirm', sample.confirm]]) {
+          assert.ok(
+            box.top >= sample.railTop - EPSILON_PX && box.bottom <= sample.railBottom + EPSILON_PX,
+            `${at} ${name} spans ${box.top}–${box.bottom}px outside the rail ${sample.railTop}–${sample.railBottom}px`
+          );
+        }
+        const room = sample.dockTop - sample.railTop;
+        assert.ok(room >= ONE_CONTROL_PX, `${at} the axes keep ${room}px above the dock, under one ${ONE_CONTROL_PX}px control`);
+      }
+    } finally {
+      await page.close();
     }
   });
 });

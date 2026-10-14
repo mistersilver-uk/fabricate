@@ -2225,11 +2225,11 @@ describe('the module sheet against the published Chip', () => {
 });
 
 describe('the module sheet and every component style against the published InspectorCard', () => {
-  it('names the card root in 24 selectors: its two family rules, two data-hook rules, and twenty no published card can match', () => {
+  it('names the card root in 23 selectors: its two family rules, two data-hook rules, and nineteen no published card can match', () => {
     assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
     const selectors = shippedCensus(CARD, 'InspectorCard');
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
-    assert.equal(selectors.length, 24, 'the census InspectorCard was published on');
+    assert.equal(selectors.length, 23, 'the census InspectorCard was published on');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
       ['InspectorCard', 'Button', 'StatusToggle'],

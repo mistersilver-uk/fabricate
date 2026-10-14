@@ -1,6 +1,7 @@
 /**
  * Mount the real inventory view, populated with ten cards, beside a stand-in nav rail in a host
- * the size of the player window's content area, `?width=` wide.
+ * the size of the player window's content area, `?width=` wide. `?bulk=<n>` opens the bulk panel
+ * on n queued components instead of the single-item inspector.
  */
 import { mount } from 'svelte';
 
@@ -18,6 +19,13 @@ const items = Array.from({ length: 10 }, (_, index) => ({
   totalQuantity: 2,
   essences: [],
 }));
+const bulk = Number(new URLSearchParams(location.search).get('bulk') ?? 0);
+const queued = Array.from({ length: bulk }, (_, index) => ({
+  key: `sys:queued-${index}`,
+  name: `Queued ${index}`,
+  img: '',
+  actorQuantity: 2,
+}));
 const store = {
   loadedOnce: true,
   hasActor: true,
@@ -27,7 +35,11 @@ const store = {
   page: 0,
   pageSize: 25,
   filterCounts: {},
-  bulkSelectedKeys: [],
+  bulkSelectedKeys: queued.map((item) => item.key),
+  bulkActive: bulk > 0,
+  bulkEntries: queued,
+  bulkSalvageable: queued,
+  bulkCounts: { selected: bulk, salvageable: bulk, blocked: 0 },
   load() {},
   select() {},
   setPage() {},

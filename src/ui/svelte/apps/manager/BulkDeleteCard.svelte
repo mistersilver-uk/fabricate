@@ -177,14 +177,9 @@
 <style>
   /* Theme-root tokens only, per the design-system spec; scoped here so `VIEW_RECIPES` routes. */
 
-  /* The Apply dock above consumes the inspector's gap with a negative margin, and margins do not
-     collapse in that flex column. `:global()` AND CHAINED (issue 1427): the class rides the `class`
-     prop onto an element this component does not write. */
-  :global(.fabricate-card.fab-bulk-delete-card) {
-    margin-top: var(--fab-space-3);
-  }
-
-  /* The armed button reads at the shared inspector-action label size (1036), BUSY face included. */
+  /* The armed button reads at the shared inspector-action label size (1036), BUSY face included.
+     `:global()` AND CHAINED (issue 1427): the class rides the `class` prop onto an element this
+     component does not write. */
   :global(.fabricate-card.fab-bulk-delete-card .fabricate-button) {
     min-height: 34px;
     padding: 0 var(--fab-space-3);

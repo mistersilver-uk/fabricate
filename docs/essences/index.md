@@ -259,6 +259,7 @@ Staging a colour and then adding a world-known essence to the selection clears t
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
 
+The **Apply** button sits at the foot of the inspector, and the delete sits directly under it, so both stay in view while you scroll the staged changes.
 **Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.
 An essence in use is never excluded: deleting it removes it from every component that carries it and rewrites every recipe that requires it.
 A component that only inherits the essence from the world Component catalogue is counted in this impact too, so the confirmation states the delete's full reach rather than only the components that author the essence themselves.

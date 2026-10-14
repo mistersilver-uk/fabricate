@@ -4,10 +4,13 @@ import { dirname, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
+import { borrowBrowser } from '../helpers/layout-harness.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -105,6 +108,56 @@ function corpus({ toolBreakage = null } = {}) {
     membership: [{ entityId: 'hammer', systemId: 'sys-forge', inherit: {}, enabled: true }],
     ...(toolBreakage ? { toolBreakage } : {}),
   };
+}
+
+/** The components whose scoped CSS sizes the inspector column and the bulk panel inside it. */
+const INSPECTOR_CSS = [
+  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Callout.svelte',
+]
+  .map((path) => scopedComponentCss(resolve(repoRoot, path)).css)
+  .join('\n');
+
+/**
+ * The mounted inspector column, laid out in Chromium as the frame's grid track stretches it, with
+ * its dock's box against the column's border-box inner edges.
+ */
+async function measureInspectorDock(asideMarkup) {
+  const browser = await borrowBrowser();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.setContent(
+      `<!doctype html><html><head><style>${readStylesheet()}</style><style>${INSPECTOR_CSS}</style>
+      <style>body { margin: 0; } .probe-track { display: grid; width: 340px; height: 640px; }</style>
+      </head><body><div class="fabricate fabricate-manager" data-fabricate-theme="dark"
+      data-manager-view="world-tools"><div class="probe-track">${asideMarkup}</div></div></body></html>`,
+      { waitUntil: 'load' }
+    );
+    return await page.evaluate(() => {
+      const aside = document.querySelector('[data-scoped-list-inspector]');
+      const dockElement = aside.querySelector('.fab-bulk-edit-dock');
+      const box = aside.getBoundingClientRect();
+      const dock = dockElement.getBoundingClientRect();
+      // The scroller clips its content, so the dock is measured as it PAINTS, not as it is laid out.
+      const clip = aside.querySelector('.manager-scoped-list-inspector-scroll').getBoundingClientRect();
+      // Read off the axes, not the dock, so no mutation of the dock's own geometry trips it.
+      const axesBottom = dockElement.previousElementSibling.getBoundingClientRect().bottom;
+      return {
+        panelFits: axesBottom + dock.height < box.bottom,
+        column: { bottom: box.bottom, left: box.left + aside.clientLeft, right: box.right },
+        dock: {
+          bottom: Math.min(dock.bottom, clip.bottom),
+          left: Math.max(dock.left, clip.left),
+          right: Math.min(dock.right, clip.right),
+        },
+      };
+    });
+  } finally {
+    await browser.close();
+  }
 }
 
 function scopeFor(options) {
@@ -540,6 +593,28 @@ describe('world Tools Catalogue (issue 1373)', () => {
         /2 selected/,
         'the toolbar and the panel disagree about how many rows are ticked'
       );
+    });
+
+    // The maintainer's report (2026-10-14): the dock sat under the axes, inset from the column.
+    it("seats the dock on the inspector column's foot at its full width", async () => {
+      const target = await harness.mount({ scope: scopeFor({}), systems: SYSTEMS, actions: {} });
+      tick(target, 'hammer');
+      await harness.setProps({});
+      const aside = target.querySelector('[data-scoped-list-inspector]');
+      assert.ok(Boolean(aside?.querySelector('.fab-bulk-edit-dock')), 'no dock in the inspector');
+
+      const measured = await measureInspectorDock(aside.outerHTML);
+      assert.ok(measured.panelFits, 'NON-VACUITY: the panel must be shorter than the column');
+      for (const [edge, actual, expected] of [
+        ['bottom', measured.dock.bottom, measured.column.bottom],
+        ['left', measured.dock.left, measured.column.left],
+        ['right', measured.dock.right, measured.column.right],
+      ]) {
+        assert.ok(
+          Math.abs(actual - expected) <= 1,
+          `the dock's ${edge} edge is ${actual}px against the column's ${expected}px`
+        );
+      }
     });
 
     it('keeps Apply inert until an axis is staged', async () => {

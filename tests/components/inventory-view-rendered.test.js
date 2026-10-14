@@ -4,6 +4,7 @@
  * rail, the window's bottom edge and the detail rail's border with no gutter. Stacked, the pager
  * spans the window and the detail rail stands directly beneath it.
  */
+import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { near } from '../helpers/railFooterAssertions.js';
@@ -52,5 +53,143 @@ describe('inventory view, rendered: the pager is the left column footer', () => 
     near(detail.top, pager.bottom, 'the detail rail against its bottom edge');
     near(detail.left, host.left, 'the detail rail at the left edge');
     near(detail.right, host.right, 'the detail rail at the right edge');
+  });
+});
+
+/** Open the bulk panel on `rows` queued components and evaluate `measure` in the page. */
+async function onBulkPanel(rows, measure) {
+  const page = await fixtureServer.newPage({ viewport: { width: 1240, height: 900 } });
+  try {
+    await page.goto(fixtureServer.url(`${VIEW.url}?width=1200&bulk=${rows}`));
+    await page.waitForSelector(
+      'html[data-inventory-view-ready="true"] [data-inventory-bulk-footer]'
+    );
+    // A ResizeObserver publishes the footer's height before the next paint; wait for two.
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+    );
+    return await page.evaluate(measure);
+  } finally {
+    await page.close();
+  }
+}
+
+/** The footer and its first and last actions against the column's scroller, at three offsets. */
+function footerSamples() {
+  // The scroller is the shell's root inside the column section; both carry the hook.
+  const column = document.querySelector('.inventory-detail[data-inventory-detail]');
+  const footer = column.querySelector('[data-inventory-bulk-footer]');
+  const actions = [...footer.querySelectorAll('button')];
+  const style = getComputedStyle(column);
+  const edges = (node) => {
+    const { left, right, bottom } = node.getBoundingClientRect();
+    return { left, right, bottom };
+  };
+  const sampleAt = (scrollTop) => {
+    column.scrollTop = scrollTop;
+    const box = column.getBoundingClientRect();
+    const left = box.left + column.clientLeft;
+    return {
+      scrollTop: column.scrollTop,
+      column: { left, right: box.right, bottom: box.bottom },
+      content: {
+        left: left + parseFloat(style.paddingLeft),
+        right: left + column.clientWidth - parseFloat(style.paddingRight),
+      },
+      footer: edges(footer),
+      actions: [edges(actions[0]), edges(actions.at(-1))],
+    };
+  };
+  const overflow = column.scrollHeight - column.clientHeight;
+  return {
+    overflow,
+    actionCount: actions.length,
+    samples: [sampleAt(0), sampleAt(Math.floor(overflow / 2)), sampleAt(column.scrollHeight)],
+  };
+}
+
+/** Focus every control above the footer from the top, then the last of them from scroll top. */
+function focusWalk() {
+  const column = document.querySelector('.inventory-detail[data-inventory-detail]');
+  const footer = column.querySelector('[data-inventory-bulk-footer]');
+  const controls = [...column.querySelectorAll('button')].filter((node) => !footer.contains(node));
+  const under = (control) => {
+    const bottom = control.getBoundingClientRect().bottom;
+    const top = footer.getBoundingClientRect().top;
+    return bottom > top + 1
+      ? `${control.getAttribute('aria-label') ?? 'a control'} ends ${bottom}px, footer top ${top}px`
+      : '';
+  };
+  column.scrollTop = 0;
+  let scrolls = 0;
+  const obscured = [];
+  for (const control of controls) {
+    const before = column.scrollTop;
+    control.focus();
+    if (column.scrollTop !== before) scrolls += 1;
+    if (under(control)) obscured.push(under(control));
+  }
+  // Blurred first: focusing the element that already has focus does not scroll.
+  document.activeElement.blur();
+  column.scrollTop = 0;
+  controls.at(-1).focus();
+  return { count: controls.length, scrolls, obscured, last: under(controls.at(-1)) };
+}
+
+/** Two edges within a pixel: a clamped integer `scrollTop` leaves a sub-pixel residue. */
+const within = (actual, expected, label) =>
+  assert.ok(Math.abs(actual - expected) <= 1, `${label}: ${actual}, expected ${expected}`);
+
+// Maintainer ruling, 2026-10-14: pinned to the column's foot and spanning its full width.
+describe("inventory view, rendered: the bulk footer sits on the detail column's foot", () => {
+  for (const [label, rows] of [
+    ['a short queue', 1],
+    ['a queue taller than the column', 25],
+  ]) {
+    it(`meets the column's bottom and both sides with ${label}`, async () => {
+      const { overflow, actionCount, samples } = await onBulkPanel(rows, footerSamples);
+      assert.ok(
+        rows === 1 ? overflow === 0 : overflow >= 48,
+        `NON-VACUITY: ${label} overflows the column by ${overflow}px`
+      );
+      assert.equal(actionCount, 2, 'NON-VACUITY: the footer carries Destroy and Salvage');
+      for (const { scrollTop, column, content, footer, actions } of samples) {
+        within(
+          footer.bottom,
+          column.bottom,
+          `its bottom edge on the column's foot at ${scrollTop}px`
+        );
+        within(footer.left, column.left, `its left edge on the column's at ${scrollTop}px`);
+        within(footer.right, column.right, `its right edge on the column's at ${scrollTop}px`);
+        // The footer's inline padding pays its bleed back, as the shell's dock does for Apply.
+        for (const [index, action] of actions.entries()) {
+          const name = index === 0 ? 'first' : 'last';
+          within(
+            action.left,
+            content.left,
+            `its ${name} action on the content's left at ${scrollTop}px`
+          );
+          within(
+            action.right,
+            content.right,
+            `its ${name} action on the content's right at ${scrollTop}px`
+          );
+        }
+      }
+    });
+  }
+
+  it('stops a focus scroll above the footer on a 25-row queue (WCAG 2.4.11)', async () => {
+    const walk = await onBulkPanel(25, focusWalk);
+    assert.ok(
+      walk.count >= 26 && walk.scrolls > 0,
+      `NON-VACUITY: ${walk.count} controls, ${walk.scrolls} focus scrolls`
+    );
+    assert.deepEqual(walk.obscured, [], 'a focused control sat under the footer');
+    assert.equal(
+      walk.last,
+      '',
+      'the last control above the footer, focused from scroll top, sat under it'
+    );
   });
 });
