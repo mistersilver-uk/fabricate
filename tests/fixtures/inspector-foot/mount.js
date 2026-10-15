@@ -1,7 +1,7 @@
 /**
  * Mount one real system inspector (`?inspector=recipes|essences|components|tools`) in the manager's
- * rail at `?size=long` (content overflowing the rail) or `short`, in a 1280px-wide host whose rail
- * is `?h=` px tall: 634 by default, the rail the View Lab measured at 1280x820.
+ * rail at `?size=long` (content overflowing the rail) or `short`, in a 1280x634 host: the rail the
+ * View Lab measured at 1280x820.
  */
 import { mount } from 'svelte';
 
@@ -152,7 +152,7 @@ const view = params.get('inspector');
 const [component, props] = SUBJECTS[view];
 
 const host = document.createElement('div');
-host.style.cssText = `width:1280px;height:${Number(params.get('h') ?? 634)}px`;
+host.style.cssText = 'width:1280px;height:634px';
 // The two empty bands stand for the manager's header rows, so the body lands in its `1fr` track.
 host.innerHTML =
   `<div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="${view}">` +

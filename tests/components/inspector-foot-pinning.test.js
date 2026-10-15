@@ -1,9 +1,9 @@
 /*
- * THE SYSTEM INSPECTORS' PINNED FOOT (issue 2498), on the four real inspectors mounted live through
+ * The system inspectors' pinned foot (issue 2498), on the four real inspectors mounted live through
  * Vite (`tests/fixtures/inspector-foot/`) in the manager's rail at 1280x820. For each, overflowing
  * and short: the foot carries the record verbs, sits flush on the rail's bottom edge at its full
- * inner width at the top and the end of the scroll range, takes at most a quarter of the rail, shows
- * its scroll-edge fade only while content remains below, and a focused control stops above it.
+ * inner width at the top and the end of the scroll range, takes at most a quarter of the rail, a
+ * focused control stops above it, and focusing its own verb does not scroll the rail.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -50,16 +50,11 @@ function settle(page) {
   );
 }
 
-/** The foot's geometry and fade at one scroll offset, read after the tracker has answered. */
+/** The foot's geometry at one scroll offset (`null` leaves it), read after a frame has painted. */
 async function sampleAt(page, scrollTo) {
   await page.evaluate(readInspectorFoot, { ...PROBE, scrollTo });
   await settle(page);
-  const measured = await page.evaluate(readInspectorFoot, { ...PROBE, scrollTo: null });
-  measured.fade = await page.evaluate(
-    (at) => getComputedStyle(document.querySelector(at), '::before').content,
-    PROBE.foot
-  );
-  return measured;
+  return page.evaluate(readInspectorFoot, { ...PROBE, scrollTo: null });
 }
 
 /** The verbs the foot holds, by selector, and whether any of them sits outside it. */
@@ -99,6 +94,36 @@ function focusWalk() {
   const last = controls.at(-1);
   last?.focus();
   return { count: controls.length, scrolls, obscured, last: last ? under(last) : 'no control' };
+}
+
+/**
+ * Scroll the last content control to end at the foot's mid-height, so it is inside the scrollport
+ * but half under the foot, then focus it; reads its bottom against the foot's top both times.
+ */
+function focusStraddling() {
+  const aside = document.querySelector('[data-probe-inspector]');
+  const foot = aside.querySelector('.fab-inspector-panel-foot');
+  const control = [...aside.querySelectorAll('button, a[href], input, select, textarea')].findLast(
+    (node) => !foot.contains(node) && node.getBoundingClientRect().height > 0
+  );
+  const read = () => ({
+    bottom: control.getBoundingClientRect().bottom,
+    footTop: foot.getBoundingClientRect().top,
+  });
+  aside.scrollTop = 0;
+  const footBox = foot.getBoundingClientRect();
+  aside.scrollTop = control.getBoundingClientRect().bottom - (footBox.top + footBox.height / 2);
+  const before = read();
+  control.focus();
+  return { before, after: read(), scrollTop: aside.scrollTop };
+}
+
+/** Focus the foot's first verb with the rail at scroll top. */
+function focusFootVerb() {
+  const aside = document.querySelector('[data-probe-inspector]');
+  aside.scrollTop = 0;
+  aside.querySelector(':scope .fab-inspector-panel-foot :is(button, a[href])').focus();
+  return aside.scrollTop;
 }
 
 describe('the system inspectors pin their record verbs to the rail foot (issue 2498)', () => {
@@ -146,23 +171,12 @@ describe('the system inspectors pin their record verbs to the rail foot (issue 2
         }
       });
 
-      it('fades the scroll edge while content remains below, and not at the end', async () => {
-        const page = await openInspector(inspector, 'long');
-        try {
-          assert.notEqual((await sampleAt(page, 0)).fade, 'none', 'the fade shows at scroll top');
-          assert.equal((await sampleAt(page, 'max')).fade, 'none', 'and is absent at max scroll');
-        } finally {
-          await page.close();
-        }
-      });
-
-      it('seats the foot on the rail foot of a short panel, with no fade', async () => {
+      it('seats the foot on the rail foot of a short panel', async () => {
         const page = await openInspector(inspector, 'short');
         try {
           const sample = await sampleAt(page, 0);
           assert.equal(sample.overflow, 0, 'NON-VACUITY: the short panel fits its rail');
           assertDockAtColumnFoot(sample, { box: 'foot' });
-          assert.equal(sample.fade, 'none', 'nothing lies below, so nothing fades');
           const share = (sample.foot.bottom - sample.foot.top) / sample.column.height;
           assert.ok(
             share <= MAX_FOOT_SHARE,
@@ -180,6 +194,35 @@ describe('the system inspectors pin their record verbs to the rail foot (issue 2
           assert.ok(walk.count > 0 && walk.scrolls > 0, `NON-VACUITY: ${JSON.stringify(walk)}`);
           assert.deepEqual(walk.obscured, [], 'no focused control sits under the foot');
           assert.equal(walk.last, '', 'the last control, focused from scroll top, clears the foot');
+        } finally {
+          await page.close();
+        }
+      });
+
+      it('scrolls a control half under the foot clear of it on focus (WCAG 2.4.11)', async () => {
+        const page = await openInspector(inspector, 'long');
+        try {
+          const { before, after } = await page.evaluate(focusStraddling);
+          assert.ok(
+            before.bottom > before.footTop + EPSILON_PX,
+            `NON-VACUITY: the control starts under the foot (${JSON.stringify(before)})`
+          );
+          assert.ok(
+            after.bottom <= after.footTop + EPSILON_PX,
+            `the focused control ends at ${after.bottom}px, over the foot's top ${after.footTop}px`
+          );
+        } finally {
+          await page.close();
+        }
+      });
+
+      it("leaves the rail at scroll top when the foot's own verb takes focus", async () => {
+        const page = await openInspector(inspector, 'long');
+        try {
+          assert.equal(await page.evaluate(focusFootVerb), 0, 'the rail did not scroll');
+          const sample = await sampleAt(page, null);
+          assert.ok(sample.overflow >= MIN_OVERFLOW_PX, 'NON-VACUITY: the rail overflows');
+          assertDockAtColumnFoot(sample, { box: 'foot', fits: false });
         } finally {
           await page.close();
         }
