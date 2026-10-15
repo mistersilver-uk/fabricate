@@ -393,11 +393,7 @@
     </p>
   {/if}
   {#snippet foot()}
-    <!--
-      NO DUPLICATE: `store.duplicateEssence` minted a system-owned essence with its own name, icon
-      and colour under a banner saying those are the catalogue's; `Reuse these rules` on the rules
-      editor copies this system's effect source and macro into another system's rules instead.
-    -->
+    <!-- No Duplicate: an essence's name, icon and colour are the catalogue's; `Reuse these rules` on the rules editor copies these rules to another system. -->
     <Rail data-essence-section="actions">
       <Button
         role="primary"

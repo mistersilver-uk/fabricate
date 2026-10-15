@@ -759,9 +759,7 @@
 }
 
 /* === The library inspector (issue 643, brief §3.3). === ONE column on the panel background — NOT a stack of boxes; the recipe's rhythm is its body's, above `InspectorPanel`'s foot (issue 2498). */
-.fabricate-manager .manager-recipe-browser-inspector,
-.fabricate-manager .manager-recipe-browser-inspector-body,
-.fabricate-manager .manager-component-browser-inspector {
+.fabricate-manager .manager-recipe-browser-inspector-body {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
