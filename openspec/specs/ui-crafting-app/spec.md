@@ -1153,6 +1153,8 @@ It shares the selected character and the component-source actors with the Crafti
 
 - **Layout.**
   Two responsive columns — filters + item grid on the left, an item inspector on the right — reflowing to **stacked** below the container breakpoint.
+  When stacked, the browse and detail panes split the window's content height, weighted toward the browse pane, and each scrolls on its own, so the grid's pagination bar stays the browse pane's footer and the bulk footer stays pinned at the detail pane's foot.
+  Where the window is too short for both panes' floors, the content scrolls as a whole and each footer remains at its own pane's foot.
   The window is resizable, so a fixed column count is not the contract: the grid is responsive and its column count is an expression of the available width.
 - **Filter chips.**
   A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
