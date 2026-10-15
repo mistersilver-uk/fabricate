@@ -405,7 +405,7 @@
   @container fabricate-inventory (max-width: 960px) {
     .inventory-view-grid {
       grid-template-columns: 1fr;
-      grid-template-rows: minmax(350px, 1.6fr) minmax(290px, 1fr);
+      grid-template-rows: minmax(360px, 1.6fr) minmax(290px, 1fr);
       overflow-y: auto;
     }
 

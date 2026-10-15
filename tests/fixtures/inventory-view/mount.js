@@ -1,7 +1,7 @@
 /**
  * Mount the real inventory view, populated with ten cards, beside a stand-in nav rail in a host
- * the size of the player window's content area, `?width=` wide. `?bulk=<n>` opens the bulk panel
- * on n queued components instead of the single-item inspector.
+ * the size of the player window's content area, `?width=` wide by `?height=` tall. `?bulk=<n>`
+ * opens the bulk panel on n queued components instead of the single-item inspector.
  */
 import { mount } from 'svelte';
 

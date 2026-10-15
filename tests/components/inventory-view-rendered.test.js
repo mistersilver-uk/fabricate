@@ -195,7 +195,7 @@ describe("inventory view, rendered: the bulk footer sits on the detail column's 
   });
 });
 
-/** The stacked panes in a host the 1024px window's content area, `height` tall, four queued. */
+/** The stacked panes in a host the size of the 1024px window's content area, `height` tall, with four queued. */
 async function stackedPanes(height) {
   const page = await fixtureServer.newPage({ viewport: { width: 1100, height: 900 } });
   try {
@@ -212,6 +212,7 @@ async function stackedPanes(height) {
         return { left, top, right, bottom };
       };
       const cards = document.querySelector('.inventory-grid');
+      const view = document.querySelector('.inventory-view-grid');
       const detail = document.querySelector('.inventory-detail[data-inventory-detail]');
       const footerAt = (scrollTop) => {
         detail.scrollTop = scrollTop;
@@ -223,6 +224,7 @@ async function stackedPanes(height) {
         browse: box(document.querySelector('.inventory-view-column-left')),
         pager: box(document.querySelector('.inventory-grid-pagination')),
         grid: { overflow: cards.scrollHeight - cards.clientHeight, height: cards.clientHeight },
+        viewOverflow: view.scrollHeight - view.clientHeight,
         cardHeight: document.querySelector('[data-inventory-card]').getBoundingClientRect().height,
         detailOverflow: detail.scrollHeight - detail.clientHeight,
         samples: [footerAt(0), footerAt(detail.scrollHeight)],
@@ -255,7 +257,8 @@ describe('inventory view, rendered: stacked, each pane keeps its own footer', ()
   });
 
   it('keeps a card row in the grid and the footer at its foot at the 1024x640 window', async () => {
-    const { grid, cardHeight, detailOverflow, samples } = await stackedPanes(534);
+    const { grid, cardHeight, viewOverflow, detailOverflow, samples } = await stackedPanes(534);
+    assert.ok(viewOverflow > 0, `the view scrolls as a whole, overflowing by ${viewOverflow}px`);
     assert.ok(grid.overflow > 0, `the grid scrolls on its own, overflowing by ${grid.overflow}px`);
     assert.ok(
       detailOverflow > 0,
