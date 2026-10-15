@@ -134,16 +134,16 @@
               runs={listedRuns}
               onToggle={(kind) => journal?.toggleKind?.(kind)}
             />
+            <SegmentedControl
+              options={statusOptions}
+              value={journal?.activeStatusFilter ?? 'all'}
+              onChange={(value) => journal?.setActiveStatusFilter?.(value)}
+              groupName="journal-active-status"
+              ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
+              data-journal-status-filter
+              fill
+            />
           </div>
-          <SegmentedControl
-            options={statusOptions}
-            value={journal?.activeStatusFilter ?? 'all'}
-            onChange={(value) => journal?.setActiveStatusFilter?.(value)}
-            groupName="journal-active-status"
-            ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
-            data-journal-status-filter
-            fill
-          />
 
           <div class="journal-browse-lists">
             <ActiveRunsList
@@ -232,14 +232,11 @@
   }
   /* The column has no inline padding, so each list's pager can span it; its contents keep the
      inset themselves, and each section hands its own to its pager through `--fab-section-inset`. */
-  .journal-browse-controls,
-  .journal-browse > :global(.manager-segmented) {
-    margin: 0 var(--fab-space-2);
-  }
   .journal-browse-controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--fab-space-2);
+    margin: 0 var(--fab-space-2);
   }
   .journal-search-field {
     display: grid;
@@ -284,9 +281,12 @@
     .journal-browse {
       display: contents;
     }
-    .journal-browse-controls,
-    .journal-browse > :global(.manager-segmented) {
+    .journal-browse-controls {
       margin: var(--fab-space-3) var(--fab-space-3) 0;
+    }
+    /* Keeps the status filter's stacked 12px step from the kind filter. */
+    .journal-browse-controls > :global([data-journal-status-filter]) {
+      margin-top: var(--fab-space-1);
     }
     .journal-browse-lists {
       display: contents;
