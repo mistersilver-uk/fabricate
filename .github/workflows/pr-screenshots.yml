@@ -157,15 +157,16 @@ jobs:
         run: |
           SELECTION=$(node -e '
             const { readFileSync } = require("node:fs");
-            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, rendersCapture }) => {
+            import("./scripts/lib/viewLabCases.js").then(({ publishableCases }) => {
               const entries = readFileSync("changed-files.jsonl", "utf8")
                 .split("\n")
                 .filter(Boolean)
                 .map((line) => JSON.parse(line));
               const files = entries.map((entry) => entry.filename);
               const patches = Object.fromEntries(entries.map((entry) => [entry.filename, entry.patch]));
-              const ids = mapChangedFilesToCases(files, { patches }).map((c) => c.id);
-              process.stdout.write(`${rendersCapture(files)}\n${ids.join(",")}`);
+              // THROWAWAY: render every publishable case for a full regression sweep.
+              const ids = publishableCases().map((c) => c.id);
+              process.stdout.write(`true\n${ids.join(",")}`);
             });
           ')
           RENDER=$(printf '%s' "$SELECTION" | head -n 1)
@@ -245,7 +246,7 @@ jobs:
     if: (needs.select.outputs.ids != '' && needs.select.outputs.render == 'true') || needs.select.outputs.library != ''
     name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     # The library leg is supplementary: its failure never withholds the app frames from capture.
     continue-on-error: ${{ matrix.kind == 'library' }}
     permissions:
@@ -395,7 +396,8 @@ jobs:
   # Runs only when every shard and the chrome verification succeeded: a failure there fails the
   # run unpublished, as a failed render always has.
   capture:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # THROWAWAY: frames are collected from the shard artifacts; nothing is published.
+    if: false
     needs: [select, render, verify-chrome]
     runs-on: ubuntu-latest
     timeout-minutes: 10
