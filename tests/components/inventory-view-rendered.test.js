@@ -2,7 +2,8 @@
  * The inventory view in Chromium: the detail column is a full rail section flush to the content
  * area's edges, and the grid's pager is the left column's footer, so its outer box meets the nav
  * rail, the window's bottom edge and the detail rail's border with no gutter. Stacked, the pager
- * spans the window and the detail rail stands directly beneath it.
+ * spans the window and the detail rail stands directly beneath it, and the two panes split the
+ * window's height and scroll on their own, so both the pager and the bulk footer stay in view.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -191,5 +192,85 @@ describe("inventory view, rendered: the bulk footer sits on the detail column's 
       '',
       'the last control above the footer, focused from scroll top, sat under it'
     );
+  });
+});
+
+/** The stacked panes in a host the 1024px window's content area, `height` tall, four queued. */
+async function stackedPanes(height) {
+  const page = await fixtureServer.newPage({ viewport: { width: 1100, height: 900 } });
+  try {
+    await page.goto(fixtureServer.url(`${VIEW.url}?width=1010&height=${height}&bulk=4`));
+    await page.waitForSelector(
+      'html[data-inventory-view-ready="true"] [data-inventory-bulk-footer]'
+    );
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+    );
+    return await page.evaluate(() => {
+      const box = (node) => {
+        const { left, top, right, bottom } = node.getBoundingClientRect();
+        return { left, top, right, bottom };
+      };
+      const cards = document.querySelector('.inventory-grid');
+      const detail = document.querySelector('.inventory-detail[data-inventory-detail]');
+      const footerAt = (scrollTop) => {
+        detail.scrollTop = scrollTop;
+        return { scrollTop: detail.scrollTop, detail: box(detail), footer: box(footer) };
+      };
+      const footer = detail.querySelector('[data-inventory-bulk-footer]');
+      return {
+        host: box(document.querySelector('[data-host]')),
+        browse: box(document.querySelector('.inventory-view-column-left')),
+        pager: box(document.querySelector('.inventory-grid-pagination')),
+        grid: { overflow: cards.scrollHeight - cards.clientHeight, height: cards.clientHeight },
+        cardHeight: document.querySelector('[data-inventory-card]').getBoundingClientRect().height,
+        detailOverflow: detail.scrollHeight - detail.clientHeight,
+        samples: [footerAt(0), footerAt(detail.scrollHeight)],
+      };
+    });
+  } finally {
+    await page.close();
+  }
+}
+
+// The 1024px window's content area at 860px and 640px tall, less the window header and actor bar.
+describe('inventory view, rendered: stacked, each pane keeps its own footer', () => {
+  it('keeps the pager and the bulk footer in view at the 1024x860 window', async () => {
+    const { host, browse, pager, grid, detailOverflow, samples } = await stackedPanes(754);
+    assert.ok(grid.overflow > 0, `NON-VACUITY: the grid overflows by ${grid.overflow}px`);
+    assert.ok(detailOverflow > 0, `NON-VACUITY: the detail overflows by ${detailOverflow}px`);
+    assert.ok(pager.bottom <= host.bottom + 0.5, `the pager ends at ${pager.bottom}px`);
+    near(pager.left, host.left, 'the pager left edge against the nav rail');
+    near(pager.right, host.right, 'the pager right edge against the window');
+    near(pager.bottom, browse.bottom, "the pager bottom edge on the browse pane's");
+    for (const { scrollTop, detail, footer } of samples) {
+      assert.ok(footer.bottom <= host.bottom + 0.5, `the footer ends at ${footer.bottom}px`);
+      within(
+        footer.bottom,
+        detail.bottom,
+        `the footer on the detail pane's foot at ${scrollTop}px`
+      );
+    }
+    assert.ok(samples[1].scrollTop > 0, 'NON-VACUITY: the detail pane scrolled');
+  });
+
+  it('keeps a card row in the grid and the footer at its foot at the 1024x640 window', async () => {
+    const { grid, cardHeight, detailOverflow, samples } = await stackedPanes(534);
+    assert.ok(grid.overflow > 0, `the grid scrolls on its own, overflowing by ${grid.overflow}px`);
+    assert.ok(
+      detailOverflow > 0,
+      `the detail scrolls on its own, overflowing by ${detailOverflow}px`
+    );
+    assert.ok(
+      grid.height >= cardHeight,
+      `the grid scrolls in ${grid.height}px, under one ${cardHeight}px card row`
+    );
+    for (const { scrollTop, detail, footer } of samples) {
+      within(
+        footer.bottom,
+        detail.bottom,
+        `the footer on the detail pane's foot at ${scrollTop}px`
+      );
+    }
   });
 });
