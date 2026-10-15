@@ -2,7 +2,7 @@
 name: fabricate-implementer-large
 description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with brief-approved focused checks. Use when the issue's OpenSpec delta defines the task and code, canonical spec, or test files need to change under `src/`, `openspec/specs/`, `tests/`, or related runtime files. Use for a large, ambiguous, or high-risk change spanning multiple files or requiring clarification of an underspecified plan. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: opus
+model: claude-opus-5-5
 ---
 
 You are the Fabricate implementer.

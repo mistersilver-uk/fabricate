@@ -82,13 +82,15 @@ A model tier changes the model pin and nothing else: all three bindings of a fam
 "Model tier" is written in full on first use in a section.
 A bare "tier" belongs to the crafting domain's existing success/outcome vocabulary and never to these three.
 
-| Model tier | Claude `model:` | Codex `model`   | Codex `model_reasoning_effort` |
-|------------|-----------------|-----------------|--------------------------------|
-| `small`    | `haiku`         | `gpt-5.6-luna`  | `low`                          |
-| `medium`   | `sonnet`        | `gpt-5.6-terra` | `medium`                       |
-| `large`    | `opus`          | `gpt-5.6-sol`   | `high`                         |
+| Model tier | Claude `model:`     | Codex `model`   | Codex `model_reasoning_effort` |
+|------------|---------------------|-----------------|--------------------------------|
+| `small`    | `claude-haiku-5-5`  | `gpt-5.6-luna`  | `low`                          |
+| `medium`   | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`                       |
+| `large`    | `claude-opus-5-5`   | `gpt-5.6-sol`   | `high`                         |
 
 These pins are declared once in `scripts/lib/agentModelTiers.js` and mirrored by this table; `npm run validate:agents` fails any binding that drifts from them.
+Claude pins use fixed model IDs rather than floating aliases, so newly released models cannot change any agent lane without a deliberate update.
+To upgrade them, change `TIER_MODELS`, regenerate bindings with `npm run validate:agents -- --write`, update this table and the model-pin tests, and require CI approval before merging.
 The model tier is an **underscore** suffix in token space (`fabricate_implementer_small`) and a **hyphen** suffix in file space (`.codex/agents/fabricate-implementer-small.toml`), because the two namespaces already differ that way.
 This is mechanical, not cosmetic: the bindings-table parser matches a token cell against a bare backticked `(fabricate|foundry)_\w+` pattern, and `\w` covers `_` but not `-`, so a hyphenated token cell would be silently skipped and that role would lose every binding check.
 

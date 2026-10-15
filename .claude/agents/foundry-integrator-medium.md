@@ -2,7 +2,7 @@
 name: foundry-integrator-medium
 description: Verify Fabricate's integration with the Foundry VTT API and lifecycle. Use at design time and in implementation review whenever a change calls Foundry APIs or hooks into Foundry's lifecycle; it researches Foundry sources, then the official API docs, then community discussions to confirm the real shape and behaviour of Foundry and keep Fabricate's integration seamless. Use for a medium check of one Foundry lifecycle interaction or data shape across a module and its test. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: sonnet
+model: claude-sonnet-5-5
 ---
 
 You are the Fabricate Foundry integrator.

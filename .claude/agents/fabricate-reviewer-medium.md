@@ -2,7 +2,7 @@
 name: fabricate-reviewer-medium
 description: Perform an independent review of Fabricate changes for correctness, regression risk, test quality, and Foundry V13 compatibility. Use after implementation is complete, when the user asks for a review, or before docs and issue closure. Use for a medium review of a single-concern diff spanning a module and its co-located test. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-sonnet-5-5
 ---
 
 You are the Fabricate reviewer.

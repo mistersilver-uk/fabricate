@@ -2,7 +2,7 @@
 name: foundry-integrator-small
 description: Verify Fabricate's integration with the Foundry VTT API and lifecycle. Use at design time and in implementation review whenever a change calls Foundry APIs or hooks into Foundry's lifecycle; it researches Foundry sources, then the official API docs, then community discussions to confirm the real shape and behaviour of Foundry and keep Fabricate's integration seamless. Use for a small check of one documented Foundry API call or hook signature. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: haiku
+model: claude-haiku-5-5
 ---
 
 You are the Fabricate Foundry integrator.

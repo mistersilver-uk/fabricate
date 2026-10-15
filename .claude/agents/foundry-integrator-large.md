@@ -2,7 +2,7 @@
 name: foundry-integrator-large
 description: Verify Fabricate's integration with the Foundry VTT API and lifecycle. Use at design time and in implementation review whenever a change calls Foundry APIs or hooks into Foundry's lifecycle; it researches Foundry sources, then the official API docs, then community discussions to confirm the real shape and behaviour of Foundry and keep Fabricate's integration seamless. Use for a large check of cross-cutting Foundry lifecycle, document, or compatibility behaviour requiring research across sources, docs, and community discussion. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: opus
+model: claude-opus-5-5
 ---
 
 You are the Fabricate Foundry integrator.

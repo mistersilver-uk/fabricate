@@ -60,6 +60,32 @@ const PRE_1936 = {
 };
 
 /**
+ * Table rows renamed by approved changes, with exactly one model identifier substitution each.
+ * Historical data stays frozen, so future model upgrades add explicit, count-pinned mappings
+ * rather than weakening the structural preservation test (#2494).
+ */
+const RENAMED_ROWS = [
+  {
+    before: '`small` | `haiku` | `gpt-5.6-luna` | `low`',
+    after: '`small` | `claude-haiku-5-5` | `gpt-5.6-luna` | `low`',
+    identifiers: [['`claude-haiku-5-5`', '`haiku`']],
+  },
+  {
+    before: '`medium` | `sonnet` | `gpt-5.6-terra` | `medium`',
+    after: '`medium` | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`',
+    identifiers: [['`claude-sonnet-5-5`', '`sonnet`']],
+  },
+  {
+    before: '`large` | `opus` | `gpt-5.6-sol` | `high`',
+    after: '`large` | `claude-opus-5-5` | `gpt-5.6-sol` | `high`',
+    identifiers: [['`claude-opus-5-5`', '`opus`']],
+  },
+];
+
+/** Any added historical row exception must explicitly update this count. */
+const RENAMED_ROWS_COUNT = 3;
+
+/**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
  * nothing has moved yet.
  */
@@ -1015,7 +1041,9 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
     // A verified rename or superseded policy excuses its sentence here too; each is checked below.
-    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
+    const excused = new Set(
+      [...RENAMED, ...SUPERSEDED_POLICY, ...RENAMED_ROWS].map(({ before: was }) => was)
+    );
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
       ({ sentence }) => !excused.has(sentence)
     );
@@ -1023,6 +1051,38 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
       [],
       `these ${kind} predate issue #1936 in AGENTS.md and are in no DESTINATIONS file`
+    );
+  }
+});
+
+test('every renamed table row has exactly one verified model identifier replacement', () => {
+  assert.equal(
+    RENAMED_ROWS.length,
+    RENAMED_ROWS_COUNT,
+    'a historical table-row exception was added or removed without updating its pinned count'
+  );
+
+  const frozen = multiset(
+    structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8'))
+  );
+  const current = survivingLines(structuralLinesOf);
+  for (const { before, after, identifiers } of RENAMED_ROWS) {
+    assert.equal(frozen.get(before), 1, `retired model row was not in the fixture: ${before}`);
+    assert.equal(current.get(before) ?? 0, 0, `retired model row still survives: ${before}`);
+    assert.equal(current.get(after), 1, `pinned replacement row is absent or duplicated: ${after}`);
+
+    assert.equal(identifiers.length, 1, `a row rename must change exactly one identifier: ${before}`);
+    const [[replacement, original]] = identifiers;
+    assert.ok(original && replacement && original !== replacement, 'a model identifier must change');
+    assert.equal(
+      after.split(replacement).length,
+      2,
+      `replacement identifier must occur exactly once: ${replacement}`
+    );
+    assert.equal(
+      after.replace(replacement, original),
+      before,
+      `only the named model identifier may change: ${before}`
     );
   }
 });

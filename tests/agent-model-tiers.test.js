@@ -124,17 +124,17 @@ function bindingPair(tier, overrides = {}) {
 
 test('1. each model tier declares its Claude model, Codex model, and Codex reasoning effort', () => {
   assert.deepEqual(TIER_MODELS.small, {
-    claude: 'haiku',
+    claude: 'claude-haiku-5-5',
     codexModel: 'gpt-5.6-luna',
     codexReasoningEffort: 'low',
   });
   assert.deepEqual(TIER_MODELS.medium, {
-    claude: 'sonnet',
+    claude: 'claude-sonnet-5-5',
     codexModel: 'gpt-5.6-terra',
     codexReasoningEffort: 'medium',
   });
   assert.deepEqual(TIER_MODELS.large, {
-    claude: 'opus',
+    claude: 'claude-opus-5-5',
     codexModel: 'gpt-5.6-sol',
     codexReasoningEffort: 'high',
   });
@@ -271,9 +271,17 @@ test('6. model-pin comparison is exact and covers Codex model_reasoning_effort',
   assert.equal(superstring.length, 1);
   assert.match(superstring[0], /gpt-5\.6-luna-preview/);
 
-  const wrongClaude = modelPinErrors(bindingPair('small', { claudeModel: 'opus' }));
-  assert.equal(wrongClaude.length, 1);
-  assert.match(wrongClaude[0], /haiku/);
+  const wrongClaude = modelPinErrors(bindingPair('small', { claudeModel: 'claude-opus-5-5' }));
+  assert.deepEqual(wrongClaude, [
+    '.claude/agents/fabricate-implementer-small.md: pins model: claude-opus-5-5, model tier small requires claude-haiku-5-5',
+  ]);
+
+  // A retired floating alias or truncated model ID must never satisfy the exact pin.
+  for (const stale of ['haiku', 'claude-haiku', 'claude-haiku-5']) {
+    assert.deepEqual(modelPinErrors(bindingPair('small', { claudeModel: stale })), [
+      `.claude/agents/fabricate-implementer-small.md: pins model: ${stale}, model tier small requires claude-haiku-5-5`,
+    ], stale);
+  }
 
   const wrongEffort = modelPinErrors(bindingPair('small', { effort: 'medium' }));
   assert.equal(wrongEffort.length, 1);
@@ -317,7 +325,7 @@ test('7. the mapping role fabricate_pr_explorer is gated on its Codex pin only',
     token,
     tier,
     claudePath: '.claude/agents/fabricate-pr-explorer.md',
-    claudeText: claudeBinding({ token, model: 'opus', description: 'Map.' }),
+    claudeText: claudeBinding({ token, model: 'claude-opus-5-5', description: 'Map.' }),
     codexPath: '.codex/agents/fabricate-pr-explorer.toml',
     codexText: codexBinding({ token, model: 'gpt-5.6-luna', effort: 'low', description: 'Map.' }),
     requireClaude: false,
@@ -570,7 +578,7 @@ test('12. a description naming all three model tiers is rejected for every model
     claudePath: '.claude/agents/fabricate-orchestrator.md',
     claudeText: claudeBinding({
       token: 'fabricate_orchestrator',
-      model: 'opus',
+      model: 'claude-opus-5-5',
       description: 'Owns routing and the iteration loops.',
     }),
     codexPath: '.codex/agents/fabricate-orchestrator.toml',
@@ -786,13 +794,13 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
   const cases = [
     {
       name: 'modelPinErrors for a skill-backed role',
-      expected: /pins model: opus, model tier small requires haiku/,
+      expected: /pins model: claude-opus-5-5, model tier small requires claude-haiku-5-5/,
       damage: ({ write }) =>
         write(
           '.claude/agents/fabricate-implementer-small.md',
           `${claudeBinding({
             token: 'fabricate_implementer_small',
-            model: 'opus',
+            model: 'claude-opus-5-5',
             description: fixtureDescription('small'),
           })}\n\nRead \`.agents/skills/fabricate-implementer/SKILL.md\`.\n`
         ),
@@ -822,7 +830,7 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
             'name: fabricate-implementer-small',
             `description: ${fixtureDescription('small')}`,
             'tools: Read, Grep, Glob',
-            'model: haiku',
+            'model: claude-haiku-5-5',
             '---',
             '',
             'Read `.agents/skills/fabricate-implementer/SKILL.md`.',
@@ -916,9 +924,14 @@ test('16. a hyphenated model-tier token cell is reported as skipped, never parse
 // --- 17. The Claude side of the pin gate is symmetric with the Codex side ----
 
 test('17. a superstring Claude pin and a missing tiered description both error', () => {
-  const superstring = modelPinErrors(bindingPair('small', { claudeModel: 'haiku-preview' }));
+  const superstring = modelPinErrors(
+    bindingPair('small', { claudeModel: 'claude-haiku-5-5-preview' })
+  );
   assert.equal(superstring.length, 1);
-  assert.match(superstring[0], /pins model: haiku-preview, model tier small requires haiku/);
+  assert.match(
+    superstring[0],
+    /pins model: claude-haiku-5-5-preview, model tier small requires claude-haiku-5-5/
+  );
 
   const noDescription = modelPinErrors({
     token: 'fabricate_implementer_small',
@@ -928,7 +941,7 @@ test('17. a superstring Claude pin and a missing tiered description both error',
       '---',
       'name: fabricate-implementer-small',
       'tools: Read, Grep, Glob, Edit, Write, Bash',
-      'model: haiku',
+      'model: claude-haiku-5-5',
       '---',
       '',
       'body',
@@ -970,7 +983,7 @@ test('18. a TOML block description is parsed, not shadowed by the single-line pa
   assert.match(wrongTier[1], /must not name model tier large/);
 });
 
-test('14. every exact-path HIGH_RISK_PATHS entry names a file that exists', () => {
+test('19. every exact-path HIGH_RISK_PATHS entry names a file that exists', () => {
   const missing = HIGH_RISK_PATHS.filter(
     (entry) => !entry.includes('*') && !existsSync(join(REPO_ROOT, entry))
   );

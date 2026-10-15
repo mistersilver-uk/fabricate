@@ -2,7 +2,7 @@
 name: fabricate-reviewer-small
 description: Perform an independent review of Fabricate changes for correctness, regression risk, test quality, and Foundry V13 compatibility. Use after implementation is complete, when the user asks for a review, or before docs and issue closure. Use for a small review of a narrow, self-contained diff in a single file with obvious intent. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob
-model: haiku
+model: claude-haiku-5-5
 ---
 
 You are the Fabricate reviewer.
