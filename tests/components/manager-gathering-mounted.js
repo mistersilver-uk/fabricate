@@ -1843,7 +1843,7 @@ export function registerGatheringCases() {
 
       const footer = target.querySelector(selector);
       assert.ok(Boolean(footer), `the ${card} footer should render`);
-      const ranges = footer.textContent.match(/Showing \d+.\d+ of \d+/g) ?? [];
+      const ranges = footer.textContent.match(/Showing \d+[–-]\d+ of \d+/g) ?? [];
       assert.equal(ranges.length, total > 6 ? 1 : 0, `the ${card} footer range count`);
       assert.equal(
         footer.children.length,
