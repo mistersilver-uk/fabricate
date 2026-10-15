@@ -100,14 +100,14 @@
   },
   {
     "spec": "<InspectorPanel>",
-    "cap": "rail — content continuing under the foot, faded at the scroll edge",
+    "cap": "rail — content continuing under the foot",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/InspectorPanel.svelte",
     "inset": 12,
     "fixture": "InspectorPanelRecipeVerbs",
     "partial": "verbs and foot",
     "props": {
-      "style": "--fab-inspector-pad: var(--fab-space-3); --fab-inspector-bg: var(--fab-bg-2)"
+      "style": "--fab-manager-inspector-pad: var(--fab-space-3); --fab-manager-inspector-bg: var(--fab-bg-2)"
     },
     "content": [
       {
@@ -132,7 +132,7 @@
       "edit": "Edit recipe",
       "remove": "Delete recipe"
     },
-    "note": "The panel’s three recipe verbs in its foot, the content above it as plain text. The aside’s two tokens ride the root’s `style`, because the lab’s slot is not a `.manager-inspector`; the slot is not a scroller, so the foot stands under the content with no fade."
+    "note": "The panel’s three recipe verbs in its foot, the content above it as plain text. The aside’s two tokens ride the root’s `style`, because the lab’s slot is not a `.manager-inspector`; the slot is not a scroller, so the foot stands under the content."
   },
   {
     "spec": "<Modal>",

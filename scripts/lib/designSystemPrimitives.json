@@ -78,7 +78,7 @@
       "status": "shipped",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The single-record inspector's filling root and pinned foot (issue 2498), rendering the record verbs of `recipes/RecipeBrowserInspector`, `essences/EssenceBrowserInspector`, `components/ComponentBrowserInspector` and `tools/ToolBrowserInspector`; `scoped/EntityListInspectorFrame` imports its `markContentBelow` attachment for its own foot's scroll-edge fade. `library.html` names it under Structures. Targeted: the recipes and essences inspector View Lab cases claim it by `sourceMatches`. Scoped `manager-only`: its foot bleeds by and paints the manager inspector aside's `--fab-inspector-pad` and `--fab-inspector-bg`, and it must be that aside's direct child."
+      "why": "The single-record inspector's filling root and pinned foot (issue 2498), rendering the record verbs of `recipes/RecipeBrowserInspector`, `essences/EssenceBrowserInspector`, `components/ComponentBrowserInspector` and `tools/ToolBrowserInspector`. `library.html` names it under Structures. Targeted: the recipes and essences inspector View Lab cases claim it by `sourceMatches`. Scoped `manager-only`: the manager sheet bleeds its foot by and paints it with the inspector aside's `--fab-manager-inspector-pad` and `--fab-manager-inspector-bg`, and it must be that aside's direct child."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkEditSection.svelte",

@@ -701,10 +701,16 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
   it('puts the context rail on the ONE shared right-hand-panel surface', () => {
     // Issue 643 put the Recipe Studio rail on the SAME surface as its main editor panel
     // (--fab-bg-2) while every other screen kept the lighter --fab-bg-3.
+    // The fill is the aside's token, which `InspectorPanel`'s foot paints too (issue 2498).
     assert.match(
       css,
-      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*--fab-manager-inspector-bg:\s*var\(--fab-bg-2\);/,
       'the shared inspector sits on --fab-bg-2 on every screen'
+    );
+    assert.match(
+      css,
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-manager-inspector-bg\);/,
+      'the shared inspector paints its own fill token'
     );
     assert.doesNotMatch(
       css,

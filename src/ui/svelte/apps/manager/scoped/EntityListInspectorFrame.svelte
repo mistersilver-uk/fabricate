@@ -39,7 +39,6 @@
   import FilterBar from '../../../components/FilterBar.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { createScopedListBrowserState } from '../../../../model/managerBrowserViewState.js';
-  import { markContentBelow } from '../InspectorPanel.svelte';
 
   let {
     scope = null,
@@ -844,7 +843,8 @@
       {/if}
     </div>
 
-    <!-- `&& available`: unavailable draws one callout and no panel, so a track would be void. -->
+    <!-- `&& available` for the reason the layout's own note gives: the unavailable state draws
+         one callout and no panel, so a 300px track beside it would be a painted void. -->
     {#if inspectorBody && available}
       <aside
         class="manager-scoped-list-inspector"
@@ -896,7 +896,7 @@
               {descriptionOf(inspectedEntry)}
             </p>
           </div>
-          <div class="manager-scoped-list-inspector-scroll" {@attach markContentBelow}>
+          <div class="manager-scoped-list-inspector-scroll">
             {@render inspectorBody(inspectedEntry, rowContext(inspectedEntry))}
           </div>
           {#if inspectorFoot}

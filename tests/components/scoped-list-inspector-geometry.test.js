@@ -151,7 +151,6 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     FRAME,
-    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',

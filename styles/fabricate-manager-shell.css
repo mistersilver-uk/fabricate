@@ -374,32 +374,23 @@
   overflow: hidden;
 }
 
-/* `InspectorPanel` publishes its foot's height plus its fade on the aside, so a focus scroll stops above both (WCAG 2.4.11); until it measures, the fade alone. */
+/* `InspectorPanel` publishes its foot's height on the aside, so a focus scroll stops above the foot (WCAG 2.4.11). */
 .fabricate-manager .manager-inspector:has(> .fab-inspector-panel) {
-  scroll-padding-block-end: var(--fab-inspector-scroll-pad, var(--fab-space-5));
+  scroll-padding-block-end: var(--fab-manager-inspector-scroll-pad, 0);
 }
 
-/* The world list frame's inspector column, whose scroller is a child above its own foot: the same scroll-edge fade as `InspectorPanel`'s, in the column's own fill, spanning the column's gap, and only while `markContentBelow` finds content below the scroller's edge. */
-.fabricate-manager .manager-scoped-list-inspector {
-  --fab-inspector-bg: var(--fab-bg-1);
+/* `bottom` answers the scrollport clamp, which Chromium measures from the aside's content box, and `margin-bottom` the containing-block clamp at maximum scroll; both are the aside's padding token, so the foot spans the rail's full inner width on the aside's own fill. */
+.fabricate-manager .fab-inspector-panel-foot {
+  bottom: calc(-1 * var(--fab-manager-inspector-pad));
+  margin-inline: calc(-1 * var(--fab-manager-inspector-pad));
+  margin-bottom: calc(-1 * var(--fab-manager-inspector-pad));
+  padding-inline: var(--fab-manager-inspector-pad);
+  background: var(--fab-manager-inspector-bg);
 }
 
-.fabricate-manager .manager-scoped-list-inspector-scroll {
-  scroll-padding-block-end: var(--fab-space-5);
-}
-
-.fabricate-manager .manager-scoped-list-inspector-foot {
-  position: relative;
-}
-
-.fabricate-manager .manager-scoped-list-inspector-scroll.has-content-below + .manager-scoped-list-inspector-foot::before {
-  position: absolute;
-  inset-inline: 0;
-  bottom: calc(100% + 1px);
-  block-size: 20px;
-  background: linear-gradient(to top, var(--fab-inspector-bg), transparent);
-  pointer-events: none;
-  content: "";
+/* The foot is always in view, so while focus is inside it the aside drops that padding and focusing a foot verb does not scroll the rail; Chromium tests a focus target's own box against the padded scrollport. */
+.fabricate-manager .manager-inspector:has(> .fab-inspector-panel > .fab-inspector-panel-foot:focus-within) {
+  scroll-padding-block-end: 0;
 }
 
 .fabricate-manager .manager-rail {

@@ -34,7 +34,7 @@
 
 /* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest. */
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
-  --fab-inspector-pad: var(--fab-space-4);
+  --fab-manager-inspector-pad: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-authority-card,
@@ -853,7 +853,7 @@
 
 /* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to be brought onto the same ladder here rather than in a component's scoped `<style>`. */
 .fabricate-manager[data-manager-view='essences'] .manager-inspector {
-  --fab-inspector-bg: var(--fab-bg-0);
+  --fab-manager-inspector-bg: var(--fab-bg-0);
 }
 
 .fabricate-manager[data-manager-view='essences'] .manager-inspector .fabricate-card {
@@ -959,7 +959,7 @@
 
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence rules list does, so its surfaces are brought onto the ladder here rather than in a scoped block (issue 1373). */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
-  --fab-inspector-bg: var(--fab-bg-1);
+  --fab-manager-inspector-bg: var(--fab-bg-1);
 }
 
 .fabricate-manager[data-manager-view='tools'] .manager-inspector .fabricate-card {
