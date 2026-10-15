@@ -75,11 +75,6 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/IconFactRow\.svelte$/,
 ];
 
-// The system inspectors' filling root and pinned foot (issue 2498): Recipes, Essence Rules,
-// Component Rules and Tool Rules render their record verbs through it. The Tool Studio frames keep
-// `TOOL_STUDIO_MATCHES` by identity, which their parity checks read, so Tool Rules is not listed.
-const INSPECTOR_PANEL_PATTERN = /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/;
-
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
 const BULK_STUDIO_SURFACE_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard)\.svelte$/;
@@ -183,6 +178,19 @@ const worldNavigationFrame = (id, label) => ({
 
 export const VIEW_RECIPES = Object.freeze([
   {
+    // The system inspectors' filling root and pinned foot (issue 2498): the four browsers whose
+    // record verbs render through it, each at its default selection.
+    id: 'manager-inspector-panel',
+    label: 'Manager system inspectors — record verbs pinned to the rail foot',
+    smokeLabels: [
+      'manager-recipes-normal',
+      'manager-essences-normal',
+      'manager-components-normal',
+      'manager-tool-parity-01-library-1280x720',
+    ],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/],
+  },
+  {
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],
@@ -281,11 +289,7 @@ export const VIEW_RECIPES = Object.freeze([
     // The only components-browser view with TWO frames, so it is the one entry here that
     // cannot come from `componentsBrowserFrame` (which keys its single label off the id).
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [
-      ...COMPONENTS_BROWSER_MATCHES,
-      /^src\/ui\/model\/componentBrowserModel\.js$/,
-      INSPECTOR_PANEL_PATTERN,
-    ],
+    matches: [...COMPONENTS_BROWSER_MATCHES, /^src\/ui\/model\/componentBrowserModel\.js$/],
   },
   componentsBrowserFrame(
     'manager-components-progressive',
@@ -499,7 +503,6 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
       // The shared bulk-delete card (issue 1132).
       /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/,
-      INSPECTOR_PANEL_PATTERN,
     ],
   },
   {
@@ -567,7 +570,7 @@ export const VIEW_RECIPES = Object.freeze([
     // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a browser-side
     // component placed there would republish the five recipe-EDITOR frames and never the browser
     // frame.
-    matches: [...RECIPES_BROWSER_MATCHES, INSPECTOR_PANEL_PATTERN],
+    matches: RECIPES_BROWSER_MATCHES,
   },
   // Issue 1010: the Recipe Studio's bulk-edit states — rows multi-selected, the shared selection
   // toolbar, and the rail's staged bulk panel in place of the single-recipe inspector.

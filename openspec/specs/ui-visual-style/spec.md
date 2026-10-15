@@ -285,6 +285,11 @@ Every GM studio's right-hand inspector ends in a stack of verbs for the selected
 That is one meaning, so a new studio's inspector MUST render its verbs through the button primitive's roles, at full width, rather than declaring a treatment of its own.
 Each verb takes the button's shipped manager rung — the compact control height, the band's corner and the header label size — so a rail verb and a header verb are one control.
 
+The rail's record verbs — its primary verb and the Duplicate and Delete it offers for the selected record — sit in the inspector's foot, on the rail's bottom edge at the rail's full inner width whether or not the inspector's content fills the rail, so the primary verb is visible at every scroll offset.
+A verb bound to one section, such as Copy source UUID and Unlink beside Source, and a verb collected into an overflow menu stay where they are.
+The foot carries verbs only: a note about a verb's consequence sits in the content directly above the foot and is referenced from that verb.
+Below the manager's supported minimum width, where the inspector is not its own scroll area, the foot follows the content.
+
 Each verb takes the role its verb names:
 
 - `primary` is the success family (section 16 of the design-system library), and there is at most one per rail — the verb that opens the selected record.
@@ -383,7 +388,7 @@ A GM who moved focus elsewhere while an awaited write was in flight keeps their 
 Apply's dock sits on its rail's bottom edge at the rail's full inner width whether or not the staged axes fill the rail: a panel shorter than its rail fills it, so the dock never stops under the axes with the rail empty beneath it.
 A set delete renders inside that dock, under Apply, rather than as a card after the panel, so Apply and the delete both sit at the rail's foot on every bulk edit panel (maintainer ruling, 2026-10-14).
 Nothing renders after the panel in its rail, because a sibling would shorten the dock's containing block and lift the dock off the rail's foot.
-A control that takes focus above the dock, or above the player inventory's sticky bulk footer, is scrolled to stop above it rather than under it (WCAG 2.4.11), whatever height the dock or footer currently has.
+A control that takes focus above the dock, an inspector's foot, or the player inventory's sticky bulk footer is scrolled to stop above it rather than under it (WCAG 2.4.11), whatever height it currently has.
 
 #### Announcing after a focus move
 
