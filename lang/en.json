@@ -4726,7 +4726,6 @@
             "RequiredToolsLibraryEmptyHint": "Open the Tools page from the left rail to add tools first.",
             "SearchTools": "Search tools...",
             "SearchToolsByName": "Search tools by name",
-            "ShowingTools": "Showing {start}-{end} of {total} tools",
             "EmptyToolSearchTitle": "No tools match your search",
             "AddToolToTask": "Add {name} to required tools",
             "RemoveToolFromTask": "Remove {name} from required tools",
@@ -4782,7 +4781,6 @@
             "RemoveComponentTagFilter": "Remove {tag}",
             "NoComponents": "No components available",
             "EmptyComponentSearchTitle": "No components match these filters",
-            "ShowingComponents": "Showing {start}-{end} of {total} components",
             "EmptyDropSearchTitle": "No drop rules match this search",
             "DropCalculationHelp": "Final drop chance = base chance + matching drop modifiers + environment and actor specific modifiers",
             "RewardRuleNotice": "Multiple drop rows use this component. Current drop rules may award only one matching row."
