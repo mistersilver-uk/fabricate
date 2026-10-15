@@ -20,9 +20,9 @@
   - The root is the `.manager-inspector` aside's direct child and fills it, so the foot sits on
     the aside's foot whether or not the content overflows; the aside's `--fab-inspector-pad` and
     `--fab-inspector-bg` size the foot's bleed and paint its fill.
-  - The foot publishes its height, and everything above it takes that plus the fade as
-    `scroll-margin-block-end` (WCAG 2.4.11); the fade shows only while content lies below the
-    visible edge. Pinned by `tests/components/inspector-foot-pinning.test.js`.
+  - The foot publishes its height on the aside, whose `scroll-padding-block-end` is that plus the
+    fade, so a focused control stops above the foot (WCAG 2.4.11); the fade shows only while
+    content lies below the visible edge. Pinned by `tests/components/inspector-foot-pinning.test.js`.
 -->
 <script module>
   /**
@@ -74,12 +74,20 @@
   // The aside is the scroller: the root is its direct child.
   const trackAside = (root) =>
     trackContentBelow(root.parentElement, (more) => (contentBelow = more));
+
+  // On the aside, not the content: Chromium's focus scroll ignores a `scroll-margin` on a control
+  // that is inside the scrollport but under the foot, and honours the scroller's padding.
+  function publishFootHeight(root) {
+    const aside = root.parentElement;
+    aside.style.setProperty('--fab-inspector-foot-block-size', `${footHeight}px`);
+    return () => aside.style.removeProperty('--fab-inspector-foot-block-size');
+  }
 </script>
 
 <section
   class={['fab-inspector-panel', extraClass]}
-  style:--fab-inspector-foot-block-size={footHeight > 0 ? `${footHeight}px` : undefined}
   {@attach trackAside}
+  {@attach publishFootHeight}
   {...rest}
 >
   {@render children?.()}
@@ -130,12 +138,5 @@
     background: linear-gradient(to top, var(--fab-inspector-bg), transparent);
     pointer-events: none;
     content: '';
-  }
-
-  /* Not inherited, so set on every node above the foot; `:global` because the content is the
-     caller's. */
-  .fab-inspector-panel > :global(:not(.fab-inspector-panel-foot)),
-  .fab-inspector-panel > :global(:not(.fab-inspector-panel-foot) *) {
-    scroll-margin-block-end: calc(var(--fab-inspector-foot-block-size, 0px) + var(--fab-space-5));
   }
 </style>

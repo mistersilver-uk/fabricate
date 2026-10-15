@@ -380,6 +380,11 @@
   --fab-inspector-bg: var(--fab-bg-2);
 }
 
+/* `InspectorPanel` publishes its foot's height on the aside, so a focus scroll stops above the foot and its fade (WCAG 2.4.11). */
+.fabricate-manager .manager-inspector:has(> .fab-inspector-panel) {
+  scroll-padding-block-end: calc(var(--fab-inspector-foot-block-size, 0px) + var(--fab-space-5));
+}
+
 /* The world list frame's inspector column, whose scroller is a child above its own foot: the same scroll-edge fade as `InspectorPanel`'s, in the column's own fill, spanning the column's gap, and only while `markContentBelow` finds content below the scroller's edge. */
 .fabricate-manager .manager-scoped-list-inspector {
   --fab-inspector-bg: var(--fab-bg-1);
