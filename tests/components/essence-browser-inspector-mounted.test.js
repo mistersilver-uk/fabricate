@@ -69,6 +69,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte',
   ],
 });

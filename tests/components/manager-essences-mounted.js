@@ -279,6 +279,13 @@ export function registerEssencesCases() {
       Boolean(target.querySelector('[data-essence-action="edit"]')),
       'NON-VACUITY: the actions cluster is rendered, so the absence above is a measurement'
     );
+    // The record verbs sit in the inspector's pinned foot (issue 2498).
+    const essenceFoot = target.querySelector(':scope .manager-inspector .fab-inspector-panel-foot');
+    assert.ok(
+      Boolean(essenceFoot?.querySelector(':scope [data-essence-action="edit"]')) &&
+        Boolean(essenceFoot.querySelector(':scope [data-essence-action="delete"]')),
+      'Edit and Delete render inside the foot'
+    );
     // The `SYSTEM RULES n / m` panel (issue 1372, B1) renders only when the world corpus can
     // answer it, and this harness registers no essence scope store, so it is correctly absent
     // here — the same rule the membership filter follows. Its presence is measured where a
@@ -605,9 +612,13 @@ export function registerEssencesCases() {
       false,
       'a carried essence is still deletable — the delete is warned, not blocked'
     );
+    const impact = target.querySelector('[data-essence-delete-impact]');
+    assert.ok(impact, 'and an impact note states how far the cascade reaches');
     assert.ok(
-      target.querySelector('[data-essence-delete-impact]'),
-      'and an impact note states how far the cascade reaches'
+      !impact.closest('.fab-inspector-panel-foot') &&
+        target.querySelector('[data-essence-action="delete"]').getAttribute('aria-describedby') ===
+          impact.id,
+      'the note sits above the foot, and Delete is described by it (issue 2498)'
     );
 
     // ── NO CREATE ON THIS ROUTE (issue 1372, maintainer parity round 8) ─────────────────────
