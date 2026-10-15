@@ -61,6 +61,8 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  // Its scroller's scroll-edge fade tracker (issue 2498).
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',

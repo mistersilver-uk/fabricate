@@ -136,6 +136,7 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',

@@ -380,6 +380,29 @@
   --fab-inspector-bg: var(--fab-bg-2);
 }
 
+/* The world list frame's inspector column, whose scroller is a child above its own foot: the same scroll-edge fade as `InspectorPanel`'s, in the column's own fill, spanning the column's gap, and only while `markContentBelow` finds content below the scroller's edge. */
+.fabricate-manager .manager-scoped-list-inspector {
+  --fab-inspector-bg: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-scoped-list-inspector-scroll {
+  scroll-padding-block-end: var(--fab-space-5);
+}
+
+.fabricate-manager .manager-scoped-list-inspector-foot {
+  position: relative;
+}
+
+.fabricate-manager .manager-scoped-list-inspector-scroll.has-content-below + .manager-scoped-list-inspector-foot::before {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(100% + 1px);
+  block-size: var(--fab-space-5);
+  background: linear-gradient(to top, var(--fab-inspector-bg), transparent);
+  pointer-events: none;
+  content: "";
+}
+
 .fabricate-manager .manager-rail {
   display: flex;
   flex-direction: column;

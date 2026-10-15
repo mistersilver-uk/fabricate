@@ -69,6 +69,7 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
   'src/ui/svelte/components/SegmentedControl.svelte',
 ];

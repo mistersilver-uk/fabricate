@@ -55,6 +55,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     // THE `SYSTEM RULES n / m` PANEL.
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
