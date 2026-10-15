@@ -28,6 +28,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
 
 /**
@@ -183,7 +184,8 @@ const listScreen = (rows = SIX_ROWS) => `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fab-inspector-panel" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -211,7 +213,8 @@ const listScreen = (rows = SIX_ROWS) => `
         <div class="manager-tool-inspector-routes">
           <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
-        <div class="manager-tool-inspector-foot" data-probe="foot">
+      </section>
+        <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">
           <button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
         </div>
       </section>
@@ -335,13 +338,15 @@ function inspectorColumn(sections, footState) {
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fab-inspector-panel" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
           <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
         </div>
-        <div class="manager-tool-inspector-foot" data-probe="foot">${foot}</div>
+      </section>
+        <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">${foot}</div>
       </section>
     </aside>
   </div>

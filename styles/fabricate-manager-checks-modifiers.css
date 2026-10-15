@@ -1668,9 +1668,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
-  padding: var(--fab-space-3);
+  padding: var(--fab-inspector-pad);
   border-left: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-inspector-bg);
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;

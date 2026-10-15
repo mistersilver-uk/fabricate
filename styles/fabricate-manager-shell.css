@@ -374,6 +374,12 @@
   overflow: hidden;
 }
 
+/* The inspector's inset and fill, as tokens a route overrides, so `InspectorPanel`'s foot bleeds by and paints exactly what the aside does (issue 2498). */
+.fabricate-manager .manager-inspector {
+  --fab-inspector-pad: var(--fab-space-3);
+  --fab-inspector-bg: var(--fab-bg-2);
+}
+
 .fabricate-manager .manager-rail {
   display: flex;
   flex-direction: column;
