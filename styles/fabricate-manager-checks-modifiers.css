@@ -1663,8 +1663,11 @@
   padding: var(--fab-space-4);
 }
 
-/* ONE right-hand-panel surface for the whole manager (issues 881, 643). */
+/* ONE right-hand-panel surface for the whole manager (issues 881, 643). Its inset and fill are tokens a route overrides, so `InspectorPanel`'s foot bleeds by and paints exactly what the aside does (issue 2498). */
 .fabricate-manager .manager-inspector {
+  --fab-inspector-pad: var(--fab-space-3);
+  --fab-inspector-bg: var(--fab-bg-2);
+
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);

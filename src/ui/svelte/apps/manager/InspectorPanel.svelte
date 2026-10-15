@@ -20,9 +20,9 @@
   - The root is the `.manager-inspector` aside's direct child and fills it, so the foot sits on
     the aside's foot whether or not the content overflows; the aside's `--fab-inspector-pad` and
     `--fab-inspector-bg` size the foot's bleed and paint its fill.
-  - The foot publishes its height on the aside, whose `scroll-padding-block-end` is that plus the
-    fade, so a focused control stops above the foot (WCAG 2.4.11); the fade shows only while
-    content lies below the visible edge. Pinned by `tests/components/inspector-foot-pinning.test.js`.
+  - The foot publishes its height plus the fade on the aside as `--fab-inspector-scroll-pad`, its
+    `scroll-padding-block-end`, so a focused control stops above the foot (WCAG 2.4.11); the fade
+    shows only while content lies below the visible edge. Pinned by `tests/components/inspector-foot-pinning.test.js`.
 -->
 <script module>
   /**
@@ -76,18 +76,22 @@
     trackContentBelow(root.parentElement, (more) => (contentBelow = more));
 
   // On the aside, not the content: Chromium's focus scroll ignores a `scroll-margin` on a control
-  // that is inside the scrollport but under the foot, and honours the scroller's padding.
-  function publishFootHeight(root) {
+  // that is inside the scrollport but under the foot, and honours the scroller's padding. The
+  // `--fab-space-5` addend is the fade's 20px.
+  function publishScrollPad(root) {
     const aside = root.parentElement;
-    aside.style.setProperty('--fab-inspector-foot-block-size', `${footHeight}px`);
-    return () => aside.style.removeProperty('--fab-inspector-foot-block-size');
+    aside.style.setProperty(
+      '--fab-inspector-scroll-pad',
+      `calc(${footHeight}px + var(--fab-space-5))`
+    );
+    return () => aside.style.removeProperty('--fab-inspector-scroll-pad');
   }
 </script>
 
 <section
   class={['fab-inspector-panel', extraClass]}
   {@attach trackAside}
-  {@attach publishFootHeight}
+  {@attach publishScrollPad}
   {...rest}
 >
   {@render children?.()}
@@ -134,7 +138,7 @@
     position: absolute;
     inset-inline: 0;
     bottom: calc(100% + 1px);
-    block-size: var(--fab-space-5);
+    block-size: 20px;
     background: linear-gradient(to top, var(--fab-inspector-bg), transparent);
     pointer-events: none;
     content: '';
