@@ -1994,12 +1994,6 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-drop-count {
-  flex: 0 0 auto;
-  font-size: 0.76rem;
-  white-space: nowrap;
-}
-
 .fabricate-manager .manager-drop-rank-cell {
   display: flex;
   flex-direction: column;
