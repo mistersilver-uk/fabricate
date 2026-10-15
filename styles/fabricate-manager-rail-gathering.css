@@ -1836,6 +1836,8 @@
 }
 
 .fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0;
   border-top: 0;
   background: transparent;
@@ -1979,6 +1981,8 @@
 }
 
 .fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0;
   border-top: 0;
   background: transparent;

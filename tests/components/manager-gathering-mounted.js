@@ -1768,7 +1768,7 @@ export function registerGatheringCases() {
       'next-page control should render while multiple pages exist'
     );
 
-    // Selecting 9 fits all seven components on a single page. The per-page selector must
+    // Selecting 9 fits all eight components on a single page. The per-page selector must
     // survive so the user can still switch back — the prev/next nav is the only part that
     // should disappear once there is a single page.
     chooseSelectOption(target, '[data-pagination-size]', 9);
@@ -1807,6 +1807,68 @@ export function registerGatheringCases() {
       'the per-page selector should switch back to six per page'
     );
   });
+
+  // Issue 2497: each card printed its own range beside the shared pager's, so the count read twice.
+  const libraryTools = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `tool-${index}`,
+      label: `Tool ${index}`,
+      enabled: true,
+      componentId: 'c1',
+      requirement: null,
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' },
+    }));
+  const componentFooter = {
+    card: 'component browser',
+    tab: 'results',
+    selector: '.manager-task-component-browser-footer',
+  };
+  const toolFooter = {
+    card: 'required tools',
+    tab: 'requirements',
+    selector: '.manager-task-required-tools-footer',
+  };
+  const footerRangeCases = [
+    { ...componentFooter, total: 2, storeOptions: {} },
+    { ...componentFooter, total: 8, storeOptions: { extendedComponentCards: true } },
+    { ...toolFooter, total: 2, storeOptions: { gatheringLibraryTools: libraryTools(2) } },
+    { ...toolFooter, total: 8, storeOptions: { gatheringLibraryTools: libraryTools(8) } },
+  ];
+  for (const { card, tab, selector, total, storeOptions } of footerRangeCases) {
+    it(`shows the ${card} range once, through the shared pager, over ${total} rows`, async () => {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store: createStore([], storeOptions), services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      navButton('Gathering').click();
+      await tick();
+      flushSync();
+      gatheringSubitem('Tasks').click();
+      await tick();
+      flushSync();
+      target
+        .querySelector(
+          ':scope [data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]'
+        )
+        .click();
+      await tick();
+      flushSync();
+      await openTaskTab(tab);
+
+      const footer = target.querySelector(selector);
+      assert.ok(Boolean(footer), `the ${card} footer should render`);
+      const ranges = footer.textContent.match(/Showing \d+.\d+ of \d+/g) ?? [];
+      assert.equal(ranges.length, total > 6 ? 1 : 0, `the ${card} footer range count`);
+      assert.ok(
+        !footer.querySelector('.manager-drop-count'),
+        `the ${card} footer should carry no card-local range`
+      );
+    });
+  }
 
   it('caps gathering task drop modifiers at four labels and redirects to the selected rule beyond', async () => {
     const fourModifiers = Array.from({ length: 4 }, (_, index) => ({

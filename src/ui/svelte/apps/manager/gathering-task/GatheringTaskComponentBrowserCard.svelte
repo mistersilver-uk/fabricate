@@ -55,12 +55,6 @@
   $effect(() => {
     for (const card of paginatedComponentCards) card?.hydrate?.()?.catch?.(() => {});
   });
-  const componentShowingStart = $derived(
-    filteredComponentCards.length === 0 ? 0 : componentPageIndex * componentPageSize + 1
-  );
-  const componentShowingEnd = $derived(
-    Math.min(filteredComponentCards.length, (componentPageIndex + 1) * componentPageSize)
-  );
 
   $effect(() => {
     if (
@@ -256,15 +250,6 @@
   </div>
 
   <div class="manager-task-component-browser-footer">
-    <span class="manager-muted manager-drop-count" data-gathering-component-count
-      >{text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.ShowingComponents',
-        'Showing {start}-{end} of {total} components'
-      )
-        .replace('{start}', componentShowingStart)
-        .replace('{end}', componentShowingEnd)
-        .replace('{total}', filteredComponentCards.length)}</span
-    >
     <Pagination
       totalCount={filteredComponentCards.length}
       pageSize={componentPageSize}

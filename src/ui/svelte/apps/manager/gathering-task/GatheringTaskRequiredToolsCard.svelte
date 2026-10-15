@@ -50,12 +50,6 @@
   const paginatedLibraryTools = $derived(
     filteredLibraryTools.slice(toolPageIndex * toolPageSize, (toolPageIndex + 1) * toolPageSize)
   );
-  const toolShowingStart = $derived(
-    filteredLibraryTools.length === 0 ? 0 : toolPageIndex * toolPageSize + 1
-  );
-  const toolShowingEnd = $derived(
-    Math.min(filteredLibraryTools.length, (toolPageIndex + 1) * toolPageSize)
-  );
 
   $effect(() => {
     if (toolPageIndex > 0 && toolPageIndex * toolPageSize >= filteredLibraryTools.length)
@@ -275,15 +269,6 @@
 
   {#if libraryToolList.length > 0}
     <div class="manager-task-required-tools-footer">
-      <span class="manager-muted manager-drop-count" data-gathering-task-required-tools-count>
-        {text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.ShowingTools',
-          'Showing {start}-{end} of {total} tools'
-        )
-          .replace('{start}', toolShowingStart)
-          .replace('{end}', toolShowingEnd)
-          .replace('{total}', filteredLibraryTools.length)}
-      </span>
       <Pagination
         totalCount={filteredLibraryTools.length}
         pageSize={toolPageSize}
