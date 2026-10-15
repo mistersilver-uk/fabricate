@@ -1836,9 +1836,17 @@
 }
 
 .fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0;
   border-top: 0;
   background: transparent;
+}
+
+/* The pager is the footer's only content and renders nothing at or below the smallest page. */
+.fabricate-manager .manager-task-component-browser-footer:not(:has(.fabricate-pagination)),
+.fabricate-manager .manager-task-required-tools-footer:not(:has(.fabricate-pagination)) {
+  display: none;
 }
 
 .fabricate-manager .manager-task-required-tools-card {
@@ -1979,15 +1987,11 @@
 }
 
 .fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0;
   border-top: 0;
   background: transparent;
-}
-
-.fabricate-manager .manager-drop-count {
-  flex: 0 0 auto;
-  font-size: 0.76rem;
-  white-space: nowrap;
 }
 
 .fabricate-manager .manager-drop-rank-cell {

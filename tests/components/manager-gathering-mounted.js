@@ -1768,7 +1768,7 @@ export function registerGatheringCases() {
       'next-page control should render while multiple pages exist'
     );
 
-    // Selecting 9 fits all seven components on a single page. The per-page selector must
+    // Selecting 9 fits all eight components on a single page. The per-page selector must
     // survive so the user can still switch back — the prev/next nav is the only part that
     // should disappear once there is a single page.
     chooseSelectOption(target, '[data-pagination-size]', 9);
@@ -1807,6 +1807,51 @@ export function registerGatheringCases() {
       'the per-page selector should switch back to six per page'
     );
   });
+
+  // Each gathering-task footer's only range is the shared pager's summary, shown only above the smallest page.
+  const libraryTools = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `tool-${index}`,
+      label: `Tool ${index}`,
+      enabled: true,
+      componentId: 'c1',
+      requirement: null,
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' },
+    }));
+  const componentFooter = {
+    card: 'component browser',
+    tab: 'results',
+    selector: '.manager-task-component-browser-footer',
+  };
+  const toolFooter = {
+    card: 'required tools',
+    tab: 'requirements',
+    selector: '.manager-task-required-tools-footer',
+  };
+  const footerRangeCases = [
+    { ...componentFooter, total: 2, storeOptions: {} },
+    { ...componentFooter, total: 8, storeOptions: { extendedComponentCards: true } },
+    { ...toolFooter, total: 2, storeOptions: { gatheringLibraryTools: libraryTools(2) } },
+    { ...toolFooter, total: 8, storeOptions: { gatheringLibraryTools: libraryTools(8) } },
+  ];
+  for (const { card, tab, selector, total, storeOptions } of footerRangeCases) {
+    it(`shows the ${card} range only through the shared pager, over ${total} rows`, async () => {
+      await openTasks(storeOptions);
+      await openEditor('task', 'task-herbs');
+      await openTaskTab(tab);
+
+      const footer = target.querySelector(selector);
+      assert.ok(Boolean(footer), `the ${card} footer should render`);
+      const ranges = footer.textContent.match(/Showing \d+[–-]\d+ of \d+/g) ?? [];
+      assert.equal(ranges.length, total > 6 ? 1 : 0, `the ${card} footer range count`);
+      assert.equal(
+        footer.children.length,
+        total > 6 ? 1 : 0,
+        `the ${card} footer should hold only the shared pager, and nothing below the smallest page`
+      );
+    });
+  }
 
   it('caps gathering task drop modifiers at four labels and redirects to the selected rule beyond', async () => {
     const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
