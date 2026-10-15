@@ -12,6 +12,7 @@
   | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the per-page selector with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. |
   | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row; the full page sentence stays in the accessibility tree. |
+  | `edge` | boolean | `false` | With `compact`, the bar closes a pane section: its rule spans the section and it pads itself by `--fab-section-inset` (`--fab-space-2` by default) inline and below. |
 
   Invariants:
   - THE ROOT `<section>` CARRIES `fabricate-pagination`, written inline
@@ -44,6 +45,7 @@
     ariaLabel = '',
     navLabel = '',
     density = 'default',
+    edge = false,
   } = $props();
 
   const compact = $derived(density === 'compact');
@@ -81,6 +83,7 @@
   <section
     class="fabricate-pagination"
     class:is-compact={compact}
+    class:is-edge={compact && edge}
     data-pagination-compact={compact || undefined}
     aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >

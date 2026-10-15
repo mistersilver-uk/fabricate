@@ -226,9 +226,15 @@
     min-height: 0;
     flex-direction: column;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
+    padding: var(--fab-space-2) 0 0;
     border-right: 1px solid var(--fab-border);
     background: var(--fab-bg-1);
+  }
+  /* The column has no inline padding, so each list's pager can span it; its contents keep the
+     inset themselves, and each section hands its own to its pager through `--fab-section-inset`. */
+  .journal-browse-controls,
+  .journal-browse > :global(.manager-segmented) {
+    margin: 0 var(--fab-space-2);
   }
   .journal-browse-controls {
     display: grid;
@@ -248,7 +254,13 @@
     grid-template-rows: minmax(0, 1fr) 280px;
     min-height: 0;
     flex: 1 1 auto;
-    gap: var(--fab-space-2);
+    gap: 0;
+  }
+  .journal-browse-lists > :global(.journal-list-section) {
+    --fab-section-inset: var(--fab-space-2);
+  }
+  .journal-browse-lists :global(:is(.journal-list-header, .journal-list-body)) {
+    padding-inline: var(--fab-section-inset);
   }
   .journal-browse-lists > :global([data-journal-list='finished']) {
     padding-top: var(--fab-space-2);
@@ -283,11 +295,12 @@
       box-sizing: border-box;
       height: 360px;
       min-height: 360px;
-      padding: var(--fab-space-3);
-      border-bottom: 1px solid var(--fab-border);
+      padding: var(--fab-space-3) 0 0;
+      --fab-section-inset: var(--fab-space-3);
     }
     .journal-detail-pane {
       min-height: 220px;
+      border-top: 1px solid var(--fab-border);
       overflow: visible;
     }
   }
