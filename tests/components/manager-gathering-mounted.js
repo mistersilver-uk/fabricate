@@ -1808,7 +1808,7 @@ export function registerGatheringCases() {
     );
   });
 
-  // Issue 2497: each card printed its own range beside the shared pager's, so the count read twice.
+  // Each gathering-task footer's only range is the shared pager's summary, shown only above the smallest page.
   const libraryTools = (count) =>
     Array.from({ length: count }, (_, index) => ({
       id: `tool-${index}`,
@@ -1836,36 +1836,19 @@ export function registerGatheringCases() {
     { ...toolFooter, total: 8, storeOptions: { gatheringLibraryTools: libraryTools(8) } },
   ];
   for (const { card, tab, selector, total, storeOptions } of footerRangeCases) {
-    it(`shows the ${card} range once, through the shared pager, over ${total} rows`, async () => {
-      target = document.createElement('div');
-      document.body.appendChild(target);
-      mounted = mount(Component, {
-        target,
-        props: { store: createStore([], storeOptions), services: { openCurrentAdmin: () => {} } },
-      });
-      flushSync();
-      navButton('Gathering').click();
-      await tick();
-      flushSync();
-      gatheringSubitem('Tasks').click();
-      await tick();
-      flushSync();
-      target
-        .querySelector(
-          ':scope [data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]'
-        )
-        .click();
-      await tick();
-      flushSync();
+    it(`shows the ${card} range only through the shared pager, over ${total} rows`, async () => {
+      await openTasks(storeOptions);
+      await openEditor('task', 'task-herbs');
       await openTaskTab(tab);
 
       const footer = target.querySelector(selector);
       assert.ok(Boolean(footer), `the ${card} footer should render`);
       const ranges = footer.textContent.match(/Showing \d+.\d+ of \d+/g) ?? [];
       assert.equal(ranges.length, total > 6 ? 1 : 0, `the ${card} footer range count`);
-      assert.ok(
-        !footer.querySelector('.manager-drop-count'),
-        `the ${card} footer should carry no card-local range`
+      assert.equal(
+        footer.children.length,
+        total > 6 ? 1 : 0,
+        `the ${card} footer should hold only the shared pager, and nothing below the smallest page`
       );
     });
   }

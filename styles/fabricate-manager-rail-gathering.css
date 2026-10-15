@@ -1843,6 +1843,12 @@
   background: transparent;
 }
 
+/* The pager is the footer's only content and renders nothing at or below the smallest page. */
+.fabricate-manager .manager-task-component-browser-footer:not(:has(.fabricate-pagination)),
+.fabricate-manager .manager-task-required-tools-footer:not(:has(.fabricate-pagination)) {
+  display: none;
+}
+
 .fabricate-manager .manager-task-required-tools-card {
   display: flex;
   flex-direction: column;
