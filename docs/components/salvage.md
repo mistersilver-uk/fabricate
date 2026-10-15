@@ -223,6 +223,8 @@ Players can select several owned items in the Inventory grid and act on all of t
 Shift-click a card, or press Shift+Enter or Shift+Space with a card focused, to add it to the selection.
 Shift-clicking a selected card removes it again.
 Pressing Escape clears the whole selection.
+In a narrow window the Inventory grid and the inspector stack and share the window's height, and each scrolls on its own.
+The grid's page controls and the bulk panel's **Salvage** and **Destroy** buttons therefore stay in view.
 
 {% include screenshot.html case="player-inventory-bulk-mixed" caption="Four items selected at once, drawn from more than one crafting system." %}
 

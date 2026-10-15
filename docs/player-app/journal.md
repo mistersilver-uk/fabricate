@@ -28,7 +28,7 @@ When no character is selected the Journal shows a short prompt:
 **Active** lists the selected character's unfinished runs.
 **Finished** is the history browser for completed, failed, and cancelled runs.
 Select a row in either list to read its detail.
-The lists and selected detail scroll independently, with sort controls and page controls kept outside the scrolling lists.
+The lists and selected detail scroll independently, with sort controls kept outside the scrolling lists.
 In a narrow window they stack in the order Active, Finished, then detail.
 
 Use **Search runs** and the **Run types** filter to narrow both lists.
@@ -43,6 +43,7 @@ Its counts describe the run types shown before search or paging, so a search can
 Both lists start with four runs per page and have independent page sizes and page controls.
 You can choose 4, 6, 12, or 25 runs per page.
 Each compact pager keeps its range, arrows, and page-size choice on one row.
+It closes its list's section as a full-width footer.
 Changing one list's page does not move the other list's page.
 The list sections keep their space when a page is short or empty, and an empty-state panel fills the available list area.
 Your selected detail stays open even when its row is on another page or hidden by a filter, including a search with no matches.
