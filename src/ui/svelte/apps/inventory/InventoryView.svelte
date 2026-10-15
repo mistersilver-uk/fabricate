@@ -398,18 +398,15 @@
 
   /* At the supported 1024px window floor this container's content box is roughly
      938px wide, so the shared 960px boundary is deliberately reachable. Stacked, the
-     rail runs the window's width beneath the left column, its border turned to the top. */
+     rail runs the window's width beneath the left column, its border turned to the top.
+     The two panes split the height at the wide layout's ratio and each scrolls on its own, so
+     both footers stay at their pane's foot; the floors are the browse chrome plus one card row
+     and the bulk footer plus a little body, and below them the grid scrolls as a whole. */
   @container fabricate-inventory (max-width: 960px) {
     .inventory-view-grid {
       grid-template-columns: 1fr;
-      grid-auto-rows: minmax(min-content, max-content);
-      height: auto;
-      min-height: 100%;
+      grid-template-rows: minmax(360px, 1.6fr) minmax(290px, 1fr);
       overflow-y: auto;
-    }
-
-    .inventory-view-column {
-      min-height: 220px;
     }
 
     .inventory-view-column-right {

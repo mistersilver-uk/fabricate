@@ -19,7 +19,6 @@ const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');
 const appSource = read('../../src/ui/SvelteFabricateApp.svelte.js');
 const viewSource = read('../../src/ui/svelte/apps/gathering/GatheringView.svelte');
 const responsiveViewSources = [
-  ['inventory', read('../../src/ui/svelte/apps/inventory/InventoryView.svelte'), '220px'],
   ['gathering', viewSource, '220px'],
   ['crafting', read('../../src/ui/svelte/apps/crafting/CraftingView.svelte'), '220px'],
   ['alchemy', read('../../src/ui/svelte/apps/alchemy/AlchemyView.svelte'), '240px'],

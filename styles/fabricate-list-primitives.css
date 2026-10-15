@@ -335,6 +335,12 @@
   font-size: 9.5px;
 }
 
+/* A compact pager closing a pane section spans it and carries the section's inset itself (`design-system`, a compact pager closes a pane section). */
+.fabricate-pagination.fabricate-pagination.is-compact.is-edge {
+  padding: var(--fab-space-2) var(--fab-section-inset, var(--fab-space-2))
+    var(--fab-section-inset, var(--fab-space-2));
+}
+
 .fabricate-pagination.is-compact .manager-pagination-summary {
   flex: 1 1 auto;
   min-width: 0;

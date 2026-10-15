@@ -59,6 +59,7 @@ Status counts use the union of the active kinds before search, active-status fil
 Toggling a kind returns both lists to their first page.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
+Each pager MUST be its list section's footer: its rule meets the browse column's edges, its content keeps the section's inline inset, and the next section's top rule, or the window's bottom edge for Finished, sits directly beneath it with no gap, at 1240×880 and the stacked 1024×880.
 At the populated wide layout, all four default Active and all four default Finished entries MUST fit visibly in their panes without undersizing shared primitives.
 Finished rows MUST be 44px border-box with a 24px-square dismiss control.
 Both pane allocations and footer bounds MUST remain stable across full, short-last, empty and restored pages at 1240×880 and the supported 1024×880 stacked layout.

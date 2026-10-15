@@ -2316,7 +2316,7 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 Where a player browse column closes with a pagination bar, the bar MUST be that column's footer: its outer box MUST meet the app rail, the window's bottom edge and the border of the pane beside it with no gutter, and the panes beside the browse column MUST be square pane sections divided from it by one rule, not floating cards (this governs the pane containers, not the rows or cards inside them).
 In the stacked layout (below the 960px container breakpoint) the bar MUST span the window and the next pane's top rule MUST sit directly beneath it.
 Where the browse column shows no bar, its own padding applies.
-A compact pager (`density="compact"`) is not a column footer and is not governed by this rule.
+A compact pager (`density="compact"`) is not a player browse column's footer and is not governed by this rule, except that a compact pager closing a pane section draws its rule across that section's full width and carries the section's inline inset itself.
 
 #### Scenario: A new GM browse surface is built
 
@@ -2342,6 +2342,12 @@ A compact pager (`density="compact"`) is not a column footer and is not governed
 - **THEN** the bar meets the app rail, the window's bottom edge and the adjacent pane's border with no gutter
 - **AND** the adjacent pane is a square pane section divided by one rule
 - **AND** in the stacked layout the bar spans the window
+
+#### Scenario: A compact pager closes a pane section
+
+- **WHEN** a compact pager closes a pane section that is not a player browse column
+- **THEN** its rule meets the section's edges
+- **AND** the next section's top rule sits directly beneath it
 
 ### Requirement: The application shell renders through the shell primitives
 

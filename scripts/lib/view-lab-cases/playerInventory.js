@@ -741,6 +741,11 @@ export const CASES = Object.freeze([
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
       ':has([data-inventory-bulk-queue="preview"] [data-inventory-bulk-queue-row])',
+    // Against the window's scrollport, which clips at the window edge rather than growing with its content.
+    expectContained: [
+      { container: '.fabricate-app-content', target: '.inventory-grid-pagination' },
+      { container: '.fabricate-app-content', target: '[data-inventory-bulk-footer]' },
+    ],
   }),
   playerCase({
     ...BULK_DEFAULTS,

@@ -62,6 +62,7 @@
       {pageSizeOptions}
       persistent
       density="compact"
+      edge
       ariaLabel={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
       navLabel={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
       onPageChange={(index) => onPageChange?.(index)}
