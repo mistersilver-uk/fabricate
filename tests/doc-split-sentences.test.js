@@ -60,24 +60,30 @@ const PRE_1936 = {
 };
 
 /**
- * Three pre-#1936 table rows deliberately superseded in issue #2494 by explicit Claude 5.5
- * model IDs. Unlike a generic structural-row exemption, each old row is paired with exactly
- * one current row; the regression check below verifies both sides.
+ * Table rows renamed by approved changes, with exactly one model identifier substitution each.
+ * Historical data stays frozen, so future model upgrades add explicit, count-pinned mappings
+ * rather than weakening the structural preservation test (#2494).
  */
-const SUPERSEDED_MODEL_ROWS = [
+const RENAMED_ROWS = [
   {
     before: '`small` | `haiku` | `gpt-5.6-luna` | `low`',
     after: '`small` | `claude-haiku-5-5` | `gpt-5.6-luna` | `low`',
+    identifiers: [['`claude-haiku-5-5`', '`haiku`']],
   },
   {
     before: '`medium` | `sonnet` | `gpt-5.6-terra` | `medium`',
     after: '`medium` | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`',
+    identifiers: [['`claude-sonnet-5-5`', '`sonnet`']],
   },
   {
     before: '`large` | `opus` | `gpt-5.6-sol` | `high`',
     after: '`large` | `claude-opus-5-5` | `gpt-5.6-sol` | `high`',
+    identifiers: [['`claude-opus-5-5`', '`opus`']],
   },
 ];
+
+/** Any added historical row exception must explicitly update this count. */
+const RENAMED_ROWS_COUNT = 3;
 
 /**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
@@ -1036,7 +1042,7 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
     );
     // A verified rename or superseded policy excuses its sentence here too; each is checked below.
     const excused = new Set(
-      [...RENAMED, ...SUPERSEDED_POLICY, ...SUPERSEDED_MODEL_ROWS].map(({ before: was }) => was)
+      [...RENAMED, ...SUPERSEDED_POLICY, ...RENAMED_ROWS].map(({ before: was }) => was)
     );
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
       ({ sentence }) => !excused.has(sentence)
@@ -1049,26 +1055,34 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
   }
 });
 
-test('each retired model-alias row is replaced by its exact pinned-model row', () => {
-  assert.equal(SUPERSEDED_MODEL_ROWS.length, 3, 'only the #2494 model alias transition is exempt');
+test('every renamed table row has exactly one verified model identifier replacement', () => {
+  assert.equal(
+    RENAMED_ROWS.length,
+    RENAMED_ROWS_COUNT,
+    'a historical table-row exception was added or removed without updating its pinned count'
+  );
 
   const frozen = multiset(
     structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8'))
   );
   const current = survivingLines(structuralLinesOf);
-  for (const { before, after } of SUPERSEDED_MODEL_ROWS) {
+  for (const { before, after, identifiers } of RENAMED_ROWS) {
     assert.equal(frozen.get(before), 1, `retired model row was not in the fixture: ${before}`);
     assert.equal(current.get(before) ?? 0, 0, `retired model row still survives: ${before}`);
     assert.equal(current.get(after), 1, `pinned replacement row is absent or duplicated: ${after}`);
 
-    // This transition may change the Claude model only, not the tier, Codex model, or effort.
-    const previous = before.split(' | ');
-    const replacement = after.split(' | ');
-    assert.equal(previous.length, 4);
-    assert.equal(replacement.length, 4);
-    assert.deepEqual(
-      [replacement[0], ...replacement.slice(2)],
-      [previous[0], ...previous.slice(2)]
+    assert.equal(identifiers.length, 1, `a row rename must change exactly one identifier: ${before}`);
+    const [[replacement, original]] = identifiers;
+    assert.ok(original && replacement && original !== replacement, 'a model identifier must change');
+    assert.equal(
+      after.split(replacement).length,
+      2,
+      `replacement identifier must occur exactly once: ${replacement}`
+    );
+    assert.equal(
+      after.replace(replacement, original),
+      before,
+      `only the named model identifier may change: ${before}`
     );
   }
 });
