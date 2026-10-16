@@ -334,7 +334,7 @@ Items that share such a source register as separate components, and adding one a
 The source does not resolve when its pack is missing (the module or system that provides it is disabled or uninstalled), its entry was deleted, or the lookup failed.
 The split is permanent once made.
 Restoring the entry does not rejoin the components.
-To remove an unwanted split, delete the extra component, restore the entry, and import the item again, or use replace-source onto the original component.
+To remove an unwanted split, delete the extra component, then either restore the entry and import the item again, or use replace-source to link the original component to the item.
 A component that already absorbed several such items stays merged, so delete it and import the items again.
 If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`, unless another component of the system, or a World Component other than the one the import adopts, already claims it.
 The first import still reports its `sourceFallbacks` entry when the alias is withheld.

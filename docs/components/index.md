@@ -309,7 +309,7 @@ Re-importing an item whose own UUID a component already claims never changes whi
 If the stored name, image, or linked item is out of date, Fabricate updates the component in place and remembers the previous link so items already in characters' inventories still match.
 
 If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
-Fabricate remembers the broken link only when no other component claims it.
+Fabricate remembers the broken link only when no other component claims it, and warns you either way.
 The exception is importing again an item that is already registered: Fabricate adds no fallback and shows no warning for it.
 
 {: .note }
@@ -327,10 +327,10 @@ The exception is importing again an item that is already registered: Fabricate a
 > A component that already absorbed several items before this was fixed stays merged.
 > Delete that component and import the items again, as described in [Every item I import updates the same component]({% link help/troubleshooting.md %}#every-item-i-import-updates-the-same-component).
 > Items that share a compendium entry which can no longer be found, because the pack is missing or disabled or the entry was deleted, are registered separately.
-> This holds for components, recipe items, and tools alike, and the first import still warns about the broken link.
+> This holds for components, recipe items, and tools alike, and the first import of each item still warns about the broken link.
 > The split is permanent once made, and restoring the entry later does not rejoin the items.
-> To remove an unwanted split, delete the extra definition, restore the entry, and import the item again.
-> For a component, you can instead use **Replace Source** on the original component.
+> To remove an unwanted split, delete the extra component, recipe item, or tool, then restore the entry and import the item again.
+> For a component, once the extra one is deleted, you can instead use **Replace Source** on the original component to link it to the item.
 > A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.

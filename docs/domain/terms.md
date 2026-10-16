@@ -1499,7 +1499,7 @@ Such a source matches only a definition claiming its own uuid, so Items sharing 
 A source does not resolve when its pack is missing (its module or system is disabled or uninstalled, or held back by a core compatibility gate), its entry was deleted, or the server lookup failed.
 A component records the alias only when no other component of its system, and no World Component other than the one it adopts, claims it, compared without a pack uuid's document-type segment.
 A first import that withholds the alias still reports its `sourceFallbacks` entry.
-The split is permanent once made: restoring the entry does not rejoin the Items, and the recovery is to delete the extra definition, restore the entry and import again (or replace-source onto the original component).
+The split is permanent once made: restoring the entry does not rejoin the Items, and the recovery is to delete the extra definition, then either restore the entry and import again or, for a component, replace-source the Item onto the original component.
 Replace-source keeps refusing an Item whose unresolvable source another component of its system claims.
 Neither the gate nor the unresolvable-source rule un-merges: a component that absorbed several derivatives, or several Items sharing an unresolvable entry, before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
 The derivative gate is a registration and source-replacement rule only, and the unresolvable-source rule is a registration rule only: the runtime matchers have neither, so an owned copy with no leaf whose only source reference is an unresolvable compendium source resolves to the first definition claiming it.
