@@ -543,7 +543,11 @@ Fabricate now tells a copy of an entry from something built from it by name: a c
 
 - A renamed copy of a compendium entry is registered as its own component and does not claim the entry.
   An item a player drags straight from the compendium does not match it, so hand out copies from the item you registered.
-- Components and recipe items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored; tools do not.
+- Items that share a compendium entry which can no longer be found, because the pack is missing or disabled or the entry was deleted, are registered separately as components, recipe items, and tools.
+  The first import still warns about the broken link.
+  The split is permanent once made, so restoring the entry later does not rejoin the items.
+  To remove an unwanted split, delete the extra definition, restore the entry, and import the item again.
+  For a component, you can instead use **Replace Source** on the original component.
 - Editing an item's name, image, or description refreshes only the component linked to that item.
 
 **See also:** [Adding Components]({% link components/index.md %}#adding-components) covers importing items.

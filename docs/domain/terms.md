@@ -1484,7 +1484,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipe-visibi
 Whether a source is a derivative is decided by a name comparison, trimmed, whitespace-collapsed and case-insensitive.
 The source's stored name (`_source.name`, else `name`) is compared against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
 The source's own `flags.babele.originalName` is never read, because an Item built from a translated entry inherits that entry's flags and would always match it.
-A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative, so components and recipe items sharing an unresolvable entry still merge until it is restored.
+A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative.
+The unresolvable-source rule then keeps Items sharing that entry apart, as set out below.
 The motivating case is the dnd5e spell scroll (issue 2217): dnd5e builds every scroll of one level from that level's template entry, so scrolls registered from freshly built Items shared one **Source UUID** and each overwrote the component the last one registered.
 The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference; the GM hands out copies of the registered Item instead.
 It is told apart from a clone by the absence of `_stats.duplicateSource`, and from a double import (two world copies of one entry that keep its name, which still de-duplicate to one definition) by its name.
@@ -1492,8 +1493,17 @@ Unlike a clone's stripped provenance, a derivative's `_stats.compendiumSource` s
 The gate decides only what a new definition claims.
 Find-existing prefers the definition claiming the source's own uuid, and re-registering such a source neither adds nor releases a compendium-source claim: a registered derivative renamed back to its entry's name stays on its own uuid, and one registered before the gate moves its `originItemUuid` to its own uuid on its next import and keeps the entry's uuid in `aliasItemUuids`.
 For a recipe item and a tool, a durable `roles[systemId]` leaf a derivative inherited from a stamped entry is an inherited marker, passed over and (on a world source) overwritten, when the definition it names claims none of the source's own uuids and does not carry its stored name; a component's find-existing reads no durable leaf.
-The gate never un-merges: a component that absorbed several derivatives before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
-It is a registration and source-replacement rule only: the runtime matchers have no derivative gate, and Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
+The same leaf test applies to a source whose compendium source does not resolve, so its leaf is honoured only when the named definition claims the source's own uuid or carries the source's stored name.
+The **unresolvable-source rule** is separate from the derivative gate: for every kind, find-existing does not match through a compendium source that does not resolve, because the registration records it only as an alias.
+Such a source matches only a definition claiming its own uuid, so Items sharing the entry register separately as components, recipe items and tools, and importing one again finds its definition by its own uuid.
+A source does not resolve when its pack is missing (its module or system is disabled or uninstalled, or held back by a core compatibility gate), its entry was deleted, or the server lookup failed.
+A component records the alias only when no other component of its system, and no World Component other than the one it adopts, claims it, compared without a pack uuid's document-type segment.
+A first import that withholds the alias still reports its `sourceFallbacks` entry.
+The split is permanent once made: restoring the entry does not rejoin the Items, and the recovery is to delete the extra definition, restore the entry and import again (or replace-source onto the original component).
+Replace-source keeps refusing an Item whose unresolvable source another component of its system claims.
+Neither the gate nor the unresolvable-source rule un-merges: a component that absorbed several derivatives, or several Items sharing an unresolvable entry, before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
+The derivative gate is a registration and source-replacement rule only, and the unresolvable-source rule is a registration rule only: the runtime matchers have neither, so an owned copy with no leaf whose only source reference is an unresolvable compendium source resolves to the first definition claiming it.
+Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
 
 Canonical mapping: `isDerivativeOf` / `resolveImportedComponentSourceData` in `src/systems/manager/itemSources.js`; `storedMatchName()` / `normalizeMatchName()` / `getOwnSourceUuids()` / `findRegisteredDefinition()` / `settleCompendiumClaim()` in `src/utils/sourceUuid.js`; `resolveSourceRepairOwner` in `src/systems/SourceIdentityService.js`
 
