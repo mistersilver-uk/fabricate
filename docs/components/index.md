@@ -298,11 +298,14 @@ You can add items one at a time or import an entire compendium pack at once.
 
 ### Single-item drop
 
-Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list.
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the Component Rules page.
 
 1. Open the Items sidebar or the compendium browser
-2. Drag the item onto the components list's drop zone
+2. Drag the item onto the drop zone at the top of the page, or anywhere on the components list below it
 3. The item appears in the list of components
+
+The list accepts a drop wherever you release it, including the empty "No components yet" area.
+The toolbar above the list and the page controls below it do not take drops.
 
 If the item is already registered in the system, whether by the item you dropped or by a copy of the same compendium entry that still carries the entry's name, the drop reuses the existing component instead of creating a duplicate.
 Re-importing an item whose own UUID a component already claims never changes which compendium entry that component claims.

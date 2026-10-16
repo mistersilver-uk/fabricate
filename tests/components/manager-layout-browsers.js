@@ -434,6 +434,26 @@ test('manager components browser defines drop target and compact responsive list
     css.includes('.fabricate-manager .manager-component-drop-zone.is-drop-active'),
     'component drop zone should expose an active drag state'
   );
+  // Issue 2397: the list is the second drop target, outlined so the face never resizes a track.
+  const listDropBlock = blockFor(
+    '.fabricate-manager[data-manager-view="components"] .manager-table-scroll.is-drop-active'
+  );
+  assert.ok(
+    listDropBlock.includes('outline: 2px dashed var(--fab-success-border);'),
+    'the components list draws its drop-active state as a success outline'
+  );
+  assert.ok(
+    listDropBlock.includes('outline-offset: -2px;'),
+    'the components list insets its drop outline so it stays inside the gutter'
+  );
+  assert.ok(
+    !/^\s*border[\w-]*:/m.test(listDropBlock),
+    'and declares no border that would resize the list'
+  );
+  assert.ok(
+    listDropBlock.includes('background: var(--fab-success-soft);'),
+    'the components list fills its drop-active state with the success tint'
+  );
   assert.ok(
     toolbarBlock.includes('display: grid;'),
     'manager toolbar should own a grid layout for primary controls and auxiliary rows'
