@@ -167,7 +167,7 @@
     white-space: nowrap;
   }
 
-  /* Muted falls under 4.5:1 on the raised ground (`log-list-time-contrast.test.js`). */
+  /* Hovered entries take secondary ink; each ink clears 4.5:1 on its ground (`log-list-time-contrast.test.js`). */
   .fab-log-list-entry.is-open:not(.is-selected):hover .fab-log-list-when {
     color: var(--fab-text-secondary);
   }
