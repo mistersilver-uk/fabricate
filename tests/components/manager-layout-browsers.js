@@ -443,6 +443,10 @@ test('manager components browser defines drop target and compact responsive list
     'the components list draws its drop-active state as a success outline'
   );
   assert.ok(
+    listDropBlock.includes('outline-offset: -2px;'),
+    'the components list insets its drop outline so it stays inside the gutter'
+  );
+  assert.ok(
     !/^\s*border[\w-]*:/m.test(listDropBlock),
     'and declares no border that would resize the list'
   );

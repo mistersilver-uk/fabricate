@@ -858,6 +858,15 @@ describe('ComponentsBrowserView list region drop target (issue 2397)', () => {
     assert.ok(!list.classList.contains('is-drop-active'), 'leaving the list clears it');
   });
 
+  it('takes no drop on the pager, so only the list and the head zone import', async () => {
+    const { root, drops } = await mountLogged({ itemCards: manyGeneral(30), dropEnabled: true });
+    const main = root.querySelector('.manager-main');
+    const pager = main.querySelector(':scope > .fabricate-pagination');
+    assert.ok(Boolean(pager), 'a paging list renders the pager');
+    fire(pager, 'drop', { data: PAYLOAD });
+    assert.equal(drops.length, 0, 'a drop on the pager imports nothing');
+  });
+
   it("keeps `.manager-main`'s children to the head, toolbar, list and, when paging, the pager", async () => {
     const TRACKS = [
       'manager-component-head',
